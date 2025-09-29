@@ -13,14 +13,14 @@ const LoginPage = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [churchName, setChurchName] = useState('') // Novo estado para o nome da igreja
+  const [churchName, setChurchName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isRegisterMode, setIsRegisterMode] = useState(false)
-  const { login, register, isLoading } = useAuthStore()
+  const { login, isLoading } = useAuthStore() // Apenas 'login' e 'isLoading' são necessários aqui
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Form submitted:', { email, isRegisterMode })
+    console.log('LoginPage: Form submitted:', { email, isRegisterMode })
     
     if (!email || !password) {
       toast.error('Por favor, preencha todos os campos')
@@ -38,22 +38,24 @@ const LoginPage = () => {
         return
       }
 
-      // Usar o Supabase para registro
+      console.log('LoginPage: Attempting Supabase signUp...');
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: name,
-            church_name: churchName, // Passar o nome da igreja como metadados
-            initial_role: 'membro' // Role inicial para novos registros
+            church_name: churchName,
+            initial_role: 'membro'
           }
         }
       })
       
       if (error) {
+        console.error('LoginPage: Supabase signUp error:', error.message);
         toast.error(error.message)
       } else if (data.user) {
+        console.log('LoginPage: Supabase signUp successful, user:', data.user.id);
         toast.success('Cadastro realizado com sucesso! Você já pode fazer login.')
         setIsRegisterMode(false)
         setName('')
@@ -61,21 +63,19 @@ const LoginPage = () => {
         setPassword('')
         setChurchName('')
       } else {
+        console.error('LoginPage: Unknown error during signUp.');
         toast.error('Erro desconhecido no registro.')
       }
 
     } else {
-      // Usar o Supabase para login
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        toast.error(error.message)
+      console.log('LoginPage: Attempting login via useAuthStore.login().');
+      const success = await login(email, password); // Chamar o método login do store
+      if (!success) {
+        // O erro já deve ter sido exibido pelo método login do store
+        console.error('LoginPage: Login failed via useAuthStore.login().');
       } else {
-        // Se o login for bem-sucedido via Supabase, o useAuthStore.checkAuth() cuidará do resto
-        toast.success('Login realizado com sucesso!')
+        console.log('LoginPage: Login successful via useAuthStore.login().');
+        // O redirecionamento será tratado pelo App.tsx reagindo ao estado do store
       }
     }
   }
