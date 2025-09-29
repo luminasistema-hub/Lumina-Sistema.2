@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { supabase } from '../integrations/supabase/client' // Importar o cliente Supabase
 
 export type UserRole = 'membro' | 'lider_ministerio' | 'pastor' | 'admin' | 'financeiro' | 'voluntario' | 'midia_tecnologia' | 'integra' | 'super_admin'
 
@@ -24,157 +25,139 @@ interface AuthState {
   isLoading: boolean
   currentChurchId: string | null // ID da igreja atualmente selecionada
   login: (email: string, password: string) => Promise<boolean>
-  register: (name: string, email: string, password: string, churchName: string) => Promise<{ success: boolean; message: string }>
+  register: (name: string, email: string, password: string, churchName: string) => Promise<{ success: boolean; message: string }> // Este método não será mais usado diretamente para registro via Supabase
   logout: () => void
   checkAuth: () => void
   setCurrentChurchId: (churchId: string | null) => void // Novo método para definir a igreja ativa
-}
-
-// Sistema de usuários em produção
-const getUsersFromStorage = (): Record<string, { password: string; user: User }> => {
-  const stored = localStorage.getItem('connect-vida-users')
-  if (stored) {
-    return JSON.parse(stored)
-  }
-  
-  // Usuário master inicial (super_admin)
-  const initialUsers = {
-    'diogoalbuquerque38@gmail.com': {
-      password: '123456789',
-      user: {
-        id: 'superadmin-001',
-        name: 'Diogo Albuquerque',
-        email: 'diogoalbuquerque38@gmail.com',
-        role: 'super_admin' as UserRole, // Novo papel
-        churchId: null, // Super admin não está ligado a uma igreja específica inicialmente
-        status: 'ativo' as const,
-        created_at: new Date().toISOString()
-      }
-    }
-  }
-  
-  localStorage.setItem('connect-vida-users', JSON.stringify(initialUsers))
-  return initialUsers
-}
-
-const saveUsersToStorage = (users: Record<string, { password: string; user: User }>) => {
-  localStorage.setItem('connect-vida-users', JSON.stringify(users))
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
-      isLoading: false,
+      isLoading: true, // Iniciar como true para indicar que a autenticação está sendo verificada
       currentChurchId: null, // Inicialmente sem igreja selecionada
 
       login: async (email: string, password: string) => {
-        console.log('Production login attempt for:', email)
         set({ isLoading: true })
-        
         try {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          
-          const users = getUsersFromStorage()
-          const userData = users[email]
-          
-          if (userData && userData.password === password) {
-            if (userData.user.status === 'pendente') {
-              console.log('Login blocked: User pending approval')
-              set({ isLoading: false })
-              return false
+          // O login agora é tratado diretamente no LoginPage via supabase.auth.signInWithPassword
+          // Este método aqui será apenas um placeholder ou pode ser removido se não houver lógica adicional
+          // para o Zustand após o login do Supabase.
+          // Para manter a compatibilidade com o LoginPage atual, vamos simular o sucesso.
+          const { data: { user: supabaseUser }, error } = await supabase.auth.getUser();
+          if (supabaseUser && !error) {
+            // Fetch user profile from 'perfis' table
+            const { data: profile, error: profileError } = await supabase
+              .from('perfis')
+              .select('*, igrejas(id, nome)')
+              .eq('id', supabaseUser.id)
+              .single();
+
+            if (profileError) {
+              console.error('Error fetching user profile:', profileError);
+              set({ user: null, isLoading: false, currentChurchId: null });
+              return false;
             }
-            
-            if (userData.user.status === 'inativo') {
-              console.log('Login blocked: User inactive')
-              set({ isLoading: false })
-              return false
-            }
-            
-            console.log('Login successful for user:', userData.user.name)
-            set({ user: userData.user, isLoading: false, currentChurchId: userData.user.churchId })
-            return true
-          } else {
-            console.log('Login failed: Invalid credentials')
-            set({ isLoading: false })
-            return false
+
+            const userRole = profile.funcao as UserRole;
+            const churchId = profile.id_igreja;
+            const churchName = profile.igrejas ? profile.igrejas.nome : undefined;
+
+            const authenticatedUser: User = {
+              id: supabaseUser.id,
+              name: profile.full_name || supabaseUser.email || 'Usuário',
+              email: supabaseUser.email!,
+              role: userRole,
+              churchId: churchId,
+              churchName: churchName,
+              status: 'ativo', // Assumimos ativo se o perfil foi encontrado
+              created_at: supabaseUser.created_at,
+            };
+            set({ user: authenticatedUser, isLoading: false, currentChurchId: churchId });
+            return true;
           }
+          set({ isLoading: false });
+          return false;
         } catch (error) {
-          console.error('Login error:', error)
-          set({ isLoading: false })
-          return false
+          console.error('Login error:', error);
+          set({ isLoading: false });
+          return false;
         }
       },
 
       register: async (name: string, email: string, password: string, churchName: string) => {
-        console.log('Registration attempt for:', email, 'for church:', churchName)
-        
-        try {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          
-          const users = getUsersFromStorage()
-          
-          if (users[email]) {
-            return { success: false, message: 'Este email já está cadastrado no sistema' }
-          }
+        // O registro agora é tratado diretamente no LoginPage via supabase.auth.signUp
+        // Este método aqui não será mais usado diretamente.
+        return { success: false, message: 'O registro é tratado diretamente pelo Supabase.' };
+      },
 
-          // Simular criação de igreja e associação
-          // Em um sistema real, isso envolveria a criação de uma nova igreja no banco de dados
-          // e a obtenção de um churchId real. Por enquanto, vamos gerar um ID simples.
-          const newChurchId = `church-${Date.now()}`
-          
-          const newUser: User = {
-            id: `user-${Date.now()}`,
-            name,
-            email,
-            role: 'membro',
-            churchId: newChurchId, // Associar ao novo ID da igreja
-            churchName: churchName,
-            status: 'pendente',
-            created_at: new Date().toISOString()
-          }
-          
-          users[email] = {
-            password,
-            user: newUser
-          }
-          
-          saveUsersToStorage(users)
-          
-          console.log('User registered successfully:', newUser.name, 'for church:', churchName)
-          return { 
-            success: true, 
-            message: `Cadastro realizado com sucesso para a igreja ${churchName}! Aguarde a aprovação do administrador para acessar o sistema.` 
-          }
-        } catch (error) {
-          console.error('Registration error:', error)
-          return { success: false, message: 'Erro interno do sistema. Tente novamente.' }
+      logout: async () => {
+        set({ isLoading: true });
+        const { error } = await supabase.auth.signOut();
+        if (!error) {
+          set({ user: null, currentChurchId: null, isLoading: false });
+          console.log('User logged out successfully');
+        } else {
+          console.error('Error during logout:', error);
+          set({ isLoading: false });
         }
       },
 
-      logout: () => {
-        console.log('User logged out')
-        set({ user: null, currentChurchId: null })
-      },
+      checkAuth: async () => {
+        set({ isLoading: true });
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
 
-      checkAuth: () => {
-        console.log('Checking authentication state...')
-        const currentUser = get().user
-        if (currentUser) {
-          console.log('User is authenticated:', currentUser.name)
-          set({ currentChurchId: currentUser.churchId })
-        } else {
-          console.log('No authenticated user found')
+          if (session && session.user) {
+            // Fetch user profile from 'perfis' table
+            const { data: profile, error: profileError } = await supabase
+              .from('perfis')
+              .select('*, igrejas(id, nome)')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profileError) {
+              console.error('Error fetching user profile:', profileError);
+              set({ user: null, isLoading: false, currentChurchId: null });
+              return;
+            }
+
+            const userRole = profile.funcao as UserRole;
+            const churchId = profile.id_igreja;
+            const churchName = profile.igrejas ? profile.igrejas.nome : undefined;
+
+            const authenticatedUser: User = {
+              id: session.user.id,
+              name: profile.full_name || session.user.user_metadata.full_name || session.user.email || 'Usuário',
+              email: session.user.email!,
+              role: userRole,
+              churchId: churchId,
+              churchName: churchName,
+              status: 'ativo', // Assumimos ativo se o perfil foi encontrado
+              created_at: session.user.created_at,
+            };
+            set({ user: authenticatedUser, isLoading: false, currentChurchId: churchId });
+            console.log('User is authenticated:', authenticatedUser.name);
+          } else {
+            set({ user: null, isLoading: false, currentChurchId: null });
+            console.log('No authenticated user found');
+          }
+        } catch (error) {
+          console.error('Auth check error:', error);
+          set({ user: null, isLoading: false, currentChurchId: null });
         }
       },
 
       setCurrentChurchId: (churchId: string | null) => {
-        set({ currentChurchId: churchId })
-        console.log('Current church ID set to:', churchId)
+        set({ currentChurchId: churchId });
+        console.log('Current church ID set to:', churchId);
       }
     }),
     {
       name: 'connect-vida-auth',
+      // Apenas persistir o currentChurchId, o user será carregado via checkAuth do Supabase
+      partialize: (state) => ({ currentChurchId: state.currentChurchId }),
     }
   )
 )

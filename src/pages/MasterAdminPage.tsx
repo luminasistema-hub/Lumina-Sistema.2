@@ -200,13 +200,13 @@ const MasterAdminPage = () => {
             </Dialog>
           </CardHeader>
           <CardContent>
-            {churches.length === 0 ? (
+            {Array.isArray(churches) && churches.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 Nenhuma igreja cadastrada ainda.
               </div>
             ) : (
               <div className="space-y-4">
-                {churches.map((church) => (
+                {Array.isArray(churches) && churches.map((church) => (
                   <Card key={church.id} className="border-0 shadow-sm">
                     <CardContent className="p-4 flex items-center justify-between">
                       <div className="flex-1">

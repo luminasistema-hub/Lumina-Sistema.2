@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label'
 import { Badge } from '../components/ui/badge'
 import { toast } from 'sonner'
 import { Church, Lock, Mail, Eye, EyeOff, User, ArrowLeft, Building } from 'lucide-react'
+import { supabase } from '../integrations/supabase/client' // Importar o cliente Supabase
 
 const LoginPage = () => {
   const [email, setEmail] = useState('')
@@ -37,25 +38,44 @@ const LoginPage = () => {
         return
       }
 
-      const result = await register(name, email, password, churchName)
+      // Usar o Supabase para registro
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+            church_name: churchName, // Passar o nome da igreja como metadados
+            initial_role: 'membro' // Role inicial para novos registros
+          }
+        }
+      })
       
-      if (result.success) {
-        toast.success(result.message)
+      if (error) {
+        toast.error(error.message)
+      } else if (data.user) {
+        toast.success('Cadastro realizado com sucesso! Verifique seu email para confirmar a conta.')
         setIsRegisterMode(false)
         setName('')
         setEmail('')
         setPassword('')
         setChurchName('')
       } else {
-        toast.error(result.message)
+        toast.error('Erro desconhecido no registro.')
       }
+
     } else {
-      const success = await login(email, password)
-      
-      if (success) {
-        toast.success('Login realizado com sucesso!')
+      // Usar o Supabase para login
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        toast.error(error.message)
       } else {
-        toast.error('Email ou senha incorretos, ou usuário aguardando aprovação')
+        // Se o login for bem-sucedido via Supabase, o useAuthStore.checkAuth() cuidará do resto
+        toast.success('Login realizado com sucesso!')
       }
     }
   }
