@@ -33,8 +33,8 @@ import {
   Upload,
   MoreHorizontal,
   User as UserIcon,
-  Link as LinkIcon, // Importar Link do lucide-react
-  Copy // Importar Copy do lucide-react
+  Link as LinkIcon,
+  Copy
 } from 'lucide-react'
 
 interface Member extends AuthUser {
@@ -66,14 +66,14 @@ interface Member extends AuthUser {
 
 const MemberManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
-  const { updateChurch, getChurchById } = useChurchStore()
+  const { updateChurch, getChurchById, loadChurches, churches } = useChurchStore()
   const [members, setMembers] = useState<Member[]>([])
   const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false)
   const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
-  const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false) // Novo estado para o diálogo do link
-  const [generatedLink, setGeneratedLink] = useState('') // Estado para o link gerado
+  const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false)
+  const [generatedLink, setGeneratedLink] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -93,14 +93,22 @@ const MemberManagementPage = () => {
     observacoes: ''
   })
 
+  // Effect para garantir que as igrejas sejam carregadas quando o componente é montado
   useEffect(() => {
+    console.log('MemberManagementPage: Initializing loadChurches on mount.');
+    loadChurches();
+  }, [loadChurches]);
+
+  // Effect para reagir a mudanças em currentChurchId ou na lista de igrejas carregadas
+  useEffect(() => {
+    console.log('MemberManagementPage: Reacting to currentChurchId or churches change. currentChurchId:', currentChurchId, 'churches count:', churches.length);
     if (currentChurchId) {
       loadMembers(currentChurchId)
     } else {
       setMembers([])
       setFilteredMembers([])
     }
-  }, [currentChurchId])
+  }, [currentChurchId, churches]); // Depende de 'churches' para garantir que esteja atualizado
 
   useEffect(() => {
     let filtered = members
@@ -223,13 +231,23 @@ const MemberManagementPage = () => {
       toast.error('Selecione uma igreja para gerar o link de cadastro.')
       return
     }
+    
+    // Adiciona uma verificação para garantir que 'churches' não esteja vazio
+    if (churches.length === 0) {
+      toast.error('Os dados das igrejas ainda não foram carregados. Por favor, aguarde um momento e tente novamente.')
+      return;
+    }
+
+    console.log('MemberManagementPage: Attempting to get church for ID:', currentChurchId);
+    console.log('MemberManagementPage: Current churches in store (before getChurchById):', churches);
     const church = getChurchById(currentChurchId)
+    console.log('MemberManagementPage: Church found by ID:', church);
     if (!church) {
-      toast.error('Não foi possível encontrar os dados da igreja.')
+      toast.error('Não foi possível encontrar os dados da igreja. O ID da igreja pode estar inválido ou os dados não foram sincronizados. Tente recarregar a página ou selecionar a igreja novamente.')
       return
     }
 
-    const baseUrl = window.location.origin // Obtém a URL base do seu aplicativo
+    const baseUrl = window.location.origin
     const link = `${baseUrl}/login?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`
     setGeneratedLink(link)
     setIsGenerateLinkDialogOpen(true)
