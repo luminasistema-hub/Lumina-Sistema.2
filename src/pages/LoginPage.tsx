@@ -54,7 +54,7 @@ const LoginPage = () => {
       if (error) {
         toast.error(error.message)
       } else if (data.user) {
-        toast.success('Cadastro realizado com sucesso! Verifique seu email para confirmar a conta.')
+        toast.success('Cadastro realizado com sucesso! Você já pode fazer login.')
         setIsRegisterMode(false)
         setName('')
         setEmail('')
@@ -174,15 +174,6 @@ const LoginPage = () => {
                   </button>
                 </div>
               </div>
-
-              {isRegisterMode && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>Importante:</strong> Após o cadastro, sua conta e a igreja ficarão pendentes de aprovação pelo administrador. 
-                    Você receberá uma confirmação quando sua conta for ativada.
-                  </p>
-                </div>
-              )}
               
               <Button 
                 type="submit" 
@@ -231,7 +222,7 @@ const LoginPage = () => {
             Sistema Connect Vida - Produção
           </p>
           <p className="text-xs">
-            Todos os novos usuários iniciam como "Membro" e precisam de aprovação do administrador
+            Todos os novos usuários iniciam como "Membro".
           </p>
         </div>
       </div>
