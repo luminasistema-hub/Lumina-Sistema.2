@@ -23,7 +23,7 @@ const MasterAdminPage = () => {
     name: '',
     subscriptionPlan: '0-100 membros' as SubscriptionPlan,
     status: 'active' as Church['status'],
-    adminUserId: user?.id || '',
+    adminUserId: user?.id || null, // Pode ser null se o super_admin não for o admin direto
   })
 
   const [editChurchData, setEditChurchData] = useState<Partial<Church>>({})
@@ -46,7 +46,7 @@ const MasterAdminPage = () => {
     )
   }
 
-  const handleAddChurch = () => {
+  const handleAddChurch = async () => {
     if (!newChurch.name || !newChurch.subscriptionPlan) {
       toast.error('Nome da igreja e plano de assinatura são obrigatórios.')
       return
@@ -58,29 +58,31 @@ const MasterAdminPage = () => {
       return
     }
 
-    const church: Church = {
-      id: `church-${Date.now()}`,
+    const churchToAdd = {
       name: newChurch.name,
       subscriptionPlan: newChurch.subscriptionPlan,
       memberLimit: selectedPlan.memberLimit,
-      currentMembers: 0,
       status: newChurch.status,
-      created_at: new Date().toISOString(),
-      adminUserId: user?.id || 'superadmin-001',
+      adminUserId: newChurch.adminUserId,
     }
 
-    addChurch(church)
-    setIsAddChurchDialogOpen(false)
-    setNewChurch({
-      name: '',
-      subscriptionPlan: '0-100 membros',
-      status: 'active',
-      adminUserId: user?.id || '',
-    })
-    toast.success(`Igreja ${church.name} adicionada com sucesso!`)
+    const added = await addChurch(churchToAdd)
+
+    if (added) {
+      setIsAddChurchDialogOpen(false)
+      setNewChurch({
+        name: '',
+        subscriptionPlan: '0-100 membros',
+        status: 'active',
+        adminUserId: user?.id || null,
+      })
+      toast.success(`Igreja ${added.name} adicionada com sucesso!`)
+    } else {
+      toast.error('Falha ao adicionar a igreja.')
+    }
   }
 
-  const handleUpdateChurch = () => {
+  const handleUpdateChurch = async () => {
     if (!selectedChurch || !editChurchData.subscriptionPlan) {
       toast.error('Selecione uma igreja e um plano de assinatura válido.')
       return
@@ -92,14 +94,22 @@ const MasterAdminPage = () => {
       return
     }
 
-    updateChurch(selectedChurch.id, {
-      ...editChurchData,
+    const updated = await updateChurch(selectedChurch.id, {
+      name: editChurchData.name,
+      subscriptionPlan: editChurchData.subscriptionPlan,
       memberLimit: selectedPlan.memberLimit,
+      status: editChurchData.status,
+      adminUserId: editChurchData.adminUserId,
     })
-    setIsEditDialogOpen(false)
-    setSelectedChurch(null)
-    setEditChurchData({})
-    toast.success(`Igreja ${selectedChurch.name} atualizada com sucesso!`)
+
+    if (updated) {
+      setIsEditDialogOpen(false)
+      setSelectedChurch(null)
+      setEditChurchData({})
+      toast.success(`Igreja ${updated.name} atualizada com sucesso!`)
+    } else {
+      toast.error('Falha ao atualizar a igreja.')
+    }
   }
 
   const getStatusBadge = (status: Church['status']) => {

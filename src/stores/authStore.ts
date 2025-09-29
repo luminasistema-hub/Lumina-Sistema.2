@@ -97,7 +97,7 @@ export const useAuthStore = create<AuthState>()(
             console.log('AuthStore: Session found, fetching user profile for ID:', session.user.id);
             const { data: profile, error: profileError } = await supabase
               .from('perfis')
-              .select('*, igrejas(id, nome)')
+              .select('*, igrejas(id, nome)') // Join with 'igrejas' to get church name
               .eq('id', session.user.id)
               .single();
             

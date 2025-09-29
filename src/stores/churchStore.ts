@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { supabase } from '../integrations/supabase/client' // Importar o cliente Supabase
 
 export type SubscriptionPlan = '0-100 membros' | '101-300 membros' | '301-500 membros' | 'ilimitado'
 
@@ -14,40 +15,17 @@ export interface Church {
   currentMembers: number
   status: 'active' | 'inactive' | 'pending' | 'trial'
   created_at: string
-  adminUserId: string // ID do usuário admin que criou/gerencia a igreja
+  adminUserId: string | null // ID do usuário admin que criou/gerencia a igreja
+  updated_at?: string // Adicionado para corresponder à tabela do Supabase
 }
 
 interface ChurchState {
   churches: Church[]
-  addChurch: (church: Church) => void
-  updateChurch: (churchId: string, updates: Partial<Church>) => void
+  addChurch: (church: Omit<Church, 'id' | 'created_at' | 'updated_at' | 'currentMembers'>) => Promise<Church | null>
+  updateChurch: (churchId: string, updates: Partial<Church>) => Promise<Church | null>
   getChurchById: (churchId: string) => Church | undefined
-  loadChurches: () => void
+  loadChurches: () => Promise<void>
   getSubscriptionPlans: () => { label: string; value: SubscriptionPlan; memberLimit: number }[]
-}
-
-const getChurchesFromStorage = (): Church[] => {
-  const stored = localStorage.getItem('connect-vida-churches')
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored)
-      // Ensure parsed data is an array, otherwise return empty array
-      if (Array.isArray(parsed)) {
-        return parsed
-      } else {
-        console.warn("churchStore: Persisted 'churches' data is not an array, returning empty array.");
-        return []
-      }
-    } catch (e) {
-      console.error("churchStore: Error parsing persisted 'churches' data, returning empty array:", e);
-      return []
-    }
-  }
-  return []
-}
-
-const saveChurchesToStorage = (churches: Church[]) => {
-  localStorage.setItem('connect-vida-churches', JSON.stringify(churches))
 }
 
 export const useChurchStore = create<ChurchState>()(
@@ -55,45 +33,125 @@ export const useChurchStore = create<ChurchState>()(
     (set, get) => ({
       churches: [],
 
-      loadChurches: () => {
-        const loadedChurches = getChurchesFromStorage()
-        console.log('churchStore: Loaded churches from storage:', loadedChurches); // Added log
-        set({ churches: loadedChurches })
+      loadChurches: async () => {
+        console.log('churchStore: Loading churches from Supabase...');
+        const { data, error } = await supabase
+          .from('igrejas')
+          .select('*');
+
+        if (error) {
+          console.error('churchStore: Error loading churches from Supabase:', error);
+          return;
+        }
+        console.log('churchStore: Churches loaded from Supabase:', data);
+        set({ churches: data as Church[] });
       },
 
-      addChurch: (church: Church) => {
-        set((state) => {
-          const newChurches = [...state.churches, church]
-          saveChurchesToStorage(newChurches)
-          return { churches: newChurches }
-        })
+      addChurch: async (newChurchData) => {
+        console.log('churchStore: Adding new church to Supabase:', newChurchData);
+        const selectedPlan = get().getSubscriptionPlans().find(p => p.value === newChurchData.subscriptionPlan);
+        const memberLimit = selectedPlan ? selectedPlan.memberLimit : 100; // Default if plan not found
+
+        const { data, error } = await supabase
+          .from('igrejas')
+          .insert({
+            nome: newChurchData.name,
+            plano_id: newChurchData.subscriptionPlan,
+            limite_membros: memberLimit,
+            membros_atuais: 0,
+            status: newChurchData.status,
+            admin_user_id: newChurchData.adminUserId,
+            address: newChurchData.address, // Adicionado
+            contactEmail: newChurchData.contactEmail, // Adicionado
+            contactPhone: newChurchData.contactPhone, // Adicionado
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('churchStore: Error adding church to Supabase:', error);
+          return null;
+        }
+
+        const addedChurch: Church = {
+          id: data.id,
+          name: data.nome,
+          subscriptionPlan: data.plano_id,
+          memberLimit: data.limite_membros,
+          currentMembers: data.membros_atuais,
+          status: data.status,
+          created_at: data.created_at,
+          adminUserId: data.admin_user_id,
+          address: data.address,
+          contactEmail: data.contactEmail,
+          contactPhone: data.contactPhone,
+          updated_at: data.updated_at,
+        };
+
+        set((state) => ({
+          churches: [...state.churches, addedChurch],
+        }));
+        return addedChurch;
       },
 
-      updateChurch: (churchId: string, updates: Partial<Church>) => {
-        set((state) => {
-          const updatedChurches = state.churches.map((c) =>
-            c.id === churchId ? { ...c, ...updates } : c
-          )
-          saveChurchesToStorage(updatedChurches)
-          return { churches: updatedChurches }
-        })
+      updateChurch: async (churchId, updates) => {
+        console.log('churchStore: Updating church in Supabase:', churchId, updates);
+        const updatePayload: any = { ...updates };
+
+        // Handle subscriptionPlan and memberLimit update
+        if (updates.subscriptionPlan) {
+          const selectedPlan = get().getSubscriptionPlans().find(p => p.value === updates.subscriptionPlan);
+          if (selectedPlan) {
+            updatePayload.plano_id = updates.subscriptionPlan;
+            updatePayload.limite_membros = selectedPlan.memberLimit;
+          }
+        }
+        if (updates.name) updatePayload.nome = updates.name;
+        if (updates.currentMembers !== undefined) updatePayload.membros_atuais = updates.currentMembers;
+        if (updates.status) updatePayload.status = updates.status;
+        if (updates.adminUserId) updatePayload.admin_user_id = updates.adminUserId;
+        if (updates.address) updatePayload.address = updates.address;
+        if (updates.contactEmail) updatePayload.contactEmail = updates.contactEmail;
+        if (updates.contactPhone) updatePayload.contactPhone = updates.contactPhone;
+
+
+        const { data, error } = await supabase
+          .from('igrejas')
+          .update(updatePayload)
+          .eq('id', churchId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('churchStore: Error updating church in Supabase:', error);
+          return null;
+        }
+
+        const updatedChurch: Church = {
+          id: data.id,
+          name: data.nome,
+          subscriptionPlan: data.plano_id,
+          memberLimit: data.limite_membros,
+          currentMembers: data.membros_atuais,
+          status: data.status,
+          created_at: data.created_at,
+          adminUserId: data.admin_user_id,
+          address: data.address,
+          contactEmail: data.contactEmail,
+          contactPhone: data.contactPhone,
+          updated_at: data.updated_at,
+        };
+
+        set((state) => ({
+          churches: state.churches.map((c) =>
+            c.id === churchId ? updatedChurch : c
+          ),
+        }));
+        return updatedChurch;
       },
 
       getChurchById: (churchId: string) => {
-        const state = get();
-        // Defensive check: ensure churches is an array before calling find
-        if (!Array.isArray(state.churches)) {
-          console.error("churchStore: 'churches' is not an array in state, attempting to re-initialize.");
-          // This might indicate a deeper issue, but for now, prevent crash
-          // and try to load from storage again or reset.
-          get().loadChurches(); // Try to reload from storage
-          const reloadedState = get();
-          if (Array.isArray(reloadedState.churches)) {
-            return reloadedState.churches.find((c) => c.id === churchId);
-          }
-          return undefined;
-        }
-        return state.churches.find((c) => c.id === churchId);
+        return get().churches.find((c) => c.id === churchId);
       },
 
       getSubscriptionPlans: () => [
@@ -105,6 +163,15 @@ export const useChurchStore = create<ChurchState>()(
     }),
     {
       name: 'connect-vida-churches',
+      // Não persistir 'churches' no localStorage, pois agora vem do Supabase
+      // Apenas persistir o estado para re-hidratar se necessário, mas 'churches' será carregado do Supabase
+      partialize: (state) => ({}), // Não persistir 'churches'
+      onRehydrateStorage: () => (state) => {
+        // Ao re-hidratar, garantir que loadChurches seja chamado
+        if (state) {
+          get().loadChurches();
+        }
+      },
     }
   )
 )
