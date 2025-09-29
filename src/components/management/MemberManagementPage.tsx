@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuthStore, User } from '../../stores/authStore' // Importar User do authStore
+import { useAuthStore, User as AuthUser } from '../../stores/authStore' // Importar User do authStore como AuthUser
 import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -31,10 +31,11 @@ import {
   Heart,
   Download,
   Upload,
-  MoreHorizontal
+  MoreHorizontal,
+  User // Importar User do lucide-react
 } from 'lucide-react'
 
-interface Member extends User { // Estender a interface User
+interface Member extends AuthUser { // Estender a interface AuthUser
   telefone?: string
   endereco?: string
   data_nascimento?: string
@@ -44,7 +45,7 @@ interface Member extends User { // Estender a interface User
     nome: string
   }
   data_cadastro: string
-  status: 'Ativo' | 'Inativo' | 'Visitante' | 'Transferido' // Manter status para compatibilidade
+  status: 'ativo' | 'pendente' | 'inativo' // Alinhar status com AuthUser
   informacoes_pessoais?: {
     estado_civil?: string
     profissao?: string
@@ -79,13 +80,13 @@ const MemberManagementPage = () => {
   const canEditRoles = user?.role === 'admin' || user?.role === 'pastor'
 
   const [newMember, setNewMember] = useState({
-    nome: '',
+    name: '', // Usar 'name' em vez de 'nome'
     email: '',
     telefone: '',
     endereco: '',
     data_nascimento: '',
     papel: 'Comum' as Member['papel'],
-    status: 'Ativo' as Member['status'],
+    status: 'ativo' as Member['status'], // Alinhar status com AuthUser
     observacoes: ''
   })
 
@@ -104,7 +105,7 @@ const MemberManagementPage = () => {
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(member => 
-        member.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.name.toLowerCase().includes(searchTerm.toLowerCase()) || // Usar 'name'
         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (member.telefone && member.telefone.includes(searchTerm))
       )
@@ -161,7 +162,7 @@ const MemberManagementPage = () => {
   }
 
   const handleAddMember = () => {
-    if (!newMember.nome || !newMember.email) {
+    if (!newMember.name || !newMember.email) { // Usar 'name'
       toast.error('Nome e email são obrigatórios')
       return
     }
@@ -178,7 +179,7 @@ const MemberManagementPage = () => {
 
     const member: Member = {
       id: `member-${Date.now()}`,
-      name: newMember.nome,
+      name: newMember.name, // Usar 'name'
       email: newMember.email,
       telefone: newMember.telefone,
       endereco: newMember.endereco,
@@ -207,13 +208,13 @@ const MemberManagementPage = () => {
     setMembers([...members, member])
     setIsAddMemberDialogOpen(false)
     setNewMember({
-      nome: '',
+      name: '', // Usar 'name'
       email: '',
       telefone: '',
       endereco: '',
       data_nascimento: '',
       papel: 'Comum',
-      status: 'Ativo',
+      status: 'ativo',
       observacoes: ''
     })
     toast.success('Membro cadastrado com sucesso! Aguardando aprovação.')
@@ -224,7 +225,7 @@ const MemberManagementPage = () => {
       case 'Master': return <Shield className="w-4 h-4" />
       case 'Pastor': return <Crown className="w-4 h-4" />
       case 'Líder de Ministério': return <UserCheck className="w-4 h-4" />
-      case 'Comum': return <User className="w-4 h-4" />
+      case 'Comum': return <User className="w-4 h-4" /> // Usar o ícone User do lucide-react
     }
   }
 
@@ -239,10 +240,11 @@ const MemberManagementPage = () => {
 
   const getStatusColor = (status: Member['status']) => {
     switch (status) {
-      case 'Ativo': return 'bg-green-100 text-green-800'
-      case 'Inativo': return 'bg-gray-100 text-gray-800'
-      case 'Visitante': return 'bg-yellow-100 text-yellow-800'
-      case 'Transferido': return 'bg-blue-100 text-blue-800'
+      case 'ativo': return 'bg-green-100 text-green-800'
+      case 'inativo': return 'bg-gray-100 text-gray-800'
+      case 'pendente': return 'bg-yellow-100 text-yellow-800'
+      // 'Visitante' e 'Transferido' não são mais status diretos, mas podem ser tratados como papéis ou tags
+      default: return 'bg-gray-100 text-gray-800'
     }
   }
 
@@ -259,7 +261,7 @@ const MemberManagementPage = () => {
 
   const statsData = {
     total: members.length,
-    active: members.filter(m => m.status === 'Ativo').length,
+    active: members.filter(m => m.status === 'ativo').length,
     leaders: members.filter(m => m.papel === 'Líder de Ministério' || m.papel === 'Pastor').length,
     baptized: members.filter(m => m.informacoes_espirituais?.batizado).length
   }
@@ -355,10 +357,9 @@ const MemberManagementPage = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="Ativo">Ativo</SelectItem>
-                <SelectItem value="Inativo">Inativo</SelectItem>
-                <SelectItem value="Visitante">Visitante</SelectItem>
-                <SelectItem value="Transferido">Transferido</SelectItem>
+                <SelectItem value="ativo">Ativo</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="inativo">Inativo</SelectItem>
               </SelectContent>
             </Select>
 
@@ -397,11 +398,11 @@ const MemberManagementPage = () => {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="nome">Nome Completo *</Label>
+                      <Label htmlFor="name">Nome Completo *</Label>
                       <Input
-                        id="nome"
-                        value={newMember.nome}
-                        onChange={(e) => setNewMember({...newMember, nome: e.target.value})}
+                        id="name"
+                        value={newMember.name}
+                        onChange={(e) => setNewMember({...newMember, name: e.target.value})}
                         placeholder="Nome completo"
                       />
                     </div>
@@ -474,9 +475,9 @@ const MemberManagementPage = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Ativo">Ativo</SelectItem>
-                          <SelectItem value="Visitante">Visitante</SelectItem>
-                          <SelectItem value="Inativo">Inativo</SelectItem>
+                          <SelectItem value="ativo">Ativo</SelectItem>
+                          <SelectItem value="pendente">Pendente</SelectItem>
+                          <SelectItem value="inativo">Inativo</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -528,7 +529,7 @@ const MemberManagementPage = () => {
                         <span className="ml-1">{member.papel}</span>
                       </Badge>
                       <Badge className={getStatusColor(member.status)}>
-                        {member.status}
+                        {member.status.charAt(0).toUpperCase() + member.status.slice(1)}
                       </Badge>
                       {member.informacoes_espirituais?.batizado && (
                         <Badge className="bg-blue-100 text-blue-800">

@@ -8,7 +8,7 @@ import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Checkbox } from '../ui/checkbox'
 import { Badge } from '../ui/badge'
-import { toast } from 'sonner'
+import { toast } from 'sonner' // Importar toast
 import { 
   User, 
   MapPin, 
@@ -59,7 +59,7 @@ interface PersonalInfoData {
   
   // Disponibilidade
   diasDisponiveis: string[]
-  horariosDisponiveis: string
+  horariosDisponiveis: string // Corrigido para string
   interesseMinisterio: string[]
 }
 
@@ -92,7 +92,8 @@ const PersonalInfo = () => {
     dataConversao: '',
     testemunho: '',
     diasDisponiveis: [],
-    horariosDisponiveis: []
+    horariosDisponiveis: '', // Inicializado como string vazia
+    interesseMinisterio: []
   })
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useChurchStore } from '../../stores/churchStore' // Importar useChurchS
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select' // Importar Select
+import { Label } from '../ui/label' // Importar Label
 import { 
   Users, 
   Calendar, 

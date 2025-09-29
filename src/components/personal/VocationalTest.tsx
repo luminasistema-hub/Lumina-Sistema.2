@@ -6,6 +6,7 @@ import { Badge } from '../ui/badge'
 import { Progress } from '../ui/progress'
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group'
 import { Label } from '../ui/label'
+import { toast } from 'sonner' // Importar toast
 import { 
   Brain, 
   Heart, 
