@@ -32,7 +32,7 @@ import {
   Download,
   Upload,
   MoreHorizontal,
-  User // Importar User do lucide-react
+  User as UserIcon // Importar User do lucide-react e renomear para UserIcon
 } from 'lucide-react'
 
 interface Member extends AuthUser { // Estender a interface AuthUser
@@ -45,7 +45,7 @@ interface Member extends AuthUser { // Estender a interface AuthUser
     nome: string
   }
   data_cadastro: string
-  status: 'ativo' | 'pendente' | 'inativo' // Alinhar status com AuthUser
+  // status: 'ativo' | 'pendente' | 'inativo' // Removido para herdar de AuthUser
   informacoes_pessoais?: {
     estado_civil?: string
     profissao?: string
@@ -225,7 +225,7 @@ const MemberManagementPage = () => {
       case 'Master': return <Shield className="w-4 h-4" />
       case 'Pastor': return <Crown className="w-4 h-4" />
       case 'Líder de Ministério': return <UserCheck className="w-4 h-4" />
-      case 'Comum': return <User className="w-4 h-4" /> // Usar o ícone User do lucide-react
+      case 'Comum': return <UserIcon className="w-4 h-4" /> // Usar o ícone UserIcon do lucide-react
     }
   }
 

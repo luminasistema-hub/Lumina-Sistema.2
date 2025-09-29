@@ -127,7 +127,7 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
         </CardContent>
       </Card>
 
-      <style jsx>{`
+      <style>{`
         @media print {
           body * {
             visibility: hidden;

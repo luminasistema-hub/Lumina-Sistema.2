@@ -288,7 +288,7 @@ const FinancialPanel = () => {
         data: '2025-09-12',
         descricao: 'Doação para reforma do templo',
         metodo_pagamento: 'PIX',
-        responsável: 'Maria Santos',
+        responsavel: 'Maria Santos', // Corrigido de 'responsável' para 'responsavel'
         status: 'Confirmado',
         membro_nome: 'Maria Santos Silva',
         recibo_emitido: true,
@@ -988,7 +988,7 @@ const FinancialPanel = () => {
                         <Label htmlFor="tipo">Tipo *</Label>
                         <Select value={newTransaction.tipo} onValueChange={(value) => setNewTransaction({...newTransaction, tipo: value as 'Entrada' | 'Saída'})}>
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder="Selecione o tipo" /> {/* Adicionado placeholder */}
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Entrada">Entrada</SelectItem>

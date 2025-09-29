@@ -8,7 +8,7 @@ import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Checkbox } from '../ui/checkbox'
 import { Badge } from '../ui/badge'
-import { toast } from 'sonner'
+import { toast } from 'sonner' // Importar toast
 import { 
   User, 
   MapPin, 
@@ -59,7 +59,7 @@ interface PersonalInfoData {
   
   // Disponibilidade
   diasDisponiveis: string[]
-  horariosDisponiveis: string // Alterado para string
+  horariosDisponiveis: string // Corrigido para string
   interesseMinisterio: string[]
 }
 
@@ -92,7 +92,7 @@ const PersonalInfo = () => {
     dataConversao: '',
     testemunho: '',
     diasDisponiveis: [],
-    horariosDisponiveis: '', // Alterado para string vazia
+    horariosDisponiveis: '', // Inicializado como string vazia
     interesseMinisterio: []
   })
 
@@ -670,7 +670,7 @@ const PersonalInfo = () => {
               <p className="font-medium">{formData.batizado ? 'Sim' : 'Não'}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Participa de Ministério</p>
+              <p className className="text-sm text-gray-500">Participa de Ministério</p>
               <p className="font-medium">{formData.participaMinisterio ? 'Sim' : 'Não'}</p>
             </div>
           </CardContent>
