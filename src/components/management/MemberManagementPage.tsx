@@ -232,33 +232,34 @@ const MemberManagementPage = () => {
   }
 
   const handleGenerateRegistrationLink = () => {
+    console.log('handleGenerateRegistrationLink called.');
+    console.log('  currentChurchId from authStore:', currentChurchId);
+    console.log('  churchesLoaded status:', churchesLoaded);
+    console.log('  churches array from useChurchStore:', churches); // Log the actual array
+
     if (!currentChurchId) {
-      toast.error('Selecione uma igreja para gerar o link de cadastro.')
-      return
+      toast.error('Nenhuma igreja selecionada. Por favor, selecione uma igreja no menu lateral.');
+      return;
     }
     
-    if (!churchesLoaded || churches.length === 0) { // Usa o novo estado
-      toast.error('Os dados das igrejas ainda não foram carregados. Por favor, aguarde um momento e tente novamente.')
+    if (!churchesLoaded || churches.length === 0) {
+      toast.error('Os dados das igrejas ainda não foram carregados ou não há igrejas cadastradas. Por favor, aguarde um momento e tente novamente.');
       return;
     }
 
-    console.log('MemberManagementPage: Attempting to get church for ID:', currentChurchId);
-    console.log('MemberManagementPage: Current churches in store (before getChurchById):', churches);
-    const church = getChurchById(currentChurchId)
-    console.log('MemberManagementPage: Church found by ID:', church);
+    const church = getChurchById(currentChurchId);
+    console.log('  Result of getChurchById:', church);
     
-    // Verificação explícita para garantir que church e church.name são válidos
     if (!church || !church.name) {
-      toast.error('Não foi possível encontrar os dados da igreja ou o nome da igreja está ausente. Tente recarregar a página ou selecionar a igreja novamente.')
-      return
+      toast.error('Erro: A igreja associada ao seu perfil não foi encontrada ou não possui um nome válido. Verifique se a igreja existe e se seu perfil está corretamente vinculado a ela.');
+      return;
     }
 
-    const baseUrl = window.location.origin
-    // Alterado para apontar para a nova RegisterPage
-    const link = `${baseUrl}/register?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`
-    setGeneratedLink(link)
-    setIsGenerateLinkDialogOpen(true)
-  }
+    const baseUrl = window.location.origin;
+    const link = `${baseUrl}/register?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`;
+    setGeneratedLink(link);
+    setIsGenerateLinkDialogOpen(true);
+  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(generatedLink)
@@ -556,7 +557,7 @@ const MemberManagementPage = () => {
               variant="outline" 
               className="flex-1 lg:flex-none"
               onClick={handleGenerateRegistrationLink}
-              disabled={!currentChurchId || !churchesLoaded} // Desabilita se nenhuma igreja selecionada ou não carregada
+              disabled={!currentChurchId || !churchesLoaded || churches.length === 0} // Desabilita se nenhuma igreja selecionada, não carregada ou lista vazia
             >
               <LinkIcon className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">Gerar Link de Cadastro</span>
