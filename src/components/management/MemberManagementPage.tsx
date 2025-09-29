@@ -1,0 +1,730 @@
+import { useState, useEffect } from 'react'
+import { useAuthStore } from '../../stores/authStore'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Textarea } from '../ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Badge } from '../ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Checkbox } from '../ui/checkbox'
+import { toast } from 'sonner'
+import { 
+  Users, 
+  Plus, 
+  Search, 
+  Filter,
+  Edit,
+  Eye,
+  Trash2,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  UserCheck,
+  Crown,
+  Shield,
+  User,
+  Church,
+  Heart,
+  Download,
+  Upload,
+  MoreHorizontal
+} from 'lucide-react'
+
+interface Member {
+  id: string
+  nome: string
+  email: string
+  telefone?: string
+  endereco?: string
+  data_nascimento?: string
+  papel: 'Comum' | 'Líder de Ministério' | 'Pastor' | 'Master'
+  ministerio_atual?: {
+    id: string
+    nome: string
+  }
+  data_cadastro: string
+  status: 'Ativo' | 'Inativo' | 'Visitante' | 'Transferido'
+  informacoes_pessoais?: {
+    estado_civil?: string
+    profissao?: string
+    conjuge?: string
+    filhos?: Array<{nome: string, idade: number}>
+  }
+  informacoes_espirituais?: {
+    data_conversao?: string
+    batizado: boolean
+    data_batismo?: string
+    tempo_igreja?: string
+  }
+  ultimo_teste_vocacional?: string
+  ministerio_recomendado?: string
+  observacoes?: string
+}
+
+const MemberManagementPage = () => {
+  const { user } = useAuthStore()
+  const [members, setMembers] = useState<Member[]>([])
+  const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null)
+  const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false)
+  const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterRole, setFilterRole] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterMinistry, setFilterMinistry] = useState('all')
+
+  const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
+  const canEditRoles = user?.role === 'admin' || user?.role === 'pastor'
+
+  const [newMember, setNewMember] = useState({
+    nome: '',
+    email: '',
+    telefone: '',
+    endereco: '',
+    data_nascimento: '',
+    papel: 'Comum' as Member['papel'],
+    status: 'Ativo' as Member['status'],
+    observacoes: ''
+  })
+
+  // Mock data
+  useEffect(() => {
+    console.log('MemberManagementPage: Loading members data...')
+    const mockMembers: Member[] = [
+      {
+        id: '1',
+        nome: 'Maria Santos Silva',
+        email: 'maria@email.com',
+        telefone: '(11) 99999-9999',
+        endereco: 'Rua das Flores, 123 - São Paulo/SP',
+        data_nascimento: '1985-05-15',
+        papel: 'Líder de Ministério',
+        ministerio_atual: { id: '1', nome: 'Louvor e Adoração' },
+        data_cadastro: '2024-01-15',
+        status: 'Ativo',
+        informacoes_pessoais: {
+          estado_civil: 'Casada',
+          profissao: 'Professora',
+          conjuge: 'João Silva',
+          filhos: [{ nome: 'Ana', idade: 8 }, { nome: 'Pedro', idade: 5 }]
+        },
+        informacoes_espirituais: {
+          data_conversao: '2020-03-10',
+          batizado: true,
+          data_batismo: '2020-06-15',
+          tempo_igreja: '4 anos'
+        },
+        ultimo_teste_vocacional: '2024-08-20',
+        ministerio_recomendado: 'Louvor e Adoração'
+      },
+      {
+        id: '2',
+        nome: 'Carlos Oliveira',
+        email: 'carlos@email.com',
+        telefone: '(11) 88888-8888',
+        papel: 'Comum',
+        data_cadastro: '2025-02-01',
+        status: 'Ativo',
+        informacoes_espirituais: {
+          batizado: false,
+          tempo_igreja: '8 meses'
+        }
+      },
+      {
+        id: '3',
+        nome: 'Ana Costa',
+        email: 'ana@email.com',
+        papel: 'Pastor',
+        data_cadastro: '2020-01-01',
+        status: 'Ativo',
+        ministerio_atual: { id: '2', nome: 'Liderança Geral' }
+      }
+    ]
+    setMembers(mockMembers)
+    setFilteredMembers(mockMembers)
+  }, [])
+
+  useEffect(() => {
+    let filtered = members
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(member => 
+        member.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (member.telefone && member.telefone.includes(searchTerm))
+      )
+    }
+
+    // Role filter
+    if (filterRole !== 'all') {
+      filtered = filtered.filter(member => member.papel === filterRole)
+    }
+
+    // Status filter
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(member => member.status === filterStatus)
+    }
+
+    // Ministry filter
+    if (filterMinistry !== 'all') {
+      filtered = filtered.filter(member => 
+        member.ministerio_atual?.nome === filterMinistry
+      )
+    }
+
+    setFilteredMembers(filtered)
+  }, [members, searchTerm, filterRole, filterStatus, filterMinistry])
+
+  const handleAddMember = () => {
+    if (!newMember.nome || !newMember.email) {
+      toast.error('Nome e email são obrigatórios')
+      return
+    }
+
+    const member: Member = {
+      id: Date.now().toString(),
+      nome: newMember.nome,
+      email: newMember.email,
+      telefone: newMember.telefone,
+      endereco: newMember.endereco,
+      data_nascimento: newMember.data_nascimento,
+      papel: newMember.papel,
+      data_cadastro: new Date().toISOString(),
+      status: newMember.status,
+      observacoes: newMember.observacoes,
+      informacoes_espirituais: {
+        batizado: false
+      }
+    }
+
+    setMembers([...members, member])
+    setIsAddMemberDialogOpen(false)
+    setNewMember({
+      nome: '',
+      email: '',
+      telefone: '',
+      endereco: '',
+      data_nascimento: '',
+      papel: 'Comum',
+      status: 'Ativo',
+      observacoes: ''
+    })
+    toast.success('Membro cadastrado com sucesso!')
+  }
+
+  const getRoleIcon = (role: Member['papel']) => {
+    switch (role) {
+      case 'Master': return <Shield className="w-4 h-4" />
+      case 'Pastor': return <Crown className="w-4 h-4" />
+      case 'Líder de Ministério': return <UserCheck className="w-4 h-4" />
+      case 'Comum': return <User className="w-4 h-4" />
+    }
+  }
+
+  const getRoleColor = (role: Member['papel']) => {
+    switch (role) {
+      case 'Master': return 'bg-red-100 text-red-800 border-red-200'
+      case 'Pastor': return 'bg-purple-100 text-purple-800 border-purple-200'
+      case 'Líder de Ministério': return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'Comum': return 'bg-green-100 text-green-800 border-green-200'
+    }
+  }
+
+  const getStatusColor = (status: Member['status']) => {
+    switch (status) {
+      case 'Ativo': return 'bg-green-100 text-green-800'
+      case 'Inativo': return 'bg-gray-100 text-gray-800'
+      case 'Visitante': return 'bg-yellow-100 text-yellow-800'
+      case 'Transferido': return 'bg-blue-100 text-blue-800'
+    }
+  }
+
+  const calculateAge = (birthDate: string) => {
+    const today = new Date()
+    const birth = new Date(birthDate)
+    let age = today.getFullYear() - birth.getFullYear()
+    const monthDiff = today.getMonth() - birth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--
+    }
+    return age
+  }
+
+  const statsData = {
+    total: members.length,
+    active: members.filter(m => m.status === 'Ativo').length,
+    leaders: members.filter(m => m.papel === 'Líder de Ministério' || m.papel === 'Pastor').length,
+    baptized: members.filter(m => m.informacoes_espirituais?.batizado).length
+  }
+
+  return (
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl md:rounded-2xl p-4 md:p-6 text-white">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Gestão de Membros 👥</h1>
+        <p className="text-blue-100 text-base md:text-lg">
+          Administre e acompanhe todos os membros da igreja
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-xl md:text-2xl font-bold text-blue-600">{statsData.total}</div>
+              <div className="text-sm text-gray-600">Total Membros</div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-xl md:text-2xl font-bold text-green-600">{statsData.active}</div>
+              <div className="text-sm text-gray-600">Ativos</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-xl md:text-2xl font-bold text-purple-600">{statsData.leaders}</div>
+              <div className="text-sm text-gray-600">Líderes</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-xl md:text-2xl font-bold text-orange-600">{statsData.baptized}</div>
+              <div className="text-sm text-gray-600">Batizados</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Actions */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:flex-1">
+          <div className="relative flex-1 lg:max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Buscar membros..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Select value={filterRole} onValueChange={setFilterRole}>
+              <SelectTrigger>
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Papel" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Papéis</SelectItem>
+                <SelectItem value="Comum">Comum</SelectItem>
+                <SelectItem value="Líder de Ministério">Líder de Ministério</SelectItem>
+                <SelectItem value="Pastor">Pastor</SelectItem>
+                <SelectItem value="Master">Master</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Status</SelectItem>
+                <SelectItem value="Ativo">Ativo</SelectItem>
+                <SelectItem value="Inativo">Inativo</SelectItem>
+                <SelectItem value="Visitante">Visitante</SelectItem>
+                <SelectItem value="Transferido">Transferido</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterMinistry} onValueChange={setFilterMinistry}>
+              <SelectTrigger>
+                <SelectValue placeholder="Ministério" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Ministérios</SelectItem>
+                <SelectItem value="Louvor e Adoração">Louvor e Adoração</SelectItem>
+                <SelectItem value="Mídia">Mídia</SelectItem>
+                <SelectItem value="Diaconato">Diaconato</SelectItem>
+                <SelectItem value="Kids">Kids</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex gap-2 w-full lg:w-auto">
+          {canManageMembers && (
+            <Dialog open={isAddMemberDialogOpen} onOpenChange={setIsAddMemberDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-500 hover:bg-blue-600 flex-1 lg:flex-none">
+                  <Plus className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">Novo Membro</span>
+                  <span className="sm:hidden">Adicionar</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Cadastrar Novo Membro</DialogTitle>
+                  <DialogDescription>
+                    Preencha as informações básicas do membro
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="nome">Nome Completo *</Label>
+                      <Input
+                        id="nome"
+                        value={newMember.nome}
+                        onChange={(e) => setNewMember({...newMember, nome: e.target.value})}
+                        placeholder="Nome completo"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={newMember.email}
+                        onChange={(e) => setNewMember({...newMember, email: e.target.value})}
+                        placeholder="email@exemplo.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="telefone">Telefone</Label>
+                      <Input
+                        id="telefone"
+                        value={newMember.telefone}
+                        onChange={(e) => setNewMember({...newMember, telefone: e.target.value})}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="data_nascimento">Data de Nascimento</Label>
+                      <Input
+                        id="data_nascimento"
+                        type="date"
+                        value={newMember.data_nascimento}
+                        onChange={(e) => setNewMember({...newMember, data_nascimento: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco">Endereço</Label>
+                    <Input
+                      id="endereco"
+                      value={newMember.endereco}
+                      onChange={(e) => setNewMember({...newMember, endereco: e.target.value})}
+                      placeholder="Endereço completo"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="papel">Papel</Label>
+                      <Select value={newMember.papel} onValueChange={(value) => setNewMember({...newMember, papel: value as Member['papel']})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Comum">Comum</SelectItem>
+                          {canEditRoles && (
+                            <>
+                              <SelectItem value="Líder de Ministério">Líder de Ministério</SelectItem>
+                              <SelectItem value="Pastor">Pastor</SelectItem>
+                              <SelectItem value="Master">Master</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select value={newMember.status} onValueChange={(value) => setNewMember({...newMember, status: value as Member['status']})}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Ativo">Ativo</SelectItem>
+                          <SelectItem value="Visitante">Visitante</SelectItem>
+                          <SelectItem value="Inativo">Inativo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="observacoes">Observações</Label>
+                    <Textarea
+                      id="observacoes"
+                      value={newMember.observacoes}
+                      onChange={(e) => setNewMember({...newMember, observacoes: e.target.value})}
+                      placeholder="Observações sobre o membro"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsAddMemberDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleAddMember}>
+                      Cadastrar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          <Button variant="outline" className="hidden sm:flex">
+            <Download className="w-4 h-4 mr-2" />
+            Exportar
+          </Button>
+        </div>
+      </div>
+
+      {/* Members List */}
+      <div className="space-y-4">
+        {filteredMembers.map((member) => (
+          <Card key={member.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900">{member.nome}</h3>
+                    <div className="flex gap-2">
+                      <Badge className={getRoleColor(member.papel)}>
+                        {getRoleIcon(member.papel)}
+                        <span className="ml-1">{member.papel}</span>
+                      </Badge>
+                      <Badge className={getStatusColor(member.status)}>
+                        {member.status}
+                      </Badge>
+                      {member.informacoes_espirituais?.batizado && (
+                        <Badge className="bg-blue-100 text-blue-800">
+                          Batizado
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-sm text-gray-600 mb-3">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      <span className="truncate">{member.email}</span>
+                    </div>
+                    {member.telefone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4" />
+                        <span>{member.telefone}</span>
+                      </div>
+                    )}
+                    {member.data_nascimento && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>{calculateAge(member.data_nascimento)} anos</span>
+                      </div>
+                    )}
+                    {member.ministerio_atual && (
+                      <div className="flex items-center gap-2">
+                        <Church className="w-4 h-4" />
+                        <span>{member.ministerio_atual.nome}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {member.endereco && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                      <MapPin className="w-4 h-4" />
+                      <span>{member.endereco}</span>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-gray-500">
+                    Membro desde {new Date(member.data_cadastro).toLocaleDateString('pt-BR')}
+                    {member.ultimo_teste_vocacional && (
+                      <span className="ml-4">
+                        • Último teste: {new Date(member.ultimo_teste_vocacional).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedMember(member)}
+                  >
+                    <Eye className="w-4 h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Ver Perfil</span>
+                  </Button>
+                  {canManageMembers && (
+                    <Button variant="outline" size="sm">
+                      <Edit className="w-4 h-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Editar</span>
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredMembers.length === 0 && (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-8 md:p-12 text-center">
+            <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum membro encontrado</h3>
+            <p className="text-gray-600">
+              {searchTerm || filterRole !== 'all' || filterStatus !== 'all' 
+                ? 'Tente ajustar os filtros de busca' 
+                : 'Cadastre o primeiro membro da igreja'
+              }
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Member Detail Modal */}
+      {selectedMember && (
+        <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                {selectedMember.nome}
+                <Badge className={getRoleColor(selectedMember.papel)}>
+                  {getRoleIcon(selectedMember.papel)}
+                  <span className="ml-1">{selectedMember.papel}</span>
+                </Badge>
+              </DialogTitle>
+              <DialogDescription>
+                Perfil completo do membro
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Tabs defaultValue="personal" className="mt-4">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="personal">Pessoal</TabsTrigger>
+                <TabsTrigger value="spiritual">Espiritual</TabsTrigger>
+                <TabsTrigger value="ministry">Ministério</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="personal" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Email</Label>
+                    <p className="text-gray-900">{selectedMember.email}</p>
+                  </div>
+                  {selectedMember.telefone && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Telefone</Label>
+                      <p className="text-gray-900">{selectedMember.telefone}</p>
+                    </div>
+                  )}
+                  {selectedMember.data_nascimento && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Idade</Label>
+                      <p className="text-gray-900">
+                        {calculateAge(selectedMember.data_nascimento)} anos
+                      </p>
+                    </div>
+                  )}
+                  {selectedMember.informacoes_pessoais?.estado_civil && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Estado Civil</Label>
+                      <p className="text-gray-900">{selectedMember.informacoes_pessoais.estado_civil}</p>
+                    </div>
+                  )}
+                </div>
+                
+                {selectedMember.endereco && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Endereço</Label>
+                    <p className="text-gray-900">{selectedMember.endereco}</p>
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="spiritual" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Batizado</Label>
+                    <p className="text-gray-900">
+                      {selectedMember.informacoes_espirituais?.batizado ? 'Sim' : 'Não'}
+                    </p>
+                  </div>
+                  {selectedMember.informacoes_espirituais?.data_batismo && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Data do Batismo</Label>
+                      <p className="text-gray-900">
+                        {new Date(selectedMember.informacoes_espirituais.data_batismo).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  )}
+                  {selectedMember.informacoes_espirituais?.tempo_igreja && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Tempo na Igreja</Label>
+                      <p className="text-gray-900">{selectedMember.informacoes_espirituais.tempo_igreja}</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="ministry" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedMember.ministerio_atual && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Ministério Atual</Label>
+                      <p className="text-gray-900">{selectedMember.ministerio_atual.nome}</p>
+                    </div>
+                  )}
+                  {selectedMember.ministerio_recomendado && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Ministério Recomendado</Label>
+                      <p className="text-gray-900">{selectedMember.ministerio_recomendado}</p>
+                    </div>
+                  )}
+                  {selectedMember.ultimo_teste_vocacional && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Último Teste Vocacional</Label>
+                      <p className="text-gray-900">
+                        {new Date(selectedMember.ultimo_teste_vocacional).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  )
+}
+
+export default MemberManagementPage

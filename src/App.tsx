@@ -1,0 +1,46 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuthStore } from './stores/authStore'
+import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
+import { useEffect } from 'react'
+
+function App() {
+  const { user, isLoading, checkAuth } = useAuthStore()
+
+  useEffect(() => {
+    console.log('App mounted, checking authentication...')
+    checkAuth()
+  }, [checkAuth])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-church-blue-50 to-church-purple-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-church-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-church-blue-600 font-medium">Carregando Sistema Connect Vida...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-church-blue-50 to-church-purple-50">
+      <Routes>
+        <Route 
+          path="/login" 
+          element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
+        />
+        <Route 
+          path="/dashboard" 
+          element={user ? <DashboardPage /> : <Navigate to="/login" replace />} 
+        />
+        <Route 
+          path="/" 
+          element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 
+        />
+      </Routes>
+    </div>
+  )
+}
+
+export default App
