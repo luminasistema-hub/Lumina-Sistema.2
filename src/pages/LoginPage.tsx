@@ -6,92 +6,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Label } from '../components/ui/label'
 import { Badge } from '../components/ui/badge'
 import { toast } from 'sonner'
-import { Church, Lock, Mail, Eye, EyeOff, User, ArrowLeft, Building } from 'lucide-react'
-import { supabase } from '../integrations/supabase/client'
-import { useSearchParams } from 'react-router-dom' // Importar useSearchParams
+import { Church, Lock, Mail, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom' // Importar Link e useSearchParams
 
 const LoginPage = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [churchName, setChurchName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [isRegisterMode, setIsRegisterMode] = useState(false)
   const { login, isLoading } = useAuthStore()
   const [searchParams] = useSearchParams() // Hook para ler parâmetros da URL
 
-  const churchIdFromUrl = searchParams.get('churchId')
-  const churchNameFromUrl = searchParams.get('churchName')
-  const initialRoleFromUrl = searchParams.get('initialRole') || 'membro' // Default to 'membro'
-
+  // Limpar parâmetros de registro se existirem na URL de login
   useEffect(() => {
-    if (churchIdFromUrl && churchNameFromUrl) {
-      setIsRegisterMode(true)
-      setChurchName(churchNameFromUrl)
+    if (searchParams.get('churchId') || searchParams.get('churchName')) {
+      // Opcional: redirecionar para /login sem os parâmetros se não for desejado
+      // navigate('/login', { replace: true });
+      // Ou apenas ignorar os parâmetros aqui
     }
-  }, [churchIdFromUrl, churchNameFromUrl])
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('LoginPage: Form submitted:', { email, isRegisterMode })
+    console.log('LoginPage: Form submitted for login:', { email })
     
     if (!email || !password) {
       toast.error('Por favor, preencha todos os campos')
       return
     }
 
-    if (isRegisterMode) {
-      if (!name || !churchName) {
-        toast.error('Por favor, preencha seu nome completo e o nome da igreja')
-        return
-      }
-
-      if (password.length < 6) {
-        toast.error('A senha deve ter pelo menos 6 caracteres')
-        return
-      }
-
-      console.log('LoginPage: Attempting Supabase signUp...');
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-            church_name: churchName,
-            initial_role: initialRoleFromUrl, // Usar papel do URL ou padrão
-            church_id: churchIdFromUrl // Passar churchId se vier do URL
-          }
-        }
-      })
-      
-      if (error) {
-        console.error('LoginPage: Supabase signUp error:', error.message);
-        toast.error(error.message)
-      } else if (data.user) {
-        console.log('LoginPage: Supabase signUp successful, user:', data.user.id);
-        toast.success('Cadastro realizado com sucesso! Você já pode fazer login.')
-        setIsRegisterMode(false)
-        setName('')
-        setEmail('')
-        setPassword('')
-        // Não limpar churchName se veio da URL para manter o contexto
-        if (!churchIdFromUrl) {
-          setChurchName('')
-        }
-      } else {
-        console.error('LoginPage: Unknown error during signUp.');
-        toast.error('Erro desconhecido no registro.')
-      }
-
+    console.log('LoginPage: Attempting login via useAuthStore.login().');
+    const success = await login(email, password);
+    if (!success) {
+      console.error('LoginPage: Login failed via useAuthStore.login().');
     } else {
-      console.log('LoginPage: Attempting login via useAuthStore.login().');
-      const success = await login(email, password);
-      if (!success) {
-        console.error('LoginPage: Login failed via useAuthStore.login().');
-      } else {
-        console.log('LoginPage: Login successful via useAuthStore.login().');
-      }
+      console.log('LoginPage: Login successful via useAuthStore.login().');
     }
   }
 
@@ -107,7 +55,7 @@ const LoginPage = () => {
               Sistema Connect Vida
             </CardTitle>
             <CardDescription className="text-base">
-              {isRegisterMode ? 'Criar nova conta' : 'Entre em sua conta'}
+              Entre em sua conta
             </CardDescription>
             <Badge className="bg-green-100 text-green-800 mx-auto">
               Sistema em Produção
@@ -116,42 +64,6 @@ const LoginPage = () => {
           
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {isRegisterMode && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome Completo</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <Input
-                        id="name"
-                        type="text"
-                        placeholder="Seu nome completo"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="pl-10 h-12"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="churchName">Nome da Igreja</Label>
-                    <div className="relative">
-                      <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <Input
-                        id="churchName"
-                        type="text"
-                        placeholder="Nome da sua igreja"
-                        value={churchName}
-                        onChange={(e) => setChurchName(e.target.value)}
-                        className="pl-10 h-12"
-                        disabled={!!churchIdFromUrl} // Desabilitar se veio da URL
-                        required
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
@@ -175,7 +87,7 @@ const LoginPage = () => {
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder={isRegisterMode ? 'Mínimo 6 caracteres' : 'Sua senha'}
+                    placeholder="Sua senha"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-10 h-12"
@@ -199,38 +111,22 @@ const LoginPage = () => {
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {isRegisterMode ? 'Cadastrando...' : 'Entrando...'}
+                    Entrando...
                   </div>
                 ) : (
-                  isRegisterMode ? 'Criar Conta' : 'Entrar no Sistema'
+                  'Entrar no Sistema'
                 )}
               </Button>
             </form>
 
             <div className="mt-6 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsRegisterMode(!isRegisterMode)
-                  setName('')
-                  setEmail('')
-                  setPassword('')
-                  // Não limpar churchName se veio da URL para manter o contexto
-                  if (!churchIdFromUrl) {
-                    setChurchName('')
-                  }
-                }}
+              <Link
+                to="/register"
                 className="text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-2 mx-auto"
               >
-                {isRegisterMode ? (
-                  <>
-                    <ArrowLeft className="w-4 h-4" />
-                    Já tenho conta - Fazer Login
-                  </>
-                ) : (
-                  'Não tenho conta - Cadastrar-se'
-                )}
-              </button>
+                Não tenho conta - Cadastrar-se
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           </CardContent>
         </Card>

@@ -1,20 +1,20 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage' // Importar a nova página de registro
 import DashboardPage from './pages/DashboardPage'
-import MasterAdminPage from './pages/MasterAdminPage' // Importar o novo painel master
+import MasterAdminPage from './pages/MasterAdminPage'
 import { useEffect } from 'react'
 
 function App() {
-  const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore() // Obter initializeAuthListener
+  const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore()
 
   useEffect(() => {
     console.log('App mounted, initializing auth listener and checking authentication...')
-    initializeAuthListener(); // Inicializar o listener de autenticação uma vez
-    checkAuth(); // Também verificar a autenticação no carregamento inicial
-  }, [checkAuth, initializeAuthListener]) // Adicionar initializeAuthListener às dependências
+    initializeAuthListener();
+    checkAuth();
+  }, [checkAuth, initializeAuthListener])
 
-  // Add this log to see the state right before rendering routes
   useEffect(() => {
     console.log('App Render: isLoading:', isLoading, 'user:', user?.email, 'userRole:', user?.role, 'currentChurchId:', currentChurchId);
   }, [isLoading, user, currentChurchId]);
@@ -36,6 +36,10 @@ function App() {
         <Route 
           path="/login" 
           element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
+        />
+        <Route 
+          path="/register" 
+          element={user ? <Navigate to="/dashboard" replace /> : <RegisterPage />} 
         />
         {user?.role === 'super_admin' ? (
           <Route path="/master-admin" element={<MasterAdminPage />} />

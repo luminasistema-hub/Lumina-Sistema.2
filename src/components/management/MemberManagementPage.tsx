@@ -248,7 +248,8 @@ const MemberManagementPage = () => {
     }
 
     const baseUrl = window.location.origin
-    const link = `${baseUrl}/login?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`
+    // Alterado para apontar para a nova RegisterPage
+    const link = `${baseUrl}/register?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`
     setGeneratedLink(link)
     setIsGenerateLinkDialogOpen(true)
   }
