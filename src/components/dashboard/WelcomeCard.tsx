@@ -1,8 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../../stores/authStore';
+import { useChurchStore } from '../../stores/churchStore';
 
 const WelcomeCard = () => {
-  const { user } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
+  const { getChurchById, loadChurches } = useChurchStore();
+  const [churchName, setChurchName] = useState('');
+
+  useEffect(() => {
+    loadChurches();
+  }, [loadChurches]);
+
+  useEffect(() => {
+    if (currentChurchId) {
+      const church = getChurchById(currentChurchId);
+      setChurchName(church?.name || 'Sua Igreja');
+    } else {
+      setChurchName('Sua Igreja');
+    }
+  }, [currentChurchId, getChurchById]);
 
   if (!user) return null;
 
@@ -21,9 +37,9 @@ const WelcomeCard = () => {
       <p className="text-blue-100 text-base md:text-lg">
         Bem-vindo ao seu painel de controle do Connect Vida
       </p>
-      {user.church && (
+      {churchName && (
         <p className="text-blue-200 mt-2 text-sm md:text-base">
-          📍 {user.church}
+          📍 {churchName}
           {user.ministry && ` • ${user.ministry}`}
         </p>
       )}

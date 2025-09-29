@@ -32,15 +32,15 @@ interface JourneyStep {
 }
 
 const MemberJourney = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
   const [journeySteps, setJourneySteps] = useState<JourneyStep[]>([
     {
       id: 'decisao',
       title: 'Decisão por Cristo',
       description: 'O primeiro passo da sua jornada espiritual - aceitar Jesus como Salvador',
       icon: <Heart className="w-6 h-6" />,
-      completed: true,
-      completedDate: '2024-01-15',
+      completed: false, // Default para false, será carregado do storage
+      completedDate: undefined,
       color: 'text-red-600',
       bgColor: 'bg-red-50 border-red-200',
       requirements: [
@@ -54,8 +54,8 @@ const MemberJourney = () => {
       title: 'Frequência Regular',
       description: 'Participar regularmente dos cultos e atividades da igreja',
       icon: <Calendar className="w-6 h-6" />,
-      completed: true,
-      completedDate: '2024-02-01',
+      completed: false,
+      completedDate: undefined,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50 border-blue-200',
       requirements: [
@@ -69,8 +69,8 @@ const MemberJourney = () => {
       title: 'Batismo nas Águas',
       description: 'Demonstração pública da sua fé através do batismo',
       icon: <Droplets className="w-6 h-6" />,
-      completed: true,
-      completedDate: '2024-03-10',
+      completed: false,
+      completedDate: undefined,
       color: 'text-cyan-600',
       bgColor: 'bg-cyan-50 border-cyan-200',
       requirements: [
@@ -143,8 +143,15 @@ const MemberJourney = () => {
   const [overallProgress, setOverallProgress] = useState(0)
 
   useEffect(() => {
-    console.log('MemberJourney component mounted for user:', user?.name)
-    
+    if (user && currentChurchId) {
+      const storedJourney = localStorage.getItem(`memberJourney-${user.id}-${currentChurchId}`)
+      if (storedJourney) {
+        setJourneySteps(JSON.parse(storedJourney))
+      }
+    }
+  }, [user, currentChurchId])
+
+  useEffect(() => {
     // Calcular progresso
     const completedSteps = journeySteps.filter(step => step.completed).length
     const totalSteps = journeySteps.length
@@ -152,7 +159,12 @@ const MemberJourney = () => {
     
     setOverallProgress(progress)
     setCurrentLevel(completedSteps)
-  }, [journeySteps])
+
+    // Salvar no localStorage sempre que journeySteps mudar
+    if (user && currentChurchId) {
+      localStorage.setItem(`memberJourney-${user.id}-${currentChurchId}`, JSON.stringify(journeySteps))
+    }
+  }, [journeySteps, user, currentChurchId])
 
   const markStepCompleted = (stepId: string) => {
     setJourneySteps(prev => prev.map(step => 
@@ -160,6 +172,7 @@ const MemberJourney = () => {
         ? { ...step, completed: true, completedDate: new Date().toISOString().split('T')[0] }
         : step
     ))
+    toast.success('Etapa concluída com sucesso!')
   }
 
   const getProgressColor = () => {
@@ -180,6 +193,14 @@ const MemberJourney = () => {
     if (currentLevel <= 3) return 'Você demonstra compromisso com sua fé e igreja.'
     if (currentLevel <= 4) return 'Você está servindo ativamente no Reino de Deus.'
     return 'Você está se desenvolvendo como líder cristão.'
+  }
+
+  if (!currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para visualizar sua jornada espiritual.
+      </div>
+    )
   }
 
   return (
@@ -274,7 +295,7 @@ const MemberJourney = () => {
                       <h4 className="font-medium text-gray-900 mb-2">Requisitos:</h4>
                       <ul className="space-y-1">
                         {step.requirements.map((req, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
+                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
                             <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
                             {req}
                           </li>

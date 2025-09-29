@@ -6,12 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Label } from '../components/ui/label'
 import { Badge } from '../components/ui/badge'
 import { toast } from 'sonner'
-import { Church, Lock, Mail, Eye, EyeOff, User, ArrowLeft } from 'lucide-react'
+import { Church, Lock, Mail, Eye, EyeOff, User, ArrowLeft, Building } from 'lucide-react'
 
 const LoginPage = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [churchName, setChurchName] = useState('') // Novo estado para o nome da igreja
   const [showPassword, setShowPassword] = useState(false)
   const [isRegisterMode, setIsRegisterMode] = useState(false)
   const { login, register, isLoading } = useAuthStore()
@@ -26,8 +27,8 @@ const LoginPage = () => {
     }
 
     if (isRegisterMode) {
-      if (!name) {
-        toast.error('Por favor, preencha seu nome completo')
+      if (!name || !churchName) {
+        toast.error('Por favor, preencha seu nome completo e o nome da igreja')
         return
       }
 
@@ -36,7 +37,7 @@ const LoginPage = () => {
         return
       }
 
-      const result = await register(name, email, password)
+      const result = await register(name, email, password, churchName)
       
       if (result.success) {
         toast.success(result.message)
@@ -44,6 +45,7 @@ const LoginPage = () => {
         setName('')
         setEmail('')
         setPassword('')
+        setChurchName('')
       } else {
         toast.error(result.message)
       }
@@ -80,21 +82,38 @@ const LoginPage = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {isRegisterMode && (
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome Completo</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="Seu nome completo"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="pl-10 h-12"
-                      required
-                    />
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome Completo</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <Input
+                        id="name"
+                        type="text"
+                        placeholder="Seu nome completo"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="pl-10 h-12"
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="churchName">Nome da Igreja</Label>
+                    <div className="relative">
+                      <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <Input
+                        id="churchName"
+                        type="text"
+                        placeholder="Nome da sua igreja"
+                        value={churchName}
+                        onChange={(e) => setChurchName(e.target.value)}
+                        className="pl-10 h-12"
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               <div className="space-y-2">
@@ -139,7 +158,7 @@ const LoginPage = () => {
               {isRegisterMode && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800">
-                    <strong>Importante:</strong> Após o cadastro, sua conta ficará pendente de aprovação pelo administrador. 
+                    <strong>Importante:</strong> Após o cadastro, sua conta e a igreja ficarão pendentes de aprovação pelo administrador. 
                     Você receberá uma confirmação quando sua conta for ativada.
                   </p>
                 </div>
@@ -169,6 +188,7 @@ const LoginPage = () => {
                   setName('')
                   setEmail('')
                   setPassword('')
+                  setChurchName('')
                 }}
                 className="text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-2 mx-auto"
               >

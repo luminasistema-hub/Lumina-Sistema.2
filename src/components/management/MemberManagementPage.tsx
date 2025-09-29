@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useAuthStore } from '../../stores/authStore'
+import { useAuthStore, User } from '../../stores/authStore' // Importar User do authStore
+import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -26,7 +27,6 @@ import {
   UserCheck,
   Crown,
   Shield,
-  User,
   Church,
   Heart,
   Download,
@@ -34,20 +34,17 @@ import {
   MoreHorizontal
 } from 'lucide-react'
 
-interface Member {
-  id: string
-  nome: string
-  email: string
+interface Member extends User { // Estender a interface User
   telefone?: string
   endereco?: string
   data_nascimento?: string
-  papel: 'Comum' | 'Líder de Ministério' | 'Pastor' | 'Master'
+  papel: 'Comum' | 'Líder de Ministério' | 'Pastor' | 'Master' // Manter papel para compatibilidade
   ministerio_atual?: {
     id: string
     nome: string
   }
   data_cadastro: string
-  status: 'Ativo' | 'Inativo' | 'Visitante' | 'Transferido'
+  status: 'Ativo' | 'Inativo' | 'Visitante' | 'Transferido' // Manter status para compatibilidade
   informacoes_pessoais?: {
     estado_civil?: string
     profissao?: string
@@ -66,7 +63,8 @@ interface Member {
 }
 
 const MemberManagementPage = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
+  const { updateChurch, getChurchById } = useChurchStore() // Obter updateChurch e getChurchById
   const [members, setMembers] = useState<Member[]>([])
   const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
@@ -91,62 +89,14 @@ const MemberManagementPage = () => {
     observacoes: ''
   })
 
-  // Mock data
   useEffect(() => {
-    console.log('MemberManagementPage: Loading members data...')
-    const mockMembers: Member[] = [
-      {
-        id: '1',
-        nome: 'Maria Santos Silva',
-        email: 'maria@email.com',
-        telefone: '(11) 99999-9999',
-        endereco: 'Rua das Flores, 123 - São Paulo/SP',
-        data_nascimento: '1985-05-15',
-        papel: 'Líder de Ministério',
-        ministerio_atual: { id: '1', nome: 'Louvor e Adoração' },
-        data_cadastro: '2024-01-15',
-        status: 'Ativo',
-        informacoes_pessoais: {
-          estado_civil: 'Casada',
-          profissao: 'Professora',
-          conjuge: 'João Silva',
-          filhos: [{ nome: 'Ana', idade: 8 }, { nome: 'Pedro', idade: 5 }]
-        },
-        informacoes_espirituais: {
-          data_conversao: '2020-03-10',
-          batizado: true,
-          data_batismo: '2020-06-15',
-          tempo_igreja: '4 anos'
-        },
-        ultimo_teste_vocacional: '2024-08-20',
-        ministerio_recomendado: 'Louvor e Adoração'
-      },
-      {
-        id: '2',
-        nome: 'Carlos Oliveira',
-        email: 'carlos@email.com',
-        telefone: '(11) 88888-8888',
-        papel: 'Comum',
-        data_cadastro: '2025-02-01',
-        status: 'Ativo',
-        informacoes_espirituais: {
-          batizado: false,
-          tempo_igreja: '8 meses'
-        }
-      },
-      {
-        id: '3',
-        nome: 'Ana Costa',
-        email: 'ana@email.com',
-        papel: 'Pastor',
-        data_cadastro: '2020-01-01',
-        status: 'Ativo',
-        ministerio_atual: { id: '2', nome: 'Liderança Geral' }
-      }
-    ]
-    setMembers(mockMembers)
-    setFilteredMembers(mockMembers)
-  }, [])
+    if (currentChurchId) {
+      loadMembers(currentChurchId)
+    } else {
+      setMembers([])
+      setFilteredMembers([])
+    }
+  }, [currentChurchId])
 
   useEffect(() => {
     let filtered = members
@@ -180,27 +130,79 @@ const MemberManagementPage = () => {
     setFilteredMembers(filtered)
   }, [members, searchTerm, filterRole, filterStatus, filterMinistry])
 
+  const loadMembers = (churchId: string) => {
+    const stored = localStorage.getItem('connect-vida-users')
+    if (stored) {
+      const usersData = JSON.parse(stored)
+      const memberList = Object.values(usersData)
+        .map((userData: any) => userData.user as Member)
+        .filter(m => m.churchId === churchId) // Filtrar por churchId
+      setMembers(memberList)
+      setFilteredMembers(memberList)
+    }
+  }
+
+  const saveMembers = (updatedMembers: Member[]) => {
+    const stored = localStorage.getItem('connect-vida-users')
+    if (stored) {
+      const usersData = JSON.parse(stored)
+      
+      updatedMembers.forEach(memberToUpdate => {
+        if (usersData[memberToUpdate.email]) {
+          usersData[memberToUpdate.email].user = memberToUpdate
+        }
+      })
+      
+      localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
+      if (currentChurchId) {
+        loadMembers(currentChurchId) // Recarregar membros da igreja ativa
+      }
+    }
+  }
+
   const handleAddMember = () => {
     if (!newMember.nome || !newMember.email) {
       toast.error('Nome e email são obrigatórios')
       return
     }
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+
+    const currentChurch = getChurchById(currentChurchId)
+    if (currentChurch && currentChurch.currentMembers >= currentChurch.memberLimit && currentChurch.memberLimit !== Infinity) {
+      toast.error(`Limite de membros atingido para o plano atual (${currentChurch.memberLimit} membros). Atualize o plano da igreja.`)
+      return
+    }
 
     const member: Member = {
-      id: Date.now().toString(),
-      nome: newMember.nome,
+      id: `member-${Date.now()}`,
+      name: newMember.nome,
       email: newMember.email,
       telefone: newMember.telefone,
       endereco: newMember.endereco,
       data_nascimento: newMember.data_nascimento,
-      papel: newMember.papel,
+      role: 'membro', // Papel padrão para novos membros
+      papel: newMember.papel, // Manter para compatibilidade com a interface Member
+      churchId: currentChurchId, // Associar ao currentChurchId
+      churchName: currentChurch?.name,
       data_cadastro: new Date().toISOString(),
-      status: newMember.status,
+      status: 'pendente', // Novos membros começam como pendentes
       observacoes: newMember.observacoes,
       informacoes_espirituais: {
         batizado: false
       }
     }
+
+    // Simular adição ao localStorage de usuários
+    const storedUsers = localStorage.getItem('connect-vida-users')
+    const usersData = storedUsers ? JSON.parse(storedUsers) : {}
+    usersData[member.email] = {
+      password: 'senha_padrao_temporaria', // Senha temporária para novos membros
+      user: member
+    }
+    localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
 
     setMembers([...members, member])
     setIsAddMemberDialogOpen(false)
@@ -214,7 +216,7 @@ const MemberManagementPage = () => {
       status: 'Ativo',
       observacoes: ''
     })
-    toast.success('Membro cadastrado com sucesso!')
+    toast.success('Membro cadastrado com sucesso! Aguardando aprovação.')
   }
 
   const getRoleIcon = (role: Member['papel']) => {
@@ -260,6 +262,14 @@ const MemberManagementPage = () => {
     active: members.filter(m => m.status === 'Ativo').length,
     leaders: members.filter(m => m.papel === 'Líder de Ministério' || m.papel === 'Pastor').length,
     baptized: members.filter(m => m.informacoes_espirituais?.batizado).length
+  }
+
+  if (!currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para gerenciar os membros.
+      </div>
+    )
   }
 
   return (
@@ -511,7 +521,7 @@ const MemberManagementPage = () => {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">{member.nome}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{member.name}</h3>
                     <div className="flex gap-2">
                       <Badge className={getRoleColor(member.papel)}>
                         {getRoleIcon(member.papel)}
@@ -616,7 +626,7 @@ const MemberManagementPage = () => {
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
-                {selectedMember.nome}
+                {selectedMember.name}
                 <Badge className={getRoleColor(selectedMember.papel)}>
                   {getRoleIcon(selectedMember.papel)}
                   <span className="ml-1">{selectedMember.papel}</span>

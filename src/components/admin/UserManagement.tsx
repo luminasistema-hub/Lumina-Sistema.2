@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { toast } from 'sonner'
-import { User, UserRole } from '../../stores/authStore'
+import { User, UserRole, useAuthStore } from '../../stores/authStore' // Importar useAuthStore
+import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
 import { 
   Users, 
   UserCheck, 
@@ -30,6 +31,8 @@ import {
 interface UserManagementProps {}
 
 const UserManagement = ({}: UserManagementProps) => {
+  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
+  const { updateChurch, getChurchById } = useChurchStore() // Obter updateChurch e getChurchById
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -41,8 +44,13 @@ const UserManagement = ({}: UserManagementProps) => {
   const [editUser, setEditUser] = useState<Partial<User>>({})
 
   useEffect(() => {
-    loadUsers()
-  }, [])
+    if (currentChurchId) {
+      loadUsers(currentChurchId)
+    } else {
+      setUsers([])
+      setFilteredUsers([])
+    }
+  }, [currentChurchId]) // Recarregar usuários quando a igreja ativa mudar
 
   useEffect(() => {
     let filtered = users
@@ -65,11 +73,13 @@ const UserManagement = ({}: UserManagementProps) => {
     setFilteredUsers(filtered)
   }, [users, searchTerm, filterStatus, filterRole])
 
-  const loadUsers = () => {
+  const loadUsers = (churchId: string) => {
     const stored = localStorage.getItem('connect-vida-users')
     if (stored) {
       const usersData = JSON.parse(stored)
-      const userList = Object.values(usersData).map((userData: any) => userData.user)
+      const userList = Object.values(usersData)
+        .map((userData: any) => userData.user as User)
+        .filter(u => u.churchId === churchId) // Filtrar por churchId
       setUsers(userList)
       setFilteredUsers(userList)
     }
@@ -80,38 +90,49 @@ const UserManagement = ({}: UserManagementProps) => {
     if (stored) {
       const usersData = JSON.parse(stored)
       
-      updatedUsers.forEach(user => {
-        if (usersData[user.email]) {
-          usersData[user.email].user = user
+      updatedUsers.forEach(userToUpdate => {
+        if (usersData[userToUpdate.email]) {
+          usersData[userToUpdate.email].user = userToUpdate
         }
       })
       
       localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
-      loadUsers()
+      if (currentChurchId) {
+        loadUsers(currentChurchId) // Recarregar usuários da igreja ativa
+      }
     }
   }
 
   const approveUser = (userId: string) => {
-    const updatedUsers = users.map(user => 
-      user.id === userId 
+    const updatedUsers = users.map(u => 
+      u.id === userId 
         ? { 
-            ...user, 
+            ...u, 
             status: 'ativo' as const,
-            approved_by: 'Diogo Albuquerque',
+            approved_by: user?.name || 'Administrador',
             approved_at: new Date().toISOString()
           }
-        : user
+        : u
     )
     
     saveUsers(updatedUsers)
     toast.success('Usuário aprovado com sucesso!')
+
+    // Atualizar contagem de membros na igreja
+    if (currentChurchId) {
+      const currentChurch = getChurchById(currentChurchId)
+      if (currentChurch) {
+        const newMemberCount = currentChurch.currentMembers + 1
+        updateChurch(currentChurchId, { currentMembers: newMemberCount })
+      }
+    }
   }
 
   const rejectUser = (userId: string) => {
-    const updatedUsers = users.map(user => 
-      user.id === userId 
-        ? { ...user, status: 'inativo' as const }
-        : user
+    const updatedUsers = users.map(u => 
+      u.id === userId 
+        ? { ...u, status: 'inativo' as const }
+        : u
     )
     
     saveUsers(updatedUsers)
@@ -121,15 +142,15 @@ const UserManagement = ({}: UserManagementProps) => {
   const handleEditUser = () => {
     if (!selectedUser || !editUser.role) return
 
-    const updatedUsers = users.map(user => 
-      user.id === selectedUser.id 
+    const updatedUsers = users.map(u => 
+      u.id === selectedUser.id 
         ? { 
-            ...user, 
+            ...u, 
             role: editUser.role as UserRole,
             ministry: editUser.ministry,
             status: editUser.status as User['status']
           }
-        : user
+        : u
     )
     
     saveUsers(updatedUsers)
@@ -148,8 +169,19 @@ const UserManagement = ({}: UserManagementProps) => {
       const usersData = JSON.parse(stored)
       delete usersData[userToDelete.email]
       localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
-      loadUsers()
+      if (currentChurchId) {
+        loadUsers(currentChurchId) // Recarregar usuários da igreja ativa
+      }
       toast.success('Usuário removido do sistema')
+
+      // Atualizar contagem de membros na igreja se o usuário estava ativo
+      if (userToDelete.status === 'ativo' && currentChurchId) {
+        const currentChurch = getChurchById(currentChurchId)
+        if (currentChurch) {
+          const newMemberCount = currentChurch.currentMembers - 1
+          updateChurch(currentChurchId, { currentMembers: newMemberCount })
+        }
+      }
     }
   }
 
@@ -163,6 +195,7 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'midia_tecnologia': return <Headphones className="w-4 h-4" />
       case 'integra': return <Heart className="w-4 h-4" />
       case 'membro': return <Users className="w-4 h-4" />
+      case 'super_admin': return <Shield className="w-4 h-4" /> // Adicionado super_admin
     }
   }
 
@@ -176,6 +209,7 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'midia_tecnologia': return 'bg-indigo-100 text-indigo-800'
       case 'integra': return 'bg-pink-100 text-pink-800'
       case 'membro': return 'bg-gray-100 text-gray-800'
+      case 'super_admin': return 'bg-red-200 text-red-900' // Cor para super_admin
     }
   }
 
@@ -197,12 +231,21 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'midia_tecnologia': return 'Mídia e Tecnologia'
       case 'integra': return 'Integração'
       case 'membro': return 'Membro'
+      case 'super_admin': return 'Super Administrador' // Label para super_admin
     }
   }
 
   const pendingUsers = users.filter(u => u.status === 'pendente')
   const activeUsers = users.filter(u => u.status === 'ativo')
   const inactiveUsers = users.filter(u => u.status === 'inativo')
+
+  if (!currentChurchId && user?.role !== 'super_admin') {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para gerenciar os usuários.
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -291,55 +334,55 @@ const UserManagement = ({}: UserManagementProps) => {
 
       {/* Users List */}
       <div className="space-y-4">
-        {filteredUsers.map((user) => (
-          <Card key={user.id} className="border-0 shadow-sm">
+        {filteredUsers.map((u) => (
+          <Card key={u.id} className="border-0 shadow-sm">
             <CardContent className="p-4 md:p-6">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">{user.name}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{u.name}</h3>
                     <div className="flex gap-2">
-                      <Badge className={getRoleColor(user.role)}>
-                        {getRoleIcon(user.role)}
-                        <span className="ml-1">{getRoleLabel(user.role)}</span>
+                      <Badge className={getRoleColor(u.role)}>
+                        {getRoleIcon(u.role)}
+                        <span className="ml-1">{getRoleLabel(u.role)}</span>
                       </Badge>
-                      <Badge className={getStatusColor(user.status)}>
-                        {user.status === 'ativo' && <CheckCircle className="w-3 h-3 mr-1" />}
-                        {user.status === 'pendente' && <Clock className="w-3 h-3 mr-1" />}
-                        {user.status === 'inativo' && <XCircle className="w-3 h-3 mr-1" />}
-                        {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+                      <Badge className={getStatusColor(u.status)}>
+                        {u.status === 'ativo' && <CheckCircle className="w-3 h-3 mr-1" />}
+                        {u.status === 'pendente' && <Clock className="w-3 h-3 mr-1" />}
+                        {u.status === 'inativo' && <XCircle className="w-3 h-3 mr-1" />}
+                        {u.status.charAt(0).toUpperCase() + u.status.slice(1)}
                       </Badge>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600 mb-2">
                     <div>
-                      <strong>Email:</strong> {user.email}
+                      <strong>Email:</strong> {u.email}
                     </div>
                     <div>
-                      <strong>Cadastro:</strong> {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                      <strong>Cadastro:</strong> {new Date(u.created_at).toLocaleDateString('pt-BR')}
                     </div>
-                    {user.ministry && (
+                    {u.ministry && (
                       <div>
-                        <strong>Ministério:</strong> {user.ministry}
+                        <strong>Ministério:</strong> {u.ministry}
                       </div>
                     )}
                   </div>
 
-                  {user.approved_by && user.approved_at && (
+                  {u.approved_by && u.approved_at && (
                     <div className="text-xs text-green-600">
-                      ✅ Aprovado por {user.approved_by} em {new Date(user.approved_at).toLocaleDateString('pt-BR')}
+                      ✅ Aprovado por {u.approved_by} em {new Date(u.approved_at).toLocaleDateString('pt-BR')}
                     </div>
                   )}
                 </div>
 
                 <div className="flex gap-2">
-                  {user.status === 'pendente' && (
+                  {u.status === 'pendente' && (user?.role === 'admin' || user?.role === 'super_admin') && (
                     <>
                       <Button 
                         size="sm" 
                         className="bg-green-500 hover:bg-green-600"
-                        onClick={() => approveUser(user.id)}
+                        onClick={() => approveUser(u.id)}
                       >
                         <UserCheck className="w-4 h-4 mr-2" />
                         Aprovar
@@ -348,37 +391,39 @@ const UserManagement = ({}: UserManagementProps) => {
                         size="sm" 
                         variant="outline"
                         className="text-red-600"
-                        onClick={() => rejectUser(user.id)}
+                        onClick={() => rejectUser(u.id)}
                       >
                         <UserX className="w-4 h-4 mr-2" />
                         Rejeitar
                       </Button>
                     </>
                   )}
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedUser(user)
-                      setEditUser({
-                        role: user.role,
-                        ministry: user.ministry,
-                        status: user.status
-                      })
-                      setIsEditDialogOpen(true)
-                    }}
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Editar
-                  </Button>
-                  {user.email !== 'diogoalbuquerque38@gmail.com' && (
+                  {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedUser(u)
+                        setEditUser({
+                          role: u.role,
+                          ministry: u.ministry,
+                          status: u.status
+                        })
+                        setIsEditDialogOpen(true)
+                      }}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Editar
+                    </Button>
+                  )}
+                  {u.email !== 'diogoalbuquerque38@gmail.com' && (user?.role === 'admin' || user?.role === 'super_admin') && (
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className="text-red-600"
                       onClick={() => {
                         if (confirm('Tem certeza que deseja remover este usuário?')) {
-                          deleteUser(user.id)
+                          deleteUser(u.id)
                         }
                       }}
                     >
@@ -432,6 +477,7 @@ const UserManagement = ({}: UserManagementProps) => {
                   <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
                   <SelectItem value="pastor">Pastor</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
+                  {user?.role === 'super_admin' && <SelectItem value="super_admin">Super Administrador</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

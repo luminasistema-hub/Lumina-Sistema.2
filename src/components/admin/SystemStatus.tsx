@@ -2,6 +2,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Badge } from '../ui/badge'
 import { Progress } from '../ui/progress'
 import { Button } from '../ui/button'
+import { useAuthStore } from '../../stores/authStore' // Importar useAuthStore
+import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
+import { useEffect, useState } from 'react' // Importar useEffect e useState
 import { 
   CheckCircle, 
   Clock, 
@@ -32,6 +35,25 @@ import {
 } from 'lucide-react'
 
 const SystemStatus = () => {
+  const { currentChurchId, user } = useAuthStore() // Obter currentChurchId e user
+  const { getChurchById, loadChurches } = useChurchStore() // Obter getChurchById e loadChurches
+  const [churchName, setChurchName] = useState('Sistema Connect Vida Beta')
+
+  useEffect(() => {
+    loadChurches()
+  }, [loadChurches])
+
+  useEffect(() => {
+    if (currentChurchId) {
+      const church = getChurchById(currentChurchId)
+      setChurchName(church?.name || 'Sistema Connect Vida Beta')
+    } else if (user?.role === 'super_admin') {
+      setChurchName('Painel Master - Status Geral')
+    } else {
+      setChurchName('Sistema Connect Vida Beta')
+    }
+  }, [currentChurchId, getChurchById, user?.role])
+
   const modules = [
     {
       name: 'Autenticação e Usuários',
@@ -193,13 +215,21 @@ const SystemStatus = () => {
 
   const overallProgress = Math.round(modules.reduce((sum, module) => sum + module.progress, 0) / modules.length)
 
+  if (!currentChurchId && user?.role !== 'super_admin') {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para visualizar o status do sistema.
+      </div>
+    )
+  }
+
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl md:rounded-2xl p-4 md:p-6 text-white">
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Status do Sistema 📊</h1>
         <p className="text-indigo-100 text-base md:text-lg">
-          Monitoramento completo do Sistema Connect Vida Beta
+          Monitoramento completo do {churchName}
         </p>
       </div>
 
@@ -211,7 +241,7 @@ const SystemStatus = () => {
             Visão Geral do Sistema
           </CardTitle>
           <CardDescription className="text-lg">
-            Status atual do Sistema Connect Vida - Versão Beta 2.0
+            Status atual do Sistema Connect Vida - Versão SaaS
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -425,7 +455,7 @@ const SystemStatus = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Versão do Sistema:</span>
-                  <span className="font-medium">Connect Vida 2.0 Beta</span>
+                  <span className="font-medium">Connect Vida 2.0 SaaS</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Último Backup:</span>

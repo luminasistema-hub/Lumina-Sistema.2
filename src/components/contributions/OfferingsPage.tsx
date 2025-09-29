@@ -30,6 +30,7 @@ import {
 
 interface Contribution {
   id: string
+  churchId: string // Adicionado para multi-igrejas
   valor: number
   tipo: 'Dízimo' | 'Oferta' | 'Doação Especial' | 'Missões' | 'Obras'
   metodo_pagamento: 'PIX' | 'Cartão' | 'Dinheiro' | 'Transferência'
@@ -46,14 +47,14 @@ interface Contribution {
 }
 
 const OfferingsPage = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedType, setSelectedType] = useState('all')
 
-  const canViewFinancial = user?.role === 'admin' || user?.role === 'pastor'
-  const canManageFinancial = user?.role === 'admin'
+  const canViewFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
+  const canManageFinancial = user?.role === 'admin' || user?.role === 'financeiro'
 
   const [newContribution, setNewContribution] = useState({
     valor: 0,
@@ -64,41 +65,57 @@ const OfferingsPage = () => {
 
   // Mock data
   useEffect(() => {
-    console.log('OfferingsPage: Loading contributions data...')
-    const mockContributions: Contribution[] = [
-      {
-        id: '1',
-        valor: 150.00,
-        tipo: 'Dízimo',
-        metodo_pagamento: 'PIX',
-        data_contribuicao: '2025-09-10T10:00:00',
-        contribuinte: { id: user?.id || '1', nome: user?.name || 'Usuário Atual' },
-        status: 'Confirmado',
-        recibo_gerado: true
-      },
-      {
-        id: '2',
-        valor: 50.00,
-        tipo: 'Oferta',
-        metodo_pagamento: 'Cartão',
-        data_contribuicao: '2025-09-08T19:30:00',
-        contribuinte: { id: user?.id || '1', nome: user?.name || 'Usuário Atual' },
-        campanha: 'Reforma do Templo',
-        status: 'Confirmado',
-        recibo_gerado: true
+    if (currentChurchId) {
+      const storedContributions = localStorage.getItem(`contributions-${currentChurchId}`)
+      if (storedContributions) {
+        setContributions(JSON.parse(storedContributions))
+      } else {
+        const mockContributions: Contribution[] = [
+          {
+            id: '1',
+            churchId: currentChurchId,
+            valor: 150.00,
+            tipo: 'Dízimo',
+            metodo_pagamento: 'PIX',
+            data_contribuicao: '2025-09-10T10:00:00',
+            contribuinte: { id: user?.id || '1', nome: user?.name || 'Usuário Atual' },
+            status: 'Confirmado',
+            recibo_gerado: true
+          },
+          {
+            id: '2',
+            churchId: currentChurchId,
+            valor: 50.00,
+            tipo: 'Oferta',
+            metodo_pagamento: 'Cartão',
+            data_contribuicao: '2025-09-08T19:30:00',
+            contribuinte: { id: user?.id || '1', nome: user?.name || 'Usuário Atual' },
+            campanha: 'Reforma do Templo',
+            status: 'Confirmado',
+            recibo_gerado: true
+          }
+        ]
+        setContributions(mockContributions)
+        localStorage.setItem(`contributions-${currentChurchId}`, JSON.stringify(mockContributions))
       }
-    ]
-    setContributions(mockContributions)
-  }, [user])
+    } else {
+      setContributions([])
+    }
+  }, [currentChurchId, user])
 
-    const handleContribute = () => {
+  const handleContribute = () => {
     if (newContribution.valor <= 0) {
       toast.error('Por favor, insira um valor válido')
+      return
+    }
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
       return
     }
 
     const contribution: Contribution = {
       id: Date.now().toString(),
+      churchId: currentChurchId,
       valor: newContribution.valor,
       tipo: newContribution.tipo,
       metodo_pagamento: newContribution.metodo_pagamento,
@@ -109,7 +126,9 @@ const OfferingsPage = () => {
       recibo_gerado: false
     }
 
-    setContributions([contribution, ...contributions])
+    const updatedContributions = [contribution, ...contributions]
+    setContributions(updatedContributions)
+    localStorage.setItem(`contributions-${currentChurchId}`, JSON.stringify(updatedContributions))
     
     // Integração com o sistema financeiro
     console.log('Registrando transação financeira:', {
@@ -167,6 +186,14 @@ const OfferingsPage = () => {
              c.status === 'Confirmado'
     })
     .reduce((sum, c) => sum + c.valor, 0)
+
+  if (!currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para visualizar as contribuições.
+      </div>
+    )
+  }
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">

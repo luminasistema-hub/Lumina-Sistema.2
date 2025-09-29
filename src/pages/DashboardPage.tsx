@@ -15,7 +15,11 @@ import FinancialPanel from '../components/management/FinancialPanel'
 import SystemStatus from '../components/admin/SystemStatus'
 import SystemSettings from '../components/admin/SystemSettings'
 
-const DashboardPage = () => {
+interface DashboardPageProps {
+  currentChurchId: string;
+}
+
+const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
   const [activeModule, setActiveModule] = useState('dashboard')
 
   const renderModuleContent = () => {

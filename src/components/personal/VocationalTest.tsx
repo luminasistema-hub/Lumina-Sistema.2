@@ -46,7 +46,7 @@ interface MinistryResult {
 }
 
 const VocationalTest = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
   const [currentStep, setCurrentStep] = useState<'intro' | 'test' | 'results'>('intro')
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<number, number>>({})
@@ -266,11 +266,28 @@ const VocationalTest = () => {
     }
   }
 
+  useEffect(() => {
+    if (user && currentChurchId) {
+      const storedTestResults = localStorage.getItem(`vocational-test-${user.id}-${currentChurchId}`)
+      if (storedTestResults) {
+        const parsedResults = JSON.parse(storedTestResults)
+        setResults(parsedResults.results)
+        setTopMinistry(parsedResults.topMinistry)
+        setCurrentStep('results')
+      }
+    }
+  }, [user, currentChurchId])
+
   const handleAnswerChange = (questionId: number, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: parseInt(value) }))
   }
 
   const calculateResults = () => {
+    if (!user || !currentChurchId) {
+      toast.error('Erro: Usuário ou igreja não identificados.')
+      return
+    }
+
     console.log('Calculating vocational test results...')
     
     const ministryScores: Record<string, number> = {
@@ -316,7 +333,8 @@ const VocationalTest = () => {
       results: calculatedResults,
       topMinistry: calculatedResults[0].name
     }
-    localStorage.setItem(`vocational-test-${user?.id}`, JSON.stringify(testResult))
+    localStorage.setItem(`vocational-test-${user.id}-${currentChurchId}`, JSON.stringify(testResult))
+    toast.success('Teste vocacional concluído e resultados salvos!')
   }
 
   const nextQuestion = () => {
@@ -342,6 +360,14 @@ const VocationalTest = () => {
   }
 
   const progress = ((currentQuestion + 1) / questions.length) * 100
+
+  if (!currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para realizar o teste vocacional.
+      </div>
+    )
+  }
 
   // Intro Screen
   if (currentStep === 'intro') {

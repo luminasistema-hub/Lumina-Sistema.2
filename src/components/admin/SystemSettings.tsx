@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -10,6 +10,8 @@ import { Switch } from '../ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
 import UserManagement from './UserManagement'
+import { useAuthStore } from '../../stores/authStore' // Importar useAuthStore
+import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
 import { 
   Settings, 
   Church, 
@@ -36,8 +38,22 @@ import {
   Wifi
 } from 'lucide-react'
 
+interface ChurchSettingsData {
+  nome: string
+  endereco: string
+  telefone: string
+  email: string
+  cnpj: string
+  pastor_principal: string
+  site: string
+  descricao: string
+}
+
 const SystemSettings = () => {
-  const [churchSettings, setChurchSettings] = useState({
+  const { currentChurchId, user } = useAuthStore() // Obter currentChurchId e user
+  const { getChurchById, updateChurch } = useChurchStore() // Obter getChurchById e updateChurch
+
+  const [churchSettings, setChurchSettings] = useState<ChurchSettingsData>({
     nome: 'Igreja Connect Vida',
     endereco: 'Rua da Igreja, 123 - Centro - São Paulo/SP',
     telefone: '(11) 99999-9999',
@@ -70,18 +86,42 @@ const SystemSettings = () => {
 
   const [showApiKey, setShowApiKey] = useState(false)
 
+  useEffect(() => {
+    if (currentChurchId) {
+      const church = getChurchById(currentChurchId)
+      if (church) {
+        // Carregar configurações da igreja do localStorage ou usar defaults
+        const storedSettings = localStorage.getItem(`churchSettings-${currentChurchId}`)
+        if (storedSettings) {
+          setChurchSettings(JSON.parse(storedSettings))
+        } else {
+          // Usar nome da igreja do store como default
+          setChurchSettings(prev => ({ ...prev, nome: church.name }))
+        }
+      }
+    }
+  }, [currentChurchId, getChurchById])
+
   const handleSaveChurchSettings = () => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja selecionada para salvar as configurações.')
+      return
+    }
     console.log('Salvando configurações da igreja:', churchSettings)
+    localStorage.setItem(`churchSettings-${currentChurchId}`, JSON.stringify(churchSettings))
+    updateChurch(currentChurchId, { name: churchSettings.nome }) // Atualizar nome no churchStore
     toast.success('Configurações da igreja salvas com sucesso!')
   }
 
   const handleSaveSystemConfig = () => {
     console.log('Salvando configurações do sistema:', systemConfig)
+    // Em um sistema real, isso seria salvo por churchId
     toast.success('Configurações do sistema atualizadas!')
   }
 
   const handleSaveSecurity = () => {
     console.log('Salvando configurações de segurança:', securitySettings)
+    // Em um sistema real, isso seria salvo por churchId
     toast.success('Configurações de segurança atualizadas!')
   }
 
@@ -94,6 +134,14 @@ const SystemSettings = () => {
 
   const handleRestore = () => {
     toast.warning('Função de restauração será implementada na versão final')
+  }
+
+  if (!currentChurchId && user?.role !== 'super_admin') {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para gerenciar as configurações.
+      </div>
+    )
   }
 
   return (

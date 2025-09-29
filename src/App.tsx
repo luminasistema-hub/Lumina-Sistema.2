@@ -2,10 +2,11 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import MasterAdminPage from './pages/MasterAdminPage' // Importar o novo painel master
 import { useEffect } from 'react'
 
 function App() {
-  const { user, isLoading, checkAuth } = useAuthStore()
+  const { user, isLoading, checkAuth, currentChurchId } = useAuthStore()
 
   useEffect(() => {
     console.log('App mounted, checking authentication...')
@@ -30,13 +31,17 @@ function App() {
           path="/login" 
           element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
         />
-        <Route 
-          path="/dashboard" 
-          element={user ? <DashboardPage /> : <Navigate to="/login" replace />} 
-        />
+        {user?.role === 'super_admin' ? (
+          <Route path="/master-admin" element={<MasterAdminPage />} />
+        ) : (
+          <Route 
+            path="/dashboard" 
+            element={user && currentChurchId ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/login" replace />} 
+          />
+        )}
         <Route 
           path="/" 
-          element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 
+          element={<Navigate to={user?.role === 'super_admin' ? "/master-admin" : (user ? "/dashboard" : "/login")} replace />} 
         />
       </Routes>
     </div>

@@ -34,6 +34,7 @@ import {
 
 interface Kid {
   id: string
+  churchId: string // Adicionado para multi-igrejas
   nome_crianca: string
   idade: number
   data_nascimento: string
@@ -59,6 +60,7 @@ interface Kid {
 
 interface CheckinRecord {
   id: string
+  churchId: string // Adicionado para multi-igrejas
   crianca_id: string
   data_checkin: string
   data_checkout?: string
@@ -69,7 +71,7 @@ interface CheckinRecord {
 }
 
 const KidsPage = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
   const [kids, setKids] = useState<Kid[]>([])
   const [checkinRecords, setCheckinRecords] = useState<CheckinRecord[]>([])
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false)
@@ -98,52 +100,73 @@ const KidsPage = () => {
 
   // Mock data
   useEffect(() => {
-    console.log('KidsPage: Loading kids data...')
-    const mockKids: Kid[] = [
-      {
-        id: '1',
-        nome_crianca: 'Ana Sofia',
-        idade: 7,
-        data_nascimento: '2018-05-15',
-        responsavel: {
-          id: '1',
-          nome: 'Maria Santos',
-          telefone: '(11) 99999-9999',
-          email: 'maria@email.com'
-        },
-        alergias: 'Alergia a amendoim',
-        informacoes_especiais: 'Criança muito tímida, precisa de atenção especial',
-        autorizacao_fotos: true,
-        status_checkin: 'Presente',
-        ultimo_checkin: '2025-09-11T09:00:00',
-        codigo_seguranca: 'AS123'
-      },
-      {
-        id: '2',
-        nome_crianca: 'Pedro Lucas',
-        idade: 5,
-        data_nascimento: '2020-03-20',
-        responsavel: {
-          id: '2',
-          nome: 'Carlos Silva',
-          telefone: '(11) 88888-8888'
-        },
-        medicamentos: 'Bronchodilator - usar em caso de crise asmática',
-        autorizacao_fotos: false,
-        status_checkin: 'Ausente'
+    if (currentChurchId) {
+      const storedKids = localStorage.getItem(`kids-${currentChurchId}`)
+      const storedCheckinRecords = localStorage.getItem(`checkinRecords-${currentChurchId}`)
+      if (storedKids) {
+        setKids(JSON.parse(storedKids))
+      } else {
+        const mockKids: Kid[] = [
+          {
+            id: '1',
+            churchId: currentChurchId,
+            nome_crianca: 'Ana Sofia',
+            idade: 7,
+            data_nascimento: '2018-05-15',
+            responsavel: {
+              id: '1',
+              nome: 'Maria Santos',
+              telefone: '(11) 99999-9999',
+              email: 'maria@email.com'
+            },
+            alergias: 'Alergia a amendoim',
+            informacoes_especiais: 'Criança muito tímida, precisa de atenção especial',
+            autorizacao_fotos: true,
+            status_checkin: 'Presente',
+            ultimo_checkin: '2025-09-11T09:00:00',
+            codigo_seguranca: 'AS123'
+          },
+          {
+            id: '2',
+            churchId: currentChurchId,
+            nome_crianca: 'Pedro Lucas',
+            idade: 5,
+            data_nascimento: '2020-03-20',
+            responsavel: {
+              id: '2',
+              nome: 'Carlos Silva',
+              telefone: '(11) 88888-8888'
+            },
+            medicamentos: 'Bronchodilator - usar em caso de crise asmática',
+            autorizacao_fotos: false,
+            status_checkin: 'Ausente'
+          }
+        ]
+        setKids(mockKids)
+        localStorage.setItem(`kids-${currentChurchId}`, JSON.stringify(mockKids))
       }
-    ]
-    setKids(mockKids)
-  }, [user])
+      if (storedCheckinRecords) {
+        setCheckinRecords(JSON.parse(storedCheckinRecords))
+      }
+    } else {
+      setKids([])
+      setCheckinRecords([])
+    }
+  }, [currentChurchId, user])
 
   const handleAddKid = () => {
     if (!newKid.nome_crianca || !newKid.responsavel_nome || !newKid.responsavel_telefone) {
       toast.error('Preencha os campos obrigatórios')
       return
     }
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
 
     const kid: Kid = {
       id: Date.now().toString(),
+      churchId: currentChurchId,
       nome_crianca: newKid.nome_crianca,
       idade: newKid.idade,
       data_nascimento: newKid.data_nascimento,
@@ -165,7 +188,10 @@ const KidsPage = () => {
       status_checkin: 'Ausente'
     }
 
-    setKids([...kids, kid])
+    const updatedKids = [...kids, kid]
+    setKids(updatedKids)
+    localStorage.setItem(`kids-${currentChurchId}`, JSON.stringify(updatedKids))
+
     setIsAddKidDialogOpen(false)
     // Reset form
     setNewKid({
@@ -187,9 +213,13 @@ const KidsPage = () => {
   }
 
   const handleCheckin = (kidId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
     const codigo = Math.random().toString(36).substr(2, 6).toUpperCase()
     
-    setKids(prev => prev.map(kid => 
+    const updatedKids = kids.map(kid => 
       kid.id === kidId 
         ? { 
             ...kid, 
@@ -198,28 +228,40 @@ const KidsPage = () => {
             codigo_seguranca: codigo
           }
         : kid
-    ))
+    )
+    setKids(updatedKids)
+    localStorage.setItem(`kids-${currentChurchId}`, JSON.stringify(updatedKids))
 
     const checkinRecord: CheckinRecord = {
       id: Date.now().toString(),
+      churchId: currentChurchId,
       crianca_id: kidId,
       data_checkin: new Date().toISOString(),
       responsavel_checkin: user?.name || '',
       codigo_seguranca: codigo
     }
 
-    setCheckinRecords([...checkinRecords, checkinRecord])
+    const updatedCheckinRecords = [...checkinRecords, checkinRecord]
+    setCheckinRecords(updatedCheckinRecords)
+    localStorage.setItem(`checkinRecords-${currentChurchId}`, JSON.stringify(updatedCheckinRecords))
+
     toast.success(`Check-in realizado! Código: ${codigo}`)
   }
 
   const handleCheckout = (kidId: string) => {
-    setKids(prev => prev.map(kid => 
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+    const updatedKids = kids.map(kid => 
       kid.id === kidId 
         ? { ...kid, status_checkin: 'Ausente' as const }
         : kid
-    ))
+    )
+    setKids(updatedKids)
+    localStorage.setItem(`kids-${currentChurchId}`, JSON.stringify(updatedKids))
 
-    setCheckinRecords(prev => prev.map(record => 
+    const updatedCheckinRecords = checkinRecords.map(record => 
       record.crianca_id === kidId && !record.data_checkout
         ? { 
             ...record, 
@@ -227,7 +269,9 @@ const KidsPage = () => {
             responsavel_checkout: user?.name || ''
           }
         : record
-    ))
+    )
+    setCheckinRecords(updatedCheckinRecords)
+    localStorage.setItem(`checkinRecords-${currentChurchId}`, JSON.stringify(updatedCheckinRecords))
 
     toast.success('Check-out realizado com sucesso!')
   }
@@ -261,6 +305,14 @@ const KidsPage = () => {
 
   const presentKids = kids.filter(kid => kid.status_checkin === 'Presente')
   const totalKids = kids.length
+
+  if (!currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para gerenciar o ministério Kids.
+      </div>
+    )
+  }
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">

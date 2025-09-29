@@ -64,7 +64,7 @@ interface PersonalInfoData {
 }
 
 const PersonalInfo = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
   const [isEditing, setIsEditing] = useState(false)
   const [isFirstAccess, setIsFirstAccess] = useState(true)
   const [formData, setFormData] = useState<PersonalInfoData>({
@@ -92,21 +92,22 @@ const PersonalInfo = () => {
     dataConversao: '',
     testemunho: '',
     diasDisponiveis: [],
-    horariosDisponiveis: '',
-    interesseMinisterio: []
+    horariosDisponiveis: []
   })
 
   useEffect(() => {
-    console.log('PersonalInfo component mounted for user:', user?.name)
-    // Simular verificação se é primeiro acesso
-    const hasCompletedProfile = localStorage.getItem(`profile-${user?.id}`)
-    if (hasCompletedProfile) {
-      setIsFirstAccess(false)
-      setFormData(JSON.parse(hasCompletedProfile))
-    } else {
-      setIsEditing(true)
+    console.log('PersonalInfo component mounted for user:', user?.name, 'church:', currentChurchId)
+    if (user && currentChurchId) {
+      const hasCompletedProfile = localStorage.getItem(`profile-${user.id}-${currentChurchId}`)
+      if (hasCompletedProfile) {
+        setIsFirstAccess(false)
+        setFormData(JSON.parse(hasCompletedProfile))
+      } else {
+        setIsEditing(true)
+        setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }))
+      }
     }
-  }, [user])
+  }, [user, currentChurchId])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -145,6 +146,11 @@ const PersonalInfo = () => {
   }
 
   const handleSave = () => {
+    if (!user || !currentChurchId) {
+      toast.error('Erro: Usuário ou igreja não identificados.')
+      return
+    }
+    
     console.log('Saving personal info:', formData)
     
     // Validação básica
@@ -154,7 +160,7 @@ const PersonalInfo = () => {
     }
 
     // Salvar dados
-    localStorage.setItem(`profile-${user?.id}`, JSON.stringify(formData))
+    localStorage.setItem(`profile-${user.id}-${currentChurchId}`, JSON.stringify(formData))
     setIsFirstAccess(false)
     setIsEditing(false)
     toast.success('Informações salvas com sucesso!')
@@ -174,6 +180,14 @@ const PersonalInfo = () => {
     'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 
     'Sexta-feira', 'Sábado', 'Domingo'
   ]
+
+  if (!currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para visualizar/editar suas informações pessoais.
+      </div>
+    )
+  }
 
   if (isFirstAccess && isEditing) {
     return (

@@ -7,9 +7,15 @@ import MemberDashboardContent from './MemberDashboardContent';
 import AdminPastorDashboardContent from './AdminPastorDashboardContent';
 
 const DashboardHome = () => {
-  const { user } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
 
-  if (!user) return null;
+  if (!user || !currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        {user?.role === 'super_admin' ? 'Selecione uma igreja no menu lateral para visualizar o dashboard.' : 'Carregando informações da igreja...'}
+      </div>
+    );
+  }
 
   const isAdminOrPastor = user.role === 'admin' || user.role === 'pastor';
 

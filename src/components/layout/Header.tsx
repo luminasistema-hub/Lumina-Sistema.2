@@ -1,4 +1,5 @@
 import { useAuthStore, UserRole } from '../../stores/authStore'
+import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { 
@@ -15,19 +16,42 @@ import {
   DollarSign,
   Users,
   Headphones,
-  Heart
+  Heart,
+  Building
 } from 'lucide-react'
 import { Input } from '../ui/input'
-import { useState } from 'react'
+import { useState, useEffect } from 'react' // Importar useEffect
 
-const Header = () => {
+interface HeaderProps {
+  currentChurchId: string | null; // Receber currentChurchId
+}
+
+const Header = ({ currentChurchId }: HeaderProps) => {
   const { user, logout } = useAuthStore()
+  const { getChurchById, loadChurches } = useChurchStore() // Obter getChurchById e loadChurches
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [currentChurchName, setCurrentChurchName] = useState('Nenhuma Igreja Selecionada')
+
+  useEffect(() => {
+    loadChurches() // Carregar igrejas ao montar o componente
+  }, [loadChurches])
+
+  useEffect(() => {
+    if (currentChurchId) {
+      const church = getChurchById(currentChurchId)
+      setCurrentChurchName(church?.name || 'Igreja Desconhecida')
+    } else if (user?.role === 'super_admin') {
+      setCurrentChurchName('Painel Master')
+    } else {
+      setCurrentChurchName('Nenhuma Igreja Selecionada')
+    }
+  }, [currentChurchId, getChurchById, user?.role])
 
   if (!user) return null
 
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
+      case 'super_admin': return <Shield className="w-3 h-3" />
       case 'admin': return <Shield className="w-3 h-3" />
       case 'pastor': return <Crown className="w-3 h-3" />
       case 'lider_ministerio': return <UserCheck className="w-3 h-3" />
@@ -41,6 +65,7 @@ const Header = () => {
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
+      case 'super_admin': return 'Super Admin'
       case 'admin': return 'Administrador'
       case 'pastor': return 'Pastor'
       case 'lider_ministerio': return 'Líder de Ministério'
@@ -54,6 +79,7 @@ const Header = () => {
 
   const getRoleColor = (role: UserRole) => {
     switch (role) {
+      case 'super_admin': return 'bg-red-100 text-red-800 border-red-200'
       case 'admin': return 'bg-red-100 text-red-800 border-red-200'
       case 'pastor': return 'bg-purple-100 text-purple-800 border-purple-200'
       case 'lider_ministerio': return 'bg-blue-100 text-blue-800 border-blue-200'
@@ -68,15 +94,19 @@ const Header = () => {
   return (
     <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Search Bar */}
-        <div className="flex-1 max-w-xs md:max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Pesquisar módulos, membros..."
-              className="pl-10 bg-gray-50 border-0 focus:bg-white"
-            />
-          </div>
+        {/* Church Name / Search Bar */}
+        <div className="flex-1 max-w-xs md:max-w-md flex items-center gap-3">
+          <Building className="w-5 h-5 text-gray-500" />
+          <span className="font-semibold text-gray-800 truncate">{currentChurchName}</span>
+          {user.role !== 'super_admin' && (
+            <div className="relative flex-1 ml-4 hidden sm:block">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Pesquisar módulos, membros..."
+                className="pl-10 bg-gray-50 border-0 focus:bg-white"
+              />
+            </div>
+          )}
         </div>
 
         {/* Right Side Actions */}

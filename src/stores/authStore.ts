@@ -1,14 +1,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type UserRole = 'membro' | 'lider_ministerio' | 'pastor' | 'admin' | 'financeiro' | 'voluntario' | 'midia_tecnologia' | 'integra'
+export type UserRole = 'membro' | 'lider_ministerio' | 'pastor' | 'admin' | 'financeiro' | 'voluntario' | 'midia_tecnologia' | 'integra' | 'super_admin'
 
 export interface User {
   id: string
   name: string
   email: string
   role: UserRole
-  church?: string
+  churchId: string | null // Adicionado para associar o usuário a uma igreja
+  churchName?: string // Nome da igreja para exibição
   ministry?: string
   status: 'ativo' | 'pendente' | 'inativo'
   created_at: string
@@ -19,10 +20,12 @@ export interface User {
 interface AuthState {
   user: User | null
   isLoading: boolean
+  currentChurchId: string | null // ID da igreja atualmente selecionada
   login: (email: string, password: string) => Promise<boolean>
-  register: (name: string, email: string, password: string) => Promise<{ success: boolean; message: string }>
+  register: (name: string, email: string, password: string, churchName: string) => Promise<{ success: boolean; message: string }>
   logout: () => void
   checkAuth: () => void
+  setCurrentChurchId: (churchId: string | null) => void // Novo método para definir a igreja ativa
 }
 
 // Sistema de usuários em produção
@@ -32,16 +35,16 @@ const getUsersFromStorage = (): Record<string, { password: string; user: User }>
     return JSON.parse(stored)
   }
   
-  // Usuário master inicial
+  // Usuário master inicial (super_admin)
   const initialUsers = {
     'diogoalbuquerque38@gmail.com': {
       password: '123456789',
       user: {
-        id: 'master-001',
+        id: 'superadmin-001',
         name: 'Diogo Albuquerque',
         email: 'diogoalbuquerque38@gmail.com',
-        role: 'admin' as UserRole,
-        church: 'Igreja Connect Vida',
+        role: 'super_admin' as UserRole, // Novo papel
+        churchId: null, // Super admin não está ligado a uma igreja específica inicialmente
         status: 'ativo' as const,
         created_at: new Date().toISOString()
       }
@@ -61,6 +64,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       isLoading: false,
+      currentChurchId: null, // Inicialmente sem igreja selecionada
 
       login: async (email: string, password: string) => {
         console.log('Production login attempt for:', email)
@@ -86,7 +90,7 @@ export const useAuthStore = create<AuthState>()(
             }
             
             console.log('Login successful for user:', userData.user.name)
-            set({ user: userData.user, isLoading: false })
+            set({ user: userData.user, isLoading: false, currentChurchId: userData.user.churchId })
             return true
           } else {
             console.log('Login failed: Invalid credentials')
@@ -100,8 +104,8 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      register: async (name: string, email: string, password: string) => {
-        console.log('Registration attempt for:', email)
+      register: async (name: string, email: string, password: string, churchName: string) => {
+        console.log('Registration attempt for:', email, 'for church:', churchName)
         
         try {
           await new Promise(resolve => setTimeout(resolve, 1000))
@@ -111,13 +115,19 @@ export const useAuthStore = create<AuthState>()(
           if (users[email]) {
             return { success: false, message: 'Este email já está cadastrado no sistema' }
           }
+
+          // Simular criação de igreja e associação
+          // Em um sistema real, isso envolveria a criação de uma nova igreja no banco de dados
+          // e a obtenção de um churchId real. Por enquanto, vamos gerar um ID simples.
+          const newChurchId = `church-${Date.now()}`
           
           const newUser: User = {
             id: `user-${Date.now()}`,
             name,
             email,
             role: 'membro',
-            church: 'Igreja Connect Vida',
+            churchId: newChurchId, // Associar ao novo ID da igreja
+            churchName: churchName,
             status: 'pendente',
             created_at: new Date().toISOString()
           }
@@ -129,10 +139,10 @@ export const useAuthStore = create<AuthState>()(
           
           saveUsersToStorage(users)
           
-          console.log('User registered successfully:', newUser.name)
+          console.log('User registered successfully:', newUser.name, 'for church:', churchName)
           return { 
             success: true, 
-            message: 'Cadastro realizado com sucesso! Aguarde a aprovação do administrador para acessar o sistema.' 
+            message: `Cadastro realizado com sucesso para a igreja ${churchName}! Aguarde a aprovação do administrador para acessar o sistema.` 
           }
         } catch (error) {
           console.error('Registration error:', error)
@@ -142,7 +152,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         console.log('User logged out')
-        set({ user: null })
+        set({ user: null, currentChurchId: null })
       },
 
       checkAuth: () => {
@@ -150,9 +160,15 @@ export const useAuthStore = create<AuthState>()(
         const currentUser = get().user
         if (currentUser) {
           console.log('User is authenticated:', currentUser.name)
+          set({ currentChurchId: currentUser.churchId })
         } else {
           console.log('No authenticated user found')
         }
+      },
+
+      setCurrentChurchId: (churchId: string | null) => {
+        set({ currentChurchId: churchId })
+        console.log('Current church ID set to:', churchId)
       }
     }),
     {

@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore, UserRole } from '../../stores/authStore'
+import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select' // Importar Select
 import { 
   Users, 
   Calendar, 
@@ -27,9 +29,11 @@ import {
   Activity,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Building
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useNavigate } from 'react-router-dom' // Importar useNavigate
 
 interface ModuleItem {
   id: string
@@ -216,12 +220,19 @@ const moduleCategories: ModuleCategory[] = [
 interface SidebarProps {
   activeModule?: string
   onModuleSelect?: (moduleId: string) => void
+  currentChurchId: string | null // Receber currentChurchId
 }
 
-const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) => {
+const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['personal'])
-  const { user } = useAuthStore()
+  const { user, setCurrentChurchId } = useAuthStore()
+  const { churches, loadChurches } = useChurchStore()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    loadChurches()
+  }, [loadChurches])
 
   if (!user) return null
 
@@ -234,11 +245,16 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
   }
 
   const handleModuleClick = (moduleId: string) => {
-    onModuleSelect?.(moduleId)
+    if (moduleId === 'master-admin') {
+      navigate('/master-admin')
+    } else {
+      onModuleSelect?.(moduleId)
+    }
   }
 
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
+      case 'super_admin': return <Shield className="w-3 h-3" />
       case 'admin': return <Shield className="w-3 h-3" />
       case 'pastor': return <Crown className="w-3 h-3" />
       case 'lider_ministerio': return <UserCheck className="w-3 h-3" />
@@ -252,6 +268,7 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
 
   const getRoleColor = (role: UserRole) => {
     switch (role) {
+      case 'super_admin': return 'bg-red-100 text-red-700 border-red-200'
       case 'admin': return 'bg-red-100 text-red-700 border-red-200'
       case 'pastor': return 'bg-purple-100 text-purple-700 border-purple-200'
       case 'lider_ministerio': return 'bg-blue-100 text-blue-700 border-blue-200'
@@ -265,6 +282,7 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
+      case 'super_admin': return 'Super Admin'
       case 'admin': return 'Admin'
       case 'pastor': return 'Pastor'
       case 'lider_ministerio': return 'Líder'
@@ -294,6 +312,16 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
     )
   }
 
+  const handleChurchSelect = (churchId: string) => {
+    setCurrentChurchId(churchId)
+    // Opcional: redirecionar para o dashboard após selecionar a igreja
+    if (user?.role === 'super_admin') {
+      navigate('/dashboard')
+    }
+  }
+
+  const currentChurch = currentChurchId ? churches.find(c => c.id === currentChurchId) : null
+
   return (
     <div className={cn(
       "h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300",
@@ -309,9 +337,9 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
             <div>
               <h1 className="font-bold text-gray-900">Connect Vida</h1>
               <div className="flex items-center gap-2">
-                <p className="text-xs text-gray-500">Sistema Beta</p>
+                <p className="text-xs text-gray-500">Sistema Multi-Igrejas</p>
                 <Badge className="bg-green-100 text-green-800 text-xs px-2 py-0.5">
-                  Demo
+                  SaaS
                 </Badge>
               </div>
             </div>
@@ -342,9 +370,30 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
               </Badge>
             </div>
           </div>
-          {user.church && (
-            <p className="text-xs text-gray-500 mt-2 truncate">📍 {user.church}</p>
+          {user.churchName && (
+            <p className="text-xs text-gray-500 mt-2 truncate">📍 {user.churchName}</p>
           )}
+        </div>
+      )}
+
+      {/* Church Selector for Super Admin */}
+      {user.role === 'super_admin' && !isCollapsed && (
+        <div className="p-4 border-b border-gray-100">
+          <Label htmlFor="church-selector" className="text-xs font-medium text-gray-600 mb-1 block">
+            Igreja Ativa
+          </Label>
+          <Select value={currentChurchId || ''} onValueChange={handleChurchSelect}>
+            <SelectTrigger id="church-selector" className="w-full">
+              <SelectValue placeholder="Selecione uma igreja" />
+            </SelectTrigger>
+            <SelectContent>
+              {churches.map(church => (
+                <SelectItem key={church.id} value={church.id}>
+                  {church.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 
@@ -365,6 +414,24 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
             {!isCollapsed && <span className="ml-3">Dashboard</span>}
           </Button>
         </div>
+
+        {/* Master Admin Link */}
+        {user.role === 'super_admin' && (
+          <div className="px-4 mb-4">
+            <Button
+              variant={activeModule === 'master-admin' ? 'default' : 'ghost'}
+              className={cn(
+                "w-full justify-start",
+                isCollapsed ? "px-2" : "px-3",
+                activeModule === 'master-admin' && "bg-red-50 text-red-700 hover:bg-red-100"
+              )}
+              onClick={() => handleModuleClick('master-admin')}
+            >
+              <Shield className="w-4 h-4" />
+              {!isCollapsed && <span className="ml-3">Painel Master</span>}
+            </Button>
+          </div>
+        )}
 
         {/* Module Categories */}
         <div className="space-y-2">
@@ -430,7 +497,7 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
         <div className="p-4 border-t border-gray-100">
           <div className="text-center">
             <p className="text-xs text-gray-500">
-              Connect Vida v2.0 Beta
+              Connect Vida v2.0 SaaS
             </p>
             <p className="text-xs text-gray-400 mt-1">
               © 2025 Igreja Connect
