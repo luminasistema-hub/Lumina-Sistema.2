@@ -110,7 +110,7 @@ export const useAuthStore = create<AuthState>()(
             }
 
             const userRole = profile.funcao as UserRole;
-            const churchId = profile.id_igreja;
+            const churchIdFromProfile = profile.id_igreja;
             const churchName = profile.igrejas ? profile.igrejas.nome : undefined;
 
             const authenticatedUser: User = {
@@ -118,13 +118,26 @@ export const useAuthStore = create<AuthState>()(
               name: profile.full_name || session.user.user_metadata.full_name || session.user.email || 'Usuário',
               email: session.user.email!,
               role: userRole,
-              churchId: churchId,
+              churchId: churchIdFromProfile, // This is the user's primary church ID
               churchName: churchName,
               status: profile.status as User['status'],
               created_at: session.user.created_at,
             };
-            set({ user: authenticatedUser, isLoading: false, currentChurchId: churchId });
-            console.log('AuthStore: User authenticated and state updated:', authenticatedUser.name, 'Church ID:', churchId);
+
+            let newCurrentChurchId: string | null;
+            if (userRole === 'super_admin') {
+                // Super admin's currentChurchId is managed separately (can be null or selected)
+                // We keep the existing currentChurchId from persisted state or set to null if not found
+                newCurrentChurchId = get().currentChurchId;
+                console.log('AuthStore: Super admin detected. Keeping currentChurchId as:', newCurrentChurchId);
+            } else {
+                // For all other roles, currentChurchId should always be their primary churchId
+                newCurrentChurchId = churchIdFromProfile;
+                console.log('AuthStore: Non-super admin detected. Setting currentChurchId to profile church ID:', newCurrentChurchId);
+            }
+
+            set({ user: authenticatedUser, isLoading: false, currentChurchId: newCurrentChurchId });
+            console.log('AuthStore: User authenticated and state updated. Final currentChurchId:', newCurrentChurchId);
           } else {
             console.log('AuthStore: No authenticated user found in session.');
             set({ user: null, isLoading: false, currentChurchId: null });

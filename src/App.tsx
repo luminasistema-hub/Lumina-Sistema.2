@@ -14,6 +14,11 @@ function App() {
     checkAuth(); // Também verificar a autenticação no carregamento inicial
   }, [checkAuth, initializeAuthListener]) // Adicionar initializeAuthListener às dependências
 
+  // Add this log to see the state right before rendering routes
+  useEffect(() => {
+    console.log('App Render: isLoading:', isLoading, 'user:', user?.email, 'userRole:', user?.role, 'currentChurchId:', currentChurchId);
+  }, [isLoading, user, currentChurchId]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-church-blue-50 to-church-purple-50">
