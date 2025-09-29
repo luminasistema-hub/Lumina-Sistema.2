@@ -266,10 +266,6 @@ const DashboardHome = () => {
             {user.ministry && ` • ${user.ministry}`}
           </p>
         )}
-        <Badge className="bg-white/20 text-white border-white/30 mt-3">
-          <Star className="w-3 h-3 mr-1" />
-          Sistema Beta - Modo Demonstração
-        </Badge>
       </div>
 
       {/* Stats Grid */}
