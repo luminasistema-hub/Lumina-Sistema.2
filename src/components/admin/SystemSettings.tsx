@@ -10,8 +10,8 @@ import { Switch } from '../ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
 import UserManagement from './UserManagement'
-import { useAuthStore } from '../../stores/authStore' // Importar useAuthStore
-import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
+import { useAuthStore } from '../../stores/authStore'
+import { useChurchStore } from '../../stores/churchStore'
 import { 
   Settings, 
   Church, 
@@ -50,8 +50,8 @@ interface ChurchSettingsData {
 }
 
 const SystemSettings = () => {
-  const { currentChurchId, user } = useAuthStore() // Obter currentChurchId e user
-  const { getChurchById, updateChurch } = useChurchStore() // Obter getChurchById e updateChurch
+  const { currentChurchId, user } = useAuthStore()
+  const { getChurchById, updateChurch, loadChurches } = useChurchStore() // Adicionado loadChurches
 
   const [churchSettings, setChurchSettings] = useState<ChurchSettingsData>({
     nome: 'Igreja Connect Vida',
@@ -87,20 +87,46 @@ const SystemSettings = () => {
   const [showApiKey, setShowApiKey] = useState(false)
 
   useEffect(() => {
+    loadChurches(); // Garante que as igrejas sejam carregadas ao montar o componente
+  }, [loadChurches]);
+
+  useEffect(() => {
+    console.log('SystemSettings: currentChurchId changed:', currentChurchId);
     if (currentChurchId) {
-      const church = getChurchById(currentChurchId)
+      const church = getChurchById(currentChurchId);
       if (church) {
-        // Carregar configurações da igreja do localStorage ou usar defaults
-        const storedSettings = localStorage.getItem(`churchSettings-${currentChurchId}`)
+        // Carregar configurações do localStorage para esta igreja específica
+        const storedSettings = localStorage.getItem(`churchSettings-${currentChurchId}`);
         if (storedSettings) {
-          setChurchSettings(JSON.parse(storedSettings))
+          setChurchSettings(JSON.parse(storedSettings));
+          console.log(`SystemSettings: Loaded settings for ${church.name} from localStorage.`);
         } else {
-          // Usar nome da igreja do store como default
-          setChurchSettings(prev => ({ ...prev, nome: church.name }))
+          // Se não houver configurações específicas, inicializa com o nome da igreja do store e outros defaults
+          setChurchSettings(prev => ({
+            ...prev,
+            nome: church.name, // Usa o nome da igreja do churchStore
+            // Os outros campos permanecem com os valores padrão ou podem ser definidos a partir de um template
+          }));
+          console.log(`SystemSettings: Initialized settings for ${church.name} with default/store name.`);
         }
+      } else {
+        console.warn(`SystemSettings: Church with ID ${currentChurchId} not found in store.`);
+        // Opcionalmente, resetar para o padrão ou mostrar uma mensagem se a igreja não for encontrada
+        setChurchSettings({
+          nome: 'Igreja Desconhecida',
+          endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
+        });
       }
+    } else if (user?.role === 'super_admin') {
+      setChurchSettings(prev => ({ ...prev, nome: 'Painel Master - Configurações' }));
+    } else {
+      // Nenhuma igreja selecionada e não é super_admin
+      setChurchSettings({
+        nome: 'Nenhuma Igreja Selecionada',
+        endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
+      });
     }
-  }, [currentChurchId, getChurchById])
+  }, [currentChurchId, user?.role, getChurchById]); // Depende de getChurchById para reagir a atualizações do store
 
   const handleSaveChurchSettings = () => {
     if (!currentChurchId) {
@@ -109,7 +135,10 @@ const SystemSettings = () => {
     }
     console.log('Salvando configurações da igreja:', churchSettings)
     localStorage.setItem(`churchSettings-${currentChurchId}`, JSON.stringify(churchSettings))
-    updateChurch(currentChurchId, { name: churchSettings.nome }) // Atualizar nome no churchStore
+    
+    // Atualiza o nome da igreja no store global
+    updateChurch(currentChurchId, { name: churchSettings.nome })
+    
     toast.success('Configurações da igreja salvas com sucesso!')
   }
 
