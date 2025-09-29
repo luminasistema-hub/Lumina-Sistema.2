@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export type UserRole = 'membro' | 'lider_ministerio' | 'pastor' | 'admin' | 'financeiro' | 'voluntario' | 'midia_tecnologia' | 'integra' | 'super_admin'
 
-export interface User {
+interface User {
   id: string
   name: string
   email: string
@@ -16,6 +16,8 @@ export interface User {
   approved_by?: string
   approved_at?: string
 }
+
+export type { User } // Exportação explícita da interface como um tipo
 
 interface AuthState {
   user: User | null
