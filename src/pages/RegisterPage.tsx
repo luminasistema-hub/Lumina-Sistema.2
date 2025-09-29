@@ -14,18 +14,21 @@ const RegisterPage = () => {
   const navigate = useNavigate();
 
   const churchIdFromUrl = searchParams.get('churchId');
-  const churchNameFromUrl = searchParams.get('churchName');
+  // Trata a string "undefined" vinda da URL como vazia
+  const rawChurchNameFromUrl = searchParams.get('churchName');
+  const churchNameFromUrl = rawChurchNameFromUrl === 'undefined' ? '' : rawChurchNameFromUrl;
+  
   const initialRoleFromUrl = searchParams.get('initialRole') || 'membro';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [churchName, setChurchName] = useState(churchNameFromUrl || '');
+  const [churchName, setChurchName] = useState(churchNameFromUrl || ''); // Usa o nome da igreja já tratado
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (churchNameFromUrl) {
+    if (churchNameFromUrl) { // Esta condição agora será verdadeira apenas se for um nome válido
       setChurchName(churchNameFromUrl);
     }
   }, [churchNameFromUrl]);

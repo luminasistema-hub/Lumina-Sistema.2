@@ -78,6 +78,7 @@ const MemberManagementPage = () => {
   const [filterRole, setFilterRole] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMinistry, setFilterMinistry] = useState('all')
+  const [churchesLoaded, setChurchesLoaded] = useState(false); // Novo estado para rastrear o carregamento das igrejas
 
   const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
   const canEditRoles = user?.role === 'admin' || user?.role === 'pastor'
@@ -96,7 +97,11 @@ const MemberManagementPage = () => {
   // Effect para garantir que as igrejas sejam carregadas quando o componente é montado
   useEffect(() => {
     console.log('MemberManagementPage: Initializing loadChurches on mount.');
-    loadChurches();
+    const fetchChurches = async () => {
+      await loadChurches();
+      setChurchesLoaded(true); // Marca como carregado após a busca
+    };
+    fetchChurches();
   }, [loadChurches]);
 
   // Effect para reagir a mudanças em currentChurchId ou na lista de igrejas carregadas
@@ -232,8 +237,7 @@ const MemberManagementPage = () => {
       return
     }
     
-    // Adiciona uma verificação para garantir que 'churches' não esteja vazio
-    if (churches.length === 0) {
+    if (!churchesLoaded || churches.length === 0) { // Usa o novo estado
       toast.error('Os dados das igrejas ainda não foram carregados. Por favor, aguarde um momento e tente novamente.')
       return;
     }
@@ -242,8 +246,10 @@ const MemberManagementPage = () => {
     console.log('MemberManagementPage: Current churches in store (before getChurchById):', churches);
     const church = getChurchById(currentChurchId)
     console.log('MemberManagementPage: Church found by ID:', church);
-    if (!church) {
-      toast.error('Não foi possível encontrar os dados da igreja. O ID da igreja pode estar inválido ou os dados não foram sincronizados. Tente recarregar a página ou selecionar a igreja novamente.')
+    
+    // Verificação explícita para garantir que church e church.name são válidos
+    if (!church || !church.name) {
+      toast.error('Não foi possível encontrar os dados da igreja ou o nome da igreja está ausente. Tente recarregar a página ou selecionar a igreja novamente.')
       return
     }
 
@@ -550,6 +556,7 @@ const MemberManagementPage = () => {
               variant="outline" 
               className="flex-1 lg:flex-none"
               onClick={handleGenerateRegistrationLink}
+              disabled={!currentChurchId || !churchesLoaded} // Desabilita se nenhuma igreja selecionada ou não carregada
             >
               <LinkIcon className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">Gerar Link de Cadastro</span>
