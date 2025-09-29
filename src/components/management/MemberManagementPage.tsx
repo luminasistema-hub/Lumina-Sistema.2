@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useAuthStore, User as AuthUser } from '../../stores/authStore' // Importar User do authStore como AuthUser
-import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
+import { useAuthStore, User as AuthUser } from '../../stores/authStore'
+import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -32,20 +32,21 @@ import {
   Download,
   Upload,
   MoreHorizontal,
-  User as UserIcon // Importar User do lucide-react e renomear para UserIcon
+  User as UserIcon,
+  Link as LinkIcon, // Importar Link do lucide-react
+  Copy // Importar Copy do lucide-react
 } from 'lucide-react'
 
-interface Member extends AuthUser { // Estender a interface AuthUser
+interface Member extends AuthUser {
   telefone?: string
   endereco?: string
   data_nascimento?: string
-  papel: 'Comum' | 'Líder de Ministério' | 'Pastor' | 'Master' // Manter papel para compatibilidade
+  papel: 'Comum' | 'Líder de Ministério' | 'Pastor' | 'Master'
   ministerio_atual?: {
     id: string
     nome: string
   }
   data_cadastro: string
-  // status: 'ativo' | 'pendente' | 'inativo' // Removido para herdar de AuthUser
   informacoes_pessoais?: {
     estado_civil?: string
     profissao?: string
@@ -64,13 +65,15 @@ interface Member extends AuthUser { // Estender a interface AuthUser
 }
 
 const MemberManagementPage = () => {
-  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
-  const { updateChurch, getChurchById } = useChurchStore() // Obter updateChurch e getChurchById
+  const { user, currentChurchId } = useAuthStore()
+  const { updateChurch, getChurchById } = useChurchStore()
   const [members, setMembers] = useState<Member[]>([])
   const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false)
   const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
+  const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false) // Novo estado para o diálogo do link
+  const [generatedLink, setGeneratedLink] = useState('') // Estado para o link gerado
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -80,13 +83,13 @@ const MemberManagementPage = () => {
   const canEditRoles = user?.role === 'admin' || user?.role === 'pastor'
 
   const [newMember, setNewMember] = useState({
-    name: '', // Usar 'name' em vez de 'nome'
+    name: '',
     email: '',
     telefone: '',
     endereco: '',
     data_nascimento: '',
     papel: 'Comum' as Member['papel'],
-    status: 'ativo' as Member['status'], // Alinhar status com AuthUser
+    status: 'ativo' as Member['status'],
     observacoes: ''
   })
 
@@ -102,26 +105,22 @@ const MemberManagementPage = () => {
   useEffect(() => {
     let filtered = members
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(member => 
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()) || // Usar 'name'
+        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (member.telefone && member.telefone.includes(searchTerm))
       )
     }
 
-    // Role filter
     if (filterRole !== 'all') {
       filtered = filtered.filter(member => member.papel === filterRole)
     }
 
-    // Status filter
     if (filterStatus !== 'all') {
       filtered = filtered.filter(member => member.status === filterStatus)
     }
 
-    // Ministry filter
     if (filterMinistry !== 'all') {
       filtered = filtered.filter(member => 
         member.ministerio_atual?.nome === filterMinistry
@@ -137,7 +136,7 @@ const MemberManagementPage = () => {
       const usersData = JSON.parse(stored)
       const memberList = Object.values(usersData)
         .map((userData: any) => userData.user as Member)
-        .filter(m => m.churchId === churchId) // Filtrar por churchId
+        .filter(m => m.churchId === churchId)
       setMembers(memberList)
       setFilteredMembers(memberList)
     }
@@ -156,13 +155,13 @@ const MemberManagementPage = () => {
       
       localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
       if (currentChurchId) {
-        loadMembers(currentChurchId) // Recarregar membros da igreja ativa
+        loadMembers(currentChurchId)
       }
     }
   }
 
   const handleAddMember = () => {
-    if (!newMember.name || !newMember.email) { // Usar 'name'
+    if (!newMember.name || !newMember.email) {
       toast.error('Nome e email são obrigatórios')
       return
     }
@@ -179,28 +178,27 @@ const MemberManagementPage = () => {
 
     const member: Member = {
       id: `member-${Date.now()}`,
-      name: newMember.name, // Usar 'name'
+      name: newMember.name,
       email: newMember.email,
       telefone: newMember.telefone,
       endereco: newMember.endereco,
       data_nascimento: newMember.data_nascimento,
-      role: 'membro', // Papel padrão para novos membros
-      papel: newMember.papel, // Manter para compatibilidade com a interface Member
-      churchId: currentChurchId, // Associar ao currentChurchId
+      role: 'membro',
+      papel: newMember.papel,
+      churchId: currentChurchId,
       churchName: currentChurch?.name,
       data_cadastro: new Date().toISOString(),
-      status: 'pendente', // Novos membros começam como pendentes
+      status: 'pendente',
       observacoes: newMember.observacoes,
       informacoes_espirituais: {
         batizado: false
       }
     }
 
-    // Simular adição ao localStorage de usuários
     const storedUsers = localStorage.getItem('connect-vida-users')
     const usersData = storedUsers ? JSON.parse(storedUsers) : {}
     usersData[member.email] = {
-      password: 'senha_padrao_temporaria', // Senha temporária para novos membros
+      password: 'senha_padrao_temporaria',
       user: member
     }
     localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
@@ -208,7 +206,7 @@ const MemberManagementPage = () => {
     setMembers([...members, member])
     setIsAddMemberDialogOpen(false)
     setNewMember({
-      name: '', // Usar 'name'
+      name: '',
       email: '',
       telefone: '',
       endereco: '',
@@ -220,12 +218,34 @@ const MemberManagementPage = () => {
     toast.success('Membro cadastrado com sucesso! Aguardando aprovação.')
   }
 
+  const handleGenerateRegistrationLink = () => {
+    if (!currentChurchId) {
+      toast.error('Selecione uma igreja para gerar o link de cadastro.')
+      return
+    }
+    const church = getChurchById(currentChurchId)
+    if (!church) {
+      toast.error('Não foi possível encontrar os dados da igreja.')
+      return
+    }
+
+    const baseUrl = window.location.origin // Obtém a URL base do seu aplicativo
+    const link = `${baseUrl}/login?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`
+    setGeneratedLink(link)
+    setIsGenerateLinkDialogOpen(true)
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(generatedLink)
+    toast.success('Link copiado para a área de transferência!')
+  }
+
   const getRoleIcon = (role: Member['papel']) => {
     switch (role) {
       case 'Master': return <Shield className="w-4 h-4" />
       case 'Pastor': return <Crown className="w-4 h-4" />
       case 'Líder de Ministério': return <UserCheck className="w-4 h-4" />
-      case 'Comum': return <UserIcon className="w-4 h-4" /> // Usar o ícone UserIcon do lucide-react
+      case 'Comum': return <UserIcon className="w-4 h-4" />
     }
   }
 
@@ -243,7 +263,6 @@ const MemberManagementPage = () => {
       case 'ativo': return 'bg-green-100 text-green-800'
       case 'inativo': return 'bg-gray-100 text-gray-800'
       case 'pendente': return 'bg-yellow-100 text-yellow-800'
-      // 'Visitante' e 'Transferido' não são mais status diretos, mas podem ser tratados como papéis ou tags
       default: return 'bg-gray-100 text-gray-800'
     }
   }
@@ -507,6 +526,18 @@ const MemberManagementPage = () => {
             </Dialog>
           )}
 
+          {canManageMembers && (
+            <Button 
+              variant="outline" 
+              className="flex-1 lg:flex-none"
+              onClick={handleGenerateRegistrationLink}
+            >
+              <LinkIcon className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Gerar Link de Cadastro</span>
+              <span className="sm:hidden">Link</span>
+            </Button>
+          )}
+
           <Button variant="outline" className="hidden sm:flex">
             <Download className="w-4 h-4 mr-2" />
             Exportar
@@ -734,6 +765,42 @@ const MemberManagementPage = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Generate Registration Link Dialog */}
+      <Dialog open={isGenerateLinkDialogOpen} onOpenChange={setIsGenerateLinkDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link de Cadastro para Membros</DialogTitle>
+            <DialogDescription>
+              Compartilhe este link com novos membros para que se cadastrem diretamente na sua igreja.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="registration-link">Link de Cadastro</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="registration-link"
+                  value={generatedLink}
+                  readOnly
+                  className="flex-1"
+                />
+                <Button variant="outline" size="icon" onClick={handleCopyLink}>
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600">
+              Novos usuários que se cadastrarem por este link serão automaticamente associados à sua igreja como "Membros".
+            </p>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setIsGenerateLinkDialogOpen(false)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

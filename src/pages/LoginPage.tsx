@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -7,7 +7,8 @@ import { Label } from '../components/ui/label'
 import { Badge } from '../components/ui/badge'
 import { toast } from 'sonner'
 import { Church, Lock, Mail, Eye, EyeOff, User, ArrowLeft, Building } from 'lucide-react'
-import { supabase } from '../integrations/supabase/client' // Importar o cliente Supabase
+import { supabase } from '../integrations/supabase/client'
+import { useSearchParams } from 'react-router-dom' // Importar useSearchParams
 
 const LoginPage = () => {
   const [email, setEmail] = useState('')
@@ -16,7 +17,19 @@ const LoginPage = () => {
   const [churchName, setChurchName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isRegisterMode, setIsRegisterMode] = useState(false)
-  const { login, isLoading } = useAuthStore() // Apenas 'login' e 'isLoading' são necessários aqui
+  const { login, isLoading } = useAuthStore()
+  const [searchParams] = useSearchParams() // Hook para ler parâmetros da URL
+
+  const churchIdFromUrl = searchParams.get('churchId')
+  const churchNameFromUrl = searchParams.get('churchName')
+  const initialRoleFromUrl = searchParams.get('initialRole') || 'membro' // Default to 'membro'
+
+  useEffect(() => {
+    if (churchIdFromUrl && churchNameFromUrl) {
+      setIsRegisterMode(true)
+      setChurchName(churchNameFromUrl)
+    }
+  }, [churchIdFromUrl, churchNameFromUrl])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,7 +59,8 @@ const LoginPage = () => {
           data: {
             full_name: name,
             church_name: churchName,
-            initial_role: 'membro'
+            initial_role: initialRoleFromUrl, // Usar papel do URL ou padrão
+            church_id: churchIdFromUrl // Passar churchId se vier do URL
           }
         }
       })
@@ -61,7 +75,10 @@ const LoginPage = () => {
         setName('')
         setEmail('')
         setPassword('')
-        setChurchName('')
+        // Não limpar churchName se veio da URL para manter o contexto
+        if (!churchIdFromUrl) {
+          setChurchName('')
+        }
       } else {
         console.error('LoginPage: Unknown error during signUp.');
         toast.error('Erro desconhecido no registro.')
@@ -69,13 +86,11 @@ const LoginPage = () => {
 
     } else {
       console.log('LoginPage: Attempting login via useAuthStore.login().');
-      const success = await login(email, password); // Chamar o método login do store
+      const success = await login(email, password);
       if (!success) {
-        // O erro já deve ter sido exibido pelo método login do store
         console.error('LoginPage: Login failed via useAuthStore.login().');
       } else {
         console.log('LoginPage: Login successful via useAuthStore.login().');
-        // O redirecionamento será tratado pelo App.tsx reagindo ao estado do store
       }
     }
   }
@@ -129,6 +144,7 @@ const LoginPage = () => {
                         value={churchName}
                         onChange={(e) => setChurchName(e.target.value)}
                         className="pl-10 h-12"
+                        disabled={!!churchIdFromUrl} // Desabilitar se veio da URL
                         required
                       />
                     </div>
@@ -199,7 +215,10 @@ const LoginPage = () => {
                   setName('')
                   setEmail('')
                   setPassword('')
-                  setChurchName('')
+                  // Não limpar churchName se veio da URL para manter o contexto
+                  if (!churchIdFromUrl) {
+                    setChurchName('')
+                  }
                 }}
                 className="text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-2 mx-auto"
               >
