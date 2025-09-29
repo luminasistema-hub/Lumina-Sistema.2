@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuthStore, User as AuthUser } from '../../stores/authStore'
+import { useAuthStore, UserRole } from '../../stores/authStore' // Import UserRole
 import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
+import { supabase } from '../../integrations/supabase/client' // Import supabase client
 import { 
   Users, 
   Plus, 
@@ -34,35 +35,57 @@ import {
   MoreHorizontal,
   User as UserIcon,
   Link as LinkIcon,
-  Copy
+  Copy,
+  Clock,
+  XCircle,
+  CheckCircle,
+  DollarSign,
+  Headphones
 } from 'lucide-react'
 
-interface Member extends AuthUser {
-  telefone?: string
-  endereco?: string
-  data_nascimento?: string
-  papel: 'Comum' | 'Líder de Ministério' | 'Pastor' | 'Master'
-  ministerio_atual?: {
-    id: string
-    nome: string
-  }
-  data_cadastro: string
-  informacoes_pessoais?: {
-    estado_civil?: string
-    profissao?: string
-    conjuge?: string
-    filhos?: Array<{nome: string, idade: number}>
-  }
-  informacoes_espirituais?: {
-    data_conversao?: string
-    batizado: boolean
-    data_batismo?: string
-    tempo_igreja?: string
-  }
-  ultimo_teste_vocacional?: string
-  ministerio_recomendado?: string
-  observacoes?: string
+// Define a more accurate interface based on Supabase tables
+interface MemberProfile {
+  id: string; // Corresponds to auth.users.id and perfis.id
+  id_igreja: string; // Corresponds to perfis.id_igreja
+  funcao: UserRole; // Corresponds to perfis.funcao
+  perfil_completo: boolean; // Corresponds to perfis.perfil_completo
+  full_name: string; // Corresponds to perfis.full_name
+  status: 'ativo' | 'pendente' | 'inativo'; // Corresponds to perfis.status
+  // Fields from informacoes_pessoais (joined)
+  telefone?: string;
+  endereco?: string; // Assuming this is stored in informacoes_pessoais
+  data_nascimento?: string; // Assuming this is stored in informacoes_pessoais
+  estado_civil?: string;
+  profissao?: string;
+  conjuge?: string;
+  filhos?: Array<{nome: string, idade: number}>; // JSONB
+  pais_cristaos?: string;
+  familiar_na_igreja?: string;
+  tempo_igreja?: string;
+  batizado?: boolean;
+  data_batismo?: string;
+  participa_ministerio?: boolean;
+  ministerio_anterior?: string;
+  experiencia_anterior?: string;
+  decisao_cristo?: string;
+  data_conversao?: string;
+  testemunho?: string;
+  dias_disponiveis?: string[]; // ARRAY
+  horarios_disponiveis?: string;
+  interesse_ministerio?: string[]; // ARRAY
+  // Fields from membros (for vocational test results, if joined)
+  ultimo_teste_data?: string; // from public.membros.ultimo_teste_data
+  ministerio_recomendado?: string; // from public.membros.ministerio_recomendado
+  // Other fields from auth.users or derived
+  email: string; // From auth.users
+  created_at: string; // From auth.users
+  churchName?: string; // Joined from public.igrejas
+  approved_by?: string; // Not directly in schema, might be derived or added to perfis
+  approved_at?: string; // Not directly in schema, might be derived or added to perfis
 }
+
+// The 'Member' type used in the component should be MemberProfile
+type Member = MemberProfile;
 
 const MemberManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
@@ -78,7 +101,7 @@ const MemberManagementPage = () => {
   const [filterRole, setFilterRole] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMinistry, setFilterMinistry] = useState('all')
-  const [churchesLoaded, setChurchesLoaded] = useState(false); // Novo estado para rastrear o carregamento das igrejas
+  const [churchesLoaded, setChurchesLoaded] = useState(false); 
 
   const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
   const canEditRoles = user?.role === 'admin' || user?.role === 'pastor'
@@ -89,10 +112,13 @@ const MemberManagementPage = () => {
     telefone: '',
     endereco: '',
     data_nascimento: '',
-    papel: 'Comum' as Member['papel'],
-    status: 'ativo' as Member['status'],
+    funcao: 'membro' as UserRole, // Changed from 'papel' to 'funcao' to match DB
+    status: 'pendente' as Member['status'], // Default to pending
     observacoes: ''
   })
+
+  const [editMemberData, setEditMemberData] = useState<Partial<Member>>({});
+
 
   // Effect para garantir que as igrejas sejam carregadas quando o componente é montado
   useEffect(() => {
@@ -120,14 +146,14 @@ const MemberManagementPage = () => {
 
     if (searchTerm) {
       filtered = filtered.filter(member => 
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (member.telefone && member.telefone.includes(searchTerm))
       )
     }
 
     if (filterRole !== 'all') {
-      filtered = filtered.filter(member => member.papel === filterRole)
+      filtered = filtered.filter(member => member.funcao === filterRole)
     }
 
     if (filterStatus !== 'all') {
@@ -135,51 +161,127 @@ const MemberManagementPage = () => {
     }
 
     if (filterMinistry !== 'all') {
+      // This part needs to be adjusted if ministry is not directly on MemberProfile
+      // For now, assuming ministerio_recomendado or similar
       filtered = filtered.filter(member => 
-        member.ministerio_atual?.nome === filterMinistry
+        member.ministerio_recomendado?.toLowerCase().includes(filterMinistry.toLowerCase())
       )
     }
 
     setFilteredMembers(filtered)
   }, [members, searchTerm, filterRole, filterStatus, filterMinistry])
 
-  const loadMembers = (churchId: string) => {
-    const stored = localStorage.getItem('connect-vida-users')
-    if (stored) {
-      const usersData = JSON.parse(stored)
-      const memberList = Object.values(usersData)
-        .map((userData: any) => userData.user as Member)
-        .filter(m => m.churchId === churchId)
-      setMembers(memberList)
-      setFilteredMembers(memberList)
-    }
-  }
+  const loadMembers = async (churchId: string) => {
+    console.log('MemberManagementPage: Loading members for churchId:', churchId);
+    const { data, error } = await supabase
+      .from('perfis')
+      .select(`
+        id,
+        id_igreja,
+        funcao,
+        perfil_completo,
+        full_name,
+        status,
+        created_at,
+        informacoes_pessoais (
+          telefone,
+          endereco,
+          data_nascimento,
+          estado_civil,
+          profissao,
+          conjuge,
+          filhos,
+          pais_cristaos,
+          familiar_na_igreja,
+          tempo_igreja,
+          batizado,
+          data_batismo,
+          participa_ministerio,
+          ministerio_anterior,
+          experiencia_anterior,
+          decisao_cristo,
+          data_conversao,
+          testemunho,
+          dias_disponiveis,
+          horarios_disponiveis,
+          interesse_ministerio
+        ),
+        igrejas (
+          nome
+        )
+      `)
+      .eq('id_igreja', churchId);
 
-  const saveMembers = (updatedMembers: Member[]) => {
-    const stored = localStorage.getItem('connect-vida-users')
-    if (stored) {
-      const usersData = JSON.parse(stored)
-      
-      updatedMembers.forEach(memberToUpdate => {
-        if (usersData[memberToUpdate.email]) {
-          usersData[memberToUpdate.email].user = memberToUpdate
-        }
-      })
-      
-      localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
-      if (currentChurchId) {
-        loadMembers(currentChurchId)
+    if (error) {
+      console.error('Error loading members:', error);
+      toast.error('Erro ao carregar membros: ' + error.message);
+      return;
+    }
+
+    console.log('Loaded raw member data:', data);
+
+    const membersData: Member[] = data.map((profile: any) => ({
+      id: profile.id,
+      id_igreja: profile.id_igreja,
+      funcao: profile.funcao,
+      perfil_completo: profile.perfil_completo,
+      full_name: profile.full_name,
+      status: profile.status,
+      email: profile.email || 'N/A', // Email is not directly in perfis, but in auth.users. We'll need to fetch it or assume it's available. For now, mock.
+      created_at: profile.created_at, // Not directly in perfis, but in auth.users. For now, mock.
+      churchName: profile.igrejas?.nome,
+      // Map informacoes_pessoais fields
+      telefone: profile.informacoes_pessoais?.telefone,
+      endereco: profile.informacoes_pessoais?.endereco,
+      data_nascimento: profile.informacoes_pessoais?.data_nascimento,
+      estado_civil: profile.informacoes_pessoais?.estado_civil,
+      profissao: profile.informacoes_pessoais?.profissao,
+      conjuge: profile.informacoes_pessoais?.conjuge,
+      filhos: profile.informacoes_pessoais?.filhos,
+      pais_cristaos: profile.informacoes_pessoais?.pais_cristaos,
+      familiar_na_igreja: profile.informacoes_pessoais?.familiar_na_igreja,
+      tempo_igreja: profile.informacoes_pessoais?.tempo_igreja,
+      batizado: profile.informacoes_pessoais?.batizado,
+      data_batismo: profile.informacoes_pessoais?.data_batismo,
+      participa_ministerio: profile.informacoes_pessoais?.participa_ministerio,
+      ministerio_anterior: profile.informacoes_pessoais?.ministerio_anterior,
+      experiencia_anterior: profile.informacoes_pessoais?.experiencia_anterior,
+      decisao_cristo: profile.informacoes_pessoais?.decisao_cristo,
+      data_conversao: profile.informacoes_pessoais?.data_conversao,
+      testemunho: profile.informacoes_pessoais?.testemunho,
+      dias_disponiveis: profile.informacoes_pessoais?.dias_disponiveis,
+      horarios_disponiveis: profile.informacoes_pessoais?.horarios_disponiveis,
+      interesse_ministerio: profile.informacoes_pessoais?.interesse_ministerio,
+      // Assuming these are from a joined 'membros' table or similar, for now, mock
+      ultimo_teste_data: undefined, 
+      ministerio_recomendado: undefined,
+    }));
+
+    // Fetch emails and created_at from auth.users for each profile
+    const userIds = membersData.map(m => m.id);
+    if (userIds.length > 0) {
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers(); // Use admin client to list users
+      if (authError) {
+        console.warn('Could not fetch auth user details:', authError.message);
+      } else if (authUsers) {
+        authUsers.users.forEach(authUser => {
+          const memberIndex = membersData.findIndex(m => m.id === authUser.id);
+          if (memberIndex !== -1) {
+            membersData[memberIndex].email = authUser.email || membersData[memberIndex].email;
+            membersData[memberIndex].created_at = authUser.created_at || membersData[memberIndex].created_at;
+          }
+        });
       }
     }
+
+
+    setMembers(membersData);
+    setFilteredMembers(membersData);
   }
 
-  const handleAddMember = () => {
-    if (!newMember.name || !newMember.email) {
-      toast.error('Nome e email são obrigatórios')
-      return
-    }
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
+  const handleAddMember = async () => {
+    if (!newMember.name || !newMember.email || !currentChurchId) {
+      toast.error('Nome, email e igreja são obrigatórios.')
       return
     }
 
@@ -189,76 +291,235 @@ const MemberManagementPage = () => {
       return
     }
 
-    const member: Member = {
-      id: `member-${Date.now()}`,
-      name: newMember.name,
+    setIsAddMemberDialogOpen(false); // Close dialog immediately
+
+    // 1. Create auth.users entry
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: newMember.email,
-      telefone: newMember.telefone,
-      endereco: newMember.endereco,
-      data_nascimento: newMember.data_nascimento,
-      role: 'membro',
-      papel: newMember.papel,
-      churchId: currentChurchId,
-      churchName: currentChurch?.name,
-      data_cadastro: new Date().toISOString(),
-      status: 'pendente',
-      observacoes: newMember.observacoes,
-      informacoes_espirituais: {
-        batizado: false
+      password: 'password_temp_123', // Temporary password, user will reset via email
+      options: {
+        data: {
+          full_name: newMember.name,
+          church_id: currentChurchId,
+          initial_role: newMember.funcao,
+          // Other fields for informacoes_pessoais can be passed here if trigger is updated
+        },
+      },
+    });
+
+    if (authError) {
+      console.error('Error creating auth user:', authError.message);
+      toast.error('Erro ao cadastrar membro: ' + authError.message);
+      return;
+    }
+
+    if (authData.user) {
+      // The handle_new_user trigger should handle inserting into 'perfis' and 'informacoes_pessoais'
+      // We just need to update the church's member count if the status is 'ativo'
+      // For now, new members from this form will also be 'pendente'
+      if (currentChurchId) {
+        const updatedChurch = await updateChurch(currentChurchId, { currentMembers: (currentChurch?.currentMembers || 0) + 1 });
+        if (updatedChurch) {
+          console.log('Church member count updated:', updatedChurch.currentMembers);
+        }
+      }
+      toast.success('Membro cadastrado com sucesso! Um email de confirmação foi enviado.');
+      loadMembers(currentChurchId); // Reload members to show the new one
+    } else {
+      toast.error('Erro desconhecido ao cadastrar membro.');
+    }
+
+    setNewMember({
+      name: '', email: '', telefone: '', endereco: '', data_nascimento: '',
+      funcao: 'membro', status: 'pendente', observacoes: ''
+    });
+  }
+
+  const handleEditMember = async () => {
+    if (!selectedMember || !currentChurchId) {
+      toast.error('Nenhum membro selecionado ou igreja ativa.');
+      return;
+    }
+
+    // Update perfis table
+    const { error: profileError } = await supabase
+      .from('perfis')
+      .update({
+        funcao: editMemberData.funcao,
+        status: editMemberData.status,
+        full_name: editMemberData.full_name,
+        // Add approved_by and approved_at if these fields are added to perfis
+      })
+      .eq('id', selectedMember.id);
+
+    if (profileError) {
+      console.error('Error updating profile:', profileError);
+      toast.error('Erro ao atualizar perfil: ' + profileError.message);
+      return;
+    }
+
+    // Update informacoes_pessoais table
+    const { error: personalInfoError } = await supabase
+      .from('informacoes_pessoais')
+      .update({
+        telefone: editMemberData.telefone,
+        endereco: editMemberData.endereco,
+        data_nascimento: editMemberData.data_nascimento,
+        estado_civil: editMemberData.estado_civil,
+        profissao: editMemberData.profissao,
+        conjuge: editMemberData.conjuge,
+        filhos: editMemberData.filhos,
+        pais_cristaos: editMemberData.pais_cristaos,
+        familiar_na_igreja: editMemberData.familiar_na_igreja,
+        tempo_igreja: editMemberData.tempo_igreja,
+        batizado: editMemberData.batizado,
+        data_batismo: editMemberData.data_batismo,
+        participa_ministerio: editMemberData.participa_ministerio,
+        ministerio_anterior: editMemberData.ministerio_anterior,
+        experiencia_anterior: editMemberData.experiencia_anterior,
+        decisao_cristo: editMemberData.decisao_cristo,
+        data_conversao: editMemberData.data_conversao,
+        testemunho: editMemberData.testemunho,
+        dias_disponiveis: editMemberData.dias_disponiveis,
+        horarios_disponiveis: editMemberData.horarios_disponiveis,
+        interesse_ministerio: editMemberData.interesse_ministerio,
+      })
+      .eq('membro_id', selectedMember.id);
+
+    if (personalInfoError) {
+      console.error('Error updating personal info:', personalInfoError);
+      toast.error('Erro ao atualizar informações pessoais: ' + personalInfoError.message);
+      return;
+    }
+
+    setIsEditMemberDialogOpen(false);
+    setSelectedMember(null);
+    setEditMemberData({});
+    toast.success('Membro atualizado com sucesso!');
+    loadMembers(currentChurchId); // Reload members to show changes
+  };
+
+  const deleteUser = async (memberId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.');
+      return;
+    }
+
+    if (!confirm('Tem certeza que deseja remover este usuário? Esta ação é irreversível.')) {
+      return;
+    }
+
+    // Supabase handles cascade delete from auth.users -> perfis -> informacoes_pessoais
+    const { error: authError } = await supabase.auth.admin.deleteUser(memberId);
+
+    if (authError) {
+      console.error('Error deleting user from auth:', authError.message);
+      toast.error('Erro ao remover usuário: ' + authError.message);
+      return;
+    }
+
+    // Update church member count
+    const memberToDelete = members.find(m => m.id === memberId);
+    if (memberToDelete && memberToDelete.status === 'ativo') {
+      const currentChurch = getChurchById(currentChurchId);
+      if (currentChurch) {
+        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
       }
     }
 
-    const storedUsers = localStorage.getItem('connect-vida-users')
-    const usersData = storedUsers ? JSON.parse(storedUsers) : {}
-    usersData[member.email] = {
-      password: 'senha_padrao_temporaria',
-      user: member
-    }
-    localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
+    toast.success('Usuário removido do sistema com sucesso!');
+    loadMembers(currentChurchId); // Reload members
+  };
 
-    setMembers([...members, member])
-    setIsAddMemberDialogOpen(false)
-    setNewMember({
-      name: '',
-      email: '',
-      telefone: '',
-      endereco: '',
-      data_nascimento: '',
-      papel: 'Comum',
-      status: 'ativo',
-      observacoes: ''
-    })
-    toast.success('Membro cadastrado com sucesso! Aguardando aprovação.')
-  }
-
-  const handleGenerateRegistrationLink = () => {
-    console.log('handleGenerateRegistrationLink called.');
-    console.log('  currentChurchId from authStore:', currentChurchId);
-    console.log('  churchesLoaded status:', churchesLoaded);
-    console.log('  churches array from useChurchStore:', churches); // Log the actual array
-
+  const approveUser = async (memberId: string) => {
     if (!currentChurchId) {
-      toast.error('Nenhuma igreja selecionada. Por favor, selecione uma igreja no menu lateral.');
+      toast.error('Nenhuma igreja ativa selecionada.');
       return;
     }
-    
+
+    const { error } = await supabase
+      .from('perfis')
+      .update({
+        status: 'ativo',
+        approved_by: user?.name || 'Administrador', // Assuming these fields exist in perfis
+        approved_at: new Date().toISOString(),
+      })
+      .eq('id', memberId);
+
+    if (error) {
+      console.error('Error approving user:', error.message);
+      toast.error('Erro ao aprovar usuário: ' + error.message);
+      return;
+    }
+
+    // Update church member count
+    const currentChurch = getChurchById(currentChurchId);
+    if (currentChurch) {
+      await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers + 1 });
+    }
+
+    toast.success('Usuário aprovado com sucesso!');
+    loadMembers(currentChurchId);
+  };
+
+  const rejectUser = async (memberId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('perfis')
+      .update({
+        status: 'inativo',
+        // approved_by: user?.name || 'Administrador', // Add these fields to perfis table if needed
+        // approved_at: new Date().toISOString(),
+      })
+      .eq('id', memberId);
+
+    if (error) {
+      console.error('Error rejecting user:', error.message);
+      toast.error('Erro ao rejeitar usuário: ' + error.message);
+      return;
+    }
+
+    toast.success('Usuário rejeitado com sucesso!');
+    loadMembers(currentChurchId);
+  };
+
+  const handleGenerateRegistrationLink = () => {
+    console.log('--- handleGenerateRegistrationLink called ---');
+    console.log('  currentChurchId from authStore:', currentChurchId);
+    console.log('   churchesLoaded status:', churchesLoaded);
+    console.log('  churches array from useChurchStore (raw):', churches); // Log the actual array
+
+    if (!currentChurchId) {
+      toast.error('Nenhuma  igreja selecionada. Por favor, selecione uma igreja no menu lateral.');
+      return;
+    }
+
     if (!churchesLoaded || churches.length === 0) {
-      toast.error('Os dados das igrejas ainda não foram carregados ou não há igrejas cadastradas. Por favor, aguarde um momento e tente novamente.');
+      toast.error('Os dados das igrejas  ainda não foram carregados ou não há igrejas cadastradas. Por favor, aguarde um momento e tente novamente.');
       return;
     }
 
     const church = getChurchById(currentChurchId);
-    console.log('  Result of getChurchById:', church);
-    
-    if (!church || !church.name) {
-      toast.error('Erro: A igreja associada ao seu perfil não foi encontrada ou não possui um nome válido. Verifique se a igreja existe e se seu perfil está corretamente vinculado a ela.');
+    console.log('  Result  of getChurchById:', church);
+
+    if (!church) {
+      toast.error('Erro: Não foi possível encontrar os dados da igreja para o ID selecionado. Verifique se a igreja existe no sistema.');
+      return;
+    }
+    if (!church.name) {
+      toast.error('Erro: A igreja encontrada não possui um nome válido. Por favor, verifique as configurações da igreja.');
       return;
     }
 
-    const baseUrl = window.location.origin;
+    const baseUrl =  window.location.origin;
     const link = `${baseUrl}/register?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`;
     setGeneratedLink(link);
     setIsGenerateLinkDialogOpen(true);
+    console.log('--- Generated Link:', link);
   };
 
   const handleCopyLink = () => {
@@ -266,21 +527,33 @@ const MemberManagementPage = () => {
     toast.success('Link copiado para a área de transferência!')
   }
 
-  const getRoleIcon = (role: Member['papel']) => {
+  const getRoleIcon = (role: UserRole) => {
     switch (role) {
-      case 'Master': return <Shield className="w-4 h-4" />
-      case 'Pastor': return <Crown className="w-4 h-4" />
-      case 'Líder de Ministério': return <UserCheck className="w-4 h-4" />
-      case 'Comum': return <UserIcon className="w-4 h-4" />
+      case 'super_admin': return <Shield className="w-4 h-4" />
+      case 'admin': return <Shield className="w-4 h-4" />
+      case 'pastor': return <Crown className="w-4 h-4" />
+      case 'lider_ministerio': return <UserCheck className="w-4 h-4" />
+      case 'financeiro': return <DollarSign className="w-4 h-4" />
+      case 'voluntario': return <Users className="w-4 h-4" />
+      case 'midia_tecnologia': return <Headphones className="w-4 h-4" />
+      case 'integra': return <Heart className="w-4 h-4" />
+      case 'membro': return <UserIcon className="w-4 h-4" />
+      default: return <UserIcon className="w-4 h-4" />
     }
   }
 
-  const getRoleColor = (role: Member['papel']) => {
+  const getRoleColor = (role: UserRole) => {
     switch (role) {
-      case 'Master': return 'bg-red-100 text-red-800 border-red-200'
-      case 'Pastor': return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'Líder de Ministério': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'Comum': return 'bg-green-100 text-green-800 border-green-200'
+      case 'super_admin': return 'bg-red-100 text-red-800 border-red-200'
+      case 'admin': return 'bg-red-100 text-red-800 border-red-200'
+      case 'pastor': return 'bg-purple-100 text-purple-800 border-purple-200'
+      case 'lider_ministerio': return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'financeiro': return 'bg-green-100 text-green-800 border-green-200'
+      case 'voluntario': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'midia_tecnologia': return 'bg-indigo-100 text-indigo-800 border-indigo-200'
+      case 'integra': return 'bg-pink-100 text-pink-800 border-pink-200'
+      case 'membro': return 'bg-gray-100 text-gray-800 border-gray-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
@@ -293,7 +566,8 @@ const MemberManagementPage = () => {
     }
   }
 
-  const calculateAge = (birthDate: string) => {
+  const calculateAge = (birthDate?: string) => {
+    if (!birthDate) return 'N/A';
     const today = new Date()
     const birth = new Date(birthDate)
     let age = today.getFullYear() - birth.getFullYear()
@@ -307,8 +581,8 @@ const MemberManagementPage = () => {
   const statsData = {
     total: members.length,
     active: members.filter(m => m.status === 'ativo').length,
-    leaders: members.filter(m => m.papel === 'Líder de Ministério' || m.papel === 'Pastor').length,
-    baptized: members.filter(m => m.informacoes_espirituais?.batizado).length
+    leaders: members.filter(m => m.funcao === 'lider_ministerio' || m.funcao === 'pastor' || m.funcao === 'admin' || m.funcao === 'super_admin').length,
+    baptized: members.filter(m => m.batizado).length
   }
 
   if (!currentChurchId) {
@@ -389,10 +663,15 @@ const MemberManagementPage = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Papéis</SelectItem>
-                <SelectItem value="Comum">Comum</SelectItem>
-                <SelectItem value="Líder de Ministério">Líder de Ministério</SelectItem>
-                <SelectItem value="Pastor">Pastor</SelectItem>
-                <SelectItem value="Master">Master</SelectItem>
+                <SelectItem value="membro">Membro</SelectItem>
+                <SelectItem value="voluntario">Voluntário</SelectItem>
+                <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
+                <SelectItem value="pastor">Pastor</SelectItem>
+                <SelectItem value="financeiro">Financeiro</SelectItem>
+                <SelectItem value="midia_tecnologia">Mídia e Tecnologia</SelectItem>
+                <SelectItem value="integra">Integração</SelectItem>
+                {user?.role === 'admin' && <SelectItem value="admin">Administrador</SelectItem>}
+                {user?.role === 'super_admin' && <SelectItem value="super_admin">Super Administrador</SelectItem>}
               </SelectContent>
             </Select>
 
@@ -415,9 +694,13 @@ const MemberManagementPage = () => {
               <SelectContent>
                 <SelectItem value="all">Todos os Ministérios</SelectItem>
                 <SelectItem value="Louvor e Adoração">Louvor e Adoração</SelectItem>
-                <SelectItem value="Mídia">Mídia</SelectItem>
+                <SelectItem value="Mídia e Tecnologia">Mídia e Tecnologia</SelectItem>
                 <SelectItem value="Diaconato">Diaconato</SelectItem>
                 <SelectItem value="Kids">Kids</SelectItem>
+                <SelectItem value="Ensino e Discipulado">Ensino e Discipulado</SelectItem>
+                <SelectItem value="Integração">Integração</SelectItem>
+                <SelectItem value="Organização">Organização</SelectItem>
+                <SelectItem value="Ação Social">Ação Social</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -496,18 +779,23 @@ const MemberManagementPage = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="papel">Papel</Label>
-                      <Select value={newMember.papel} onValueChange={(value) => setNewMember({...newMember, papel: value as Member['papel']})}>
+                      <Label htmlFor="funcao">Função</Label>
+                      <Select value={newMember.funcao} onValueChange={(value) => setNewMember({...newMember, funcao: value as UserRole})}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Comum">Comum</SelectItem>
+                          <SelectItem value="membro">Membro</SelectItem>
                           {canEditRoles && (
                             <>
-                              <SelectItem value="Líder de Ministério">Líder de Ministério</SelectItem>
-                              <SelectItem value="Pastor">Pastor</SelectItem>
-                              <SelectItem value="Master">Master</SelectItem>
+                              <SelectItem value="voluntario">Voluntário</SelectItem>
+                              <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
+                              <SelectItem value="pastor">Pastor</SelectItem>
+                              <SelectItem value="financeiro">Financeiro</SelectItem>
+                              <SelectItem value="midia_tecnologia">Mídia e Tecnologia</SelectItem>
+                              <SelectItem value="integra">Integração</SelectItem>
+                              {user?.role === 'admin' && <SelectItem value="admin">Administrador</SelectItem>}
+                              {user?.role === 'super_admin' && <SelectItem value="super_admin">Super Administrador</SelectItem>}
                             </>
                           )}
                         </SelectContent>
@@ -580,16 +868,16 @@ const MemberManagementPage = () => {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">{member.name}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{member.full_name}</h3>
                     <div className="flex gap-2">
-                      <Badge className={getRoleColor(member.papel)}>
-                        {getRoleIcon(member.papel)}
-                        <span className="ml-1">{member.papel}</span>
+                      <Badge className={getRoleColor(member.funcao)}>
+                        {getRoleIcon(member.funcao)}
+                        <span className="ml-1">{member.funcao.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())}</span>
                       </Badge>
                       <Badge className={getStatusColor(member.status)}>
                         {member.status.charAt(0).toUpperCase() + member.status.slice(1)}
                       </Badge>
-                      {member.informacoes_espirituais?.batizado && (
+                      {member.batizado && (
                         <Badge className="bg-blue-100 text-blue-800">
                           Batizado
                         </Badge>
@@ -614,10 +902,10 @@ const MemberManagementPage = () => {
                         <span>{calculateAge(member.data_nascimento)} anos</span>
                       </div>
                     )}
-                    {member.ministerio_atual && (
+                    {member.ministerio_recomendado && (
                       <div className="flex items-center gap-2">
                         <Church className="w-4 h-4" />
-                        <span>{member.ministerio_atual.nome}</span>
+                        <span>{member.ministerio_recomendado}</span>
                       </div>
                     )}
                   </div>
@@ -630,16 +918,37 @@ const MemberManagementPage = () => {
                   )}
 
                   <div className="text-xs text-gray-500">
-                    Membro desde {new Date(member.data_cadastro).toLocaleDateString('pt-BR')}
-                    {member.ultimo_teste_vocacional && (
+                    Membro desde {new Date(member.created_at).toLocaleDateString('pt-BR')}
+                    {member.ultimo_teste_data && (
                       <span className="ml-4">
-                        • Último teste: {new Date(member.ultimo_teste_vocacional).toLocaleDateString('pt-BR')}
+                        • Último teste: {new Date(member.ultimo_teste_data).toLocaleDateString('pt-BR')}
                       </span>
                     )}
                   </div>
                 </div>
 
                 <div className="flex gap-2">
+                  {member.status === 'pendente' && (user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'pastor') && (
+                    <>
+                      <Button 
+                        size="sm" 
+                        className="bg-green-500 hover:bg-green-600"
+                        onClick={() => approveUser(member.id)}
+                      >
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        Aprovar
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="text-red-600"
+                        onClick={() => rejectUser(member.id)}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Rejeitar
+                      </Button>
+                    </>
+                  )}
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -648,15 +957,26 @@ const MemberManagementPage = () => {
                     <Eye className="w-4 h-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Ver Perfil</span>
                   </Button>
-                  {canManageMembers && (
-                    <Button variant="outline" size="sm">
+                  {(canManageMembers || member.id === user?.id) && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleOpenEditMemberDialog(member)}
+                    >
                       <Edit className="w-4 h-4 mr-1 sm:mr-2" />
                       <span className="hidden sm:inline">Editar</span>
                     </Button>
                   )}
-                  <Button variant="outline" size="sm">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
+                  {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-red-600"
+                      onClick={() => deleteUser(member.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -685,10 +1005,10 @@ const MemberManagementPage = () => {
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
-                {selectedMember.name}
-                <Badge className={getRoleColor(selectedMember.papel)}>
-                  {getRoleIcon(selectedMember.papel)}
-                  <span className="ml-1">{selectedMember.papel}</span>
+                {selectedMember.full_name}
+                <Badge className={getRoleColor(selectedMember.funcao)}>
+                  {getRoleIcon(selectedMember.funcao)}
+                  <span className="ml-1">{selectedMember.funcao.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())}</span>
                 </Badge>
               </DialogTitle>
               <DialogDescription>
@@ -723,10 +1043,44 @@ const MemberManagementPage = () => {
                       </p>
                     </div>
                   )}
-                  {selectedMember.informacoes_pessoais?.estado_civil && (
+                  {selectedMember.estado_civil && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Estado Civil</Label>
-                      <p className="text-gray-900">{selectedMember.informacoes_pessoais.estado_civil}</p>
+                      <p className="text-gray-900">{selectedMember.estado_civil}</p>
+                    </div>
+                  )}
+                  {selectedMember.profissao && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Profissão</Label>
+                      <p className="text-gray-900">{selectedMember.profissao}</p>
+                    </div>
+                  )}
+                  {selectedMember.conjuge && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Cônjuge</Label>
+                      <p className="text-gray-900">{selectedMember.conjuge}</p>
+                    </div>
+                  )}
+                  {selectedMember.filhos && selectedMember.filhos.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Filhos</Label>
+                      <ul className="list-disc list-inside text-gray-900">
+                        {selectedMember.filhos.map((filho, index) => (
+                          <li key={index}>{filho.nome} ({filho.idade} anos)</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {selectedMember.pais_cristaos && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Pais Cristãos</Label>
+                      <p className="text-gray-900">{selectedMember.pais_cristaos}</p>
+                    </div>
+                  )}
+                  {selectedMember.familiar_na_igreja && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Familiar na Igreja</Label>
+                      <p className="text-gray-900">{selectedMember.familiar_na_igreja}</p>
                     </div>
                   )}
                 </div>
@@ -744,21 +1098,41 @@ const MemberManagementPage = () => {
                   <div>
                     <Label className="text-sm font-medium text-gray-500">Batizado</Label>
                     <p className="text-gray-900">
-                      {selectedMember.informacoes_espirituais?.batizado ? 'Sim' : 'Não'}
+                      {selectedMember.batizado ? 'Sim' : 'Não'}
                     </p>
                   </div>
-                  {selectedMember.informacoes_espirituais?.data_batismo && (
+                  {selectedMember.data_batismo && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Data do Batismo</Label>
                       <p className="text-gray-900">
-                        {new Date(selectedMember.informacoes_espirituais.data_batismo).toLocaleDateString('pt-BR')}
+                        {new Date(selectedMember.data_batismo).toLocaleDateString('pt-BR')}
                       </p>
                     </div>
                   )}
-                  {selectedMember.informacoes_espirituais?.tempo_igreja && (
+                  {selectedMember.tempo_igreja && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Tempo na Igreja</Label>
-                      <p className="text-gray-900">{selectedMember.informacoes_espirituais.tempo_igreja}</p>
+                      <p className="text-gray-900">{selectedMember.tempo_igreja}</p>
+                    </div>
+                  )}
+                  {selectedMember.decisao_cristo && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Decisão por Cristo</Label>
+                      <p className="text-gray-900">{selectedMember.decisao_cristo}</p>
+                    </div>
+                  )}
+                  {selectedMember.data_conversao && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Data da Conversão</Label>
+                      <p className="text-gray-900">
+                        {new Date(selectedMember.data_conversao).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  )}
+                  {selectedMember.testemunho && (
+                    <div className="md:col-span-2">
+                      <Label className="text-sm font-medium text-gray-500">Testemunho</Label>
+                      <p className="text-gray-900 whitespace-pre-wrap">{selectedMember.testemunho}</p>
                     </div>
                   )}
                 </div>
@@ -766,10 +1140,22 @@ const MemberManagementPage = () => {
               
               <TabsContent value="ministry" className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedMember.ministerio_atual && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Participa de Ministério</Label>
+                    <p className="text-gray-900">
+                      {selectedMember.participa_ministerio ? 'Sim' : 'Não'}
+                    </p>
+                  </div>
+                  {selectedMember.ministerio_anterior && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-500">Ministério Atual</Label>
-                      <p className="text-gray-900">{selectedMember.ministerio_atual.nome}</p>
+                      <Label className="text-sm font-medium text-gray-500">Ministério Anterior</Label>
+                      <p className="text-gray-900">{selectedMember.ministerio_anterior}</p>
+                    </div>
+                  )}
+                  {selectedMember.experiencia_anterior && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Experiência Anterior</Label>
+                      <p className="text-gray-900">{selectedMember.experiencia_anterior}</p>
                     </div>
                   )}
                   {selectedMember.ministerio_recomendado && (
@@ -778,17 +1164,342 @@ const MemberManagementPage = () => {
                       <p className="text-gray-900">{selectedMember.ministerio_recomendado}</p>
                     </div>
                   )}
-                  {selectedMember.ultimo_teste_vocacional && (
+                  {selectedMember.ultimo_teste_data && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Último Teste Vocacional</Label>
                       <p className="text-gray-900">
-                        {new Date(selectedMember.ultimo_teste_vocacional).toLocaleDateString('pt-BR')}
+                        {new Date(selectedMember.ultimo_teste_data).toLocaleDateString('pt-BR')}
                       </p>
+                    </div>
+                  )}
+                  {selectedMember.dias_disponiveis && selectedMember.dias_disponiveis.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Dias Disponíveis</Label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedMember.dias_disponiveis.map((dia, index) => (
+                          <Badge key={index} variant="outline">{dia}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedMember.horarios_disponiveis && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Horários Disponíveis</Label>
+                      <p className="text-gray-900">{selectedMember.horarios_disponiveis}</p>
+                    </div>
+                  )}
+                  {selectedMember.interesse_ministerio && selectedMember.interesse_ministerio.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">Interesse em Ministérios</Label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedMember.interesse_ministerio.map((min, index) => (
+                          <Badge key={index} variant="outline">{min}</Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
               </TabsContent>
             </Tabs>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Member Dialog */}
+      {selectedMember && (
+        <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Membro: {selectedMember.full_name}</DialogTitle>
+              <DialogDescription>
+                Atualize as informações do membro
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-full_name">Nome Completo</Label>
+                  <Input
+                    id="edit-full_name"
+                    value={editMemberData.full_name || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, full_name: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={selectedMember.email} // Email cannot be changed directly here
+                    disabled
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-telefone">Telefone</Label>
+                  <Input
+                    id="edit-telefone"
+                    value={editMemberData.telefone || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, telefone: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-data_nascimento">Data de Nascimento</Label>
+                  <Input
+                    id="edit-data_nascimento"
+                    type="date"
+                    value={editMemberData.data_nascimento || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, data_nascimento: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-endereco">Endereço</Label>
+                <Input
+                  id="edit-endereco"
+                  value={editMemberData.endereco || ''}
+                  onChange={(e) => setEditMemberData({...editMemberData, endereco: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-funcao">Função</Label>
+                  <Select value={editMemberData.funcao} onValueChange={(value) => setEditMemberData({...editMemberData, funcao: value as UserRole})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="membro">Membro</SelectItem>
+                      <SelectItem value="voluntario">Voluntário</SelectItem>
+                      <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
+                      <SelectItem value="pastor">Pastor</SelectItem>
+                      <SelectItem value="financeiro">Financeiro</SelectItem>
+                      <SelectItem value="midia_tecnologia">Mídia e Tecnologia</SelectItem>
+                      <SelectItem value="integra">Integração</SelectItem>
+                      {user?.role === 'admin' && <SelectItem value="admin">Administrador</SelectItem>}
+                      {user?.role === 'super_admin' && <SelectItem value="super_admin">Super Administrador</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select value={editMemberData.status} onValueChange={(value) => setEditMemberData({...editMemberData, status: value as Member['status']})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Additional Personal Info Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-estado_civil">Estado Civil</Label>
+                  <Select value={editMemberData.estado_civil} onValueChange={(value) => setEditMemberData({...editMemberData, estado_civil: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                      <SelectItem value="casado">Casado(a)</SelectItem>
+                      <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                      <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-profissao">Profissão</Label>
+                  <Input
+                    id="edit-profissao"
+                    value={editMemberData.profissao || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, profissao: e.target.value})}
+                  />
+                </div>
+                {editMemberData.estado_civil === 'casado' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-conjuge">Cônjuge</Label>
+                    <Input
+                      id="edit-conjuge"
+                      value={editMemberData.conjuge || ''}
+                      onChange={(e) => setEditMemberData({...editMemberData, conjuge: e.target.value})}
+                    />
+                  </div>
+                )}
+                {/* Filhos - simplified for now, full implementation would need dynamic fields */}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-filhos">Filhos (JSON)</Label>
+                  <Textarea
+                    id="edit-filhos"
+                    value={JSON.stringify(editMemberData.filhos || [], null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setEditMemberData({...editMemberData, filhos: JSON.parse(e.target.value)});
+                      } catch (err) {
+                        console.error("Invalid JSON for filhos", err);
+                        toast.error("Formato JSON inválido para filhos.");
+                      }
+                    }}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Spiritual Info Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-batizado">Batizado</Label>
+                  <Select value={editMemberData.batizado?.toString()} onValueChange={(value) => setEditMemberData({...editMemberData, batizado: value === 'true'})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Sim</SelectItem>
+                      <SelectItem value="false">Não</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editMemberData.batizado && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-data_batismo">Data do Batismo</Label>
+                    <Input
+                      id="edit-data_batismo"
+                      type="date"
+                      value={editMemberData.data_batismo || ''}
+                      onChange={(e) => setEditMemberData({...editMemberData, data_batismo: e.target.value})}
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tempo_igreja">Tempo na Igreja</Label>
+                  <Input
+                    id="edit-tempo_igreja"
+                    value={editMemberData.tempo_igreja || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, tempo_igreja: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-decisao_cristo">Decisão por Cristo</Label>
+                  <Input
+                    id="edit-decisao_cristo"
+                    value={editMemberData.decisao_cristo || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, decisao_cristo: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-data_conversao">Data da Conversão</Label>
+                  <Input
+                    id="edit-data_conversao"
+                    type="date"
+                    value={editMemberData.data_conversao || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, data_conversao: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-testemunho">Testemunho</Label>
+                  <Textarea
+                    id="edit-testemunho"
+                    value={editMemberData.testemunho || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, testemunho: e.target.value})}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Ministry Info Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-participa_ministerio">Participa de Ministério</Label>
+                  <Select value={editMemberData.participa_ministerio?.toString()} onValueChange={(value) => setEditMemberData({...editMemberData, participa_ministerio: value === 'true'})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Sim</SelectItem>
+                      <SelectItem value="false">Não</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editMemberData.participa_ministerio && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-ministerio_anterior">Ministério Anterior</Label>
+                      <Input
+                        id="edit-ministerio_anterior"
+                        value={editMemberData.ministerio_anterior || ''}
+                        onChange={(e) => setEditMemberData({...editMemberData, ministerio_anterior: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="edit-experiencia_anterior">Experiência Anterior</Label>
+                      <Textarea
+                        id="edit-experiencia_anterior"
+                        value={editMemberData.experiencia_anterior || ''}
+                        onChange={(e) => setEditMemberData({...editMemberData, experiencia_anterior: e.target.value})}
+                        rows={2}
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-dias_disponiveis">Dias Disponíveis (JSON)</Label>
+                  <Textarea
+                    id="edit-dias_disponiveis"
+                    value={JSON.stringify(editMemberData.dias_disponiveis || [], null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setEditMemberData({...editMemberData, dias_disponiveis: JSON.parse(e.target.value)});
+                      } catch (err) {
+                        console.error("Invalid JSON for dias_disponiveis", err);
+                        toast.error("Formato JSON inválido para dias disponíveis.");
+                      }
+                    }}
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-horarios_disponiveis">Horários Disponíveis</Label>
+                  <Input
+                    id="edit-horarios_disponiveis"
+                    value={editMemberData.horarios_disponiveis || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, horarios_disponiveis: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-interesse_ministerio">Interesse em Ministérios (JSON)</Label>
+                  <Textarea
+                    id="edit-interesse_ministerio"
+                    value={JSON.stringify(editMemberData.interesse_ministerio || [], null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setEditMemberData({...editMemberData, interesse_ministerio: JSON.parse(e.target.value)});
+                      } catch (err) {
+                        console.error("Invalid JSON for interesse_ministerio", err);
+                        toast.error("Formato JSON inválido para interesse em ministérios.");
+                      }
+                    }}
+                    rows={2}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditMemberDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleEditMember}>
+                  Salvar Alterações
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}

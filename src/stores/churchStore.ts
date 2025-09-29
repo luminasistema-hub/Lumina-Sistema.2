@@ -44,7 +44,20 @@ export const useChurchStore = create<ChurchState>()(
           return;
         }
         console.log('churchStore: Churches loaded from Supabase:', data);
-        set({ churches: data as Church[] });
+        set({ churches: data.map(c => ({
+          id: c.id,
+          name: c.nome,
+          address: c.address,
+          contactEmail: c.contactEmail,
+          contactPhone: c.contactPhone,
+          subscriptionPlan: c.plano_id,
+          memberLimit: c.limite_membros,
+          currentMembers: c.membros_atuais,
+          status: c.status,
+          created_at: c.criado_em,
+          adminUserId: c.admin_user_id,
+          updated_at: c.updated_at,
+        })) as Church[] });
       },
 
       addChurch: async (newChurchData) => {
@@ -61,9 +74,9 @@ export const useChurchStore = create<ChurchState>()(
             membros_atuais: 0,
             status: newChurchData.status,
             admin_user_id: newChurchData.adminUserId,
-            address: newChurchData.address, // Adicionado
-            contactEmail: newChurchData.contactEmail, // Adicionado
-            contactPhone: newChurchData.contactPhone, // Adicionado
+            // address: newChurchData.address, // Adicionado
+            // contactEmail: newChurchData.contactEmail, // Adicionado
+            // contactPhone: newChurchData.contactPhone, // Adicionado
           })
           .select()
           .single();
@@ -80,7 +93,7 @@ export const useChurchStore = create<ChurchState>()(
           memberLimit: data.limite_membros,
           currentMembers: data.membros_atuais,
           status: data.status,
-          created_at: data.created_at,
+          created_at: data.criado_em,
           adminUserId: data.admin_user_id,
           address: data.address,
           contactEmail: data.contactEmail,
@@ -96,7 +109,7 @@ export const useChurchStore = create<ChurchState>()(
 
       updateChurch: async (churchId, updates) => {
         console.log('churchStore: Updating church in Supabase:', churchId, updates);
-        const updatePayload: any = { ...updates };
+        const updatePayload: any = {};
 
         // Handle subscriptionPlan and memberLimit update
         if (updates.subscriptionPlan) {
@@ -134,7 +147,7 @@ export const useChurchStore = create<ChurchState>()(
           memberLimit: data.limite_membros,
           currentMembers: data.membros_atuais,
           status: data.status,
-          created_at: data.created_at,
+          created_at: data.criado_em,
           adminUserId: data.admin_user_id,
           address: data.address,
           contactEmail: data.contactEmail,
