@@ -29,7 +29,19 @@ interface ChurchState {
 const getChurchesFromStorage = (): Church[] => {
   const stored = localStorage.getItem('connect-vida-churches')
   if (stored) {
-    return JSON.parse(stored)
+    try {
+      const parsed = JSON.parse(stored)
+      // Ensure parsed data is an array, otherwise return empty array
+      if (Array.isArray(parsed)) {
+        return parsed
+      } else {
+        console.warn("churchStore: Persisted 'churches' data is not an array, returning empty array.");
+        return []
+      }
+    } catch (e) {
+      console.error("churchStore: Error parsing persisted 'churches' data, returning empty array:", e);
+      return []
+    }
   }
   return []
 }
@@ -45,6 +57,7 @@ export const useChurchStore = create<ChurchState>()(
 
       loadChurches: () => {
         const loadedChurches = getChurchesFromStorage()
+        console.log('churchStore: Loaded churches from storage:', loadedChurches); // Added log
         set({ churches: loadedChurches })
       },
 
@@ -67,7 +80,20 @@ export const useChurchStore = create<ChurchState>()(
       },
 
       getChurchById: (churchId: string) => {
-        return get().churches.find((c) => c.id === churchId)
+        const state = get();
+        // Defensive check: ensure churches is an array before calling find
+        if (!Array.isArray(state.churches)) {
+          console.error("churchStore: 'churches' is not an array in state, attempting to re-initialize.");
+          // This might indicate a deeper issue, but for now, prevent crash
+          // and try to load from storage again or reset.
+          get().loadChurches(); // Try to reload from storage
+          const reloadedState = get();
+          if (Array.isArray(reloadedState.churches)) {
+            return reloadedState.churches.find((c) => c.id === churchId);
+          }
+          return undefined;
+        }
+        return state.churches.find((c) => c.id === churchId);
       },
 
       getSubscriptionPlans: () => [
