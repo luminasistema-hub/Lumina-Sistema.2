@@ -29,6 +29,7 @@ interface AuthState {
   logout: () => void
   checkAuth: () => void
   setCurrentChurchId: (churchId: string | null) => void // Novo método para definir a igreja ativa
+  initializeAuthListener: () => void; // Novo método para inicializar o listener
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -39,51 +40,44 @@ export const useAuthStore = create<AuthState>()(
       currentChurchId: null, // Inicialmente sem igreja selecionada
 
       login: async (email: string, password: string) => {
-        set({ isLoading: true })
-        try {
-          // O login agora é tratado diretamente no LoginPage via supabase.auth.signInWithPassword
-          // Este método aqui será apenas um placeholder ou pode ser removido se não houver lógica adicional
-          // para o Zustand após o login do Supabase.
-          // Para manter a compatibilidade com o LoginPage atual, vamos simular o sucesso.
-          const { data: { user: supabaseUser }, error } = await supabase.auth.getUser();
-          if (supabaseUser && !error) {
-            // Fetch user profile from 'perfis' table
-            const { data: profile, error: profileError } = await supabase
-              .from('perfis')
-              .select('*, igrejas(id, nome)')
-              .eq('id', supabaseUser.id)
-              .single();
+        // O login agora é tratado diretamente no LoginPage via supabase.auth.signInWithPassword
+        // Este método aqui será apenas um placeholder ou pode ser removido se não houver lógica adicional
+        // para o Zustand após o login do Supabase.
+        // Para manter a compatibilidade com o LoginPage atual, vamos simular o sucesso.
+        const { data: { user: supabaseUser }, error } = await supabase.auth.getUser();
+        if (supabaseUser && !error) {
+          // Fetch user profile from 'perfis' table
+          const { data: profile, error: profileError } = await supabase
+            .from('perfis')
+            .select('*, igrejas(id, nome)')
+            .eq('id', supabaseUser.id)
+            .single();
 
-            if (profileError) {
-              console.error('Error fetching user profile:', profileError);
-              set({ user: null, isLoading: false, currentChurchId: null });
-              return false;
-            }
-
-            const userRole = profile.funcao as UserRole;
-            const churchId = profile.id_igreja;
-            const churchName = profile.igrejas ? profile.igrejas.nome : undefined;
-
-            const authenticatedUser: User = {
-              id: supabaseUser.id,
-              name: profile.full_name || supabaseUser.email || 'Usuário',
-              email: supabaseUser.email!,
-              role: userRole,
-              churchId: churchId,
-              churchName: churchName,
-              status: 'ativo', // Assumimos ativo se o perfil foi encontrado
-              created_at: supabaseUser.created_at,
-            };
-            set({ user: authenticatedUser, isLoading: false, currentChurchId: churchId });
-            return true;
+          if (profileError) {
+            console.error('Error fetching user profile:', profileError);
+            set({ user: null, isLoading: false, currentChurchId: null });
+            return false;
           }
-          set({ isLoading: false });
-          return false;
-        } catch (error) {
-          console.error('Login error:', error);
-          set({ isLoading: false });
-          return false;
+
+          const userRole = profile.funcao as UserRole;
+          const churchId = profile.id_igreja;
+          const churchName = profile.igrejas ? profile.igrejas.nome : undefined;
+
+          const authenticatedUser: User = {
+            id: supabaseUser.id,
+            name: profile.full_name || supabaseUser.email || 'Usuário',
+            email: supabaseUser.email!,
+            role: userRole,
+            churchId: churchId,
+            churchName: churchName,
+            status: 'ativo', // Assumimos ativo se o perfil foi encontrado
+            created_at: supabaseUser.created_at,
+          };
+          set({ user: authenticatedUser, isLoading: false, currentChurchId: churchId });
+          return true;
         }
+        set({ isLoading: false });
+        return false;
       },
 
       register: async (name: string, email: string, password: string, churchName: string) => {
@@ -108,6 +102,12 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const { data: { session }, error } = await supabase.auth.getSession();
+
+          if (error) {
+            console.error('Error getting session:', error);
+            set({ user: null, isLoading: false, currentChurchId: null });
+            return;
+          }
 
           if (session && session.user) {
             // Fetch user profile from 'perfis' table
@@ -134,11 +134,11 @@ export const useAuthStore = create<AuthState>()(
               role: userRole,
               churchId: churchId,
               churchName: churchName,
-              status: 'ativo', // Assumimos ativo se o perfil foi encontrado
+              status: profile.status as User['status'], // Usar status do perfil
               created_at: session.user.created_at,
             };
             set({ user: authenticatedUser, isLoading: false, currentChurchId: churchId });
-            console.log('User is authenticated:', authenticatedUser.name);
+            console.log('User is authenticated:', authenticatedUser.name, 'Church ID:', churchId);
           } else {
             set({ user: null, isLoading: false, currentChurchId: null });
             console.log('No authenticated user found');
@@ -152,11 +152,35 @@ export const useAuthStore = create<AuthState>()(
       setCurrentChurchId: (churchId: string | null) => {
         set({ currentChurchId: churchId });
         console.log('Current church ID set to:', churchId);
+      },
+
+      // Novo método para inicializar o listener de autenticação
+      initializeAuthListener: () => {
+        // Usar uma flag para garantir que o listener seja inicializado apenas uma vez
+        if (!(get() as any)._authListenerInitialized) {
+          const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+              console.log('Supabase Auth State Change Event:', event, session);
+              if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+                // Quando o usuário faz login, o token é atualizado ou o usuário é atualizado,
+                // re-verifique a autenticação para atualizar o estado do store.
+                get().checkAuth();
+              } else if (event === 'SIGNED_OUT') {
+                // Se o usuário sair, limpe o estado.
+                set({ user: null, currentChurchId: null, isLoading: false });
+              }
+            }
+          );
+          // Marcar o listener como inicializado
+          (get() as any)._authListenerInitialized = true;
+          // Opcional: armazenar a subscription para poder desinscrever em um cleanup, se necessário.
+          // (get() as any)._authSubscription = subscription;
+        }
       }
     }),
     {
       name: 'connect-vida-auth',
-      // Apenas persistir o currentChurchId, o user será carregado via checkAuth do Supabase
+      // Manter partialize para persistir currentChurchId, o user será sempre re-derivado via checkAuth
       partialize: (state) => ({ currentChurchId: state.currentChurchId }),
     }
   )

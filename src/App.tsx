@@ -6,12 +6,13 @@ import MasterAdminPage from './pages/MasterAdminPage' // Importar o novo painel 
 import { useEffect } from 'react'
 
 function App() {
-  const { user, isLoading, checkAuth, currentChurchId } = useAuthStore()
+  const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore() // Obter initializeAuthListener
 
   useEffect(() => {
-    console.log('App mounted, checking authentication...')
-    checkAuth()
-  }, [checkAuth])
+    console.log('App mounted, initializing auth listener and checking authentication...')
+    initializeAuthListener(); // Inicializar o listener de autenticação uma vez
+    checkAuth(); // Também verificar a autenticação no carregamento inicial
+  }, [checkAuth, initializeAuthListener]) // Adicionar initializeAuthListener às dependências
 
   if (isLoading) {
     return (
