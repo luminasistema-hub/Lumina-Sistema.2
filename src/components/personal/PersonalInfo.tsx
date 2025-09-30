@@ -50,8 +50,7 @@ interface PersonalInfoData {
   ministerioAtual: string
   experienciaAnterior: string
   
-  // Informações Espirituais
-  decisaoCristo: string
+  // Informações Espirituais (apenas dataConversao permanece)
   dataConversao: string
   
   // Disponibilidade
@@ -81,8 +80,7 @@ const PersonalInfo = () => {
     participaMinisterio: false,
     ministerioAtual: '',
     experienciaAnterior: '',
-    decisaoCristo: '',
-    dataConversao: '',
+    dataConversao: '', // Removido decisaoCristo
     diasDisponiveis: [],
     horariosDisponiveis: ''
   })
@@ -126,8 +124,7 @@ const PersonalInfo = () => {
             participaMinisterio: personalInfoRecord.participa_ministerio || false,
             ministerioAtual: personalInfoRecord.ministerio_anterior || '',
             experienciaAnterior: personalInfoRecord.experiencia_anterior || '',
-            decisaoCristo: personalInfoRecord.decisao_cristo || '',
-            dataConversao: personalInfoRecord.data_conversao || '',
+            dataConversao: personalInfoRecord.data_conversao || '', // Removido decisaoCristo
             diasDisponiveis: personalInfoRecord.dias_disponiveis || [],
             horariosDisponiveis: personalInfoRecord.horarios_disponiveis || ''
           });
@@ -221,9 +218,6 @@ const PersonalInfo = () => {
       cep = cep.substring(0, 8)
     }
     
-    // Não salvar cidade, estado, cep no formData, apenas usar para preencher o endereço
-    // handleInputChange('cep', cep) 
-
     if (cep.length === 9) { // Se o CEP estiver completo (com o hífen)
       const rawCep = cep.replace('-', '') // Remove o hífen para a requisição
       try {
@@ -270,18 +264,19 @@ const PersonalInfo = () => {
       conjuge: formData.conjuge || null,
       filhos: formData.filhos.length > 0 ? formData.filhos : null,
       pais_cristaos: formData.paisCristaos || null,
-      familiar_na_igreja: formData.familiarNaIgreja || null,
+      familiarNaIgreja: formData.familiarNaIgreja || null,
       tempo_igreja: formData.tempoIgreja || null,
       batizado: formData.batizado,
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
       ministerio_anterior: formData.ministerioAtual || null, // Usando ministerioAtual para este campo
       experiencia_anterior: formData.experienciaAnterior || null,
-      decisao_cristo: formData.decisaoCristo || null,
+      // decisao_cristo: formData.decisaoCristo || null, // Removido
       data_conversao: formData.dataConversao || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
       horarios_disponiveis: formData.horariosDisponiveis || null,
       // interesseMinisterio removido
+      // testemunho removido
       updated_at: new Date().toISOString(),
     };
 
@@ -571,22 +566,7 @@ const PersonalInfo = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="decisaoCristo">Como conheceu Jesus?</Label>
-                  <Select value={formData.decisaoCristo} onValueChange={(value) => handleInputChange('decisaoCristo', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="familia">Através da família</SelectItem>
-                      <SelectItem value="amigos">Através de amigos</SelectItem>
-                      <SelectItem value="igreja">Em um culto/igreja</SelectItem>
-                      <SelectItem value="evento">Em um evento evangelístico</SelectItem>
-                      <SelectItem value="midia">Através de mídia (TV, internet)</SelectItem>
-                      <SelectItem value="outro">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Removido o campo "Decisão por Cristo" */}
                 <div className="space-y-2">
                   <Label htmlFor="dataConversao">Data da Conversão</Label>
                   <Input
