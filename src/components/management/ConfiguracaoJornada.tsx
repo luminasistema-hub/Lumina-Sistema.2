@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Plus, Loader2, ListOrdered, AlertCircle } from 'lucide-react';
+import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Interfaces para os dados do Supabase
@@ -128,13 +128,19 @@ const ConfiguracaoJornada = () => {
                 <Card key={etapa.id} className="border-0 shadow-sm">
                   <CardContent className="p-4 flex items-center justify-between">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold">{etapa.titulo}</h3>
+                      <span className="font-bold text-lg">{etapa.ordem}. {etapa.titulo}</span>
                       <p className="text-sm text-gray-600">{etapa.descricao}</p>
-                      <p className="text-xs text-gray-500 mt-1">Ordem: {etapa.ordem}</p>
                     </div>
-                    <Button variant="outline" size="sm">
-                      Editar
-                    </Button>
+                    <div className="space-x-2">
+                      <Button variant="outline" size="sm">
+                        <Edit className="w-4 h-4 mr-2" />
+                        Editar
+                      </Button>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Apagar
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
