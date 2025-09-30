@@ -32,6 +32,7 @@ const ConfiguracaoJornada = () => {
   const { currentChurchId } = useAuthStore();
 
   const [newEtapa, setNewEtapa] = useState({
+    id: '', // Adicionado ID para identificar se é edição
     titulo: '',
     descricao: '',
     ordem: 1,
@@ -101,12 +102,26 @@ const ConfiguracaoJornada = () => {
 
   const handleAddEtapaClick = () => {
     setNewEtapa({
+      id: '', // Resetar ID para indicar que é uma nova etapa
       titulo: '',
       descricao: '',
       ordem: etapas.length > 0 ? Math.max(...etapas.map(e => e.ordem)) + 1 : 1, // Sugere a próxima ordem
       tipo_conteudo: 'Texto',
       conteudo: '',
       cor: '#FFFFFF',
+    });
+    setIsAddEtapaDialogOpen(true);
+  };
+
+  const handleEditEtapaClick = (etapa: EtapaTrilha) => {
+    setNewEtapa({
+      id: etapa.id,
+      titulo: etapa.titulo,
+      descricao: etapa.descricao,
+      ordem: etapa.ordem,
+      tipo_conteudo: etapa.tipo_conteudo,
+      conteudo: etapa.conteudo,
+      cor: etapa.cor,
     });
     setIsAddEtapaDialogOpen(true);
   };
@@ -124,29 +139,53 @@ const ConfiguracaoJornada = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('etapas_trilha')
-        .insert({
-          id_trilha: activeTrilhaId,
-          ordem: newEtapa.ordem,
-          titulo: newEtapa.titulo,
-          descricao: newEtapa.descricao,
-          tipo_conteudo: newEtapa.tipo_conteudo,
-          conteudo: newEtapa.conteudo,
-          cor: newEtapa.cor,
-        })
-        .select()
-        .single();
+      if (newEtapa.id) { // Modo de edição
+        const { data, error } = await supabase
+          .from('etapas_trilha')
+          .update({
+            ordem: newEtapa.ordem,
+            titulo: newEtapa.titulo,
+            descricao: newEtapa.descricao,
+            tipo_conteudo: newEtapa.tipo_conteudo,
+            conteudo: newEtapa.conteudo,
+            cor: newEtapa.cor,
+          })
+          .eq('id', newEtapa.id)
+          .select()
+          .single();
 
-      if (error) {
-        console.error('ConfiguracaoJornada: Erro ao salvar nova etapa:', error);
-        toast.error('Erro ao criar nova etapa: ' + error.message);
-        return;
+        if (error) {
+          console.error('ConfiguracaoJornada: Erro ao atualizar etapa:', error);
+          toast.error('Erro ao atualizar etapa: ' + error.message);
+          return;
+        }
+        toast.success('Etapa atualizada com sucesso!');
+      } else { // Modo de criação
+        const { data, error } = await supabase
+          .from('etapas_trilha')
+          .insert({
+            id_trilha: activeTrilhaId,
+            ordem: newEtapa.ordem,
+            titulo: newEtapa.titulo,
+            descricao: newEtapa.descricao,
+            tipo_conteudo: newEtapa.tipo_conteudo,
+            conteudo: newEtapa.conteudo,
+            cor: newEtapa.cor,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('ConfiguracaoJornada: Erro ao salvar nova etapa:', error);
+          toast.error('Erro ao criar nova etapa: ' + error.message);
+          return;
+        }
+        toast.success('Etapa criada com sucesso!');
       }
 
-      toast.success('Etapa criada com sucesso!');
       setIsAddEtapaDialogOpen(false);
-      setNewEtapa({
+      setNewEtapa({ // Resetar formulário
+        id: '',
         titulo: '',
         descricao: '',
         ordem: 1,
@@ -213,7 +252,7 @@ const ConfiguracaoJornada = () => {
                       <p className="text-sm text-gray-600">{etapa.descricao}</p>
                     </div>
                     <div className="space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleEditEtapaClick(etapa)}>
                         <Edit className="w-4 h-4 mr-2" />
                         Editar
                       </Button>
@@ -230,13 +269,13 @@ const ConfiguracaoJornada = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog para Criar Nova Etapa */}
+      {/* Dialog para Criar/Editar Etapa */}
       <Dialog open={isAddEtapaDialogOpen} onOpenChange={setIsAddEtapaDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Criar Nova Etapa da Jornada</DialogTitle>
+            <DialogTitle>{newEtapa.id ? 'Editar Etapa da Jornada' : 'Criar Nova Etapa da Jornada'}</DialogTitle>
             <DialogDescription>
-              Defina os detalhes para uma nova etapa na trilha de crescimento.
+              {newEtapa.id ? 'Atualize os detalhes desta etapa.' : 'Defina os detalhes para uma nova etapa na trilha de crescimento.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -312,8 +351,7 @@ const ConfiguracaoJornada = () => {
                 Cancelar
               </Button>
               <Button onClick={handleSaveEtapa}>
-                <Plus className="w-4 h-4 mr-2" />
-                Criar Etapa
+                {newEtapa.id ? 'Salvar Alterações' : 'Criar Etapa'}
               </Button>
             </div>
           </div>
