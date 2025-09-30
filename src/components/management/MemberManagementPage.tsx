@@ -52,7 +52,7 @@ interface MemberProfile {
   perfil_completo: boolean; // Corresponds to perfis.perfil_completo
   full_name: string; // Corresponds to perfis.full_name
   status: 'ativo' | 'pendente' | 'inativo'; // Corresponds to perfis.status
-  created_at: string; // From auth.users or perfis
+  created_at: string; // From perfis
   approved_by?: string; // From perfis
   approved_at?: string; // From perfis
   
@@ -65,7 +65,7 @@ interface MemberProfile {
   conjuge?: string;
   filhos?: Array<{nome: string, idade: string}>; // JSONB
   pais_cristaos?: string;
-  familiar_na_igreja?: string;
+  familiarNaIgreja?: string;
   tempo_igreja?: string;
   batizado?: boolean;
   data_batismo?: string;
@@ -81,7 +81,7 @@ interface MemberProfile {
   ministerio_recomendado?: string; // from public.membros.ministerio_recomendado
   
   // Other fields from auth.users or derived
-  email: string; // From auth.users
+  email: string; // From membros
   churchName?: string; // Joined from public.igrejas
 }
 
@@ -207,6 +207,7 @@ const MemberManagementPage = () => {
           horarios_disponiveis
         ),
         membros (
+          email,
           ultimo_teste_data,
           ministerio_recomendado
         ),
@@ -231,8 +232,8 @@ const MemberManagementPage = () => {
       perfil_completo: profile.perfil_completo,
       full_name: profile.full_name,
       status: profile.status,
-      email: profile.email || 'N/A', // Email is not directly in perfis, but in auth.users. We'll need to fetch it or assume it's available. For now, mock.
-      created_at: profile.created_at, // Not directly in perfis, but in auth.users. For now, mock.
+      email: profile.membros?.[0]?.email || 'N/A', // Get email from membros table
+      created_at: profile.created_at, // From perfis table
       approved_by: profile.approved_by,
       approved_at: profile.approved_at,
       churchName: profile.igrejas?.nome,
@@ -259,24 +260,6 @@ const MemberManagementPage = () => {
       ultimo_teste_data: profile.membros?.[0]?.ultimo_teste_data, // Access first element if 'membros' is an array
       ministerio_recomendado: profile.membros?.[0]?.ministerio_recomendado, // Access first element if 'membros' is an array
     }));
-
-    // Fetch emails and created_at from auth.users for each profile
-    const userIds = membersData.map(m => m.id);
-    if (userIds.length > 0) {
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers(); // Use admin client to list users
-      if (authError) {
-        console.warn('Could not fetch auth user details:', authError.message);
-      } else if (authUsers) {
-        authUsers.users.forEach(authUser => {
-          const memberIndex = membersData.findIndex(m => m.id === authUser.id);
-          if (memberIndex !== -1) {
-            membersData[memberIndex].email = authUser.email || membersData[memberIndex].email;
-            membersData[memberIndex].created_at = authUser.created_at || membersData[memberIndex].created_at;
-          }
-        });
-      }
-    }
-
 
     setMembers(membersData);
     setFilteredMembers(membersData);
