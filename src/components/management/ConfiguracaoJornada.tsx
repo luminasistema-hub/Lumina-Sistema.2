@@ -42,6 +42,7 @@ const ConfiguracaoJornada = () => {
   const [etapasAninhadas, setEtapasAninhadas] = useState<EtapaTrilha[]>([]);
   const [loading, setLoading] = useState(true);
   const { currentChurchId } = useAuthStore();
+  const [etapaAberta, setEtapaAberta] = useState<string | null>(null); // Estado para controlar qual etapa está aberta
 
   const [isEtapaModalOpen, setIsEtapaModalOpen] = useState(false);
   const [etapaParaEditar, setEtapaParaEditar] = useState<EtapaTrilha | null>(null);
@@ -84,63 +85,66 @@ const ConfiguracaoJornada = () => {
     })
   );
 
-  useEffect(() => {
-    const carregarJornadaCompleta = async () => {
-      if (!currentChurchId) {
-        setLoading(false);
+  const carregarJornadaCompleta = async () => {
+    if (!currentChurchId) {
+      setLoading(false);
+      setEtapasAninhadas([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      // 1. Busca a trilha principal da igreja
+      const { data: trilha, error: trilhaError } = await supabase
+        .from('trilhas_crescimento')
+        .select('id')
+        .eq('id_igreja', currentChurchId)
+        .eq('is_ativa', true)
+        .single();
+      
+      if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = No rows found
+        console.error('Erro ao buscar trilha ativa:', trilhaError);
+        setEtapasAninhadas([]);
         return;
       }
-      setLoading(true);
-      try {
-        // 1. Busca a trilha principal da igreja
-        const { data: trilha, error: trilhaError } = await supabase
-          .from('trilhas_crescimento')
-          .select('id')
-          .eq('id_igreja', currentChurchId)
-          .single();
+
+      if (trilha) {
+        // 2. Busca as etapas principais dessa trilha
+        const { data: etapasData, error: etapasDataError } = await supabase
+          .from('etapas_trilha')
+          .select('*')
+          .eq('id_trilha', trilha.id)
+          .order('ordem', { ascending: true });
+        if (etapasDataError) throw etapasDataError;
+
+        // 3. Busca todos os passos de todas as etapas de uma vez
+        const etapaIds = (etapasData || []).map(e => e.id);
+        const { data: passosData, error: passosError } = await supabase
+          .from('passos_etapa')
+          .select('*')
+          .in('id_etapa', etapaIds)
+          .order('ordem', { ascending: true });
+        if (passosError) throw passosError;
+
+        // 4. Combina os dados: aninha os passos dentro de suas respectivas etapas
+        const etapasComPassos = (etapasData || []).map(etapa => ({
+          ...etapa,
+          passos: (passosData || []).filter(passo => passo.id_etapa === etapa.id) || []
+        }));
         
-        if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = No rows found
-          console.error('Erro ao buscar trilha ativa:', trilhaError);
-          setEtapasAninhadas([]);
-          return;
-        }
-
-        if (trilha) {
-          // 2. Busca as etapas principais dessa trilha
-          const { data: etapasData, error: etapasDataError } = await supabase
-            .from('etapas_trilha')
-            .select('*')
-            .eq('id_trilha', trilha.id)
-            .order('ordem', { ascending: true });
-          if (etapasDataError) throw etapasDataError;
-
-          // 3. Busca todos os passos de todas as etapas de uma vez
-          const etapaIds = (etapasData || []).map(e => e.id);
-          const { data: passosData, error: passosError } = await supabase
-            .from('passos_etapa')
-            .select('*')
-            .in('id_etapa', etapaIds)
-            .order('ordem', { ascending: true });
-          if (passosError) throw passosError;
-
-          // 4. Combina os dados: aninha os passos dentro de suas respectivas etapas
-          const etapasComPassos = (etapasData || []).map(etapa => ({
-            ...etapa,
-            passos: (passosData || []).filter(passo => passo.id_etapa === etapa.id) || []
-          }));
-          setEtapasAninhadas(etapasComPassos);
-        } else {
-          setEtapasAninhadas([]);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar a jornada completa:", error);
-        toast.error("Erro ao carregar a jornada. Tente novamente.");
+        setEtapasAninhadas(etapasComPassos);
+      } else {
         setEtapasAninhadas([]);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error("Erro ao carregar a jornada completa:", error);
+      toast.error("Erro ao carregar a jornada. Tente novamente.");
+      setEtapasAninhadas([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     carregarJornadaCompleta();
   }, [currentChurchId]);
 
@@ -211,7 +215,7 @@ const ConfiguracaoJornada = () => {
             id_trilha: trilha.id,
             ordem: novaOrdem,
             titulo: formEtapaData.titulo,
-            descricao: formEtapaData.descricao,
+            descricao: formEtataData.descricao,
             cor: formEtapaData.cor,
           });
 
@@ -469,46 +473,45 @@ const ConfiguracaoJornada = () => {
             <SortableContext items={etapasAninhadas.map(e => e.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-6">
                 {etapasAninhadas.map((etapa) => (
-                  <Card key={etapa.id} className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                      <SortableEtapaItem 
-                        etapa={etapa} 
-                        onEdit={handleOpenEditEtapaModal} 
-                        onDelete={handleDeleteEtapa} 
-                      />
-                      
-                      {/* Passos dentro da etapa */}
-                      <div className="ml-8 mt-4 space-y-3">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2">
-                          <ListOrdered className="w-4 h-4" />
-                          Passos da Etapa
-                        </h4>
-                        <SortableContext items={etapa.passos.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                          {etapa.passos.length > 0 ? (
-                            etapa.passos.map((passo) => (
-                              <SortablePassoItem 
-                                key={passo.id} 
-                                passo={passo} 
-                                onEdit={(p) => handleOpenEditPassoModal(p, etapa)} 
-                                onDelete={handleDeletePasso} 
-                              />
-                            ))
-                          ) : (
-                            <p className="text-sm text-gray-500 italic">Nenhum passo adicionado a esta etapa.</p>
-                          )}
-                        </SortableContext>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="mt-3"
-                          onClick={() => handleOpenCreatePassoModal(etapa)}
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Adicionar Passo
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <SortableEtapaItem 
+                    key={etapa.id} 
+                    etapa={etapa} 
+                    onEdit={handleOpenEditEtapaModal} 
+                    onDelete={handleDeleteEtapa} 
+                    isExpanded={etapaAberta === etapa.id}
+                    onToggleExpand={() => setEtapaAberta(etapaAberta === etapa.id ? null : etapa.id)}
+                  >
+                    {/* Passos dentro da etapa, renderizados como children */}
+                    <div className="ml-4 mt-2 space-y-3">
+                      <h4 className="font-semibold text-gray-700 flex items-center gap-2">
+                        <ListOrdered className="w-4 h-4" />
+                        Passos da Etapa
+                      </h4>
+                      <SortableContext items={etapa.passos.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                        {etapa.passos.length > 0 ? (
+                          etapa.passos.map((passo) => (
+                            <SortablePassoItem 
+                              key={passo.id} 
+                              passo={passo} 
+                              onEdit={(p) => handleOpenEditPassoModal(p, etapa)} 
+                              onDelete={handleDeletePasso} 
+                            />
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 italic">Nenhum passo adicionado a esta etapa.</p>
+                        )}
+                      </SortableContext>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-3"
+                        onClick={() => handleOpenCreatePassoModal(etapa)}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Passo
+                      </Button>
+                    </div>
+                  </SortableEtapaItem>
                 ))}
               </div>
             </SortableContext>
