@@ -101,12 +101,12 @@ export const useAuthStore = create<AuthState>()(
               .from('perfis')
               .select('*, igrejas(id, nome)') // Join with 'igrejas' to get church name
               .eq('id', session.user.id)
-              .single();
+              .maybeSingle(); // Alterado de .single() para .maybeSingle()
             
             console.log('AuthStore: Profile fetch result - data:', profile, 'error:', profileError);
 
             if (profileError || !profile) { // Adicionado !profile para cobrir casos onde data é null sem erro explícito
-              console.error('AuthStore: Error fetching user profile or profile not found:', profileError?.message || 'Profile data is null/undefined.');
+              console.error('AuthStore: Error fetching user profile or profile not found:', profileError?.message || 'Profile data is null/undefined. Setting user to null and isLoading to false.');
               set({ user: null, isLoading: false, currentChurchId: null });
               return;
             }
