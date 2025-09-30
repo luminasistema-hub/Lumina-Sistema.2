@@ -53,7 +53,7 @@ const ConfiguracaoJornada = () => {
   });
 
   const [isPassoModalOpen, setIsPassoModalOpen] = useState(false);
-  const [passoParaEditar, setPassoParaEditar] = useState<PassoEtapa | null>(null);
+  // Removido passoParaEditar, usaremos formPassoData.id para identificar edição
   const [etapaAtualParaPasso, setEtapaAtualParaPasso] = useState<EtapaTrilha | null>(null);
   const [formPassoData, setFormPassoData] = useState<Partial<PassoEtapa>>({
     titulo: '',
@@ -256,23 +256,19 @@ const ConfiguracaoJornada = () => {
 
   const handleOpenCreatePassoModal = (etapa: EtapaTrilha) => {
     setEtapaAtualParaPasso(etapa);
-    setPassoParaEditar(null);
-    setFormPassoData({
+    setFormPassoData({ // Inicializa com id undefined para indicar criação
+      id_etapa: etapa.id,
       titulo: '',
       tipo_passo: 'leitura',
       conteudo: '',
+      ordem: etapa.passos.length > 0 ? Math.max(...etapa.passos.map(p => p.ordem)) + 1 : 1,
     });
     setIsPassoModalOpen(true);
   };
 
   const handleOpenEditPassoModal = (passo: PassoEtapa, etapa: EtapaTrilha) => {
     setEtapaAtualParaPasso(etapa);
-    setPassoParaEditar(passo);
-    setFormPassoData({
-      titulo: passo.titulo,
-      tipo_passo: passo.tipo_passo,
-      conteudo: passo.conteudo,
-    });
+    setFormPassoData(passo); // Carrega todos os dados do passo para o formulário, incluindo o ID
     setIsPassoModalOpen(true);
   };
 
@@ -288,23 +284,23 @@ const ConfiguracaoJornada = () => {
 
     setLoading(true);
     try {
-      if (passoParaEditar) {
-        // Atualizar passo existente
-        const { error } = await supabase
+      let error;
+      if (formPassoData.id) {
+        // Lógica de ATUALIZAÇÃO (UPDATE)
+        const { error: updateError } = await supabase
           .from('passos_etapa')
           .update({
             titulo: formPassoData.titulo,
             tipo_passo: formPassoData.tipo_passo,
             conteudo: formPassoData.conteudo,
+            // A ordem é gerenciada pelo drag and drop, não editada diretamente no modal
           })
-          .eq('id', passoParaEditar.id);
-
-        if (error) throw error;
-        toast.success('Passo atualizado com sucesso!');
+          .eq('id', formPassoData.id);
+        error = updateError;
       } else {
-        // Criar novo passo
+        // Lógica de CRIAÇÃO (INSERT)
         const novaOrdem = etapaAtualParaPasso.passos.length > 0 ? Math.max(...etapaAtualParaPasso.passos.map(p => p.ordem)) + 1 : 1;
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('passos_etapa')
           .insert({
             id_etapa: etapaAtualParaPasso.id,
@@ -313,12 +309,14 @@ const ConfiguracaoJornada = () => {
             tipo_passo: formPassoData.tipo_passo,
             conteudo: formPassoData.conteudo,
           });
-
-        if (error) throw error;
-        toast.success('Novo passo criado com sucesso!');
+        error = insertError;
       }
+
+      if (error) throw error;
+      
       setIsPassoModalOpen(false);
       carregarJornadaCompleta();
+      toast.success('Passo salvo com sucesso!');
     } catch (error: any) {
       console.error("Erro ao salvar passo:", error);
       toast.error('Erro ao salvar passo: ' + error.message);
@@ -591,9 +589,9 @@ const ConfiguracaoJornada = () => {
       <Dialog open={isPassoModalOpen} onOpenChange={setIsPassoModalOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{passoParaEditar ? 'Editar Passo' : 'Criar Novo Passo'}</DialogTitle>
+            <DialogTitle>{formPassoData.id ? 'Editar Passo' : 'Criar Novo Passo'}</DialogTitle>
             <DialogDescription>
-              {passoParaEditar ? `Edite os detalhes do passo "${passoParaEditar.titulo}"` : `Preencha os detalhes do novo passo para a etapa "${etapaAtualParaPasso?.titulo}".`}
+              {formPassoData.id ? `Edite os detalhes do passo "${formPassoData.titulo}"` : `Preencha os detalhes do novo passo para a etapa "${etapaAtualParaPasso?.titulo}".`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -601,7 +599,7 @@ const ConfiguracaoJornada = () => {
               <Label htmlFor="passo-titulo">Título do Passo *</Label>
               <Input
                 id="passo-titulo"
-                value={formPassoData.titulo}
+                value={formPassoData.titulo || ''}
                 onChange={(e) => setFormPassoData({...formPassoData, titulo: e.target.value})}
                 placeholder="Ex: Assista ao vídeo sobre Batismo"
               />
@@ -631,7 +629,7 @@ const ConfiguracaoJornada = () => {
               <Label htmlFor="passo-conteudo">Conteúdo (URL ou Texto)</Label>
               <Input
                 id="passo-conteudo"
-                value={formPassoData.conteudo}
+                value={formPassoData.conteudo || ''}
                 onChange={(e) => setFormPassoData({...formPassoData, conteudo: e.target.value})}
                 placeholder="Link para vídeo, PDF, ou texto adicional"
               />
@@ -642,7 +640,7 @@ const ConfiguracaoJornada = () => {
               Cancelar
             </Button>
             <Button onClick={handleSavePasso}>
-              {passoParaEditar ? 'Salvar Alterações' : 'Criar Passo'}
+              {formPassoData.id ? 'Salvar Alterações' : 'Criar Passo'}
             </Button>
           </div>
         </DialogContent>
