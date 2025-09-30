@@ -3,7 +3,7 @@ import { supabase } from '../../integrations/supabase/client';
 import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2, GripVertical, Video, FileText, HelpCircle, Link, CheckCircle, BookOpen } from 'lucide-react';
+import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2, GripVertical, Video, FileText, HelpCircle, Link, CheckCircle, BookOpen, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
@@ -12,8 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableEtapaItem } from './SortableEtapaItem'; // Reutilizando o componente SortableEtapaItem
-import { SortablePassoItem } from './SortablePassoItem'; // Novo componente para passos
+import { SortableEtapaItem } from './SortableEtapaItem';
+import { SortablePassoItem } from './SortablePassoItem';
+
+interface QuizPergunta {
+  id?: string; // Opcional para novas perguntas
+  ordem: number;
+  pergunta_texto: string;
+  opcoes: string[];
+  resposta_correta: number; // Índice da opção correta (0-based)
+  pontuacao: number;
+}
 
 interface PassoEtapa {
   id: string;
@@ -23,6 +32,7 @@ interface PassoEtapa {
   tipo_passo: 'video' | 'quiz' | 'leitura' | 'acao' | 'link_externo';
   conteudo?: string;
   created_at: string;
+  quiz_perguntas?: QuizPergunta[]; // Adicionado para quizzes
 }
 
 interface EtapaTrilha {
@@ -31,34 +41,34 @@ interface EtapaTrilha {
   ordem: number;
   titulo: string;
   descricao: string;
-  tipo_conteudo: string; // Pode ser removido se o conteúdo for apenas nos passos
-  conteudo: string; // Pode ser removido se o conteúdo for apenas nos passos
+  tipo_conteudo: string;
+  conteudo: string;
   cor: string;
   created_at: string;
-  passos: PassoEtapa[]; // Nova propriedade para aninhar os passos
+  passos: PassoEtapa[];
 }
 
 const ConfiguracaoJornada = () => {
   const [etapasAninhadas, setEtapasAninhadas] = useState<EtapaTrilha[]>([]);
   const [loading, setLoading] = useState(true);
   const { currentChurchId } = useAuthStore();
-  const [etapaAberta, setEtapaAberta] = useState<string | null>(null); // Estado para controlar qual etapa está aberta
+  const [etapaAberta, setEtapaAberta] = useState<string | null>(null);
 
   const [isEtapaModalOpen, setIsEtapaModalOpen] = useState(false);
   const [etapaParaEditar, setEtapaParaEditar] = useState<EtapaTrilha | null>(null);
   const [formEtapaData, setFormEtapaData] = useState<Partial<EtapaTrilha>>({
     titulo: '',
     descricao: '',
-    cor: '#e0f2fe', // Cor padrão
+    cor: '#e0f2fe',
   });
 
   const [isPassoModalOpen, setIsPassoModalOpen] = useState(false);
-  // Removido passoParaEditar, usaremos formPassoData.id para identificar edição
   const [etapaAtualParaPasso, setEtapaAtualParaPasso] = useState<EtapaTrilha | null>(null);
   const [formPassoData, setFormPassoData] = useState<Partial<PassoEtapa>>({
     titulo: '',
     tipo_passo: 'leitura',
     conteudo: '',
+    quiz_perguntas: [], // Inicializa com array vazio para quizzes
   });
 
   const coresDisponiveis = [
@@ -93,7 +103,6 @@ const ConfiguracaoJornada = () => {
     }
     setLoading(true);
     try {
-      // 1. Busca a trilha principal da igreja
       const { data: trilha, error: trilhaError } = await supabase
         .from('trilhas_crescimento')
         .select('id')
@@ -101,14 +110,13 @@ const ConfiguracaoJornada = () => {
         .eq('is_ativa', true)
         .single();
       
-      if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = No rows found
+      if (trilhaError && trilhaError.code !== 'PGRST116') {
         console.error('Erro ao buscar trilha ativa:', trilhaError);
         setEtapasAninhadas([]);
         return;
       }
 
       if (trilha) {
-        // 2. Busca as etapas principais dessa trilha
         const { data: etapasData, error: etapasDataError } = await supabase
           .from('etapas_trilha')
           .select('*')
@@ -116,7 +124,6 @@ const ConfiguracaoJornada = () => {
           .order('ordem', { ascending: true });
         if (etapasDataError) throw etapasDataError;
 
-        // 3. Busca todos os passos de todas as etapas de uma vez
         const etapaIds = (etapasData || []).map(e => e.id);
         const { data: passosData, error: passosError } = await supabase
           .from('passos_etapa')
@@ -125,10 +132,29 @@ const ConfiguracaoJornada = () => {
           .order('ordem', { ascending: true });
         if (passosError) throw passosError;
 
-        // 4. Combina os dados: aninha os passos dentro de suas respectivas etapas
+        // Carregar perguntas de quiz para os passos do tipo 'quiz'
+        const quizPassoIds = (passosData || []).filter(p => p.tipo_passo === 'quiz').map(p => p.id);
+        let quizPerguntasData: QuizPergunta[] = [];
+        if (quizPassoIds.length > 0) {
+          const { data: qData, error: qError } = await supabase
+            .from('quiz_perguntas')
+            .select('*')
+            .in('passo_id', quizPassoIds)
+            .order('ordem', { ascending: true });
+          if (qError) console.error('Erro ao carregar perguntas de quiz:', qError);
+          quizPerguntasData = qData || [];
+        }
+
         const etapasComPassos = (etapasData || []).map(etapa => ({
           ...etapa,
-          passos: (passosData || []).filter(passo => passo.id_etapa === etapa.id) || []
+          passos: (passosData || [])
+            .filter(passo => passo.id_etapa === etapa.id)
+            .map(passo => ({
+              ...passo,
+              quiz_perguntas: passo.tipo_passo === 'quiz' 
+                ? quizPerguntasData.filter(qp => qp.passo_id === passo.id) 
+                : undefined
+            })) || []
         }));
         
         setEtapasAninhadas(etapasComPassos);
@@ -194,7 +220,6 @@ const ConfiguracaoJornada = () => {
       }
 
       if (etapaParaEditar) {
-        // Atualizar etapa existente
         const { error } = await supabase
           .from('etapas_trilha')
           .update({
@@ -207,7 +232,6 @@ const ConfiguracaoJornada = () => {
         if (error) throw error;
         toast.success('Etapa atualizada com sucesso!');
       } else {
-        // Criar nova etapa
         const novaOrdem = etapasAninhadas.length > 0 ? Math.max(...etapasAninhadas.map(e => e.ordem)) + 1 : 1;
         const { error } = await supabase
           .from('etapas_trilha')
@@ -256,11 +280,11 @@ const ConfiguracaoJornada = () => {
 
   const handleOpenCreatePassoModal = (etapa: EtapaTrilha) => {
     setEtapaAtualParaPasso(etapa);
-    setFormPassoData({ // Inicializa com id undefined para indicar criação
-      id_etapa: etapa.id,
+    setFormPassoData({
       titulo: '',
       tipo_passo: 'leitura',
       conteudo: '',
+      quiz_perguntas: [],
       ordem: etapa.passos.length > 0 ? Math.max(...etapa.passos.map(p => p.ordem)) + 1 : 1,
     });
     setIsPassoModalOpen(true);
@@ -268,7 +292,15 @@ const ConfiguracaoJornada = () => {
 
   const handleOpenEditPassoModal = (passo: PassoEtapa, etapa: EtapaTrilha) => {
     setEtapaAtualParaPasso(etapa);
-    setFormPassoData(passo); // Carrega todos os dados do passo para o formulário, incluindo o ID
+    setFormPassoData({
+      id: passo.id,
+      id_etapa: passo.id_etapa,
+      titulo: passo.titulo,
+      tipo_passo: passo.tipo_passo,
+      conteudo: passo.conteudo,
+      ordem: passo.ordem,
+      quiz_perguntas: passo.tipo_passo === 'quiz' ? passo.quiz_perguntas : [],
+    });
     setIsPassoModalOpen(true);
   };
 
@@ -281,26 +313,41 @@ const ConfiguracaoJornada = () => {
       toast.error('Título e tipo do passo são obrigatórios.');
       return;
     }
+    if (formPassoData.tipo_passo === 'quiz' && (!formPassoData.quiz_perguntas || formPassoData.quiz_perguntas.length === 0)) {
+      toast.error('Quizzes devem ter pelo menos uma pergunta.');
+      return;
+    }
+    if (formPassoData.tipo_passo === 'quiz') {
+      for (const q of formPassoData.quiz_perguntas!) {
+        if (!q.pergunta_texto || q.opcoes.length < 2 || q.resposta_correta === undefined || q.resposta_correta < 0 || q.resposta_correta >= q.opcoes.length) {
+          toast.error('Todas as perguntas do quiz devem ter texto, pelo menos 2 opções e uma resposta correta válida.');
+          return;
+        }
+      }
+    }
 
     setLoading(true);
     try {
-      let error;
+      let passoId: string;
       if (formPassoData.id) {
-        // Lógica de ATUALIZAÇÃO (UPDATE)
-        const { error: updateError } = await supabase
+        // Atualizar passo existente
+        const { data, error } = await supabase
           .from('passos_etapa')
           .update({
             titulo: formPassoData.titulo,
             tipo_passo: formPassoData.tipo_passo,
             conteudo: formPassoData.conteudo,
-            // A ordem é gerenciada pelo drag and drop, não editada diretamente no modal
           })
-          .eq('id', formPassoData.id);
-        error = updateError;
+          .eq('id', formPassoData.id)
+          .select('id')
+          .single();
+        if (error) throw error;
+        passoId = data.id;
+        toast.success('Passo atualizado com sucesso!');
       } else {
-        // Lógica de CRIAÇÃO (INSERT)
+        // Criar novo passo
         const novaOrdem = etapaAtualParaPasso.passos.length > 0 ? Math.max(...etapaAtualParaPasso.passos.map(p => p.ordem)) + 1 : 1;
-        const { error: insertError } = await supabase
+        const { data, error } = await supabase
           .from('passos_etapa')
           .insert({
             id_etapa: etapaAtualParaPasso.id,
@@ -308,15 +355,42 @@ const ConfiguracaoJornada = () => {
             titulo: formPassoData.titulo,
             tipo_passo: formPassoData.tipo_passo,
             conteudo: formPassoData.conteudo,
-          });
-        error = insertError;
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        passoId = data.id;
+        toast.success('Novo passo criado com sucesso!');
       }
 
-      if (error) throw error;
+      // Lógica para salvar perguntas do quiz
+      if (formPassoData.tipo_passo === 'quiz' && formPassoData.quiz_perguntas) {
+        // Primeiro, apagar todas as perguntas existentes para este passo
+        const { error: deleteError } = await supabase
+          .from('quiz_perguntas')
+          .delete()
+          .eq('passo_id', passoId);
+        if (deleteError) throw deleteError;
+
+        // Em seguida, inserir as novas perguntas
+        const perguntasToInsert = formPassoData.quiz_perguntas.map((q, index) => ({
+          passo_id: passoId,
+          ordem: index + 1,
+          pergunta_texto: q.pergunta_texto,
+          opcoes: q.opcoes,
+          resposta_correta: q.resposta_correta,
+          pontuacao: q.pontuacao,
+        }));
+
+        const { error: insertQuizError } = await supabase
+          .from('quiz_perguntas')
+          .insert(perguntasToInsert);
+        if (insertQuizError) throw insertQuizError;
+        toast.success('Perguntas do quiz salvas!');
+      }
       
       setIsPassoModalOpen(false);
       carregarJornadaCompleta();
-      toast.success('Passo salvo com sucesso!');
     } catch (error: any) {
       console.error("Erro ao salvar passo:", error);
       toast.error('Erro ao salvar passo: ' + error.message);
@@ -331,6 +405,7 @@ const ConfiguracaoJornada = () => {
     }
     setLoading(true);
     try {
+      // O CASCADE DELETE na FK cuidará das perguntas do quiz
       const { error } = await supabase
         .from('passos_etapa')
         .delete()
@@ -355,7 +430,6 @@ const ConfiguracaoJornada = () => {
     const isEtapaDrag = etapasAninhadas.some(etapa => etapa.id === active.id);
 
     if (isEtapaDrag) {
-      // Reordenar etapas
       const oldIndex = etapasAninhadas.findIndex(etapa => etapa.id === active.id);
       const newIndex = etapasAninhadas.findIndex(etapa => etapa.id === over.id);
 
@@ -366,7 +440,6 @@ const ConfiguracaoJornada = () => {
 
         setEtapasAninhadas(newEtapas);
 
-        // Atualizar ordem no banco de dados
         setLoading(true);
         try {
           const updates = newEtapas.map((etapa, index) => ({
@@ -384,7 +457,6 @@ const ConfiguracaoJornada = () => {
         }
       }
     } else {
-      // Reordenar passos dentro de uma etapa
       const etapaId = etapasAninhadas.find(etapa => etapa.passos.some(passo => passo.id === active.id))?.id;
       if (!etapaId) return;
 
@@ -406,7 +478,6 @@ const ConfiguracaoJornada = () => {
         };
         setEtapasAninhadas(newEtapasAninhadas);
 
-        // Atualizar ordem no banco de dados
         setLoading(true);
         try {
           const updates = newPassos.map((passo, index) => ({
@@ -424,6 +495,53 @@ const ConfiguracaoJornada = () => {
         }
       }
     }
+  };
+
+  // Funções para gerenciar perguntas do quiz no formulário
+  const addQuizQuestion = () => {
+    if (formPassoData.quiz_perguntas && formPassoData.quiz_perguntas.length >= 10) {
+      toast.error('Máximo de 10 perguntas por quiz.');
+      return;
+    }
+    setFormPassoData(prev => ({
+      ...prev,
+      quiz_perguntas: [...(prev.quiz_perguntas || []), {
+        ordem: (prev.quiz_perguntas?.length || 0) + 1,
+        pergunta_texto: '',
+        opcoes: ['', '', '', ''],
+        resposta_correta: 0,
+        pontuacao: 1,
+      }]
+    }));
+  };
+
+  const updateQuizQuestion = (index: number, field: keyof QuizPergunta, value: any) => {
+    setFormPassoData(prev => {
+      const newQuestions = [...(prev.quiz_perguntas || [])];
+      if (field === 'opcoes') {
+        newQuestions[index] = { ...newQuestions[index], [field]: value };
+      } else {
+        newQuestions[index] = { ...newQuestions[index], [field]: value };
+      }
+      return { ...prev, quiz_perguntas: newQuestions };
+    });
+  };
+
+  const updateQuizOption = (qIndex: number, oIndex: number, value: string) => {
+    setFormPassoData(prev => {
+      const newQuestions = [...(prev.quiz_perguntas || [])];
+      const newOptions = [...newQuestions[qIndex].opcoes];
+      newOptions[oIndex] = value;
+      newQuestions[qIndex] = { ...newQuestions[qIndex], opcoes: newOptions };
+      return { ...prev, quiz_perguntas: newQuestions };
+    });
+  };
+
+  const removeQuizQuestion = (index: number) => {
+    setFormPassoData(prev => ({
+      ...prev,
+      quiz_perguntas: (prev.quiz_perguntas || []).filter((_, i) => i !== index)
+    }));
   };
 
   if (!currentChurchId) {
@@ -479,7 +597,6 @@ const ConfiguracaoJornada = () => {
                     isExpanded={etapaAberta === etapa.id}
                     onToggleExpand={() => setEtapaAberta(etapaAberta === etapa.id ? null : etapa.id)}
                   >
-                    {/* Passos dentro da etapa, renderizados como children */}
                     <div className="ml-4 mt-2 space-y-3">
                       <h4 className="font-semibold text-gray-700 flex items-center gap-2">
                         <ListOrdered className="w-4 h-4" />
@@ -608,7 +725,14 @@ const ConfiguracaoJornada = () => {
               <Label htmlFor="passo-tipo">Tipo de Passo *</Label>
               <Select
                 value={formPassoData.tipo_passo}
-                onValueChange={(value) => setFormPassoData({...formPassoData, tipo_passo: value as PassoEtapa['tipo_passo']})}
+                onValueChange={(value) => {
+                  setFormPassoData(prev => ({
+                    ...prev,
+                    tipo_passo: value as PassoEtapa['tipo_passo'],
+                    conteudo: value === 'quiz' ? undefined : prev.conteudo, // Limpa conteúdo se for quiz
+                    quiz_perguntas: value === 'quiz' ? (prev.quiz_perguntas || []) : undefined, // Inicializa quiz_perguntas se for quiz
+                  }));
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o tipo" />
@@ -625,15 +749,86 @@ const ConfiguracaoJornada = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="passo-conteudo">Conteúdo (URL ou Texto)</Label>
-              <Input
-                id="passo-conteudo"
-                value={formPassoData.conteudo || ''}
-                onChange={(e) => setFormPassoData({...formPassoData, conteudo: e.target.value})}
-                placeholder="Link para vídeo, PDF, ou texto adicional"
-              />
-            </div>
+            
+            {formPassoData.tipo_passo !== 'quiz' && (
+              <div className="space-y-2">
+                <Label htmlFor="passo-conteudo">Conteúdo (URL ou Texto)</Label>
+                <Input
+                  id="passo-conteudo"
+                  value={formPassoData.conteudo || ''}
+                  onChange={(e) => setFormPassoData({...formPassoData, conteudo: e.target.value})}
+                  placeholder="Link para vídeo, PDF, ou texto adicional"
+                />
+              </div>
+            )}
+
+            {formPassoData.tipo_passo === 'quiz' && (
+              <div className="space-y-4 border p-4 rounded-lg bg-gray-50">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <HelpCircle className="w-5 h-5 text-purple-500" />
+                  Perguntas do Quiz ({formPassoData.quiz_perguntas?.length || 0}/10)
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Cadastre até 10 perguntas de múltipla escolha. A nota final será de 0 a 10.
+                </p>
+                
+                {(formPassoData.quiz_perguntas || []).map((q, qIndex) => (
+                  <Card key={qIndex} className="p-4 space-y-3 border-l-4 border-purple-200">
+                    <div className="flex justify-between items-center">
+                      <Label className="font-bold">Pergunta {qIndex + 1}</Label>
+                      <Button variant="destructive" size="sm" onClick={() => removeQuizQuestion(qIndex)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`pergunta-texto-${qIndex}`}>Texto da Pergunta *</Label>
+                      <Input
+                        id={`pergunta-texto-${qIndex}`}
+                        value={q.pergunta_texto}
+                        onChange={(e) => updateQuizQuestion(qIndex, 'pergunta_texto', e.target.value)}
+                        placeholder="Qual é a capital do Brasil?"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Opções de Resposta * (Mínimo 2)</Label>
+                      {(q.opcoes || []).map((opcao, oIndex) => (
+                        <div key={oIndex} className="flex items-center gap-2">
+                          <Input
+                            value={opcao}
+                            onChange={(e) => updateQuizOption(qIndex, oIndex, e.target.value)}
+                            placeholder={`Opção ${oIndex + 1}`}
+                          />
+                          <input
+                            type="radio"
+                            name={`correct-option-${qIndex}`}
+                            checked={q.resposta_correta === oIndex}
+                            onChange={() => updateQuizQuestion(qIndex, 'resposta_correta', oIndex)}
+                            className="form-radio h-4 w-4 text-purple-600"
+                          />
+                          <Label>Correta</Label>
+                        </div>
+                      ))}
+                      {q.opcoes.length < 5 && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => updateQuizQuestion(qIndex, 'opcoes', [...q.opcoes, ''])}
+                        >
+                          + Adicionar Opção
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+                
+                {((formPassoData.quiz_perguntas?.length || 0) < 10) && (
+                  <Button variant="outline" className="w-full mt-4" onClick={addQuizQuestion}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar Pergunta
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setIsPassoModalOpen(false)}>
