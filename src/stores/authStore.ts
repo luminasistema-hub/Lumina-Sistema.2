@@ -104,6 +104,7 @@ export const useAuthStore = create<AuthState>()(
             
             console.log('AuthStore: Fetched profile data:', profile);
             console.log('AuthStore: Profile fetch result - profile:', profile, 'profileError:', profileError);
+            console.log('AuthStore: Profile perfil_completo status:', profile?.perfil_completo); // Adicionado log
 
             if (profileError) {
               console.error('AuthStore: Error fetching user profile:', profileError);

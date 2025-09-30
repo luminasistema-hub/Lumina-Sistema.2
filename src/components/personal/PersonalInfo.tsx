@@ -238,7 +238,7 @@ const PersonalInfo = () => {
       return
     }
     
-    console.log('Saving personal info:', formData)
+    console.log('PersonalInfo: Attempting to save personal info:', formData)
     
     // Validação básica
     if (!formData.nomeCompleto || !formData.telefone || !formData.endereco) {
@@ -257,19 +257,19 @@ const PersonalInfo = () => {
       conjuge: formData.conjuge || null,
       filhos: formData.filhos.length > 0 ? formData.filhos : null,
       pais_cristaos: formData.paisCristaos || null,
-      familiar_na_igreja: formData.familiarNaIgreja || null,
+      familiarNaIgreja: formData.familiarNaIgreja || null,
       tempo_igreja: formData.tempoIgreja || null,
       batizado: formData.batizado,
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
       ministerio_anterior: formData.ministerioAtual || null, // Usando ministerioAtual para este campo
-      experiencia_anterior: formData.experienciaAnterior || null,
+      experienciaAnterior: formData.experienciaAnterior || null,
       decisao_cristo: formData.decisaoCristo || null,
       data_conversao: formData.dataConversao || null,
       testemunho: formData.testemunho || null,
-      dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horarios_disponiveis: formData.horariosDisponiveis || null,
-      interesse_ministerio: formData.interesseMinisterio.length > 0 ? formData.interesseMinisterio : null,
+      diasDisponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
+      horariosDisponiveis: formData.horariosDisponiveis || null,
+      interesseMinisterio: formData.interesseMinisterio.length > 0 ? formData.interesseMinisterio : null,
       updated_at: new Date().toISOString(),
     };
 
@@ -279,10 +279,11 @@ const PersonalInfo = () => {
       .upsert(personalInfoPayload, { onConflict: 'membro_id' });
 
     if (upsertError) {
-      console.error('Error saving personal info to Supabase:', upsertError);
+      console.error('PersonalInfo: Error saving personal info to Supabase:', upsertError);
       toast.error('Erro ao salvar informações pessoais: ' + upsertError.message);
       return;
     }
+    console.log('PersonalInfo: informacoes_pessoais upsert successful.');
 
     // Atualizar o campo perfil_completo na tabela perfis
     const { error: profileUpdateError } = await supabase
@@ -291,10 +292,11 @@ const PersonalInfo = () => {
       .eq('id', user.id);
 
     if (profileUpdateError) {
-      console.error('Error updating perfil_completo in Supabase:', profileUpdateError);
+      console.error('PersonalInfo: Error updating perfil_completo in Supabase:', profileUpdateError);
       toast.error('Erro ao atualizar status do perfil: ' + profileUpdateError.message);
       return;
     }
+    console.log('PersonalInfo: perfis.perfil_completo update successful.');
 
     // Atualizar o nome do usuário no perfil (se alterado)
     if (formData.nomeCompleto !== user.name) {
@@ -302,14 +304,19 @@ const PersonalInfo = () => {
         data: { full_name: formData.nomeCompleto }
       });
       if (authUserUpdateError) {
-        console.error('Error updating auth user name:', authUserUpdateError);
+        console.error('PersonalInfo: Error updating auth user name:', authUserUpdateError);
         toast.error('Erro ao atualizar nome do usuário: ' + authUserUpdateError.message);
         return;
       }
+      console.log('PersonalInfo: auth.users name update successful.');
     }
 
+    // Adicionar um pequeno atraso para garantir que o banco de dados tenha tempo para processar
+    await new Promise(resolve => setTimeout(resolve, 500)); 
+    
     // Chamar checkAuth para atualizar o estado do usuário no store
     await checkAuth();
+    console.log('PersonalInfo: checkAuth completed after save.');
 
     setIsFirstAccess(false)
     setIsEditing(false)
