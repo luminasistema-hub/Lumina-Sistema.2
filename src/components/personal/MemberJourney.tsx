@@ -19,6 +19,7 @@ import {
   Award,
   Target
 } from 'lucide-react'
+import DescricaoFormatada from '../utils/DescricaoFormatada'; // Importar o novo componente
 
 // Interfaces para os dados do Supabase
 interface TrilhaCrescimento {
@@ -128,14 +129,14 @@ const MemberJourney = () => {
         const trilhaId = trilhaData.id;
 
         // 2. Buscar as etapas da trilha
-        const { data: etapasData, error: etapasError } = await supabase
+        const { data: etapasData, error: etapasDataError } = await supabase
           .from('etapas_trilha')
           .select('*')
           .eq('id_trilha', trilhaId)
           .order('ordem', { ascending: true });
 
-        if (etapasError) {
-          console.error('MemberJourney: Error loading etapas_trilha:', etapasError);
+        if (etapasDataError) {
+          console.error('MemberJourney: Error loading etapas_trilha:', etapasDataError);
           toast.error('Erro ao carregar as etapas da trilha.');
           setLoading(false);
           return;
@@ -431,7 +432,7 @@ const MemberJourney = () => {
                     </div>
                   </div>
 
-                  <p className="text-gray-700 mb-4">{step.descricao}</p>
+                  <DescricaoFormatada texto={step.descricao} /> {/* Usando o novo componente */}
 
                   {step.requirements && (
                     <div className="mb-4">
