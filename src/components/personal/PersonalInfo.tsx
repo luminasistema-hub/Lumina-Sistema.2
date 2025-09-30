@@ -46,7 +46,7 @@ interface PersonalInfoData {
   paisCristaos: string
   familiarNaIgreja: string
   
-  // Informações Ministeriais
+  // Informações Ministeriais (mantidas no estado, mas não no formulário)
   tempoIgreja: string
   batizado: boolean
   dataBatismo: string
@@ -55,7 +55,7 @@ interface PersonalInfoData {
   experienciaAnterior: string
   dataConversao: string
   
-  // Disponibilidade
+  // Disponibilidade (mantidas no estado, mas não no formulário)
   diasDisponiveis: string[]
   horariosDisponiveis: string
 }
@@ -640,89 +640,10 @@ const PersonalInfo = () => {
                   )}
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="participaMinisterio"
-                    checked={formData.participaMinisterio}
-                    onCheckedChange={(checked) => handleInputChange('participaMinisterio', checked)}
-                  />
-                  <Label htmlFor="participaMinisterio">Participo ou participei de algum ministério</Label>
-                </div>
-
-                {formData.participaMinisterio && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="ministerioAtual">Ministério Atual/Anterior</Label>
-                      <Input
-                        id="ministerioAtual"
-                        value={formData.ministerioAtual}
-                        onChange={(e) => handleInputChange('ministerioAtual', e.target.value)}
-                        placeholder="Nome do ministério"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="experienciaAnterior">Experiência</Label>
-                      <Textarea
-                        id="experienciaAnterior"
-                        value={formData.experienciaAnterior}
-                        onChange={(e) => handleInputChange('experienciaAnterior', e.target.value)}
-                        placeholder="Descreva sua experiência..."
-                        rows={2}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
             </CardContent>
           </Card>
 
-          {/* Disponibilidade */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Disponibilidade
-              </CardTitle>
-              <CardDescription>Quando você pode servir</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <Label>Dias da semana disponíveis:</Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {diasSemana.map(dia => (
-                    <div key={dia} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={dia}
-                        checked={formData.diasDisponiveis.includes(dia)}
-                        onCheckedChange={(checked) => handleCheckboxChange('diasDisponiveis', dia, checked as boolean)}
-                      />
-                      <Label htmlFor={dia} className="text-sm">{dia}</Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="horariosDisponiveis">Horários Disponíveis</Label>
-                <Select value={formData.horariosDisponiveis} onValueChange={(value) => handleInputChange('horariosDisponiveis', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione seu horário" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manha">Manhã (6h às 12h)</SelectItem>
-                    <SelectItem value="tarde">Tarde (12h às 18h)</SelectItem>
-                    <SelectItem value="noite">Noite (18h às 23h)</SelectItem>
-                    <SelectItem value="manha-tarde">Manhã e Tarde</SelectItem>
-                    <SelectItem value="tarde-noite">Tarde e Noite</SelectItem>
-                    <SelectItem value="qualquer">Qualquer horário</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
+          {/* Botão de Salvar */}
           <div className="flex justify-end">
             <Button onClick={handleSave} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90">
               <Save className="w-4 h-4 mr-2" />
