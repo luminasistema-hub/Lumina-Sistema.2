@@ -41,62 +41,62 @@ const ConfiguracaoJornada = () => {
     cor: '#FFFFFF',
   });
 
-  useEffect(() => {
-    const carregarEtapas = async () => {
-      if (!currentChurchId) {
-        setLoading(false);
+  const carregarEtapas = async () => {
+    if (!currentChurchId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    console.log('ConfiguracaoJornada: Carregando etapas para a igreja:', currentChurchId);
+
+    try {
+      // 1. Encontrar a trilha ativa
+      const { data: trilha, error: trilhaError } = await supabase
+        .from('trilhas_crescimento')
+        .select('id')
+        .eq('id_igreja', currentChurchId)
+        .eq('is_ativa', true)
+        .single();
+
+      if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = No rows found
+        console.error('ConfiguracaoJornada: Erro ao buscar trilha ativa:', trilhaError);
+        toast.error('Erro ao carregar a trilha de crescimento: ' + trilhaError.message);
+        setEtapas([]);
+        setActiveTrilhaId(null);
         return;
       }
-      setLoading(true);
-      console.log('ConfiguracaoJornada: Carregando etapas para a igreja:', currentChurchId);
 
-      try {
-        // 1. Encontrar a trilha ativa
-        const { data: trilha, error: trilhaError } = await supabase
-          .from('trilhas_crescimento')
-          .select('id')
-          .eq('id_igreja', currentChurchId)
-          .eq('is_ativa', true)
-          .single();
+      if (trilha) {
+        setActiveTrilhaId(trilha.id); // Armazenar o ID da trilha ativa
+        // 2. Buscar as etapas da trilha
+        const { data: etapasData, error: etapasDataError } = await supabase
+          .from('etapas_trilha')
+          .select('*')
+          .eq('id_trilha', trilha.id)
+          .order('ordem', { ascending: true });
 
-        if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = No rows found
-          console.error('ConfiguracaoJornada: Erro ao buscar trilha ativa:', trilhaError);
-          toast.error('Erro ao carregar a trilha de crescimento: ' + trilhaError.message);
+        if (etapasDataError) {
+          console.error('ConfiguracaoJornada: Erro ao buscar etapas da trilha:', etapasDataError);
+          toast.error('Erro ao carregar as etapas: ' + etapasDataError.message);
           setEtapas([]);
-          setActiveTrilhaId(null);
           return;
         }
-
-        if (trilha) {
-          setActiveTrilhaId(trilha.id); // Armazenar o ID da trilha ativa
-          // 2. Buscar as etapas da trilha
-          const { data: etapasData, error: etapasDataError } = await supabase
-            .from('etapas_trilha')
-            .select('*')
-            .eq('id_trilha', trilha.id)
-            .order('ordem', { ascending: true });
-
-          if (etapasDataError) {
-            console.error('ConfiguracaoJornada: Erro ao buscar etapas da trilha:', etapasDataError);
-            toast.error('Erro ao carregar as etapas: ' + etapasDataError.message);
-            setEtapas([]);
-            return;
-          }
-          console.log('ConfiguracaoJornada: Etapas carregadas:', etapasData);
-          setEtapas(etapasData || []);
-        } else {
-          console.log('ConfiguracaoJornada: Nenhuma trilha ativa encontrada para esta igreja.');
-          setEtapas([]);
-          setActiveTrilhaId(null);
-        }
-      } catch (error) {
-        console.error("ConfiguracaoJornada: Erro inesperado ao carregar etapas:", error);
-        toast.error('Ocorreu um erro inesperado ao carregar as etapas da jornada.');
-      } finally {
-        setLoading(false);
+        console.log('ConfiguracaoJornada: Etapas carregadas:', etapasData);
+        setEtapas(etapasData || []);
+      } else {
+        console.log('ConfiguracaoJornada: Nenhuma trilha ativa encontrada para esta igreja.');
+        setEtapas([]);
+        setActiveTrilhaId(null);
       }
-    };
+    } catch (error) {
+      console.error("ConfiguracaoJornada: Erro inesperado ao carregar etapas:", error);
+      toast.error('Ocorreu um erro inesperado ao carregar as etapas da jornada.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     carregarEtapas();
   }, [currentChurchId]);
 
@@ -202,6 +202,34 @@ const ConfiguracaoJornada = () => {
     }
   };
 
+  const handleDeleteEtapa = async (etapaId: string) => {
+    if (!window.confirm('Tem certeza que deseja apagar esta etapa? Esta ação é irreversível.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('etapas_trilha')
+        .delete()
+        .eq('id', etapaId);
+
+      if (error) {
+        console.error('ConfiguracaoJornada: Erro ao apagar etapa:', error);
+        toast.error('Erro ao apagar etapa: ' + error.message);
+        return;
+      }
+
+      toast.success('Etapa apagada com sucesso!');
+      carregarEtapas(); // Recarrega a lista de etapas
+    } catch (error) {
+      console.error("ConfiguracaoJornada: Erro inesperado ao apagar etapa:", error);
+      toast.error('Ocorreu um erro inesperado ao apagar a etapa.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!currentChurchId) {
     return (
       <div className="p-6 text-center text-gray-600">
@@ -256,7 +284,7 @@ const ConfiguracaoJornada = () => {
                         <Edit className="w-4 h-4 mr-2" />
                         Editar
                       </Button>
-                      <Button variant="destructive" size="sm">
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteEtapa(etapa.id)}>
                         <Trash2 className="w-4 h-4 mr-2" />
                         Apagar
                       </Button>
