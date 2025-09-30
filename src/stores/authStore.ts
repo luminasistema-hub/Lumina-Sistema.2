@@ -82,35 +82,36 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
-        console.log('AuthStore: checkAuth initiated.');
+        console.log('AuthStore: checkAuth initiated. Setting isLoading to true.');
         set({ isLoading: true });
         try {
           const { data: { session }, error } = await supabase.auth.getSession();
           console.log('AuthStore: getSession result - session:', session, 'error:', error);
 
           if (error) {
-            console.error('AuthStore: Error getting session:', error);
+            console.error('AuthStore: Error getting session:', error.message);
             set({ user: null, isLoading: false, currentChurchId: null });
             return;
           }
 
           if (session && session.user) {
-            console.log('AuthStore: Session found, fetching user profile for ID:', session.user.id);
+            console.log('AuthStore: Session found for user ID:', session.user.id);
+            console.log('AuthStore: Attempting to fetch profile from "perfis" table.');
             const { data: profile, error: profileError } = await supabase
               .from('perfis')
               .select('*, igrejas(id, nome)') // Join with 'igrejas' to get church name
               .eq('id', session.user.id)
               .single();
             
-            console.log('AuthStore: Fetched profile data:', profile);
-            console.log('AuthStore: Profile fetch result - profile:', profile, 'profileError:', profileError);
-            console.log('AuthStore: Profile perfil_completo status:', profile?.perfil_completo); // Adicionado log
+            console.log('AuthStore: Profile fetch result - data:', profile, 'error:', profileError);
 
-            if (profileError) {
-              console.error('AuthStore: Error fetching user profile:', profileError);
+            if (profileError || !profile) { // Adicionado !profile para cobrir casos onde data é null sem erro explícito
+              console.error('AuthStore: Error fetching user profile or profile not found:', profileError?.message || 'Profile data is null/undefined.');
               set({ user: null, isLoading: false, currentChurchId: null });
               return;
             }
+
+            console.log('AuthStore: Profile data successfully fetched. perfil_completo:', profile.perfil_completo);
 
             const userRole = profile.funcao as UserRole;
             const churchIdFromProfile = profile.id_igreja;
@@ -121,34 +122,31 @@ export const useAuthStore = create<AuthState>()(
               name: profile.full_name || session.user.user_metadata.full_name || session.user.email || 'Usuário',
               email: session.user.email!,
               role: userRole,
-              churchId: churchIdFromProfile, // This is the user's primary church ID
+              churchId: churchIdFromProfile,
               churchName: churchName,
               status: profile.status as User['status'],
               created_at: session.user.created_at,
-              perfil_completo: profile.perfil_completo, // Adicionado
+              perfil_completo: profile.perfil_completo,
             };
 
             let newCurrentChurchId: string | null;
             if (userRole === 'super_admin') {
-                // Super admin's currentChurchId is managed separately (can be null or selected)
-                // We keep the existing currentChurchId from persisted state or set to null if not found
                 newCurrentChurchId = get().currentChurchId;
                 console.log('AuthStore: Super admin detected. Keeping currentCurrentChurchId from persisted state:', newCurrentChurchId);
             } else {
-                // For all other roles, currentChurchId should always be their primary churchId
                 newCurrentChurchId = churchIdFromProfile;
                 console.log('AuthStore: Non-super admin detected. Setting newCurrentChurchId to profile church ID:', newCurrentChurchId);
             }
 
             set({ user: authenticatedUser, isLoading: false, currentChurchId: newCurrentChurchId });
-            console.log('AuthStore: User authenticated and state updated. Final user:', authenticatedUser, 'Final currentChurchId:', newCurrentChurchId);
+            console.log('AuthStore: User authenticated and state updated. Final user:', authenticatedUser, 'Final currentChurchId:', newCurrentChurchId, 'isLoading set to false.');
           } else {
-            console.log('AuthStore: No authenticated user found in session.');
+            console.log('AuthStore: No authenticated user found in session. Setting isLoading to false.');
             set({ user: null, isLoading: false, currentChurchId: null });
           }
         } catch (error) {
           console.error('AuthStore: Unexpected error during checkAuth:', error);
-          set({ user: null, isLoading: false, currentChurchId: null });
+          set({ user: null, isLoading: false, currentChurchId: null }); // Garante que isLoading seja false mesmo em erros inesperados
         }
       },
 
