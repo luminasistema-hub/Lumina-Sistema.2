@@ -283,7 +283,7 @@ const VocationalTest = () => {
         .select('*')
         .eq('membro_id', user.id)
         .eq('is_ultimo', true)
-        .maybeSingle(); // Alterado para .maybeSingle()
+        .maybeSingle(); // Usando .maybeSingle() para evitar 406 se não houver resultados
 
       if (error) {
         console.error('VocationalTest: Error loading previous test:', error);
@@ -349,55 +349,13 @@ const VocationalTest = () => {
 
     console.log('Calculating vocational test results and saving to Supabase...');
     
-    const ministryScores: Record<string, number> = {
-      midia: 0,
-      louvor: 0,
-      diaconato: 0,
-      integracao: 0,
-      ensino: 0,
-      kids: 0,
-      organizacao: 0,
-      acao_social: 0
-    }
-
-    // Calcular pontuação por ministério
-    questions.forEach(question => {
-      const answer = answers[question.id] || 0
-      ministryScores[question.ministry] += answer
-    })
-
-    // Converter para resultados
-    const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
-      const score = ministryScores[ministryKey]
-      const maxScore = 25 // 5 perguntas x 5 pontos max
-      const percentage = (score / maxScore) * 100
-      
-      return {
-        ...ministryData[ministryKey as keyof typeof ministryData],
-        score,
-        percentage: Math.round(percentage)
-      }
-    })
-
-    // Ordenar por pontuação
-    calculatedResults.sort((a, b) => b.score - a.score)
+    // Não precisamos calcular ministryScores aqui para enviar, pois o trigger fará isso.
+    // Apenas precisamos das respostas individuais.
     
-    setResults(calculatedResults)
-    setTopMinistry(calculatedResults[0])
-
     // Preparar dados para inserção no Supabase
     const testDataToSave: any = {
       membro_id: user.id,
       data_teste: new Date().toISOString().split('T')[0],
-      soma_midia: ministryScores.midia,
-      soma_louvor: ministryScores.louvor,
-      soma_diaconato: ministryScores.diaconato,
-      soma_integra: ministryScores.integracao,
-      soma_ensino: ministryScores.ensino,
-      soma_kids: ministryScores.kids,
-      soma_organizacao: ministryScores.organizacao,
-      soma_acao_social: ministryScores.acao_social,
-      ministerio_recomendado: calculatedResults[0].name,
       is_ultimo: true, // Será ajustado pelo trigger
     };
 
@@ -419,6 +377,38 @@ const VocationalTest = () => {
     }
 
     console.log('VocationalTest: Test results saved to Supabase:', data);
+    
+    // Após salvar, o trigger calculará as somas e o ministério recomendado.
+    // Precisamos recarregar o teste para obter os resultados calculados pelo DB.
+    // Ou, se o `data` retornado já incluir os campos gerados (o que é comum com `select()`),
+    // podemos usá-los diretamente. Vamos assumir que `data` inclui os campos gerados.
+    const ministryScores: Record<string, number> = {
+      midia: data.soma_midia || 0,
+      louvor: data.soma_louvor || 0,
+      diaconato: data.soma_diaconato || 0,
+      integracao: data.soma_integra || 0,
+      ensino: data.soma_ensino || 0,
+      kids: data.soma_kids || 0,
+      organizacao: data.soma_organizacao || 0,
+      acao_social: data.soma_acao_social || 0
+    };
+
+    const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
+      const score = ministryScores[ministryKey];
+      const maxScore = 25; // 5 perguntas x 5 pontos max
+      const percentage = (score / maxScore) * 100;
+      
+      return {
+        ...ministryData[ministryKey as keyof typeof ministryData],
+        score,
+        percentage: Math.round(percentage)
+      };
+    });
+
+    calculatedResults.sort((a, b) => b.score - a.score);
+    setResults(calculatedResults);
+    setTopMinistry(calculatedResults[0]);
+
     setHasPreviousTest(true);
     setCurrentStep('results');
     toast.success('Teste vocacional concluído e resultados salvos!');
