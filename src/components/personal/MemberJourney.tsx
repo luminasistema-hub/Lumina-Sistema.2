@@ -19,7 +19,8 @@ import {
   Award,
   Target
 } from 'lucide-react'
-import DescricaoFormatada from '../utils/DescricaoFormatada'; // Importar o novo componente
+import DescricaoFormatada from '../utils/DescricaoFormatada';
+import JourneyActionDialog from './JourneyActionDialog'; // Importar o novo componente de diálogo
 
 // Interfaces para os dados do Supabase
 interface TrilhaCrescimento {
@@ -28,6 +29,26 @@ interface TrilhaCrescimento {
   titulo: string;
   descricao: string;
   is_ativa: boolean;
+}
+
+interface QuizPergunta {
+  id?: string;
+  ordem: number;
+  pergunta_texto: string;
+  opcoes: string[];
+  resposta_correta: number;
+  pontuacao: number;
+}
+
+interface PassoEtapa {
+  id: string;
+  id_etapa: string;
+  ordem: number;
+  titulo: string;
+  tipo_passo: 'video' | 'quiz' | 'leitura' | 'acao' | 'link_externo';
+  conteudo?: string;
+  created_at: string;
+  quiz_perguntas?: QuizPergunta[];
 }
 
 interface EtapaTrilha {
@@ -39,37 +60,41 @@ interface EtapaTrilha {
   tipo_conteudo: string;
   conteudo: string;
   cor: string;
+  created_at: string;
 }
 
+// Progresso agora é por PASSO, não por ETAPA
 interface ProgressoMembro {
   id: string;
   id_membro: string;
-  id_etapa: string;
+  id_passo: string; // Alterado para id_passo
   status: 'pendente' | 'concluido';
   data_conclusao?: string;
 }
 
 // A estrutura final que será usada para renderizar
-interface JourneyStepDisplay extends EtapaTrilha {
+interface JourneyPassoDisplay extends PassoEtapa {
   completed: boolean;
   completedDate?: string;
-  requirements?: string[]; // Mocked for now, could come from DB
-  nextSteps?: string[]; // Mocked for now, could come from DB
-  icon: React.ReactNode; // Derived from type or title
-  color: string; // Derived
-  bgColor: string; // Derived
+}
+
+interface JourneyEtapaDisplay extends EtapaTrilha {
+  passos: JourneyPassoDisplay[];
+  allPassosCompleted: boolean;
 }
 
 const MemberJourney = () => {
   const { user, currentChurchId } = useAuthStore() 
-  const [currentStep, setCurrentStep] = useState<'intro' | 'journey'>('intro') // Alterado para 'journey'
-  const [etapas, setEtapas] = useState<EtapaTrilha[]>([])
+  const [etapas, setEtapas] = useState<JourneyEtapaDisplay[]>([])
   const [progresso, setProgresso] = useState<ProgressoMembro[]>([])
   const [loading, setLoading] = useState(true)
   const [overallProgress, setOverallProgress] = useState(0)
   const [currentLevel, setCurrentLevel] = useState(0)
 
-  // Funções auxiliares para ícones e cores (mantidas do mock, podem ser ajustadas)
+  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
+  const [currentActionPasso, setCurrentActionPasso] = useState<PassoEtapa | null>(null);
+
+  // Funções auxiliares para ícones e cores
   const getStepIcon = (title: string) => {
     const lowerTitle = title.toLowerCase();
     if (lowerTitle.includes('decisão') || lowerTitle.includes('fé')) return <Heart className="w-6 h-6" />;
@@ -92,99 +117,155 @@ const MemberJourney = () => {
     return { color: 'text-gray-600', bgColor: 'bg-gray-50 border-gray-200' };
   };
 
-  useEffect(() => {
-    const loadJourneyData = async () => {
-      if (!user?.id || !currentChurchId) {
+  const loadJourneyData = async () => {
+    if (!user?.id || !currentChurchId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    console.log('MemberJourney: Loading journey data for user:', user.id, 'church:', currentChurchId);
+
+    try {
+      // 1. Buscar a trilha de crescimento da igreja
+      const { data: trilhaData, error: trilhaError } = await supabase
+        .from('trilhas_crescimento')
+        .select('id, titulo, descricao')
+        .eq('id_igreja', currentChurchId)
+        .eq('is_ativa', true)
+        .single();
+
+      if (trilhaError && trilhaError.code !== 'PGRST116') {
+        console.error('MemberJourney: Error loading trilha_crescimento:', trilhaError);
+        toast.error('Erro ao carregar a trilha de crescimento da igreja.');
         setLoading(false);
         return;
       }
 
-      setLoading(true);
-      console.log('MemberJourney: Loading journey data for user:', user.id, 'church:', currentChurchId);
-
-      try {
-        // 1. Buscar a trilha de crescimento da igreja
-        const { data: trilhaData, error: trilhaError } = await supabase
-          .from('trilhas_crescimento')
-          .select('id, titulo, descricao')
-          .eq('id_igreja', currentChurchId)
-          .eq('is_ativa', true)
-          .single();
-
-        if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = No rows found
-          console.error('MemberJourney: Error loading trilha_crescimento:', trilhaError);
-          toast.error('Erro ao carregar a trilha de crescimento da igreja.');
-          setLoading(false);
-          return;
-        }
-
-        if (!trilhaData) {
-          console.log('MemberJourney: No active journey found for this church.');
-          setEtapas([]);
-          setProgresso([]);
-          setLoading(false);
-          return;
-        }
-
-        const trilhaId = trilhaData.id;
-
-        // 2. Buscar as etapas da trilha
-        const { data: etapasData, error: etapasDataError } = await supabase
-          .from('etapas_trilha')
-          .select('*')
-          .eq('id_trilha', trilhaId)
-          .order('ordem', { ascending: true });
-
-        if (etapasDataError) {
-          console.error('MemberJourney: Error loading etapas_trilha:', etapasDataError);
-          toast.error('Erro ao carregar as etapas da trilha.');
-          setLoading(false);
-          return;
-        }
-        setEtapas(etapasData || []);
-
-        // 3. Buscar o progresso do membro para essas etapas
-        const etapaIds = (etapasData || []).map(etapa => etapa.id);
-        const { data: progressoData, error: progressoError } = await supabase
-          .from('progresso_membros')
-          .select('*')
-          .eq('id_membro', user.id)
-          .in('id_etapa', etapaIds);
-
-        if (progressoError) {
-          console.error('MemberJourney: Error loading progresso_membros:', progressoError);
-          toast.error('Erro ao carregar seu progresso na jornada.');
-          setLoading(false);
-          return;
-        }
-        setProgresso(progressoData || []);
-
-      } catch (error) {
-        console.error('MemberJourney: Unexpected error during data loading:', error);
-        toast.error('Ocorreu um erro inesperado ao carregar a jornada.');
-      } finally {
+      if (!trilhaData) {
+        console.log('MemberJourney: No active journey found for this church.');
+        setEtapas([]);
+        setProgresso([]);
         setLoading(false);
+        return;
       }
-    };
 
+      const trilhaId = trilhaData.id;
+
+      // 2. Buscar as etapas da trilha
+      const { data: etapasRawData, error: etapasDataError } = await supabase
+        .from('etapas_trilha')
+        .select('*')
+        .eq('id_trilha', trilhaId)
+        .order('ordem', { ascending: true });
+
+      if (etapasDataError) {
+        console.error('MemberJourney: Error loading etapas_trilha:', etapasDataError);
+        toast.error('Erro ao carregar as etapas da trilha.');
+        setLoading(false);
+        return;
+      }
+
+      const etapaIds = (etapasRawData || []).map(etapa => etapa.id);
+
+      // 3. Buscar todos os passos de todas as etapas
+      const { data: passosRawData, error: passosError } = await supabase
+        .from('passos_etapa')
+        .select('*')
+        .in('id_etapa', etapaIds)
+        .order('ordem', { ascending: true });
+
+      if (passosError) {
+        console.error('MemberJourney: Error loading passos_etapa:', passosError);
+        toast.error('Erro ao carregar os passos da jornada.');
+        setLoading(false);
+        return;
+      }
+
+      const passoIds = (passosRawData || []).map(passo => passo.id);
+
+      // 4. Buscar o progresso do membro para esses passos
+      const { data: progressoData, error: progressoError } = await supabase
+        .from('progresso_membros')
+        .select('*')
+        .eq('id_membro', user.id)
+        .in('id_passo', passoIds); // Filtrar por id_passo
+
+      if (progressoError) {
+        console.error('MemberJourney: Error loading progresso_membros:', progressoError);
+        toast.error('Erro ao carregar seu progresso na jornada.');
+        setLoading(false);
+        return;
+      }
+      setProgresso(progressoData || []);
+
+      // 5. Carregar perguntas de quiz para os passos do tipo 'quiz'
+      const quizPassoIds = (passosRawData || []).filter(p => p.tipo_passo === 'quiz').map(p => p.id);
+      let quizPerguntasData: QuizPergunta[] = [];
+      if (quizPassoIds.length > 0) {
+        const { data: qData, error: qError } = await supabase
+          .from('quiz_perguntas')
+          .select('*')
+          .in('passo_id', quizPassoIds)
+          .order('ordem', { ascending: true });
+        if (qError) console.error('Erro ao carregar perguntas de quiz:', qError);
+        quizPerguntasData = qData || [];
+      }
+
+      // 6. Aninhar passos e progresso nas etapas
+      const etapasComPassos: JourneyEtapaDisplay[] = (etapasRawData || []).map(etapa => {
+        const passosDaEtapa: JourneyPassoDisplay[] = (passosRawData || [])
+          .filter(passo => passo.id_etapa === etapa.id)
+          .map(passo => {
+            const passoProgresso = (progressoData || []).find(p => p.id_passo === passo.id);
+            return {
+              ...passo,
+              completed: passoProgresso?.status === 'concluido',
+              completedDate: passoProgresso?.data_conclusao,
+              quiz_perguntas: passo.tipo_passo === 'quiz' 
+                ? quizPerguntasData.filter(qp => qp.passo_id === passo.id) 
+                : undefined
+            };
+          });
+        
+        const allPassosCompleted = passosDaEtapa.every(p => p.completed);
+
+        return {
+          ...etapa,
+          passos: passosDaEtapa,
+          allPassosCompleted: allPassosCompleted,
+        };
+      });
+      
+      setEtapas(etapasComPassos);
+
+    } catch (error) {
+      console.error('MemberJourney: Unexpected error during data loading:', error);
+      toast.error('Ocorreu um erro inesperado ao carregar a jornada.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadJourneyData();
   }, [user?.id, currentChurchId]);
 
   useEffect(() => {
     if (!loading && etapas.length > 0) {
-      const completedStepsCount = progresso.filter(p => p.status === 'concluido').length;
-      const totalSteps = etapas.length;
-      const progressPercentage = (completedStepsCount / totalSteps) * 100;
+      const totalPassos = etapas.reduce((sum, etapa) => sum + etapa.passos.length, 0);
+      const completedPassos = etapas.reduce((sum, etapa) => sum + etapa.passos.filter(passo => passo.completed).length, 0);
+      
+      const progressPercentage = totalPassos > 0 ? (completedPassos / totalPassos) * 100 : 0;
       
       setOverallProgress(progressPercentage);
-      setCurrentLevel(completedStepsCount);
-      setCurrentStep('journey'); // Mudar para a visualização da jornada após carregar
+      setCurrentLevel(etapas.filter(etapa => etapa.allPassosCompleted).length);
     } else if (!loading && etapas.length === 0) {
-      setCurrentStep('intro'); // Se não houver etapas, volta para a introdução ou exibe mensagem
+      // Se não houver etapas, o estado de intro será mantido
     }
-  }, [etapas, progresso, loading]);
+  }, [etapas, loading]);
 
-  const markStepCompleted = async (etapaId: string) => {
+  const markPassoCompleted = async (passoId: string) => {
     if (!user?.id || !currentChurchId) {
       toast.error('Erro: Usuário ou igreja não identificados.');
       return;
@@ -192,57 +273,33 @@ const MemberJourney = () => {
 
     setLoading(true);
     try {
-      // Verificar se já existe um registro de progresso para esta etapa
-      const existingProgress = progresso.find(p => p.id_etapa === etapaId && p.id_membro === user.id);
+      const existingProgress = progresso.find(p => p.id_passo === passoId && p.id_membro === user.id);
 
       if (existingProgress) {
-        // Atualizar o registro existente
         const { error } = await supabase
           .from('progresso_membros')
           .update({ status: 'concluido', data_conclusao: new Date().toISOString() })
           .eq('id', existingProgress.id);
 
-        if (error) {
-          console.error('MemberJourney: Error updating progress:', error);
-          toast.error('Erro ao atualizar o progresso da etapa.');
-          return;
-        }
+        if (error) throw error;
       } else {
-        // Inserir um novo registro
         const { error } = await supabase
           .from('progresso_membros')
           .insert({
             id_membro: user.id,
-            id_etapa: etapaId,
+            id_passo: passoId,
             status: 'concluido',
             data_conclusao: new Date().toISOString(),
           });
 
-        if (error) {
-          console.error('MemberJourney: Error inserting new progress:', error);
-          toast.error('Erro ao registrar o progresso da etapa.');
-          return;
-        }
+        if (error) throw error;
       }
 
-      // Re-fetch para atualizar o estado local
-      const { data: updatedProgresso, error: fetchError } = await supabase
-        .from('progresso_membros')
-        .select('*')
-        .eq('id_membro', user.id)
-        .in('id_etapa', etapas.map(e => e.id));
-
-      if (fetchError) {
-        console.error('MemberJourney: Error re-fetching progress after update:', fetchError);
-        toast.error('Progresso atualizado, mas houve um erro ao recarregar os dados.');
-      } else {
-        setProgresso(updatedProgresso || []);
-        toast.success('Etapa marcada como concluída!');
-      }
-
-    } catch (error) {
-      console.error('MemberJourney: Unexpected error marking step completed:', error);
-      toast.error('Ocorreu um erro inesperado ao marcar a etapa.');
+      toast.success('Passo marcado como concluído!');
+      loadJourneyData(); // Recarrega todos os dados para atualizar o progresso
+    } catch (error: any) {
+      console.error('MemberJourney: Unexpected error marking passo completed:', error);
+      toast.error('Ocorreu um erro inesperado ao marcar o passo.');
     } finally {
       setLoading(false);
     }
@@ -270,6 +327,24 @@ const MemberJourney = () => {
     return 'Você está se desenvolvendo como líder cristão.';
   }
 
+  const findNextUncompletedPasso = (): PassoEtapa | null => {
+    for (const etapa of etapas) {
+      for (const passo of etapa.passos) {
+        if (!passo.completed) {
+          return passo;
+        }
+      }
+    }
+    return null;
+  };
+
+  const nextUncompletedPasso = findNextUncompletedPasso();
+
+  const handleOpenActionDialog = (passo: PassoEtapa) => {
+    setCurrentActionPasso(passo);
+    setIsActionDialogOpen(true);
+  };
+
   if (!currentChurchId) {
     return (
       <div className="p-6 text-center text-gray-600">
@@ -287,24 +362,7 @@ const MemberJourney = () => {
     );
   }
 
-  // Mapear etapas do banco de dados para o formato de exibição
-  const journeyStepsDisplay: JourneyStepDisplay[] = etapas.map(etapa => {
-    const memberProgress = progresso.find(p => p.id_etapa === etapa.id);
-    const { color, bgColor } = getStepColorAndBg(etapa.titulo);
-    return {
-      ...etapa,
-      completed: memberProgress?.status === 'concluido',
-      completedDate: memberProgress?.data_conclusao,
-      icon: getStepIcon(etapa.titulo),
-      color,
-      bgColor,
-      // Mocked requirements and nextSteps for now, as they are not in DB schema
-      requirements: ['Requisito 1', 'Requisito 2'], 
-      nextSteps: ['Próximo passo 1', 'Próximo passo 2']
-    };
-  });
-
-  if (currentStep === 'intro' || journeyStepsDisplay.length === 0) {
+  if (etapas.length === 0) {
     return (
       <div className="p-6 space-y-6">
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
@@ -385,7 +443,7 @@ const MemberJourney = () => {
             </div>
             <Progress value={overallProgress} className="h-3" />
             <p className="text-sm text-gray-600">
-              {currentLevel} de {etapas.length} etapas concluídas
+              {etapas.reduce((sum, etapa) => sum + etapa.passos.filter(p => p.completed).length, 0)} de {etapas.reduce((sum, etapa) => sum + etapa.passos.length, 0)} passos concluídos
             </p>
           </div>
         </CardContent>
@@ -394,104 +452,101 @@ const MemberJourney = () => {
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-900">Etapas da Jornada</h2>
         
-        {journeyStepsDisplay.map((step, index) => (
-          <Card 
-            key={step.id} 
-            className={`relative ${step.bgColor} ${step.completed ? 'ring-2 ring-green-200' : ''}`}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="flex flex-col items-center">
-                  <div className={`w-12 h-12 rounded-full ${step.completed ? 'bg-green-100' : 'bg-white'} border-2 ${step.completed ? 'border-green-500' : 'border-gray-300'} flex items-center justify-center ${step.color}`}>
-                    {step.completed ? (
-                      <CheckCircle className="w-6 h-6 text-green-600" />
-                    ) : (
-                      step.icon
+        {etapas.map((etapa, index) => {
+          const { color, bgColor } = getStepColorAndBg(etapa.titulo);
+          const isEtapaCompleted = etapa.allPassosCompleted;
+
+          return (
+            <Card 
+              key={etapa.id} 
+              className={`relative ${bgColor} ${isEtapaCompleted ? 'ring-2 ring-green-200' : ''}`}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-12 h-12 rounded-full ${isEtapaCompleted ? 'bg-green-100' : 'bg-white'} border-2 ${isEtapaCompleted ? 'border-green-500' : 'border-gray-300'} flex items-center justify-center ${color}`}>
+                      {isEtapaCompleted ? (
+                        <CheckCircle className="w-6 h-6 text-green-600" />
+                      ) : (
+                        getStepIcon(etapa.titulo)
+                      )}
+                    </div>
+                    {index < etapas.length - 1 && (
+                      <div className={`w-0.5 h-16 mt-2 ${isEtapaCompleted ? 'bg-green-300' : 'bg-gray-300'}`}></div>
                     )}
                   </div>
-                  {index < journeyStepsDisplay.length - 1 && (
-                    <div className={`w-0.5 h-16 mt-2 ${step.completed ? 'bg-green-300' : 'bg-gray-300'}`}></div>
-                  )}
-                </div>
 
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-semibold text-gray-900">{step.titulo}</h3>
-                    <div className="flex items-center gap-2">
-                      {step.completed && (
-                        <Badge className="bg-green-100 text-green-800">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Concluído
-                        </Badge>
-                      )}
-                      {step.completedDate && (
-                        <Badge variant="outline" className="text-xs">
-                          {new Date(step.completedDate).toLocaleDateString('pt-BR')}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <DescricaoFormatada texto={step.descricao} /> {/* Usando o novo componente */}
-
-                  {step.requirements && (
-                    <div className="mb-4">
-                      <h4 className="font-medium text-gray-900 mb-2">Requisitos:</h4>
-                      <ul className="space-y-1">
-                        {step.requirements.map((req, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
-                            <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
-                            {req}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {step.nextSteps && !step.completed && (
-                    <div className="bg-white/70 rounded-lg p-4 border border-gray-200">
-                      <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
-                        <Target className="w-4 h-4" />
-                        Próximos Passos:
-                      </h4>
-                      <ul className="space-y-1">
-                        {step.nextSteps.map((nextStep, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-sm text-gray-700">
-                            <ArrowRight className="w-3 h-3 text-blue-500" />
-                            {nextStep}
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="mt-3 flex gap-2">
-                        <Button size="sm" className="bg-blue-500 hover:bg-blue-600">
-                          Começar Agora
-                        </Button>
-                        {!step.completed && (
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => markStepCompleted(step.id)}
-                          >
-                            Marcar como Concluído
-                          </Button>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xl font-semibold text-gray-900">{etapa.ordem}. {etapa.titulo}</h3>
+                      <div className="flex items-center gap-2">
+                        {isEtapaCompleted && (
+                          <Badge className="bg-green-100 text-green-800">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Concluído
+                          </Badge>
                         )}
                       </div>
                     </div>
-                  )}
 
-                  {step.completed && (
-                    <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                      <div className="flex items-center gap-2 text-green-800">
-                        <Award className="w-4 h-4" />
-                        <span className="text-sm font-medium">Parabéns! Você concluiu esta etapa da sua jornada cristã.</span>
-                      </div>
+                    <DescricaoFormatada texto={etapa.descricao} />
+
+                    <div className="mt-4 space-y-3">
+                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                        <Target className="w-4 h-4" />
+                        Passos desta Etapa:
+                      </h4>
+                      {etapa.passos.length > 0 ? (
+                        <ul className="space-y-2">
+                          {etapa.passos.map((passo) => (
+                            <li key={passo.id} className="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm">
+                              <div className="flex items-center gap-3">
+                                {passo.completed ? (
+                                  <CheckCircle className="w-5 h-5 text-green-500" />
+                                ) : (
+                                  <Circle className="w-5 h-5 text-gray-400" />
+                                )}
+                                <div>
+                                  <p className={`font-medium ${passo.completed ? 'text-gray-600 line-through' : 'text-gray-900'}`}>
+                                    {passo.titulo}
+                                  </p>
+                                  {passo.completedDate && (
+                                    <p className="text-xs text-gray-500">
+                                      Concluído em {new Date(passo.completedDate).toLocaleDateString('pt-BR')}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              {!passo.completed && (
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleOpenActionDialog(passo)}
+                                >
+                                  Começar Agora
+                                </Button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">Nenhum passo configurado para esta etapa.</p>
+                      )}
                     </div>
-                  )}
+
+                    {isEtapaCompleted && (
+                      <div className="bg-green-50 rounded-lg p-3 border border-green-200 mt-4">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <Award className="w-4 h-4" />
+                          <span className="text-sm font-medium">Parabéns! Você concluiu todos os passos desta etapa.</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
@@ -502,9 +557,19 @@ const MemberJourney = () => {
               Cada passo na sua jornada espiritual é importante. Deus tem um plano maravilhoso para sua vida e ministério.
             </p>
             <div className="flex justify-center gap-3">
-              <Button className="bg-green-500 hover:bg-green-600">
-                Ver Cursos Disponíveis
-              </Button>
+              {nextUncompletedPasso ? (
+                <Button 
+                  className="bg-green-500 hover:bg-green-600"
+                  onClick={() => handleOpenActionDialog(nextUncompletedPasso)}
+                >
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  Continuar Jornada
+                </Button>
+              ) : (
+                <Button className="bg-green-500 hover:bg-green-600" disabled>
+                  Jornada Concluída!
+                </Button>
+              )}
               <Button variant="outline">
                 Conversar com um Líder
               </Button>
@@ -512,6 +577,13 @@ const MemberJourney = () => {
           </div>
         </CardContent>
       </Card>
+
+      <JourneyActionDialog
+        isOpen={isActionDialogOpen}
+        onClose={() => setIsActionDialogOpen(false)}
+        passo={currentActionPasso}
+        onCompletePasso={markPassoCompleted}
+      />
     </div>
   )
 }
