@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Progress } from '../ui/progress'
 import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
+import { supabase } from '../../integrations/supabase/client'
 import { 
   DollarSign, 
   TrendingUp, 
@@ -46,7 +47,8 @@ import {
   Bell,
   Wallet,
   PlusCircle,
-  MinusCircle
+  MinusCircle,
+  Loader2
 } from 'lucide-react'
 
 interface FinancialTransaction {
@@ -55,7 +57,7 @@ interface FinancialTransaction {
   categoria: string
   subcategoria?: string
   valor: number
-  data: string
+  data_transacao: string
   descricao: string
   metodo_pagamento: string
   responsavel: string
@@ -69,6 +71,7 @@ interface FinancialTransaction {
   centro_custo?: string
   aprovado_por?: string
   data_aprovacao?: string
+  id_igreja: string
 }
 
 interface Budget {
@@ -83,6 +86,7 @@ interface Budget {
   responsavel: string
   status: 'Ativo' | 'Excedido' | 'Finalizado'
   alertas_configurados: boolean
+  id_igreja: string
 }
 
 interface FinancialGoal {
@@ -97,6 +101,7 @@ interface FinancialGoal {
   status: 'Ativo' | 'Concluído' | 'Pausado' | 'Cancelado'
   contribuidores: number
   campanha_ativa: boolean
+  id_igreja: string
 }
 
 interface FinancialReport {
@@ -112,13 +117,13 @@ interface FinancialReport {
     saldo_periodo: number
     categorias_entrada: Array<{categoria: string, valor: number}>
     categorias_saida: Array<{categoria: string, valor: number}>
-    maior_entrada: FinancialTransaction
-    maior_saida: FinancialTransaction
+    maior_entrada: FinancialTransaction | null
+    maior_saida: FinancialTransaction | null
   }
 }
 
 const FinancialPanel = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore()
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [goals, setGoals] = useState<FinancialGoal[]>([])
@@ -126,11 +131,18 @@ const FinancialPanel = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
+  const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false)
+  const [transactionToEdit, setTransactionToEdit] = useState<FinancialTransaction | null>(null)
   const [isAddBudgetOpen, setIsAddBudgetOpen] = useState(false)
+  const [isEditBudgetOpen, setIsEditBudgetOpen] = useState(false)
+  const [budgetToEdit, setBudgetToEdit] = useState<Budget | null>(null)
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false)
+  const [isEditGoalOpen, setIsEditGoalOpen] = useState(false)
+  const [goalToEdit, setGoalToEdit] = useState<FinancialGoal | null>(null)
   const [isGenerateReportOpen, setIsGenerateReportOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [viewMode, setViewMode] = useState<'dashboard' | 'transactions' | 'budget' | 'goals' | 'reports'>('dashboard')
+  const [loadingData, setLoadingData] = useState(true)
 
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
@@ -139,7 +151,7 @@ const FinancialPanel = () => {
     categoria: '',
     subcategoria: '',
     valor: 0,
-    data: new Date().toISOString().split('T')[0],
+    data_transacao: new Date().toISOString().split('T')[0],
     descricao: '',
     metodo_pagamento: 'PIX',
     observacoes: '',
@@ -205,7 +217,7 @@ const FinancialPanel = () => {
     'Outros'
   ]
 
-  const subcategorias = {
+  const subcategorias: Record<string, string[]> = {
     'Pessoal': ['Salários', 'Benefícios', 'Encargos', 'Ajuda de Custo', 'Treinamentos'],
     'Utilidades': ['Energia Elétrica', 'Água', 'Internet', 'Telefone', 'Gás'],
     'Manutenção': ['Limpeza', 'Jardinagem', 'Reparos', 'Materiais'],
@@ -216,357 +228,463 @@ const FinancialPanel = () => {
 
   const metodosPagamento = ['PIX', 'Dinheiro', 'Cartão Débito', 'Cartão Crédito', 'Transferência', 'Cheque', 'Boleto']
 
-  // Mock data mais completo
+  const loadFinancialData = useCallback(async () => {
+    if (!currentChurchId) {
+      setTransactions([])
+      setBudgets([])
+      setGoals([])
+      setReports([])
+      setLoadingData(false)
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      // Load Transactions
+      const { data: transactionsData, error: transactionsError } = await supabase
+        .from('transacoes_financeiras')
+        .select('*')
+        .eq('id_igreja', currentChurchId)
+        .order('data_transacao', { ascending: false })
+
+      if (transactionsError) throw transactionsError
+      setTransactions(transactionsData as FinancialTransaction[])
+
+      // Load Budgets
+      const { data: budgetsData, error: budgetsError } = await supabase
+        .from('orcamentos')
+        .select('*')
+        .eq('id_igreja', currentChurchId)
+        .order('mes_ano', { ascending: false })
+
+      if (budgetsError) throw budgetsError
+      setBudgets(budgetsData.map(b => ({
+        ...b,
+        valor_disponivel: b.valor_orcado - b.valor_gasto
+      })) as Budget[])
+
+      // Load Goals
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('metas_financeiras')
+        .select('*')
+        .eq('id_igreja', currentChurchId)
+        .order('data_limite', { ascending: true })
+
+      if (goalsError) throw goalsError
+      setGoals(goalsData as FinancialGoal[])
+
+      // Load Reports (if any were saved, though typically reports are generated on demand)
+      // For now, we'll keep reports as in-memory generated.
+      setReports([])
+
+    } catch (error: any) {
+      console.error('Error loading financial data:', error.message)
+      toast.error('Erro ao carregar dados financeiros: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }, [currentChurchId])
+
   useEffect(() => {
-    console.log('FinancialPanel: Loading complete financial data...')
-    const mockTransactions: FinancialTransaction[] = [
-      {
-        id: '1',
-        tipo: 'Entrada',
-        categoria: 'Dízimos',
-        valor: 15000.00,
-        data: '2025-09-01',
-        descricao: 'Dízimos do mês de setembro - Coleta automática',
-        metodo_pagamento: 'Múltiplos',
-        responsavel: 'Sistema Automático',
-        status: 'Confirmado',
-        recibo_emitido: true,
-        numero_documento: 'DZ-202509-001',
-        centro_custo: 'Geral',
-        aprovado_por: 'Pastor João',
-        data_aprovacao: '2025-09-01'
-      },
-      {
-        id: '2',
-        tipo: 'Entrada',
-        categoria: 'Ofertas',
-        valor: 5200.00,
-        data: '2025-09-08',
-        descricao: 'Ofertas dos cultos dominicais',
-        metodo_pagamento: 'Múltiplos',
-        responsavel: 'Sistema Automático',
-        status: 'Confirmado',
-        recibo_emitido: true,
-        numero_documento: 'OF-202509-008',
-        centro_custo: 'Geral'
-      },
-      {
-        id: '3',
-        tipo: 'Saída',
-        categoria: 'Pessoal',
-        subcategoria: 'Salários',
-        valor: 8000.00,
-        data: '2025-09-05',
-        descricao: 'Salários equipe pastoral - Setembro',
-        metodo_pagamento: 'Transferência',
-        responsavel: user?.name || 'Administrador Financeiro',
-        status: 'Confirmado',
-        numero_documento: 'SAL-202509-001',
-        centro_custo: 'Administrativo',
-        aprovado_por: 'Pastor João',
-        data_aprovacao: '2025-09-05'
-      },
-      {
-        id: '4',
-        tipo: 'Saída',
-        categoria: 'Utilidades',
-        subcategoria: 'Energia Elétrica',
-        valor: 850.00,
-        data: '2025-09-10',
-        descricao: 'Conta de energia elétrica - Setembro',
-        metodo_pagamento: 'PIX',
-        responsavel: user?.name || 'Administrador Financeiro',
-        status: 'Confirmado',
-        numero_documento: 'EE-202509-001',
-        centro_custo: 'Infraestrutura'
-      },
-      {
-        id: '5',
-        tipo: 'Entrada',
-        categoria: 'Doações Especiais',
-        valor: 2500.00,
-        data: '2025-09-12',
-        descricao: 'Doação para reforma do templo',
-        metodo_pagamento: 'PIX',
-        responsavel: 'Maria Santos', // Corrigido de 'responsável' para 'responsavel'
-        status: 'Confirmado',
-        membro_nome: 'Maria Santos Silva',
-        recibo_emitido: true,
-        numero_documento: 'DE-202509-012',
-        centro_custo: 'Projetos Especiais'
-      },
-      {
-        id: '6',
-        tipo: 'Saída',
-        categoria: 'Ministérios',
-        subcategoria: 'Kids',
-        valor: 300.00,
-        data: '2025-09-13',
-        descricao: 'Materiais didáticos ministério kids',
-        metodo_pagamento: 'Cartão Débito',
-        responsavel: 'Líder Kids',
-        status: 'Pendente',
-        numero_documento: 'MK-202509-013',
-        centro_custo: 'Ministério Kids'
-      }
-    ]
+    loadFinancialData()
+  }, [loadFinancialData])
 
-    const mockBudgets: Budget[] = [
-      {
-        id: '1',
-        categoria: 'Pessoal',
-        valor_orcado: 12000,
-        valor_gasto: 8000,
-        valor_disponivel: 4000,
-        mes_ano: '2025-09',
-        responsavel: 'Administração',
-        status: 'Ativo',
-        alertas_configurados: true,
-        descricao: 'Orçamento para folha de pagamento'
-      },
-      {
-        id: '2',
-        categoria: 'Utilidades',
-        valor_orcado: 2500,
-        valor_gasto: 1850,
-        valor_disponivel: 650,
-        mes_ano: '2025-09',
-        responsavel: 'Administração',
-        status: 'Ativo',
-        alertas_configurados: true,
-        descricao: 'Contas básicas (luz, água, internet)'
-      },
-      {
-        id: '3',
-        categoria: 'Ministérios',
-        valor_orcado: 1500,
-        valor_gasto: 1600,
-        valor_disponivel: -100,
-        mes_ano: '2025-09',
-        responsavel: 'Coordenação de Ministérios',
-        status: 'Excedido',
-        alertas_configurados: true,
-        descricao: 'Atividades dos ministérios'
-      }
-    ]
+  const handleAddTransaction = async () => {
+    if (!newTransaction.categoria || !newTransaction.valor || !newTransaction.descricao || !currentChurchId) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
 
-    const mockGoals: FinancialGoal[] = [
-      {
-        id: '1',
-        nome: 'Reforma do Templo Principal',
-        valor_meta: 80000,
-        valor_atual: 25000,
-        data_inicio: '2025-01-01',
-        data_limite: '2025-12-31',
-        categoria: 'Reforma/Construção',
-        descricao: 'Reforma completa do templo principal incluindo pintura, piso e sistema elétrico',
-        status: 'Ativo',
-        contribuidores: 45,
-        campanha_ativa: true
-      },
-      {
-        id: '2',
-        nome: 'Equipamentos de Som Novos',
-        valor_meta: 15000,
-        valor_atual: 8500,
-        data_inicio: '2025-06-01',
-        data_limite: '2025-11-30',
-        categoria: 'Equipamentos',
-        descricao: 'Aquisição de novo sistema de som digital para o templo',
-        status: 'Ativo',
-        contribuidores: 12,
-        campanha_ativa: true
-      },
-      {
-        id: '3',
-        nome: 'Fundo de Emergência',
-        valor_meta: 30000,
-        valor_atual: 30000,
-        data_inicio: '2024-01-01',
-        data_limite: '2025-12-31',
-        categoria: 'Reserva',
-        descricao: 'Fundo para emergências e imprevistos da igreja',
-        status: 'Concluído',
-        contribuidores: 78,
-        campanha_ativa: false
-      }
-    ]
+    setLoadingData(true)
+    try {
+      const numeroDocumento = `${newTransaction.tipo === 'Entrada' ? 'ENT' : 'SAI'}-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(transactions.length + 1).padStart(3, '0')}`
 
-    setTransactions(mockTransactions)
-    setBudgets(mockBudgets)
-    setGoals(mockGoals)
-  }, [user])
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .insert({
+          id_igreja: currentChurchId,
+          tipo: newTransaction.tipo,
+          categoria: newTransaction.categoria,
+          subcategoria: newTransaction.subcategoria || null,
+          valor: newTransaction.valor,
+          data_transacao: newTransaction.data_transacao,
+          descricao: newTransaction.descricao,
+          metodo_pagamento: newTransaction.metodo_pagamento,
+          responsavel: user?.name || 'Sistema',
+          status: 'Pendente',
+          observacoes: newTransaction.observacoes || null,
+          numero_documento: numeroDocumento,
+          centro_custo: newTransaction.centro_custo || null
+        })
 
-  const handleAddTransaction = () => {
+      if (error) throw error
+      toast.success('Transação adicionada com sucesso!')
+      setIsAddTransactionOpen(false)
+      setNewTransaction({
+        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+        descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error adding transaction:', error.message)
+      toast.error('Erro ao adicionar transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleEditTransaction = async () => {
+    if (!transactionToEdit?.id || !currentChurchId) {
+      toast.error('Nenhuma transação selecionada para editar.')
+      return
+    }
     if (!newTransaction.categoria || !newTransaction.valor || !newTransaction.descricao) {
       toast.error('Preencha todos os campos obrigatórios')
       return
     }
 
-    const numeroDocumento = `${newTransaction.tipo === 'Entrada' ? 'ENT' : 'SAI'}-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(transactions.length + 1).padStart(3, '0')}`
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({
+          tipo: newTransaction.tipo,
+          categoria: newTransaction.categoria,
+          subcategoria: newTransaction.subcategoria || null,
+          valor: newTransaction.valor,
+          data_transacao: newTransaction.data_transacao,
+          descricao: newTransaction.descricao,
+          metodo_pagamento: newTransaction.metodo_pagamento,
+          observacoes: newTransaction.observacoes || null,
+          centro_custo: newTransaction.centro_custo || null,
+          numero_documento: newTransaction.numero_documento || null,
+          status: transactionToEdit.status, // Manter status atual
+          aprovado_por: transactionToEdit.aprovado_por,
+          data_aprovacao: transactionToEdit.data_aprovacao,
+          recibo_emitido: transactionToEdit.recibo_emitido,
+        })
+        .eq('id', transactionToEdit.id)
 
-    const transaction: FinancialTransaction = {
-      id: Date.now().toString(),
-      tipo: newTransaction.tipo,
-      categoria: newTransaction.categoria,
-      subcategoria: newTransaction.subcategoria,
-      valor: newTransaction.valor,
-      data: newTransaction.data,
-      descricao: newTransaction.descricao,
-      metodo_pagamento: newTransaction.metodo_pagamento,
-      responsavel: user?.name || '',
-      status: 'Pendente',
-      observacoes: newTransaction.observacoes,
-      numero_documento: numeroDocumento,
-      centro_custo: newTransaction.centro_custo || 'Geral'
+      if (error) throw error
+      toast.success('Transação atualizada com sucesso!')
+      setIsEditTransactionOpen(false)
+      setTransactionToEdit(null)
+      setNewTransaction({
+        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+        descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error editing transaction:', error.message)
+      toast.error('Erro ao editar transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
     }
-
-    setTransactions([transaction, ...transactions])
-    setIsAddTransactionOpen(false)
-    setNewTransaction({
-      tipo: 'Entrada',
-      categoria: '',
-      subcategoria: '',
-      valor: 0,
-      data: new Date().toISOString().split('T')[0],
-      descricao: '',
-      metodo_pagamento: 'PIX',
-      observacoes: '',
-      centro_custo: '',
-      numero_documento: ''
-    })
-    toast.success('Transação adicionada com sucesso!')
   }
 
-  const handleAddBudget = () => {
-    if (!newBudget.categoria || !newBudget.valor_orcado) {
+  const handleDeleteTransaction = async (transactionId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta transação?')) return
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .delete()
+        .eq('id', transactionId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Transação excluída com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error deleting transaction:', error.message)
+      toast.error('Erro ao excluir transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const approveTransaction = async (transactionId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({ 
+          status: 'Confirmado',
+          aprovado_por: user?.name || 'Admin',
+          data_aprovacao: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', transactionId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Transação aprovada com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error approving transaction:', error.message)
+      toast.error('Erro ao aprovar transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const generateReceipt = async (transaction: FinancialTransaction) => {
+    if (transaction.tipo === 'Saída') {
+      toast.error('Recibos só podem ser gerados para entradas')
+      return
+    }
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({ recibo_emitido: true })
+        .eq('id', transaction.id)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Recibo marcado como emitido!')
+      // Aqui você pode adicionar a lógica para realmente gerar e baixar o PDF do recibo
+      // Por exemplo, chamar uma função de Edge Function ou um serviço externo.
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error generating receipt:', error.message)
+      toast.error('Erro ao gerar recibo: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleAddBudget = async () => {
+    if (!newBudget.categoria || !newBudget.valor_orcado || !newBudget.mes_ano || !currentChurchId) {
       toast.error('Preencha todos os campos obrigatórios')
       return
     }
 
-    const budget: Budget = {
-      id: Date.now().toString(),
-      categoria: newBudget.categoria,
-      subcategoria: newBudget.subcategoria,
-      valor_orcado: newBudget.valor_orcado,
-      valor_gasto: 0,
-      valor_disponivel: newBudget.valor_orcado,
-      mes_ano: newBudget.mes_ano,
-      descricao: newBudget.descricao,
-      responsavel: user?.name || '',
-      status: 'Ativo',
-      alertas_configurados: newBudget.alertas_configurados
-    }
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('orcamentos')
+        .insert({
+          id_igreja: currentChurchId,
+          categoria: newBudget.categoria,
+          subcategoria: newBudget.subcategoria || null,
+          valor_orcado: newBudget.valor_orcado,
+          valor_gasto: 0, // Sempre inicia com 0
+          mes_ano: newBudget.mes_ano,
+          descricao: newBudget.descricao || null,
+          responsavel: user?.name || 'Sistema',
+          status: 'Ativo',
+          alertas_configurados: newBudget.alertas_configurados
+        })
 
-    setBudgets([...budgets, budget])
-    setIsAddBudgetOpen(false)
-    setNewBudget({
-      categoria: '',
-      subcategoria: '',
-      valor_orcado: 0,
-      mes_ano: new Date().toISOString().slice(0, 7),
-      descricao: '',
-      alertas_configurados: true
-    })
-    toast.success('Orçamento criado com sucesso!')
+      if (error) throw error
+      toast.success('Orçamento criado com sucesso!')
+      setIsAddBudgetOpen(false)
+      setNewBudget({
+        categoria: '', subcategoria: '', valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
+        descricao: '', alertas_configurados: true
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error adding budget:', error.message)
+      toast.error('Erro ao criar orçamento: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
   }
 
-  const handleAddGoal = () => {
+  const handleEditBudget = async () => {
+    if (!budgetToEdit?.id || !currentChurchId) {
+      toast.error('Nenhum orçamento selecionado para editar.')
+      return
+    }
+    if (!newBudget.categoria || !newBudget.valor_orcado || !newBudget.mes_ano) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('orcamentos')
+        .update({
+          categoria: newBudget.categoria,
+          subcategoria: newBudget.subcategoria || null,
+          valor_orcado: newBudget.valor_orcado,
+          mes_ano: newBudget.mes_ano,
+          descricao: newBudget.descricao || null,
+          alertas_configurados: newBudget.alertas_configurados,
+          // Recalcular valor_disponivel e status com base no valor_gasto existente
+          valor_disponivel: newBudget.valor_orcado - budgetToEdit.valor_gasto,
+          status: (newBudget.valor_orcado - budgetToEdit.valor_gasto) < 0 ? 'Excedido' : 'Ativo',
+        })
+        .eq('id', budgetToEdit.id)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Orçamento atualizado com sucesso!')
+      setIsEditBudgetOpen(false)
+      setBudgetToEdit(null)
+      setNewBudget({
+        categoria: '', subcategoria: '', valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
+        descricao: '', alertas_configurados: true
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error editing budget:', error.message)
+      toast.error('Erro ao editar orçamento: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleDeleteBudget = async (budgetId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este orçamento?')) return
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('orcamentos')
+        .delete()
+        .eq('id', budgetId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Orçamento excluído com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error deleting budget:', error.message)
+      toast.error('Erro ao excluir orçamento: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleAddGoal = async () => {
+    if (!newGoal.nome || !newGoal.valor_meta || !newGoal.data_limite || !currentChurchId) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('metas_financeiras')
+        .insert({
+          id_igreja: currentChurchId,
+          nome: newGoal.nome,
+          valor_meta: newGoal.valor_meta,
+          valor_atual: 0, // Sempre inicia com 0
+          data_inicio: new Date().toISOString().split('T')[0],
+          data_limite: newGoal.data_limite,
+          categoria: newGoal.categoria || null,
+          descricao: newGoal.descricao || null,
+          status: 'Ativo',
+          contribuidores: 0,
+          campanha_ativa: newGoal.campanha_ativa
+        })
+
+      if (error) throw error
+      toast.success('Meta financeira criada com sucesso!')
+      setIsAddGoalOpen(false)
+      setNewGoal({
+        nome: '', valor_meta: 0, data_limite: '', categoria: '',
+        descricao: '', campanha_ativa: false
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error adding goal:', error.message)
+      toast.error('Erro ao criar meta: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleEditGoal = async () => {
+    if (!goalToEdit?.id || !currentChurchId) {
+      toast.error('Nenhuma meta selecionada para editar.')
+      return
+    }
     if (!newGoal.nome || !newGoal.valor_meta || !newGoal.data_limite) {
       toast.error('Preencha todos os campos obrigatórios')
       return
     }
 
-    const goal: FinancialGoal = {
-      id: Date.now().toString(),
-      nome: newGoal.nome,
-      valor_meta: newGoal.valor_meta,
-      valor_atual: 0,
-      data_inicio: new Date().toISOString().split('T')[0],
-      data_limite: newGoal.data_limite,
-      categoria: newGoal.categoria,
-      descricao: newGoal.descricao,
-      status: 'Ativo',
-      contribuidores: 0,
-      campanha_ativa: newGoal.campanha_ativa
-    }
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('metas_financeiras')
+        .update({
+          nome: newGoal.nome,
+          valor_meta: newGoal.valor_meta,
+          data_limite: newGoal.data_limite,
+          categoria: newGoal.categoria || null,
+          descricao: newGoal.descricao || null,
+          status: newGoal.status || 'Ativo', // Permitir editar status
+          campanha_ativa: newGoal.campanha_ativa,
+          // valor_atual e contribuidores não são editáveis diretamente aqui
+        })
+        .eq('id', goalToEdit.id)
+        .eq('id_igreja', currentChurchId)
 
-    setGoals([...goals, goal])
-    setIsAddGoalOpen(false)
-    setNewGoal({
-      nome: '',
-      valor_meta: 0,
-      data_limite: '',
-      categoria: '',
-      descricao: '',
-      campanha_ativa: false
-    })
-    toast.success('Meta financeira criada com sucesso!')
+      if (error) throw error
+      toast.success('Meta financeira atualizada com sucesso!')
+      setIsEditGoalOpen(false)
+      setGoalToEdit(null)
+      setNewGoal({
+        nome: '', valor_meta: 0, data_limite: '', categoria: '',
+        descricao: '', campanha_ativa: false
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error editing goal:', error.message)
+      toast.error('Erro ao editar meta: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
   }
 
-  const approveTransaction = (transactionId: string) => {
-    setTransactions(prev => prev.map(t => 
-      t.id === transactionId 
-        ? { 
-            ...t, 
-            status: 'Confirmado' as const,
-            aprovado_por: user?.name,
-            data_aprovacao: new Date().toISOString().split('T')[0]
-          }
-        : t
-    ))
-
-    // Atualizar orçamentos
-    const transaction = transactions.find(t => t.id === transactionId)
-    if (transaction && transaction.tipo === 'Saída') {
-      setBudgets(prev => prev.map(budget => {
-        if (budget.categoria === transaction.categoria && budget.mes_ano === transaction.data.slice(0, 7)) {
-          const novoGasto = budget.valor_gasto + transaction.valor
-          return {
-            ...budget,
-            valor_gasto: novoGasto,
-            valor_disponivel: budget.valor_orcado - novoGasto,
-            status: novoGasto > budget.valor_orcado ? 'Excedido' as const : 'Ativo' as const
-          }
-        }
-        return budget
-      }))
-    }
-
-    toast.success('Transação aprovada com sucesso!')
-  }
-
-  const generateReceipt = (transaction: FinancialTransaction) => {
-    if (transaction.tipo === 'Saída') {
-      toast.error('Recibos só podem ser gerados para entradas')
+  const handleDeleteGoal = async (goalId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta meta?')) return
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
       return
     }
 
-    const receiptData = {
-      numero: transaction.numero_documento || `REC-${transaction.id}`,
-      data_emissao: new Date().toLocaleDateString('pt-BR'),
-      valor: transaction.valor,
-      descricao: transaction.descricao,
-      categoria: transaction.categoria,
-      metodo_pagamento: transaction.metodo_pagamento,
-      igreja: {
-        nome: 'Igreja Connect Vida',
-        endereco: 'Rua da Igreja, 123 - Centro - São Paulo/SP',
-        cnpj: '12.345.678/0001-90',
-        telefone: '(11) 99999-9999'
-      },
-      doador: transaction.membro_nome || 'Anônimo'
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('metas_financeiras')
+        .delete()
+        .eq('id', goalId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Meta financeira excluída com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error deleting goal:', error.message)
+      toast.error('Erro ao excluir meta: ' + error.message)
+    } finally {
+      setLoadingData(false)
     }
-
-    console.log('Generating receipt:', receiptData)
-    
-    setTransactions(prev => prev.map(t => 
-      t.id === transaction.id 
-        ? { ...t, recibo_emitido: true }
-        : t
-    ))
-
-    toast.success('Recibo gerado com sucesso!')
   }
 
   const generateReport = () => {
@@ -574,7 +692,7 @@ const FinancialPanel = () => {
     const endDate = new Date(reportParams.periodo_fim)
     
     const filteredTransactions = transactions.filter(t => {
-      const transactionDate = new Date(t.data)
+      const transactionDate = new Date(t.data_transacao)
       return transactionDate >= startDate && transactionDate <= endDate && t.status === 'Confirmado'
     })
 
@@ -607,8 +725,8 @@ const FinancialPanel = () => {
         saldo_periodo: total_entradas - total_saidas,
         categorias_entrada,
         categorias_saida,
-        maior_entrada: entradas.sort((a, b) => b.valor - a.valor)[0],
-        maior_saida: saidas.sort((a, b) => b.valor - a.valor)[0]
+        maior_entrada: entradas.sort((a, b) => b.valor - a.valor)[0] || null,
+        maior_saida: saidas.sort((a, b) => b.valor - a.valor)[0] || null
       }
     }
 
@@ -626,8 +744,8 @@ const FinancialPanel = () => {
   const totalSaidas = confirmedTransactions.filter(t => t.tipo === 'Saída').reduce((sum, t) => sum + t.valor, 0)
   const saldoAtual = totalEntradas - totalSaidas
 
-  const entradasMes = confirmedTransactions.filter(t => t.tipo === 'Entrada' && t.data.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
-  const saidasMes = confirmedTransactions.filter(t => t.tipo === 'Saída' && t.data.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
+  const entradasMes = confirmedTransactions.filter(t => t.tipo === 'Entrada' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
+  const saidasMes = confirmedTransactions.filter(t => t.tipo === 'Saída' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
   const saldoMes = entradasMes - saidasMes
 
   const budgetTotal = budgets.reduce((sum, b) => sum + b.valor_orcado, 0)
@@ -636,6 +754,23 @@ const FinancialPanel = () => {
 
   const activeGoals = goals.filter(g => g.status === 'Ativo')
   const completedGoals = goals.filter(g => g.status === 'Concluído')
+
+  if (!currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para gerenciar o painel financeiro.
+      </div>
+    )
+  }
+
+  if (loadingData) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-green-500" />
+        <p className="ml-3 text-lg text-gray-600">Carregando dados financeiros...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
@@ -988,7 +1123,7 @@ const FinancialPanel = () => {
                         <Label htmlFor="tipo">Tipo *</Label>
                         <Select value={newTransaction.tipo} onValueChange={(value) => setNewTransaction({...newTransaction, tipo: value as 'Entrada' | 'Saída'})}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Selecione o tipo" /> {/* Adicionado placeholder */}
+                            <SelectValue placeholder="Selecione o tipo" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Entrada">Entrada</SelectItem>
@@ -1040,12 +1175,12 @@ const FinancialPanel = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="data">Data *</Label>
+                        <Label htmlFor="data_transacao">Data *</Label>
                         <Input
-                          id="data"
+                          id="data_transacao"
                           type="date"
-                          value={newTransaction.data}
-                          onChange={(e) => setNewTransaction({...newTransaction, data: e.target.value})}
+                          value={newTransaction.data_transacao}
+                          onChange={(e) => setNewTransaction({...newTransaction, data_transacao: e.target.value})}
                         />
                       </div>
                     </div>
@@ -1156,7 +1291,7 @@ const FinancialPanel = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-sm text-gray-600 mb-2">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4" />
-                          <span>{new Date(transaction.data).toLocaleDateString('pt-BR')}</span>
+                          <span>{new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <CreditCard className="w-4 h-4" />
@@ -1221,11 +1356,34 @@ const FinancialPanel = () => {
                       </Button>
                       {canManageFinancial && (
                         <>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setTransactionToEdit(transaction)
+                              setNewTransaction({
+                                tipo: transaction.tipo,
+                                categoria: transaction.categoria,
+                                subcategoria: transaction.subcategoria || '',
+                                valor: transaction.valor,
+                                data_transacao: transaction.data_transacao,
+                                descricao: transaction.descricao,
+                                metodo_pagamento: transaction.metodo_pagamento,
+                                observacoes: transaction.observacoes || '',
+                                centro_custo: transaction.centro_custo || '',
+                                numero_documento: transaction.numero_documento || ''
+                              })
+                              setIsEditTransactionOpen(true)
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="outline" size="sm" className="text-red-600">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-600"
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </>
@@ -1349,7 +1507,7 @@ const FinancialPanel = () => {
                       )}
                       <p className="text-sm text-gray-500">{budget.descricao}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex gap-2 items-center">
                       <Badge className={
                         budget.status === 'Ativo' ? 'bg-green-100 text-green-800' :
                         budget.status === 'Excedido' ? 'bg-red-100 text-red-800' :
@@ -1357,6 +1515,36 @@ const FinancialPanel = () => {
                       }>
                         {budget.status}
                       </Badge>
+                      {canManageFinancial && (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setBudgetToEdit(budget)
+                              setNewBudget({
+                                categoria: budget.categoria,
+                                subcategoria: budget.subcategoria || '',
+                                valor_orcado: budget.valor_orcado,
+                                mes_ano: budget.mes_ano,
+                                descricao: budget.descricao || '',
+                                alertas_configurados: budget.alertas_configurados
+                              })
+                              setIsEditBudgetOpen(true)
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-600"
+                            onClick={() => handleDeleteBudget(budget.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                   
@@ -1498,14 +1686,47 @@ const FinancialPanel = () => {
                       <h3 className="text-lg font-semibold">{goal.nome}</h3>
                       <p className="text-sm text-gray-600">{goal.categoria}</p>
                     </div>
-                    <Badge className={
-                      goal.status === 'Ativo' ? 'bg-green-100 text-green-800' :
-                      goal.status === 'Concluído' ? 'bg-blue-100 text-blue-800' :
-                      goal.status === 'Pausado' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }>
-                      {goal.status}
-                    </Badge>
+                    <div className="flex gap-2 items-center">
+                      <Badge className={
+                        goal.status === 'Ativo' ? 'bg-green-100 text-green-800' :
+                        goal.status === 'Concluído' ? 'bg-blue-100 text-blue-800' :
+                        goal.status === 'Pausado' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }>
+                        {goal.status}
+                      </Badge>
+                      {canManageFinancial && (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setGoalToEdit(goal)
+                              setNewGoal({
+                                nome: goal.nome,
+                                valor_meta: goal.valor_meta,
+                                data_limite: goal.data_limite,
+                                categoria: goal.categoria || '',
+                                descricao: goal.descricao || '',
+                                campanha_ativa: goal.campanha_ativa,
+                                status: goal.status // Adicionar status para edição
+                              })
+                              setIsEditGoalOpen(true)
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-600"
+                            onClick={() => handleDeleteGoal(goal.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   
                   <p className="text-sm text-gray-700 mb-4">{goal.descricao}</p>
@@ -1619,6 +1840,325 @@ const FinancialPanel = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Edit Transaction Dialog */}
+      <Dialog open={isEditTransactionOpen} onOpenChange={setIsEditTransactionOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Transação</DialogTitle>
+            <DialogDescription>
+              Edite os detalhes da transação selecionada
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-tipo">Tipo *</Label>
+                <Select value={newTransaction.tipo} onValueChange={(value) => setNewTransaction({...newTransaction, tipo: value as 'Entrada' | 'Saída'})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Entrada">Entrada</SelectItem>
+                    <SelectItem value="Saída">Saída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-categoria">Categoria *</Label>
+                <Select value={newTransaction.categoria} onValueChange={(value) => setNewTransaction({...newTransaction, categoria: value, subcategoria: ''})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(newTransaction.tipo === 'Entrada' ? categoriesEntrada : categoriesSaida).map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {newTransaction.categoria && subcategorias[newTransaction.categoria as keyof typeof subcategorias] && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-subcategoria">Subcategoria</Label>
+                <Select value={newTransaction.subcategoria} onValueChange={(value) => setNewTransaction({...newTransaction, subcategoria: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a subcategoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subcategorias[newTransaction.categoria as keyof typeof subcategorias]?.map(subcat => (
+                      <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-valor">Valor (R$) *</Label>
+                <Input
+                  id="edit-valor"
+                  type="number"
+                  step="0.01"
+                  value={newTransaction.valor || ''}
+                  onChange={(e) => setNewTransaction({...newTransaction, valor: parseFloat(e.target.value) || 0})}
+                  placeholder="0,00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-data_transacao">Data *</Label>
+                <Input
+                  id="edit-data_transacao"
+                  type="date"
+                  value={newTransaction.data_transacao}
+                  onChange={(e) => setNewTransaction({...newTransaction, data_transacao: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-descricao">Descrição *</Label>
+              <Input
+                id="edit-descricao"
+                value={newTransaction.descricao}
+                onChange={(e) => setNewTransaction({...newTransaction, descricao: e.target.value})}
+                placeholder="Descrição da transação"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-metodo">Método de Pagamento</Label>
+                <Select value={newTransaction.metodo_pagamento} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {metodosPagamento.map(metodo => (
+                      <SelectItem key={metodo} value={metodo}>{metodo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-centro_custo">Centro de Custo</Label>
+                <Input
+                  id="edit-centro_custo"
+                  value={newTransaction.centro_custo}
+                  onChange={(e) => setNewTransaction({...newTransaction, centro_custo: e.target.value})}
+                  placeholder="Ex: Geral, Ministério Kids"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-observacoes">Observações</Label>
+              <Textarea
+                id="edit-observacoes"
+                value={newTransaction.observacoes}
+                onChange={(e) => setNewTransaction({...newTransaction, observacoes: e.target.value})}
+                placeholder="Observações adicionais"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditTransactionOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditTransaction}>
+                Salvar Alterações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Budget Dialog */}
+      <Dialog open={isEditBudgetOpen} onOpenChange={setIsEditBudgetOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Orçamento</DialogTitle>
+            <DialogDescription>
+              Edite os detalhes do orçamento selecionado
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-budget-categoria">Categoria *</Label>
+              <Select value={newBudget.categoria} onValueChange={(value) => setNewBudget({...newBudget, categoria: value, subcategoria: ''})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoriesSaida.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {newBudget.categoria && subcategorias[newBudget.categoria as keyof typeof subcategorias] && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-budget-subcategoria">Subcategoria</Label>
+                <Select value={newBudget.subcategoria} onValueChange={(value) => setNewBudget({...newBudget, subcategoria: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a subcategoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subcategorias[newBudget.categoria as keyof typeof subcategorias]?.map(subcat => (
+                      <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="edit-budget-valor_orcado">Valor Orçado (R$) *</Label>
+              <Input
+                id="edit-budget-valor_orcado"
+                type="number"
+                step="0.01"
+                value={newBudget.valor_orcado || ''}
+                onChange={(e) => setNewBudget({...newBudget, valor_orcado: parseFloat(e.target.value) || 0})}
+                placeholder="0,00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-budget-mes_ano">Mês/Ano</Label>
+              <Input
+                id="edit-budget-mes_ano"
+                type="month"
+                value={newBudget.mes_ano}
+                onChange={(e) => setNewBudget({...newBudget, mes_ano: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-budget-descricao">Descrição</Label>
+              <Textarea
+                id="edit-budget-descricao"
+                value={newBudget.descricao}
+                onChange={(e) => setNewBudget({...newBudget, descricao: e.target.value})}
+                placeholder="Descrição do orçamento"
+                rows={2}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="edit-budget-alertas"
+                checked={newBudget.alertas_configurados}
+                onCheckedChange={(checked) => setNewBudget({...newBudget, alertas_configurados: checked as boolean})}
+              />
+              <Label htmlFor="edit-budget-alertas">Configurar alertas automáticos</Label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditBudgetOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditBudget}>
+                Salvar Alterações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Goal Dialog */}
+      <Dialog open={isEditGoalOpen} onOpenChange={setIsEditGoalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Meta Financeira</DialogTitle>
+            <DialogDescription>
+              Edite os detalhes da meta selecionada
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-goal-nome">Nome da Meta *</Label>
+              <Input
+                id="edit-goal-nome"
+                value={newGoal.nome}
+                onChange={(e) => setNewGoal({...newGoal, nome: e.target.value})}
+                placeholder="Ex: Reforma do Templo"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-goal-valor_meta">Valor da Meta (R$) *</Label>
+              <Input
+                id="edit-goal-valor_meta"
+                type="number"
+                step="0.01"
+                value={newGoal.valor_meta || ''}
+                onChange={(e) => setNewGoal({...newGoal, valor_meta: parseFloat(e.target.value) || 0})}
+                placeholder="0,00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-goal-data_limite">Data Limite *</Label>
+              <Input
+                id="edit-goal-data_limite"
+                type="date"
+                value={newGoal.data_limite}
+                onChange={(e) => setNewGoal({...newGoal, data_limite: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-goal-categoria">Categoria</Label>
+              <Select value={newGoal.categoria} onValueChange={(value) => setNewGoal({...newGoal, categoria: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoriesEntrada.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-goal-descricao">Descrição</Label>
+              <Textarea
+                id="edit-goal-descricao"
+                value={newGoal.descricao}
+                onChange={(e) => setNewGoal({...newGoal, descricao: e.target.value})}
+                placeholder="Descrição da meta"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-goal-status">Status</Label>
+              <Select value={newGoal.status} onValueChange={(value) => setNewGoal({...newGoal, status: value as FinancialGoal['status']})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Ativo">Ativo</SelectItem>
+                  <SelectItem value="Concluído">Concluído</SelectItem>
+                  <SelectItem value="Pausado">Pausado</SelectItem>
+                  <SelectItem value="Cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="edit-goal-campanha"
+                checked={newGoal.campanha_ativa}
+                onCheckedChange={(checked) => setNewGoal({...newGoal, campanha_ativa: checked as boolean})}
+              />
+              <Label htmlFor="edit-goal-campanha">Criar campanha de arrecadação</Label>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditGoalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditGoal}>
+                Salvar Alterações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
