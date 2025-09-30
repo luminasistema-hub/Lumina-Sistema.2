@@ -5,11 +5,28 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2 } from 'lucide-react';
+import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableEtapaItem } from './SortableEtapaItem'; // Importar o novo componente
 
 // Interfaces para os dados do Supabase
 interface EtapaTrilha {
@@ -28,11 +45,12 @@ const ConfiguracaoJornada = () => {
   const [etapas, setEtapas] = useState<EtapaTrilha[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddEtapaDialogOpen, setIsAddEtapaDialogOpen] = useState(false);
-  const [activeTrilhaId, setActiveTrilhaId] = useState<string | null>(null); // Estado para armazenar o ID da trilha ativa
+  const [activeTrilhaId, setActiveTrilhaId] = useState<string | null>(null);
   const { currentChurchId } = useAuthStore();
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   const [newEtapa, setNewEtapa] = useState({
-    id: '', // Adicionado ID para identificar se é edição
+    id: '',
     titulo: '',
     descricao: '',
     ordem: 1,
@@ -40,6 +58,13 @@ const ConfiguracaoJornada = () => {
     conteudo: '',
     cor: '#FFFFFF',
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const carregarEtapas = async () => {
     if (!currentChurchId) {
@@ -50,7 +75,6 @@ const ConfiguracaoJornada = () => {
     console.log('ConfiguracaoJornada: Carregando etapas para a igreja:', currentChurchId);
 
     try {
-      // 1. Encontrar a trilha ativa
       const { data: trilha, error: trilhaError } = await supabase
         .from('trilhas_crescimento')
         .select('id')
@@ -58,7 +82,7 @@ const ConfiguracaoJornada = () => {
         .eq('is_ativa', true)
         .single();
 
-      if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = No rows found
+      if (trilhaError && trilhaError.code !== 'PGRST116') {
         console.error('ConfiguracaoJornada: Erro ao buscar trilha ativa:', trilhaError);
         toast.error('Erro ao carregar a trilha de crescimento: ' + trilhaError.message);
         setEtapas([]);
@@ -67,8 +91,7 @@ const ConfiguracaoJornada = () => {
       }
 
       if (trilha) {
-        setActiveTrilhaId(trilha.id); // Armazenar o ID da trilha ativa
-        // 2. Buscar as etapas da trilha
+        setActiveTrilhaId(trilha.id);
         const { data: etapasData, error: etapasDataError } = await supabase
           .from('etapas_trilha')
           .select('*')
@@ -102,10 +125,10 @@ const ConfiguracaoJornada = () => {
 
   const handleAddEtapaClick = () => {
     setNewEtapa({
-      id: '', // Resetar ID para indicar que é uma nova etapa
+      id: '',
       titulo: '',
       descricao: '',
-      ordem: etapas.length > 0 ? Math.max(...etapas.map(e => e.ordem)) + 1 : 1, // Sugere a próxima ordem
+      ordem: etapas.length > 0 ? Math.max(...etapas.map(e => e.ordem)) + 1 : 1,
       tipo_conteudo: 'Texto',
       conteudo: '',
       cor: '#FFFFFF',
@@ -139,7 +162,7 @@ const ConfiguracaoJornada = () => {
 
     setLoading(true);
     try {
-      if (newEtapa.id) { // Modo de edição
+      if (newEtapa.id) {
         const { data, error } = await supabase
           .from('etapas_trilha')
           .update({
@@ -160,7 +183,7 @@ const ConfiguracaoJornada = () => {
           return;
         }
         toast.success('Etapa atualizada com sucesso!');
-      } else { // Modo de criação
+      } else {
         const { data, error } = await supabase
           .from('etapas_trilha')
           .insert({
@@ -184,7 +207,7 @@ const ConfiguracaoJornada = () => {
       }
 
       setIsAddEtapaDialogOpen(false);
-      setNewEtapa({ // Resetar formulário
+      setNewEtapa({
         id: '',
         titulo: '',
         descricao: '',
@@ -193,7 +216,7 @@ const ConfiguracaoJornada = () => {
         conteudo: '',
         cor: '#FFFFFF',
       });
-      carregarEtapas(); // Recarrega a lista de etapas
+      carregarEtapas();
     } catch (error) {
       console.error("ConfiguracaoJornada: Erro inesperado ao salvar etapa:", error);
       toast.error('Ocorreu um erro inesperado ao salvar a etapa.');
@@ -221,12 +244,57 @@ const ConfiguracaoJornada = () => {
       }
 
       toast.success('Etapa apagada com sucesso!');
-      carregarEtapas(); // Recarrega a lista de etapas
+      carregarEtapas();
     } catch (error) {
       console.error("ConfiguracaoJornada: Erro inesperado ao apagar etapa:", error);
       toast.error('Ocorreu um erro inesperado ao apagar a etapa.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over) return;
+
+    if (active.id !== over.id) {
+      setEtapas((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        // Atualiza a propriedade 'ordem' no estado local para refletir a nova posição
+        return newOrder.map((item, index) => ({ ...item, ordem: index + 1 }));
+      });
+    }
+  };
+
+  const handleSaveOrder = async () => {
+    setIsSavingOrder(true);
+    try {
+      const updates = etapas.map(etapa => ({
+        id: etapa.id,
+        ordem: etapa.ordem,
+      }));
+
+      // Usar Promise.all para enviar todas as atualizações em paralelo
+      const { error } = await supabase
+        .from('etapas_trilha')
+        .upsert(updates, { onConflict: 'id' }); // upsert para atualizar se existir, inserir se não (embora aqui só atualize)
+
+      if (error) {
+        console.error('ConfiguracaoJornada: Erro ao salvar nova ordem:', error);
+        toast.error('Erro ao salvar a nova ordem das etapas: ' + error.message);
+        return;
+      }
+
+      toast.success('Ordem das etapas salva com sucesso!');
+      carregarEtapas(); // Recarrega para garantir que o estado do DB está sincronizado
+    } catch (error) {
+      console.error("ConfiguracaoJornada: Erro inesperado ao salvar ordem:", error);
+      toast.error('Ocorreu um erro inesperado ao salvar a ordem das etapas.');
+    } finally {
+      setIsSavingOrder(false);
     }
   };
 
@@ -253,10 +321,24 @@ const ConfiguracaoJornada = () => {
             <ListOrdered className="w-6 h-6 text-purple-500" />
             Etapas da Trilha
           </CardTitle>
-          <Button className="bg-purple-500 hover:bg-purple-600" onClick={handleAddEtapaClick}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Etapa
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              className="bg-green-500 hover:bg-green-600" 
+              onClick={handleSaveOrder}
+              disabled={isSavingOrder || loading}
+            >
+              {isSavingOrder ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Salvar Ordem
+            </Button>
+            <Button className="bg-purple-500 hover:bg-purple-600" onClick={handleAddEtapaClick}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Etapa
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -271,28 +353,27 @@ const ConfiguracaoJornada = () => {
               <p>Comece criando a primeira etapa da trilha de crescimento da sua igreja.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {etapas.map((etapa) => (
-                <Card key={etapa.id} className="border-0 shadow-sm">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex-1">
-                      <span className="font-bold text-lg">{etapa.ordem}. {etapa.titulo}</span>
-                      <p className="text-sm text-gray-600">{etapa.descricao}</p>
-                    </div>
-                    <div className="space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEditEtapaClick(etapa)}>
-                        <Edit className="w-4 h-4 mr-2" />
-                        Editar
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleDeleteEtapa(etapa.id)}>
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Apagar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={etapas.map(etapa => etapa.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4">
+                  {etapas.map((etapa) => (
+                    <SortableEtapaItem
+                      key={etapa.id}
+                      etapa={etapa}
+                      onEdit={handleEditEtapaClick}
+                      onDelete={handleDeleteEtapa}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </CardContent>
       </Card>
