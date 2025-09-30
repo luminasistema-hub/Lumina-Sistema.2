@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'; // Importar useLocation
+import { useLocation } from 'react-router-dom'; 
 import MainLayout from '../components/layout/MainLayout'
 import DashboardHome from '../components/dashboard/DashboardHome'
 import PersonalInfo from '../components/personal/PersonalInfo'
@@ -15,30 +15,27 @@ import MinistriesPage from '../components/management/MinistriesPage'
 import FinancialPanel from '../components/management/FinancialPanel'
 import SystemStatus from '../components/admin/SystemStatus'
 import SystemSettings from '../components/admin/SystemSettings'
-import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog' // Importar o novo componente
-import { useAuthStore } from '../stores/authStore' // Importar useAuthStore
+import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog' 
+import { useAuthStore } from '../stores/authStore' 
 
 interface DashboardPageProps {
   currentChurchId: string;
 }
 
 const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
-  const { user, isLoading } = useAuthStore(); // Obter user e isLoading do authStore
-  const location = useLocation(); // Hook para acessar o objeto location
+  const { user, isLoading } = useAuthStore(); 
+  const location = useLocation(); 
   const [activeModule, setActiveModule] = useState('dashboard')
   const [showProfileDialog, setShowProfileDialog] = useState(false);
 
   useEffect(() => {
-    // Verifica se há um estado de navegação para definir o módulo ativo
     if (location.state && (location.state as any).activeModule) {
       setActiveModule((location.state as any).activeModule);
-      // Limpa o estado para evitar que o módulo seja redefinido em futuras navegações
       window.history.replaceState({}, document.title); 
     }
   }, [location.state]);
 
   useEffect(() => {
-    // Exibir o diálogo se o usuário não for super_admin, não estiver carregando e o perfil não estiver completo
     if (!isLoading && user && user.role !== 'super_admin' && !user.perfil_completo) {
       setShowProfileDialog(true);
     } else {
@@ -136,7 +133,7 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
   const handleModuleSelect = (moduleId: string) => {
     console.log(`Dashboard: Switching to module ${moduleId}`)
     setActiveModule(moduleId)
-    setShowProfileDialog(false); // Fechar o diálogo ao navegar
+    setShowProfileDialog(false); 
   }
 
   return (

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Progress } from '../ui/progress'
-import { toast } from 'sonner' // Importar toast
+import { toast } from 'sonner' 
 import { 
   Heart, 
   Droplets, 
@@ -33,14 +33,14 @@ interface JourneyStep {
 }
 
 const MemberJourney = () => {
-  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
+  const { user, currentChurchId } = useAuthStore() 
   const [journeySteps, setJourneySteps] = useState<JourneyStep[]>([
     {
       id: 'decisao',
       title: 'Decisão por Cristo',
       description: 'O primeiro passo da sua jornada espiritual - aceitar Jesus como Salvador',
       icon: <Heart className="w-6 h-6" />,
-      completed: false, // Default para false, será carregado do storage
+      completed: false, 
       completedDate: undefined,
       color: 'text-red-600',
       bgColor: 'bg-red-50 border-red-200',
@@ -153,7 +153,6 @@ const MemberJourney = () => {
   }, [user, currentChurchId])
 
   useEffect(() => {
-    // Calcular progresso
     const completedSteps = journeySteps.filter(step => step.completed).length
     const totalSteps = journeySteps.length
     const progress = (completedSteps / totalSteps) * 100
@@ -161,7 +160,6 @@ const MemberJourney = () => {
     setOverallProgress(progress)
     setCurrentLevel(completedSteps)
 
-    // Salvar no localStorage sempre que journeySteps mudar
     if (user && currentChurchId) {
       localStorage.setItem(`memberJourney-${user.id}-${currentChurchId}`, JSON.stringify(journeySteps))
     }
@@ -206,7 +204,6 @@ const MemberJourney = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
         <h1 className="text-3xl font-bold mb-2">Jornada do Membro 🎯</h1>
         <p className="text-blue-100 text-lg">
@@ -214,7 +211,6 @@ const MemberJourney = () => {
         </p>
       </div>
 
-      {/* Progress Overview */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -244,7 +240,6 @@ const MemberJourney = () => {
         </CardContent>
       </Card>
 
-      {/* Journey Steps */}
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-900">Etapas da Jornada</h2>
         
@@ -255,7 +250,6 @@ const MemberJourney = () => {
           >
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
-                {/* Icon and Status */}
                 <div className="flex flex-col items-center">
                   <div className={`w-12 h-12 rounded-full ${step.completed ? 'bg-green-100' : 'bg-white'} border-2 ${step.completed ? 'border-green-500' : 'border-gray-300'} flex items-center justify-center ${step.color}`}>
                     {step.completed ? (
@@ -269,7 +263,6 @@ const MemberJourney = () => {
                   )}
                 </div>
 
-                {/* Content */}
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xl font-semibold text-gray-900">{step.title}</h3>
@@ -290,7 +283,6 @@ const MemberJourney = () => {
 
                   <p className="text-gray-700 mb-4">{step.description}</p>
 
-                  {/* Requirements */}
                   {step.requirements && (
                     <div className="mb-4">
                       <h4 className="font-medium text-gray-900 mb-2">Requisitos:</h4>
@@ -305,7 +297,6 @@ const MemberJourney = () => {
                     </div>
                   )}
 
-                  {/* Next Steps */}
                   {step.nextSteps && !step.completed && (
                     <div className="bg-white/70 rounded-lg p-4 border border-gray-200">
                       <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
@@ -337,7 +328,6 @@ const MemberJourney = () => {
                     </div>
                   )}
 
-                  {/* Achievement Badge */}
                   {step.completed && (
                     <div className="bg-green-50 rounded-lg p-3 border border-green-200">
                       <div className="flex items-center gap-2 text-green-800">
@@ -353,7 +343,6 @@ const MemberJourney = () => {
         ))}
       </div>
 
-      {/* Encouragement */}
       <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
         <CardContent className="p-6">
           <div className="text-center">

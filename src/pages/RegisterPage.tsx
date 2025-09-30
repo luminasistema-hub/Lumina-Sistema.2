@@ -14,7 +14,6 @@ const RegisterPage = () => {
   const navigate = useNavigate();
 
   const churchIdFromUrl = searchParams.get('churchId');
-  // Trata a string "undefined" vinda da URL como vazia
   const rawChurchNameFromUrl = searchParams.get('churchName');
   const churchNameFromUrl = rawChurchNameFromUrl === 'undefined' ? '' : rawChurchNameFromUrl;
   
@@ -23,12 +22,12 @@ const RegisterPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [churchName, setChurchName] = useState(churchNameFromUrl || ''); // Usa o nome da igreja já tratado
+  const [churchName, setChurchName] = useState(churchNameFromUrl || ''); 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (churchNameFromUrl) { // Esta condição agora será verdadeira apenas se for um nome válido
+    if (churchNameFromUrl) { 
       setChurchName(churchNameFromUrl);
     }
   }, [churchNameFromUrl]);
@@ -55,7 +54,7 @@ const RegisterPage = () => {
       password,
       options: {
         data: {
-          full_name: name,
+          full_name: name, // Mantém full_name para o trigger handle_new_user
           church_name: churchName,
           initial_role: initialRoleFromUrl,
           church_id: churchIdFromUrl,
@@ -69,7 +68,7 @@ const RegisterPage = () => {
     } else if (data.user) {
       console.log('RegisterPage: Supabase signUp successful, user:', data.user.id);
       toast.success('Cadastro realizado com sucesso! Você já pode fazer login.');
-      navigate('/login'); // Redireciona para a página de login
+      navigate('/login'); 
     } else {
       console.error('RegisterPage: Unknown error during signUp.');
       toast.error('Erro desconhecido no registro.');
@@ -124,7 +123,7 @@ const RegisterPage = () => {
                     value={churchName}
                     onChange={(e) => setChurchName(e.target.value)}
                     className="pl-10 h-12"
-                    disabled={!!churchIdFromUrl} // Desabilitar se veio da URL
+                    disabled={!!churchIdFromUrl} 
                     required
                   />
                 </div>

@@ -6,8 +6,8 @@ import { Badge } from '../ui/badge'
 import { Progress } from '../ui/progress'
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group'
 import { Label } from '../ui/label'
-import { toast } from 'sonner' // Importar toast
-import { supabase } from '../../integrations/supabase/client' // Importar supabase client
+import { toast } from 'sonner' 
+import { supabase } from '../../integrations/supabase/client' 
 import { 
   Brain, 
   Heart, 
@@ -48,7 +48,7 @@ interface MinistryResult {
 }
 
 const VocationalTest = () => {
-  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
+  const { user, currentChurchId } = useAuthStore() 
   const [currentStep, setCurrentStep] = useState<'intro' | 'test' | 'results'>('intro')
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<number, number>>({})
@@ -57,58 +57,49 @@ const VocationalTest = () => {
   const [hasPreviousTest, setHasPreviousTest] = useState(false)
   const [isLoadingResults, setIsLoadingResults] = useState(true)
 
-  // Perguntas do teste (5 para cada ministério)
   const questions: Question[] = [
-    // Mídia e Tecnologia (1-5)
     { id: 1, text: "Tenho facilidade com equipamentos eletrônicos e tecnologia", ministry: "midia" },
     { id: 2, text: "Gosto de trabalhar com câmeras, som e iluminação", ministry: "midia" },
     { id: 3, text: "Me sinto confortável operando sistemas durante os cultos", ministry: "midia" },
     { id: 4, text: "Tenho interesse em produzir conteúdo digital para a igreja", ministry: "midia" },
     { id: 5, text: "Consigo solucionar problemas técnicos com facilidade", ministry: "midia" },
 
-    // Louvor e Adoração (6-10)
     { id: 6, text: "Tenho dom musical (canto ou instrumento)", ministry: "louvor" },
     { id: 7, text: "Me sinto à vontade adorando publicamente", ministry: "louvor" },
     { id: 8, text: "Consigo conduzir outros em momentos de adoração", ministry: "louvor" },
     { id: 9, text: "Tenho facilidade para aprender música rapidamente", ministry: "louvor" },
     { id: 10, text: "A música é uma forma natural de expressar minha fé", ministry: "louvor" },
 
-    // Diaconato (11-15)
     { id: 11, text: "Gosto de servir e ajudar pessoas em necessidade", ministry: "diaconato" },
     { id: 12, text: "Tenho facilidade para identificar quem precisa de ajuda", ministry: "diaconato" },
     { id: 13, text: "Me disponho a tarefas práticas de apoio na igreja", ministry: "diaconato" },
     { id: 14, text: "Consigo organizar e coordenar ações de ajuda", ministry: "diaconato" },
     { id: 15, text: "Sinto alegria em suprir necessidades dos outros", ministry: "diaconato" },
 
-    // Integração (16-20)
     { id: 16, text: "Gosto de receber e conhecer pessoas novas", ministry: "integracao" },
     { id: 17, text: "Tenho facilidade para fazer novos membros se sentirem bem-vindos", ministry: "integracao" },
     { id: 18, text: "Consigo identificar visitantes e me aproximar deles", ministry: "integracao" },
     { id: 19, text: "Me sinto confortável apresentando a igreja para outros", ministry: "integracao" },
     { id: 20, text: "Tenho dom para criar ambiente acolhedor", ministry: "integracao" },
 
-    // Ensino e Discipulado (21-25)
     { id: 21, text: "Gosto de estudar e ensinar a Palavra de Deus", ministry: "ensino" },
     { id: 22, text: "Tenho facilidade para explicar conceitos bíblicos", ministry: "ensino" },
     { id: 23, text: "Consigo adaptar o ensino para diferentes idades", ministry: "ensino" },
     { id: 24, text: "Me sinto chamado a discipular outras pessoas", ministry: "ensino" },
     { id: 25, text: "Tenho paciência para acompanhar o crescimento espiritual dos outros", ministry: "ensino" },
 
-    // Kids (26-30)
     { id: 26, text: "Gosto de trabalhar com crianças", ministry: "kids" },
     { id: 27, text: "Tenho paciência e criatividade para ensinar crianças", ministry: "kids" },
     { id: 28, text: "Consigo manter a atenção das crianças durante as atividades", ministry: "kids" },
     { id: 29, text: "Me sinto confortável cuidando de grupos de crianças", ministry: "kids" },
     { id: 30, text: "Tenho facilidade para criar atividades lúdicas e educativas", ministry: "kids" },
 
-    // Organização e Administração (31-35)
     { id: 31, text: "Gosto de organizar eventos e atividades", ministry: "organizacao" },
     { id: 32, text: "Tenho facilidade para planejar e coordenar projetos", ministry: "organizacao" },
     { id: 33, text: "Consigo gerenciar recursos e logística", ministry: "organizacao" },
     { id: 34, text: "Me sinto bem liderando equipes de trabalho", ministry: "organizacao" },
     { id: 35, text: "Tenho atenção aos detalhes e gosto de ver tudo funcionando bem", ministry: "organizacao" },
 
-    // Ação Social (36-40)
     { id: 36, text: "Tenho coração para ajudar pessoas em situação de vulnerabilidade", ministry: "acao_social" },
     { id: 37, text: "Gosto de participar de projetos sociais e comunitários", ministry: "acao_social" },
     { id: 38, text: "Tenho facilidade para mobilizar recursos para causas sociais", ministry: "acao_social" },
@@ -283,7 +274,7 @@ const VocationalTest = () => {
         .select('*')
         .eq('membro_id', user.id)
         .eq('is_ultimo', true)
-        .maybeSingle(); // Usando .maybeSingle() para evitar 406 se não houver resultados
+        .maybeSingle(); 
 
       if (error) {
         console.error('VocationalTest: Error loading previous test:', error);
@@ -309,7 +300,7 @@ const VocationalTest = () => {
 
         const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
           const score = ministryScores[ministryKey];
-          const maxScore = 25; // 5 perguntas x 5 pontos max
+          const maxScore = 25; 
           const percentage = (score / maxScore) * 100;
           
           return {
@@ -349,17 +340,12 @@ const VocationalTest = () => {
 
     console.log('Calculating vocational test results and saving to Supabase...');
     
-    // Não precisamos calcular ministryScores aqui para enviar, pois o trigger fará isso.
-    // Apenas precisamos das respostas individuais.
-    
-    // Preparar dados para inserção no Supabase
     const testDataToSave: any = {
       membro_id: user.id,
       data_teste: new Date().toISOString().split('T')[0],
-      is_ultimo: true, // Será ajustado pelo trigger
+      is_ultimo: true, 
     };
 
-    // Adicionar respostas individuais
     questions.forEach(q => {
       testDataToSave[`q${q.id}`] = answers[q.id] || 0;
     });
@@ -378,10 +364,6 @@ const VocationalTest = () => {
 
     console.log('VocationalTest: Test results saved to Supabase:', data);
     
-    // Após salvar, o trigger calculará as somas e o ministério recomendado.
-    // Precisamos recarregar o teste para obter os resultados calculados pelo DB.
-    // Ou, se o `data` retornado já incluir os campos gerados (o que é comum com `select()`),
-    // podemos usá-los diretamente. Vamos assumir que `data` inclui os campos gerados.
     const ministryScores: Record<string, number> = {
       midia: data.soma_midia || 0,
       louvor: data.soma_louvor || 0,
@@ -395,7 +377,7 @@ const VocationalTest = () => {
 
     const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
       const score = ministryScores[ministryKey];
-      const maxScore = 25; // 5 perguntas x 5 pontos max
+      const maxScore = 25; 
       const percentage = (score / maxScore) * 100;
       
       return {
@@ -456,7 +438,6 @@ const VocationalTest = () => {
     );
   }
 
-  // Intro Screen
   if (currentStep === 'intro') {
     return (
       <div className="p-6 space-y-6">
@@ -566,7 +547,6 @@ const VocationalTest = () => {
     )
   }
 
-  // Test Screen
   if (currentStep === 'test') {
     const currentQ = questions[currentQuestion]
     const isLastQuestion = currentQuestion === questions.length - 1
@@ -654,7 +634,6 @@ const VocationalTest = () => {
     )
   }
 
-  // Results Screen
   if (currentStep === 'results') {
     return (
       <div className="p-6 space-y-6">
@@ -665,7 +644,6 @@ const VocationalTest = () => {
           </p>
         </div>
 
-        {/* Top Result */}
         {topMinistry && (
           <Card className={`border-2 ${topMinistry.bgColor} shadow-lg`}>
             <CardHeader>
@@ -739,7 +717,6 @@ const VocationalTest = () => {
           </Card>
         )}
 
-        {/* All Results */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -768,7 +745,6 @@ const VocationalTest = () => {
           </CardContent>
         </Card>
 
-        {/* Action Buttons */}
         <div className="flex justify-center gap-4">
           <Button onClick={restartTest} variant="outline">
             Fazer Teste Novamente

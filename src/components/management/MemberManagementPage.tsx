@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuthStore, UserRole } from '../../stores/authStore' // Import UserRole
+import { useAuthStore, UserRole } from '../../stores/authStore' 
 import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
-import { supabase } from '../../integrations/supabase/client' // Import supabase client
+import { supabase } from '../../integrations/supabase/client' 
 import { 
   Users, 
   Plus, 
@@ -46,15 +46,15 @@ import {
 
 // Define a more accurate interface based on Supabase tables
 interface MemberProfile {
-  id: string; // Corresponds to auth.users.id and perfis.id
-  id_igreja: string; // Corresponds to perfis.id_igreja
-  funcao: UserRole; // Corresponds to perfis.funcao
-  perfil_completo: boolean; // Corresponds to perfis.perfil_completo
-  full_name: string; // Corresponds to perfis.full_name
-  status: 'ativo' | 'pendente' | 'inativo'; // Corresponds to perfis.status
-  created_at: string; // From perfis
-  approved_by?: string; // From perfis
-  approved_at?: string; // From perfis
+  id: string; 
+  id_igreja: string; 
+  funcao: UserRole; 
+  perfil_completo: boolean; 
+  nome_completo: string; // Alterado de full_name
+  status: 'ativo' | 'pendente' | 'inativo'; 
+  created_at: string; 
+  approved_by?: string; // Agora na tabela membros
+  approved_at?: string; // Agora na tabela membros
   
   // Fields from informacoes_pessoais (joined)
   telefone?: string;
@@ -63,29 +63,27 @@ interface MemberProfile {
   estado_civil?: string;
   profissao?: string;
   conjuge?: string;
-  filhos?: Array<{nome: string, idade: string}>; // JSONB
+  filhos?: Array<{nome: string, idade: string}>; 
   pais_cristaos?: string;
-  familiarNaIgreja?: string;
-  tempo_igreja?: string;
+  familiar_na_igreja?: string; // Nome de coluna corrigido
+  tempo_igreja?: string; // Nome de coluna corrigido
   batizado?: boolean;
   data_batismo?: string;
   participa_ministerio?: boolean;
   ministerio_anterior?: string;
   experiencia_anterior?: string;
   data_conversao?: string;
-  dias_disponiveis?: string[]; // ARRAY
-  horarios_disponiveis?: string;
+  dias_disponiveis?: string[]; 
+  horarios_disponiveis?: string; // Nome de coluna corrigido
 
-  // Fields from membros (joined)
-  ultimo_teste_data?: string; // from public.membros.ultimo_teste_data
-  ministerio_recomendado?: string; // from public.membros.ministerio_recomendado
+  // Fields from membros (agora a fonte primária)
+  ultimo_teste_data?: string; 
+  ministerio_recomendado?: string; 
   
-  // Other fields from auth.users or derived
-  email: string; // From membros
-  churchName?: string; // Joined from public.igrejas
+  email: string; 
+  churchName?: string; 
 }
 
-// The 'Member' type used in the component should be MemberProfile
 type Member = MemberProfile;
 
 const MemberManagementPage = () => {
@@ -113,25 +111,23 @@ const MemberManagementPage = () => {
     telefone: '',
     endereco: '',
     data_nascimento: '',
-    funcao: 'membro' as UserRole, // Changed from 'papel' to 'funcao' to match DB
-    status: 'pendente' as Member['status'], // Default to pending
+    funcao: 'membro' as UserRole, 
+    status: 'pendente' as Member['status'], 
     observacoes: ''
   })
 
   const [editMemberData, setEditMemberData] = useState<Partial<Member>>({});
 
 
-  // Effect para garantir que as igrejas sejam carregadas quando o componente é montado
   useEffect(() => {
     console.log('MemberManagementPage: Initializing loadChurches on mount.');
     const fetchChurches = async () => {
       await loadChurches();
-      setChurchesLoaded(true); // Marca como carregado após a busca
+      setChurchesLoaded(true); 
     };
     fetchChurches();
   }, [loadChurches]);
 
-  // Effect para reagir a mudanças em currentChurchId ou na lista de igrejas carregadas
   useEffect(() => {
     console.log('MemberManagementPage: Reacting to currentChurchId or churches change. currentChurchId:', currentChurchId, 'churches count:', churches.length);
     if (currentChurchId) {
@@ -140,14 +136,14 @@ const MemberManagementPage = () => {
       setMembers([])
       setFilteredMembers([])
     }
-  }, [currentChurchId, churches]); // Depende de 'churches' para garantir que esteja atualizado
+  }, [currentChurchId, churches]); 
 
   useEffect(() => {
     let filtered = members
 
     if (searchTerm) {
       filtered = filtered.filter(member => 
-        member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) || // Alterado de full_name
         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (member.telefone && member.telefone.includes(searchTerm))
       )
@@ -162,8 +158,6 @@ const MemberManagementPage = () => {
     }
 
     if (filterMinistry !== 'all') {
-      // This part needs to be adjusted if ministry is not directly on MemberProfile
-      // For now, assuming ministerio_recomendado or similar
       filtered = filtered.filter(member => 
         member.ministerio_recomendado?.toLowerCase().includes(filterMinistry.toLowerCase())
       )
@@ -175,17 +169,20 @@ const MemberManagementPage = () => {
   const loadMembers = async (churchId: string) => {
     console.log('MemberManagementPage: Loading members for churchId:', churchId);
     const { data, error } = await supabase
-      .from('perfis')
+      .from('membros') // Alterado de 'perfis' para 'membros'
       .select(`
         id,
         id_igreja,
         funcao,
         perfil_completo,
-        full_name,
+        nome_completo, 
         status,
         created_at,
-        approved_by,
-        approved_at,
+        approved_by, 
+        approved_at, 
+        email,
+        ultimo_teste_data, 
+        ministerio_recomendado, 
         informacoes_pessoais (
           telefone,
           endereco,
@@ -206,11 +203,6 @@ const MemberManagementPage = () => {
           dias_disponiveis,
           horarios_disponiveis
         ),
-        membros (
-          email,
-          ultimo_teste_data,
-          ministerio_recomendado
-        ),
         igrejas (
           nome
         )
@@ -225,40 +217,40 @@ const MemberManagementPage = () => {
 
     console.log('Loaded raw member data:', data);
 
-    const membersData: Member[] = data.map((profile: any) => ({
-      id: profile.id,
-      id_igreja: profile.id_igreja,
-      funcao: profile.funcao,
-      perfil_completo: profile.perfil_completo,
-      full_name: profile.full_name,
-      status: profile.status,
-      email: profile.membros?.[0]?.email || 'N/A', // Get email from membros table
-      created_at: profile.created_at, // From perfis table
-      approved_by: profile.approved_by,
-      approved_at: profile.approved_at,
-      churchName: profile.igrejas?.nome,
+    const membersData: Member[] = data.map((member: any) => ({
+      id: member.id,
+      id_igreja: member.id_igreja,
+      funcao: member.funcao,
+      perfil_completo: member.perfil_completo,
+      nome_completo: member.nome_completo, 
+      status: member.status,
+      email: member.email, 
+      created_at: member.created_at, 
+      approved_by: member.approved_by, 
+      approved_at: member.approved_at, 
+      churchName: member.igrejas?.nome,
       // Map informacoes_pessoais fields
-      telefone: profile.informacoes_pessoais?.telefone,
-      endereco: profile.informacoes_pessoais?.endereco,
-      data_nascimento: profile.informacoes_pessoais?.data_nascimento,
-      estado_civil: profile.informacoes_pessoais?.estado_civil,
-      profissao: profile.informacoes_pessoais?.profissao,
-      conjuge: profile.informacoes_pessoais?.conjuge,
-      filhos: profile.informacoes_pessoais?.filhos,
-      pais_cristaos: profile.informacoes_pessoais?.pais_cristaos,
-      familiarNaIgreja: profile.informacoes_pessoais?.familiar_na_igreja,
-      tempo_igreja: profile.informacoes_pessoais?.tempo_igreja,
-      batizado: profile.informacoes_pessoais?.batizado,
-      data_batismo: profile.informacoes_pessoais?.data_batismo,
-      participa_ministerio: profile.informacoes_pessoais?.participa_ministerio,
-      ministerio_anterior: profile.informacoes_pessoais?.ministerio_anterior,
-      experiencia_anterior: profile.informacoes_pessoais?.experiencia_anterior,
-      data_conversao: profile.informacoes_pessoais?.data_conversao,
-      dias_disponiveis: profile.informacoes_pessoais?.dias_disponiveis,
-      horarios_disponiveis: profile.informacoes_pessoais?.horarios_disponiveis,
-      // Map membros fields
-      ultimo_teste_data: profile.membros?.[0]?.ultimo_teste_data, // Access first element if 'membros' is an array
-      ministerio_recomendado: profile.membros?.[0]?.ministerio_recomendado, // Access first element if 'membros' is an array
+      telefone: member.informacoes_pessoais?.telefone,
+      endereco: member.informacoes_pessoais?.endereco,
+      data_nascimento: member.informacoes_pessoais?.data_nascimento,
+      estado_civil: member.informacoes_pessoais?.estado_civil,
+      profissao: member.informacoes_pessoais?.profissao,
+      conjuge: member.informacoes_pessoais?.conjuge,
+      filhos: member.informacoes_pessoais?.filhos,
+      pais_cristaos: member.informacoes_pessoais?.pais_cristaos,
+      familiar_na_igreja: member.informacoes_pessoais?.familiar_na_igreja,
+      tempo_igreja: member.informacoes_pessoais?.tempo_igreja,
+      batizado: member.informacoes_pessoais?.batizado,
+      data_batismo: member.informacoes_pessoais?.data_batismo,
+      participa_ministerio: member.informacoes_pessoais?.participa_ministerio,
+      ministerio_anterior: member.informacoes_pessoais?.ministerio_anterior,
+      experiencia_anterior: member.informacoes_pessoais?.experiencia_anterior,
+      data_conversao: member.informacoes_pessoais?.data_conversao,
+      dias_disponiveis: member.informacoes_pessoais?.dias_disponiveis,
+      horarios_disponiveis: member.informacoes_pessoais?.horarios_disponiveis,
+      // Map membros fields (agora diretamente do objeto 'member' principal)
+      ultimo_teste_data: member.ultimo_teste_data, 
+      ministerio_recomendado: member.ministerio_recomendado, 
     }));
 
     setMembers(membersData);
@@ -277,18 +269,17 @@ const MemberManagementPage = () => {
       return
     }
 
-    setIsAddMemberDialogOpen(false); // Close dialog immediately
+    setIsAddMemberDialogOpen(false); 
 
     // 1. Create auth.users entry
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: newMember.email,
-      password: 'password_temp_123', // Temporary password, user will reset via email
+      password: 'password_temp_123', 
       options: {
         data: {
-          full_name: newMember.name,
+          full_name: newMember.name, // Mantém full_name para o trigger
           church_id: currentChurchId,
           initial_role: newMember.funcao,
-          // Other fields for informacoes_pessoais can be passed here if trigger is updated
         },
       },
     });
@@ -300,13 +291,8 @@ const MemberManagementPage = () => {
     }
 
     if (authData.user) {
-      // The handle_new_user trigger should handle inserting into 'perfis' and 'informacoes_pessoais'
-      // We just need to update the church's member count if the status is 'ativo'
-      // For now, new members from this form will also be 'pendente'
-      // The trigger now sets status to 'pendente' and does not increment member count.
-      // The member count will be incremented upon approval.
       toast.success('Membro cadastrado com sucesso! Um email de confirmação foi enviado.');
-      loadMembers(currentChurchId); // Reload members to show the new one
+      loadMembers(currentChurchId); 
     } else {
       toast.error('Erro desconhecido ao cadastrar membro.');
     }
@@ -320,7 +306,7 @@ const MemberManagementPage = () => {
   const handleOpenEditMemberDialog = (member: Member) => {
     setSelectedMember(member);
     setEditMemberData({
-      full_name: member.full_name,
+      nome_completo: member.nome_completo, // Alterado de full_name
       telefone: member.telefone,
       endereco: member.endereco,
       data_nascimento: member.data_nascimento,
@@ -329,8 +315,8 @@ const MemberManagementPage = () => {
       conjuge: member.conjuge,
       filhos: member.filhos,
       pais_cristaos: member.pais_cristaos,
-      familiarNaIgreja: member.familiarNaIgreja,
-      tempo_igreja: member.tempo_igreja,
+      familiar_na_igreja: member.familiar_na_igreja, // Corrigido
+      tempo_igreja: member.tempo_igreja, // Corrigido
       batizado: member.batizado,
       data_batismo: member.data_batismo,
       participa_ministerio: member.participa_ministerio,
@@ -338,11 +324,11 @@ const MemberManagementPage = () => {
       experiencia_anterior: member.experiencia_anterior,
       data_conversao: member.data_conversao,
       dias_disponiveis: member.dias_disponiveis,
-      horarios_disponiveis: member.horarios_disponiveis,
+      horarios_disponiveis: member.horarios_disponiveis, // Corrigido
       funcao: member.funcao,
       status: member.status,
-      ultimo_teste_data: member.ultimo_teste_data, // Include these fields
-      ministerio_recomendado: member.ministerio_recomendado, // Include these fields
+      ultimo_teste_data: member.ultimo_teste_data, 
+      ministerio_recomendado: member.ministerio_recomendado, 
     });
     setIsEditMemberDialogOpen(true);
   };
@@ -353,20 +339,21 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Update perfis table
-    const { error: profileError } = await supabase
-      .from('perfis')
+    // Update membros table
+    const { error: membrosError } = await supabase
+      .from('membros') 
       .update({
         funcao: editMemberData.funcao,
         status: editMemberData.status,
-        full_name: editMemberData.full_name,
-        // Add approved_by and approved_at if these fields are added to perfis
+        nome_completo: editMemberData.nome_completo, // Alterado de full_name
+        ministerio_recomendado: editMemberData.ministerio_recomendado,
+        ultimo_teste_data: editMemberData.ultimo_teste_data,
       })
       .eq('id', selectedMember.id);
 
-    if (profileError) {
-      console.error('Error updating profile:', profileError);
-      toast.error('Erro ao atualizar perfil: ' + profileError.message);
+    if (membrosError) {
+      console.error('Error updating membros table:', membrosError);
+      toast.error('Erro ao atualizar dados do membro: ' + membrosError.message);
       return;
     }
 
@@ -382,7 +369,7 @@ const MemberManagementPage = () => {
         conjuge: editMemberData.conjuge,
         filhos: editMemberData.filhos,
         pais_cristaos: editMemberData.pais_cristaos,
-        familiarNaIgreja: editMemberData.familiarNaIgreja,
+        familiar_na_igreja: editMemberData.familiar_na_igreja,
         tempo_igreja: editMemberData.tempo_igreja,
         batizado: editMemberData.batizado,
         data_batismo: editMemberData.data_batismo,
@@ -401,34 +388,11 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Update membros table for vocational test related fields
-    const { error: membrosError } = await supabase
-      .from('membros')
-      .update({
-        ministerio_recomendado: editMemberData.ministerio_recomendado,
-        ultimo_teste_data: editMemberData.ultimo_teste_data,
-        // Also update other fields that might be duplicated in 'membros' if they are editable here
-        nome_completo: editMemberData.full_name,
-        funcao: editMemberData.funcao,
-        status: editMemberData.status,
-        // telefone: editMemberData.telefone, // Telefone is in informacoes_pessoais
-        // data_nascimento: editMemberData.data_nascimento, // Data_nascimento is in informacoes_pessoais
-        // email is from auth.users, not directly editable here
-      })
-      .eq('id', selectedMember.id);
-
-    if (membrosError) {
-      console.error('Error updating membros table:', membrosError);
-      toast.error('Erro ao atualizar dados do membro: ' + membrosError.message);
-      return;
-    }
-
-
     setIsEditMemberDialogOpen(false);
     setSelectedMember(null);
     setEditMemberData({});
     toast.success('Membro atualizado com sucesso!');
-    loadMembers(currentChurchId); // Reload members to show changes
+    loadMembers(currentChurchId); 
   };
 
   const deleteUser = async (memberId: string) => {
@@ -441,7 +405,7 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Supabase handles cascade delete from auth.users -> perfis -> informacoes_pessoais -> membros
+    // Supabase agora lida com o cascade delete de auth.users -> membros -> informacoes_pessoais
     const { error: authError } = await supabase.auth.admin.deleteUser(memberId);
 
     if (authError) {
@@ -450,7 +414,6 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Update church member count if the user was active
     const memberToDelete = members.find(m => m.id === memberId);
     if (memberToDelete && memberToDelete.status === 'ativo') {
       const currentChurch = getChurchById(currentChurchId);
@@ -460,7 +423,7 @@ const MemberManagementPage = () => {
     }
 
     toast.success('Usuário removido do sistema com sucesso!');
-    loadMembers(currentChurchId); // Reload members
+    loadMembers(currentChurchId); 
   };
 
   const approveUser = async (memberId: string) => {
@@ -469,27 +432,13 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Update perfis table
-    const { error: profileError } = await supabase
-      .from('perfis')
-      .update({
-        status: 'ativo',
-        approved_by: user?.name || 'Administrador', // Assuming these fields exist in perfis
-        approved_at: new Date().toISOString(),
-      })
-      .eq('id', memberId);
-
-    if (profileError) {
-      console.error('Error approving user profile:', profileError.message);
-      toast.error('Erro ao aprovar perfil do usuário: ' + profileError.message);
-      return;
-    }
-
     // Update membros table
     const { error: membrosError } = await supabase
-      .from('membros')
+      .from('membros') 
       .update({
         status: 'ativo',
+        approved_by: user?.name || 'Administrador', 
+        approved_at: new Date().toISOString(),
       })
       .eq('id', memberId);
 
@@ -499,7 +448,6 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Update church member count
     const currentChurch = getChurchById(currentChurchId);
     if (currentChurch) {
       await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers + 1 });
@@ -515,23 +463,9 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Update perfis table
-    const { error: profileError } = await supabase
-      .from('perfis')
-      .update({
-        status: 'inativo',
-      })
-      .eq('id', memberId);
-
-    if (profileError) {
-      console.error('Error rejecting user profile:', profileError.message);
-      toast.error('Erro ao rejeitar perfil do usuário: ' + profileError.message);
-      return;
-    }
-
     // Update membros table
     const { error: membrosError } = await supabase
-      .from('membros')
+      .from('membros') 
       .update({
         status: 'inativo',
       })
@@ -543,7 +477,6 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // If the user was active, decrement member count
     const memberToReject = members.find(m => m.id === memberId);
     if (memberToReject && memberToReject.status === 'ativo') {
       const currentChurch = getChurchById(currentChurchId);
@@ -560,7 +493,7 @@ const MemberManagementPage = () => {
     console.log('--- handleGenerateRegistrationLink called ---');
     console.log('  currentChurchId from authStore:', currentChurchId);
     console.log('   churchesLoaded status:', churchesLoaded);
-    console.log('  churches array from useChurchStore (raw):', churches); // Log the actual array
+    console.log('  churches array from useChurchStore (raw):', churches); 
 
     if (!currentChurchId) {
       toast.error('Nenhuma  igreja selecionada. Por favor, selecione uma igreja no menu lateral.');
@@ -914,7 +847,7 @@ const MemberManagementPage = () => {
               variant="outline" 
               className="flex-1 lg:flex-none"
               onClick={handleGenerateRegistrationLink}
-              disabled={!currentChurchId || !churchesLoaded || churches.length === 0} // Desabilita se nenhuma igreja selecionada, não carregada ou lista vazia
+              disabled={!currentChurchId || !churchesLoaded || churches.length === 0} 
             >
               <LinkIcon className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">Gerar Link de Cadastro</span>
@@ -937,7 +870,7 @@ const MemberManagementPage = () => {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">{member.full_name}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">{member.nome_completo}</h3>
                     <div className="flex gap-2">
                       <Badge className={getRoleColor(member.funcao)}>
                         {getRoleIcon(member.funcao)}
@@ -1074,7 +1007,7 @@ const MemberManagementPage = () => {
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
-                {selectedMember.full_name}
+                {selectedMember.nome_completo}
                 <Badge className={getRoleColor(selectedMember.funcao)}>
                   {getRoleIcon(selectedMember.funcao)}
                   <span className="ml-1">{selectedMember.funcao.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())}</span>
@@ -1146,10 +1079,10 @@ const MemberManagementPage = () => {
                       <p className="text-gray-900">{selectedMember.pais_cristaos}</p>
                     </div>
                   )}
-                  {selectedMember.familiarNaIgreja && (
+                  {selectedMember.familiar_na_igreja && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Familiar na Igreja</Label>
-                      <p className="text-gray-900">{selectedMember.familiarNaIgreja}</p>
+                      <p className="text-gray-900">{selectedMember.familiar_na_igreja}</p>
                     </div>
                   )}
                 </div>
@@ -1257,7 +1190,7 @@ const MemberManagementPage = () => {
         <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Editar Membro: {selectedMember.full_name}</DialogTitle>
+              <DialogTitle>Editar Membro: {selectedMember.nome_completo}</DialogTitle>
               <DialogDescription>
                 Atualize as informações do membro
               </DialogDescription>
@@ -1265,11 +1198,11 @@ const MemberManagementPage = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-full_name">Nome Completo</Label>
+                  <Label htmlFor="edit-nome_completo">Nome Completo</Label>
                   <Input
-                    id="edit-full_name"
-                    value={editMemberData.full_name || ''}
-                    onChange={(e) => setEditMemberData({...editMemberData, full_name: e.target.value})}
+                    id="edit-nome_completo"
+                    value={editMemberData.nome_completo || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, nome_completo: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1277,7 +1210,7 @@ const MemberManagementPage = () => {
                   <Input
                     id="edit-email"
                     type="email"
-                    value={selectedMember.email} // Email cannot be changed directly here
+                    value={selectedMember.email} 
                     disabled
                   />
                 </div>
@@ -1509,7 +1442,7 @@ const MemberManagementPage = () => {
                     id="edit-ministerio_recomendado"
                     value={editMemberData.ministerio_recomendado || ''}
                     onChange={(e) => setEditMemberData({...editMemberData, ministerio_recomendado: e.target.value})}
-                    disabled // This field is usually set by the vocational test
+                    disabled 
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
@@ -1519,7 +1452,7 @@ const MemberManagementPage = () => {
                     type="date"
                     value={editMemberData.ultimo_teste_data || ''}
                     onChange={(e) => setEditMemberData({...editMemberData, ultimo_teste_data: e.target.value})}
-                    disabled // This field is usually set by the vocational test
+                    disabled 
                   />
                 </div>
               </div>

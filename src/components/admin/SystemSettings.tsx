@@ -51,7 +51,7 @@ interface ChurchSettingsData {
 
 const SystemSettings = () => {
   const { currentChurchId, user } = useAuthStore()
-  const { getChurchById, updateChurch, loadChurches } = useChurchStore() // Adicionado loadChurches
+  const { getChurchById, updateChurch, loadChurches } = useChurchStore() 
 
   const [churchSettings, setChurchSettings] = useState<ChurchSettingsData>({
     nome: 'Igreja Connect Vida',
@@ -87,7 +87,7 @@ const SystemSettings = () => {
   const [showApiKey, setShowApiKey] = useState(false)
 
   useEffect(() => {
-    loadChurches(); // Garante que as igrejas sejam carregadas ao montar o componente
+    loadChurches(); 
   }, [loadChurches]);
 
   useEffect(() => {
@@ -95,23 +95,19 @@ const SystemSettings = () => {
     if (currentChurchId) {
       const church = getChurchById(currentChurchId);
       if (church) {
-        // Carregar configurações do localStorage para esta igreja específica
         const storedSettings = localStorage.getItem(`churchSettings-${currentChurchId}`);
         if (storedSettings) {
           setChurchSettings(JSON.parse(storedSettings));
           console.log(`SystemSettings: Loaded settings for ${church.name} from localStorage.`);
         } else {
-          // Se não houver configurações específicas, inicializa com o nome da igreja do store e outros defaults
           setChurchSettings(prev => ({
             ...prev,
-            nome: church.name, // Usa o nome da igreja do churchStore
-            // Os outros campos permanecem com os valores padrão ou podem ser definidos a partir de um template
+            nome: church.name, 
           }));
           console.log(`SystemSettings: Initialized settings for ${church.name} with default/store name.`);
         }
       } else {
         console.warn(`SystemSettings: Church with ID ${currentChurchId} not found in store.`);
-        // Opcionalmente, resetar para o padrão ou mostrar uma mensagem se a igreja não for encontrada
         setChurchSettings({
           nome: 'Igreja Desconhecida',
           endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
@@ -120,13 +116,12 @@ const SystemSettings = () => {
     } else if (user?.role === 'super_admin') {
       setChurchSettings(prev => ({ ...prev, nome: 'Painel Master - Configurações' }));
     } else {
-      // Nenhuma igreja selecionada e não é super_admin
       setChurchSettings({
         nome: 'Nenhuma Igreja Selecionada',
         endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
       });
     }
-  }, [currentChurchId, user?.role, getChurchById]); // Depende de getChurchById para reagir a atualizações do store
+  }, [currentChurchId, user?.role, getChurchById]); 
 
   const handleSaveChurchSettings = () => {
     if (!currentChurchId) {
@@ -136,7 +131,6 @@ const SystemSettings = () => {
     console.log('Salvando configurações da igreja:', churchSettings)
     localStorage.setItem(`churchSettings-${currentChurchId}`, JSON.stringify(churchSettings))
     
-    // Atualiza o nome da igreja no store global
     updateChurch(currentChurchId, { name: churchSettings.nome })
     
     toast.success('Configurações da igreja salvas com sucesso!')
@@ -144,13 +138,11 @@ const SystemSettings = () => {
 
   const handleSaveSystemConfig = () => {
     console.log('Salvando configurações do sistema:', systemConfig)
-    // Em um sistema real, isso seria salvo por churchId
     toast.success('Configurações do sistema atualizadas!')
   }
 
   const handleSaveSecurity = () => {
     console.log('Salvando configurações de segurança:', securitySettings)
-    // Em um sistema real, isso seria salvo por churchId
     toast.success('Configurações de segurança atualizadas!')
   }
 

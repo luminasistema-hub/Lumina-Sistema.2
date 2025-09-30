@@ -8,8 +8,8 @@ import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Checkbox } from '../ui/checkbox'
 import { Badge } from '../ui/badge'
-import { toast } from 'sonner' // Importar toast
-import { supabase } from '../../integrations/supabase/client' // Importar supabase client
+import { toast } from 'sonner' 
+import { supabase } from '../../integrations/supabase/client' 
 import { 
   User, 
   MapPin, 
@@ -26,7 +26,7 @@ import {
   History,
   ArrowRight
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom' // Importar useNavigate
+import { useNavigate } from 'react-router-dom' 
 
 interface PersonalInfoData {
   // Dados Pessoais
@@ -69,9 +69,9 @@ interface VocationalTestResult {
 
 const PersonalInfo = () => {
   const { user, currentChurchId, checkAuth } = useAuthStore()
-  const navigate = useNavigate(); // Inicializar useNavigate
+  const navigate = useNavigate(); 
   const [isEditing, setIsEditing] = useState(false)
-  const [isFirstAccess, setIsFirstAccess] = useState(true) // Controla a mensagem de boas-vindas
+  const [isFirstAccess, setIsFirstAccess] = useState(true) 
   const [formData, setFormData] = useState<PersonalInfoData>({
     nomeCompleto: user?.name || '',
     dataNascimento: '',
@@ -102,14 +102,15 @@ const PersonalInfo = () => {
     if (user && currentChurchId) {
       const loadProfileData = async () => {
         console.log('Attempting to load personal info for user ID:', user.id);
-        const { data: personalInfoRecord, error } = await supabase
+        // Buscar dados da tabela informacoes_pessoais
+        const { data: personalInfoRecord, error: personalInfoError } = await supabase
           .from('informacoes_pessoais')
           .select('*')
           .eq('membro_id', user.id)
           .maybeSingle();
 
-        if (error) {
-          console.error('Error loading personal info from Supabase:', error);
+        if (personalInfoError) {
+          console.error('Error loading personal info from Supabase:', personalInfoError);
           toast.error('Erro ao carregar informações pessoais.');
           return;
         }
@@ -117,14 +118,13 @@ const PersonalInfo = () => {
         console.log('Personal info data received:', personalInfoRecord);
 
         if (personalInfoRecord) {
-          // Se há dados, preenche o formulário
           setFormData({
-            nomeCompleto: user.name,
+            nomeCompleto: user.name, // Nome vem do authStore
             dataNascimento: personalInfoRecord.data_nascimento || '',
             estadoCivil: personalInfoRecord.estado_civil || '',
             profissao: personalInfoRecord.profissao || '',
             telefone: personalInfoRecord.telefone || '',
-            email: user.email,
+            email: user.email, // Email vem do authStore
             endereco: personalInfoRecord.endereco || '',
             conjuge: personalInfoRecord.conjuge || '',
             filhos: personalInfoRecord.filhos || [],
@@ -141,7 +141,6 @@ const PersonalInfo = () => {
             horariosDisponiveis: personalInfoRecord.horarios_disponiveis || ''
           });
         } else {
-          // Se não há dados, inicializa com nome e email do usuário
           setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }));
         }
       };
@@ -156,7 +155,7 @@ const PersonalInfo = () => {
           .from('testes_vocacionais')
           .select('id, data_teste, ministerio_recomendado, is_ultimo')
           .eq('membro_id', user.id)
-          .gte('data_teste', sixMonthsAgo.toISOString().split('T')[0]) // Filter for last 6 months
+          .gte('data_teste', sixMonthsAgo.toISOString().split('T')[0]) 
           .order('data_teste', { ascending: false });
 
         if (testsError) {
@@ -167,7 +166,7 @@ const PersonalInfo = () => {
 
         console.log('Vocational tests data received:', tests);
         if (tests && tests.length > 0) {
-          const latest = tests.find(test => test.is_ultimo) || tests[0]; // Get latest or most recent
+          const latest = tests.find(test => test.is_ultimo) || tests[0]; 
           setLatestVocationalTest(latest);
           setVocationalTestHistory(tests.filter(test => test.id !== latest.id));
         } else {
@@ -177,7 +176,6 @@ const PersonalInfo = () => {
       };
       loadVocationalTests();
 
-      // Controla o modo de edição e a mensagem de primeiro acesso com base em user.perfil_completo
       if (!user.perfil_completo) {
         setIsFirstAccess(true);
         setIsEditing(true);
@@ -186,7 +184,7 @@ const PersonalInfo = () => {
         setIsEditing(false);
       }
     }
-  }, [user, currentChurchId, user?.perfil_completo]) // Dependências atualizadas
+  }, [user, currentChurchId, user?.perfil_completo]) 
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -226,20 +224,16 @@ const PersonalInfo = () => {
 
   const formatPhoneNumber = (value: string) => {
     if (!value) return "";
-    value = value.replace(/\D/g, ""); // Remove tudo que não é dígito
-    if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
+    value = value.replace(/\D/g, ""); 
+    if (value.length > 11) value = value.substring(0, 11); 
 
     if (value.length > 10) {
-      // (00)9 0000-0000
       return `(${value.substring(0, 2)}) ${value.substring(2, 3)} ${value.substring(3, 7)}-${value.substring(7, 11)}`;
     } else if (value.length > 6) {
-      // (00) 0000-0000
       return `(${value.substring(0, 2)}) ${value.substring(2, 6)}-${value.substring(6, 10)}`;
     } else if (value.length > 2) {
-      // (00) 0000
       return `(${value.substring(0, 2)}) ${value.substring(2, 6)}`;
     } else if (value.length > 0) {
-      // (00
       return `(${value.substring(0, 2)}`;
     }
     return value;
@@ -251,17 +245,16 @@ const PersonalInfo = () => {
   };
 
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let cep = e.target.value.replace(/\D/g, '') // Remove tudo que não é dígito
+    let cep = e.target.value.replace(/\D/g, '') 
     
-    // Formata o CEP
     if (cep.length > 5) {
       cep = cep.substring(0, 5) + '-' + cep.substring(5, 8)
     } else if (cep.length > 8) {
       cep = cep.substring(0, 8)
     }
     
-    if (cep.length === 9) { // Se o CEP estiver completo (com o hífen)
-      const rawCep = cep.replace('-', '') // Remove o hífen para a requisição
+    if (cep.length === 9) { 
+      const rawCep = cep.replace('-', '') 
       try {
         const response = await fetch(`https://viacep.com.br/ws/${rawCep}/json/`)
         const data = await response.json()
@@ -289,15 +282,13 @@ const PersonalInfo = () => {
     
     console.log('PersonalInfo: Attempting to save personal info:', formData)
     
-    // Validação básica
     if (!formData.nomeCompleto || !formData.telefone || !formData.endereco) {
       toast.error('Por favor, preencha os campos obrigatórios')
       return
     }
 
-    // Preparar dados para informacoes_pessoais
     const personalInfoPayload = {
-      membro_id: user.id, // Adicionado o membro_id aqui
+      membro_id: user.id, 
       telefone: formData.telefone,
       endereco: formData.endereco,
       data_nascimento: formData.dataNascimento || null,
@@ -306,20 +297,19 @@ const PersonalInfo = () => {
       conjuge: formData.conjuge || null,
       filhos: formData.filhos.length > 0 ? formData.filhos : null,
       pais_cristaos: formData.paisCristaos || null,
-      familiar_na_igreja: formData.familiarNaIgreja || null, // Corrigido
-      tempo_igreja: formData.tempoIgreja || null, // Corrigido
+      familiar_na_igreja: formData.familiarNaIgreja || null, 
+      tempo_igreja: formData.tempoIgreja || null, 
       batizado: formData.batizado,
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
-      ministerio_anterior: formData.ministerioAtual || null, // Usando ministerioAtual para este campo
+      ministerio_anterior: formData.ministerioAtual || null, 
       experiencia_anterior: formData.experienciaAnterior || null,
       data_conversao: formData.dataConversao || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horarios_disponiveis: formData.horariosDisponiveis || null, // Corrigido
+      horarios_disponiveis: formData.horariosDisponiveis || null, 
       updated_at: new Date().toISOString(),
     };
 
-    // Tentar inserir ou atualizar em informacoes_pessoais
     const { error: upsertError } = await supabase
       .from('informacoes_pessoais')
       .upsert(personalInfoPayload, { onConflict: 'membro_id' });
@@ -331,18 +321,18 @@ const PersonalInfo = () => {
     }
     console.log('PersonalInfo: informacoes_pessoais upsert successful.');
 
-    // Atualizar o campo perfil_completo na tabela perfis
-    const { error: profileUpdateError } = await supabase
-      .from('perfis')
+    // Atualizar o campo perfil_completo na tabela membros (antiga perfis)
+    const { error: membrosUpdateError } = await supabase
+      .from('membros') // Alterado de 'perfis' para 'membros'
       .update({ perfil_completo: true })
       .eq('id', user.id);
 
-    if (profileUpdateError) {
-      console.error('PersonalInfo: Error updating perfil_completo in Supabase:', profileUpdateError);
-      toast.error('Erro ao atualizar status do perfil: ' + profileUpdateError.message);
+    if (membrosUpdateError) {
+      console.error('PersonalInfo: Error updating perfil_completo in Supabase:', membrosUpdateError);
+      toast.error('Erro ao atualizar status do perfil: ' + membrosUpdateError.message);
       return;
     }
-    console.log('PersonalInfo: perfis.perfil_completo update successful.');
+    console.log('PersonalInfo: membros.perfil_completo update successful.');
 
     // Atualizar o nome do usuário no perfil (se alterado)
     if (formData.nomeCompleto !== user.name) {
@@ -357,10 +347,8 @@ const PersonalInfo = () => {
       console.log('PersonalInfo: auth.users name update successful.');
     }
 
-    // Adicionar um pequeno atraso para garantir que o banco de dados tenha tempo para processar
     await new Promise(resolve => setTimeout(resolve, 500)); 
     
-    // Chamar checkAuth para atualizar o estado do usuário no store
     await checkAuth();
     console.log('PersonalInfo: checkAuth completed after save.');
 
@@ -392,7 +380,6 @@ const PersonalInfo = () => {
     )
   }
 
-  // Renderiza o formulário completo se for o primeiro acesso ou estiver editando
   if (isFirstAccess || isEditing) {
     return (
       <div className="p-6 space-y-6">
@@ -464,7 +451,7 @@ const PersonalInfo = () => {
                   value={formData.telefone}
                   onChange={handlePhoneChange}
                   placeholder="(00)9 0000-0000"
-                  maxLength={15} // (XX)9 XXXX-XXXX
+                  maxLength={15} 
                 />
               </div>
               <div className="space-y-2">
@@ -496,7 +483,7 @@ const PersonalInfo = () => {
                   id="cep"
                   onChange={handleCepChange}
                   placeholder="00000-000"
-                  maxLength={9} // 8 dígitos + 1 hífen
+                  maxLength={9} 
                 />
               </div>
               <div className="space-y-2">
@@ -747,7 +734,6 @@ const PersonalInfo = () => {
     )
   }
 
-  // Renderiza o resumo das informações se o perfil estiver completo e não estiver editando
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -770,7 +756,6 @@ const PersonalInfo = () => {
         </div>
       </div>
 
-      {/* Resumo das Informações */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-3">
@@ -849,7 +834,6 @@ const PersonalInfo = () => {
         </Card>
       </div>
 
-      {/* Nova Seção: Resultados do Teste Vocacional */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -921,7 +905,6 @@ const PersonalInfo = () => {
 
       {isEditing && (
         <div className="space-y-6">
-          {/* Formulário de edição aqui... */}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsEditing(false)}>
               Cancelar

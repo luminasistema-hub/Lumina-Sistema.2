@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { toast } from 'sonner'
-import { User, UserRole, useAuthStore } from '../../stores/authStore' // Importar useAuthStore
-import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
+import { User, UserRole, useAuthStore } from '../../stores/authStore' 
+import { useChurchStore } from '../../stores/churchStore' 
 import { 
   Users, 
   UserCheck, 
@@ -30,10 +30,25 @@ import {
 
 interface UserManagementProps {}
 
+// Interface para os dados do membro como vêm do banco de dados
+interface MemberDBProfile {
+  id: string;
+  id_igreja: string;
+  funcao: UserRole;
+  perfil_completo: boolean;
+  nome_completo: string; 
+  status: 'ativo' | 'pendente' | 'inativo';
+  created_at: string;
+  approved_by?: string; 
+  approved_at?: string; 
+  email: string; 
+  ministerio_recomendado?: string; // Adicionado para mapear para 'ministry' no frontend
+}
+
 const UserManagement = ({}: UserManagementProps) => {
-  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
-  const { updateChurch, getChurchById } = useChurchStore() // Obter updateChurch e getChurchById
-  const [users, setUsers] = useState<User[]>([])
+  const { user, currentChurchId } = useAuthStore() 
+  const { updateChurch, getChurchById } = useChurchStore() 
+  const [users, setUsers] = useState<User[]>([]) // Usando a interface User do authStore
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -50,7 +65,7 @@ const UserManagement = ({}: UserManagementProps) => {
       setUsers([])
       setFilteredUsers([])
     }
-  }, [currentChurchId]) // Recarregar usuários quando a igreja ativa mudar
+  }, [currentChurchId]) 
 
   useEffect(() => {
     let filtered = users
@@ -73,117 +88,177 @@ const UserManagement = ({}: UserManagementProps) => {
     setFilteredUsers(filtered)
   }, [users, searchTerm, filterStatus, filterRole])
 
-  const loadUsers = (churchId: string) => {
-    const stored = localStorage.getItem('connect-vida-users')
-    if (stored) {
-      const usersData = JSON.parse(stored)
-      const userList = Object.values(usersData)
-        .map((userData: any) => userData.user as User)
-        .filter(u => u.churchId === churchId) // Filtrar por churchId
-      setUsers(userList)
-      setFilteredUsers(userList)
-    }
-  }
+  const loadUsers = async (churchId: string) => {
+    console.log('UserManagement: Loading users for churchId:', churchId);
+    const { data, error } = await supabase
+      .from('membros') // Alterado de 'perfis' para 'membros'
+      .select(`
+        id,
+        id_igreja,
+        funcao,
+        perfil_completo,
+        nome_completo, 
+        status,
+        created_at,
+        approved_by,
+        approved_at,
+        email,
+        ministerio_recomendado
+      `)
+      .eq('id_igreja', churchId);
 
-  const saveUsers = (updatedUsers: User[]) => {
-    const stored = localStorage.getItem('connect-vida-users')
-    if (stored) {
-      const usersData = JSON.parse(stored)
-      
-      updatedUsers.forEach(userToUpdate => {
-        if (usersData[userToUpdate.email]) {
-          usersData[userToUpdate.email].user = userToUpdate
-        }
+    if (error) {
+      console.error('Error loading users:', error);
+      toast.error('Erro ao carregar usuários: ' + error.message);
+      return;
+    }
+
+    const usersData: User[] = data.map((member: MemberDBProfile) => ({
+      id: member.id,
+      name: member.nome_completo, // Mapeia nome_completo do DB para name do frontend
+      email: member.email,
+      role: member.funcao,
+      churchId: member.id_igreja,
+      status: member.status,
+      created_at: member.created_at,
+      approved_by: member.approved_by,
+      approved_at: member.approved_at,
+      perfil_completo: member.perfil_completo,
+      ministry: member.ministerio_recomendado, // Mapeia ministerio_recomendado para ministry
+    }));
+    setUsers(usersData);
+    setFilteredUsers(usersData);
+  };
+
+  const approveUser = async (userId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('membros') // Alterado de 'perfis' para 'membros'
+      .update({
+        status: 'ativo',
+        approved_by: user?.name || 'Administrador',
+        approved_at: new Date().toISOString(),
       })
-      
-      localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
-      if (currentChurchId) {
-        loadUsers(currentChurchId) // Recarregar usuários da igreja ativa
-      }
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error approving user:', error);
+      toast.error('Erro ao aprovar usuário: ' + error.message);
+      return;
     }
-  }
 
-  const approveUser = (userId: string) => {
-    const updatedUsers = users.map(u => 
-      u.id === userId 
-        ? { 
-            ...u, 
-            status: 'ativo' as const,
-            approved_by: user?.name || 'Administrador',
-            approved_at: new Date().toISOString()
-          }
-        : u
-    )
-    
-    saveUsers(updatedUsers)
-    toast.success('Usuário aprovado com sucesso!')
+    const currentChurch = getChurchById(currentChurchId);
+    if (currentChurch) {
+      await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers + 1 });
+    }
+    toast.success('Usuário aprovado com sucesso!');
+    loadUsers(currentChurchId);
+  };
 
-    // Atualizar contagem de membros na igreja
-    if (currentChurchId) {
-      const currentChurch = getChurchById(currentChurchId)
+  const rejectUser = async (userId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('membros') // Alterado de 'perfis' para 'membros'
+      .update({ status: 'inativo' })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error rejecting user:', error);
+      toast.error('Erro ao rejeitar usuário: ' + error.message);
+      return;
+    }
+
+    const userToReject = users.find(u => u.id === userId);
+    if (userToReject && userToReject.status === 'ativo') {
+      const currentChurch = getChurchById(currentChurchId);
       if (currentChurch) {
-        const newMemberCount = currentChurch.currentMembers + 1
-        updateChurch(currentChurchId, { currentMembers: newMemberCount })
+        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
       }
     }
-  }
+    toast.success('Usuário rejeitado!');
+    loadUsers(currentChurchId);
+  };
 
-  const rejectUser = (userId: string) => {
-    const updatedUsers = users.map(u => 
-      u.id === userId 
-        ? { ...u, status: 'inativo' as const }
-        : u
-    )
-    
-    saveUsers(updatedUsers)
-    toast.success('Usuário rejeitado')
-  }
+  const handleEditUser = async () => {
+    if (!selectedUser || !editUser.role || !currentChurchId) {
+      toast.error('Nenhum usuário selecionado ou igreja ativa.');
+      return;
+    }
 
-  const handleEditUser = () => {
-    if (!selectedUser || !editUser.role) return
+    const { error } = await supabase
+      .from('membros') // Alterado de 'perfis' para 'membros'
+      .update({
+        funcao: editUser.role,
+        nome_completo: editUser.name, // Mapeia editUser.name para nome_completo
+        ministerio_recomendado: editUser.ministry, // Mapeia editUser.ministry para ministerio_recomendado
+        status: editUser.status,
+      })
+      .eq('id', selectedUser.id);
 
-    const updatedUsers = users.map(u => 
-      u.id === selectedUser.id 
-        ? { 
-            ...u, 
-            role: editUser.role as UserRole,
-            ministry: editUser.ministry,
-            status: editUser.status as User['status']
-          }
-        : u
-    )
-    
-    saveUsers(updatedUsers)
-    setIsEditDialogOpen(false)
-    setSelectedUser(null)
-    setEditUser({})
-    toast.success('Usuário atualizado com sucesso!')
-  }
+    if (error) {
+      console.error('Error updating user:', error);
+      toast.error('Erro ao atualizar usuário: ' + error.message);
+      return;
+    }
 
-  const deleteUser = (userId: string) => {
-    const userToDelete = users.find(u => u.id === userId)
-    if (!userToDelete) return
-
-    const stored = localStorage.getItem('connect-vida-users')
-    if (stored) {
-      const usersData = JSON.parse(stored)
-      delete usersData[userToDelete.email]
-      localStorage.setItem('connect-vida-users', JSON.stringify(usersData))
-      if (currentChurchId) {
-        loadUsers(currentChurchId) // Recarregar usuários da igreja ativa
-      }
-      toast.success('Usuário removido do sistema')
-
-      // Atualizar contagem de membros na igreja se o usuário estava ativo
-      if (userToDelete.status === 'ativo' && currentChurchId) {
-        const currentChurch = getChurchById(currentChurchId)
-        if (currentChurch) {
-          const newMemberCount = currentChurch.currentMembers - 1
-          updateChurch(currentChurchId, { currentMembers: newMemberCount })
-        }
+    const oldUser = users.find(u => u.id === selectedUser.id);
+    if (oldUser && oldUser.status === 'ativo' && editUser.status === 'inativo') {
+      const currentChurch = getChurchById(currentChurchId);
+      if (currentChurch) {
+        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
       }
     }
-  }
+    if (oldUser && oldUser.status !== 'ativo' && editUser.status === 'ativo') {
+      const currentChurch = getChurchById(currentChurchId);
+      if (currentChurch) {
+        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers + 1 });
+      }
+    }
+
+    setIsEditDialogOpen(false);
+    setSelectedUser(null);
+    setEditUser({});
+    toast.success('Usuário atualizado com sucesso!');
+    loadUsers(currentChurchId);
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.');
+      return;
+    }
+
+    if (!confirm('Tem certeza que deseja remover este usuário? Esta ação é irreversível.')) {
+      return;
+    }
+
+    // Supabase agora lida com o cascade delete de auth.users -> membros -> informacoes_pessoais
+    const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+
+    if (authError) {
+      console.error('Error deleting user from auth:', authError.message);
+      toast.error('Erro ao remover usuário: ' + authError.message);
+      return;
+    }
+
+    const userToDelete = users.find(u => u.id === userId);
+    if (userToDelete && userToDelete.status === 'ativo') {
+      const currentChurch = getChurchById(currentChurchId);
+      if (currentChurch) {
+        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
+      }
+    }
+    toast.success('Usuário removido do sistema!');
+    loadUsers(currentChurchId);
+  };
 
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
@@ -195,7 +270,7 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'midia_tecnologia': return <Headphones className="w-4 h-4" />
       case 'integra': return <Heart className="w-4 h-4" />
       case 'membro': return <Users className="w-4 h-4" />
-      case 'super_admin': return <Shield className="w-4 h-4" /> // Adicionado super_admin
+      case 'super_admin': return <Shield className="w-4 h-4" /> 
     }
   }
 
@@ -209,7 +284,7 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'midia_tecnologia': return 'bg-indigo-100 text-indigo-800'
       case 'integra': return 'bg-pink-100 text-pink-800'
       case 'membro': return 'bg-gray-100 text-gray-800'
-      case 'super_admin': return 'bg-red-200 text-red-900' // Cor para super_admin
+      case 'super_admin': return 'bg-red-200 text-red-900' 
     }
   }
 
@@ -231,7 +306,7 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'midia_tecnologia': return 'Mídia e Tecnologia'
       case 'integra': return 'Integração'
       case 'membro': return 'Membro'
-      case 'super_admin': return 'Super Administrador' // Label para super_admin
+      case 'super_admin': return 'Super Administrador' 
     }
   }
 
@@ -405,8 +480,9 @@ const UserManagement = ({}: UserManagementProps) => {
                       onClick={() => {
                         setSelectedUser(u)
                         setEditUser({
+                          name: u.name, // Mapeia para nome_completo no DB
                           role: u.role,
-                          ministry: u.ministry,
+                          ministry: u.ministry, // Mapeia para ministerio_recomendado no DB
                           status: u.status
                         })
                         setIsEditDialogOpen(true)
@@ -463,6 +539,14 @@ const UserManagement = ({}: UserManagementProps) => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
+              <Label>Nome Completo</Label>
+              <Input
+                value={editUser.name || ''}
+                onChange={(e) => setEditUser({...editUser, name: e.target.value})}
+                placeholder="Nome completo do usuário"
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Papel</Label>
               <Select value={editUser.role} onValueChange={(value) => setEditUser({...editUser, role: value as UserRole})}>
                 <SelectTrigger>
@@ -497,11 +581,11 @@ const UserManagement = ({}: UserManagementProps) => {
             </div>
 
             <div className="space-y-2">
-              <Label>Ministério (opcional)</Label>
+              <Label>Ministério Recomendado (opcional)</Label>
               <Input
                 value={editUser.ministry || ''}
                 onChange={(e) => setEditUser({...editUser, ministry: e.target.value})}
-                placeholder="Nome do ministério"
+                placeholder="Nome do ministério recomendado"
               />
             </div>
 

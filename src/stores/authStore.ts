@@ -96,16 +96,16 @@ export const useAuthStore = create<AuthState>()(
 
           if (session && session.user) {
             console.log('AuthStore: Session found for user ID:', session.user.id);
-            console.log('AuthStore: Attempting to fetch profile from "perfis" table.');
+            console.log('AuthStore: Attempting to fetch profile from "membros" table.');
             const { data: profile, error: profileError } = await supabase
-              .from('perfis')
+              .from('membros') // Alterado de 'perfis' para 'membros'
               .select('*, igrejas(id, nome)') // Join with 'igrejas' to get church name
               .eq('id', session.user.id)
-              .maybeSingle(); // Alterado de .single() para .maybeSingle()
+              .maybeSingle(); 
             
             console.log('AuthStore: Profile fetch result - data:', profile, 'error:', profileError);
 
-            if (profileError || !profile) { // Adicionado !profile para cobrir casos onde data é null sem erro explícito
+            if (profileError || !profile) { 
               console.error('AuthStore: Error fetching user profile or profile not found:', profileError?.message || 'Profile data is null/undefined. Setting user to null and isLoading to false.');
               set({ user: null, isLoading: false, currentChurchId: null });
               return;
@@ -119,7 +119,7 @@ export const useAuthStore = create<AuthState>()(
 
             const authenticatedUser: User = {
               id: session.user.id,
-              name: profile.full_name || session.user.user_metadata.full_name || session.user.email || 'Usuário',
+              name: profile.nome_completo || session.user.user_metadata.full_name || session.user.email || 'Usuário', // Alterado de profile.full_name para profile.nome_completo
               email: session.user.email!,
               role: userRole,
               churchId: churchIdFromProfile,
@@ -146,7 +146,7 @@ export const useAuthStore = create<AuthState>()(
           }
         } catch (error) {
           console.error('AuthStore: Unexpected error during checkAuth:', error);
-          set({ user: null, isLoading: false, currentChurchId: null }); // Garante que isLoading seja false mesmo em erros inesperados
+          set({ user: null, isLoading: false, currentChurchId: null }); 
         }
       },
 
@@ -171,8 +171,6 @@ export const useAuthStore = create<AuthState>()(
             }
           );
           (get() as any)._authListenerInitialized = true;
-          // Store subscription to unsubscribe on component unmount if needed
-          // (get() as any)._authSubscription = subscription;
         }
       }
     }),

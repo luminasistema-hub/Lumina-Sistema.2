@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase } from '../integrations/supabase/client' // Importar o cliente Supabase
+import { supabase } from '../integrations/supabase/client' 
 
 export type SubscriptionPlan = '0-100 membros' | '101-300 membros' | '301-500 membros' | 'ilimitado'
 
@@ -15,8 +15,8 @@ export interface Church {
   currentMembers: number
   status: 'active' | 'inactive' | 'pending' | 'trial'
   created_at: string
-  adminUserId: string | null // ID do usuário admin que criou/gerencia a igreja
-  updated_at?: string // Adicionado para corresponder à tabela do Supabase
+  adminUserId: string | null 
+  updated_at?: string 
 }
 
 interface ChurchState {
@@ -63,7 +63,7 @@ export const useChurchStore = create<ChurchState>()(
       addChurch: async (newChurchData) => {
         console.log('churchStore: Adding new church to Supabase:', newChurchData);
         const selectedPlan = get().getSubscriptionPlans().find(p => p.value === newChurchData.subscriptionPlan);
-        const memberLimit = selectedPlan ? selectedPlan.memberLimit : 100; // Default if plan not found
+        const memberLimit = selectedPlan ? selectedPlan.memberLimit : 100; 
 
         const { data, error } = await supabase
           .from('igrejas')
@@ -74,9 +74,6 @@ export const useChurchStore = create<ChurchState>()(
             membros_atuais: 0,
             status: newChurchData.status,
             admin_user_id: newChurchData.adminUserId,
-            // address: newChurchData.address, // Adicionado
-            // contactEmail: newChurchData.contactEmail, // Adicionado
-            // contactPhone: newChurchData.contactPhone, // Adicionado
           })
           .select()
           .single();
@@ -111,7 +108,6 @@ export const useChurchStore = create<ChurchState>()(
         console.log('churchStore: Updating church in Supabase:', churchId, updates);
         const updatePayload: any = {};
 
-        // Handle subscriptionPlan and memberLimit update
         if (updates.subscriptionPlan) {
           const selectedPlan = get().getSubscriptionPlans().find(p => p.value === updates.subscriptionPlan);
           if (selectedPlan) {
@@ -176,11 +172,8 @@ export const useChurchStore = create<ChurchState>()(
     }),
     {
       name: 'connect-vida-churches',
-      // Não persistir 'churches' no localStorage, pois agora vem do Supabase
-      // Apenas persistir o estado para re-hidratar se necessário, mas 'churches' será carregado do Supabase
-      partialize: (state) => ({}), // Não persistir 'churches'
+      partialize: (state) => ({}), 
       onRehydrateStorage: () => (state) => {
-        // Ao re-hidratar, garantir que loadChurches seja chamado
         if (state) {
           get().loadChurches();
         }

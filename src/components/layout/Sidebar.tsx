@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore, UserRole } from '../../stores/authStore'
-import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
+import { useChurchStore } from '../../stores/churchStore' 
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select' // Importar Select
-import { Label } from '../ui/label' // Importar Label
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select' 
+import { Label } from '../ui/label' 
 import { 
   Users, 
   Calendar, 
@@ -34,7 +34,7 @@ import {
   Building
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
-import { useNavigate } from 'react-router-dom' // Importar useNavigate
+import { useNavigate } from 'react-router-dom' 
 
 interface ModuleItem {
   id: string
@@ -221,7 +221,7 @@ const moduleCategories: ModuleCategory[] = [
 interface SidebarProps {
   activeModule?: string
   onModuleSelect?: (moduleId: string) => void
-  currentChurchId: string | null // Receber currentChurchId
+  currentChurchId: string | null 
 }
 
 const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }: SidebarProps) => {
@@ -315,7 +315,6 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }
 
   const handleChurchSelect = (churchId: string) => {
     setCurrentChurchId(churchId)
-    // Opcional: redirecionar para o dashboard após selecionar a igreja
     if (user?.role === 'super_admin') {
       navigate('/dashboard')
     }

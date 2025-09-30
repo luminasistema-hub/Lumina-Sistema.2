@@ -23,7 +23,7 @@ const MasterAdminPage = () => {
     name: '',
     subscriptionPlan: '0-100 membros' as SubscriptionPlan,
     status: 'active' as Church['status'],
-    adminUserId: user?.id || null, // Pode ser null se o super_admin não for o admin direto
+    adminUserId: user?.id || null, 
   })
 
   const [editChurchData, setEditChurchData] = useState<Partial<Church>>({})
@@ -243,9 +243,6 @@ const MasterAdminPage = () => {
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
-                        {/* <Button variant="outline" size="sm" className="text-red-600">
-                          <Trash2 className="w-4 h-4" />
-                        </Button> */}
                       </div>
                     </CardContent>
                   </Card>
@@ -255,7 +252,6 @@ const MasterAdminPage = () => {
           </CardContent>
         </Card>
 
-        {/* Edit Church Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>

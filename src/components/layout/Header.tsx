@@ -1,5 +1,5 @@
 import { useAuthStore, UserRole } from '../../stores/authStore'
-import { useChurchStore } from '../../stores/churchStore' // Importar useChurchStore
+import { useChurchStore } from '../../stores/churchStore' 
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { 
@@ -20,20 +20,20 @@ import {
   Building
 } from 'lucide-react'
 import { Input } from '../ui/input'
-import { useState, useEffect } from 'react' // Importar useEffect
+import { useState, useEffect } from 'react' 
 
 interface HeaderProps {
-  currentChurchId: string | null; // Receber currentChurchId
+  currentChurchId: string | null; 
 }
 
 const Header = ({ currentChurchId }: HeaderProps) => {
   const { user, logout } = useAuthStore()
-  const { getChurchById, loadChurches } = useChurchStore() // Obter getChurchById e loadChurches
+  const { getChurchById, loadChurches } = useChurchStore() 
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [currentChurchName, setCurrentChurchName] = useState('Nenhuma Igreja Selecionada')
 
   useEffect(() => {
-    loadChurches() // Carregar igrejas ao montar o componente
+    loadChurches() 
   }, [loadChurches])
 
   useEffect(() => {
@@ -94,7 +94,6 @@ const Header = ({ currentChurchId }: HeaderProps) => {
   return (
     <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Church Name / Search Bar */}
         <div className="flex-1 max-w-xs md:max-w-md flex items-center gap-3">
           <Building className="w-5 h-5 text-gray-500" />
           <span className="font-semibold text-gray-800 truncate">{currentChurchName}</span>
@@ -109,9 +108,7 @@ const Header = ({ currentChurchId }: HeaderProps) => {
           )}
         </div>
 
-        {/* Right Side Actions */}
         <div className="flex items-center gap-2 md:gap-4">
-          {/* Notifications */}
           <Button variant="ghost" size="sm" className="relative hidden sm:flex">
             <Bell className="w-5 h-5" />
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs flex items-center justify-center text-white">
@@ -119,7 +116,6 @@ const Header = ({ currentChurchId }: HeaderProps) => {
             </span>
           </Button>
 
-          {/* Theme Toggle */}
           <Button 
             variant="ghost" 
             size="sm"
@@ -129,12 +125,10 @@ const Header = ({ currentChurchId }: HeaderProps) => {
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </Button>
 
-          {/* Settings */}
           <Button variant="ghost" size="sm" className="hidden md:flex">
             <Settings className="w-5 h-5" />
           </Button>
 
-          {/* User Profile */}
           <div className="flex items-center gap-2 md:gap-3 px-2 md:px-3 py-2 bg-gray-50 rounded-lg">
             <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-xs md:text-sm">
               {user.name.charAt(0).toUpperCase()}
@@ -148,7 +142,6 @@ const Header = ({ currentChurchId }: HeaderProps) => {
             </div>
           </div>
 
-          {/* Logout */}
           <Button 
             variant="outline" 
             size="sm"
