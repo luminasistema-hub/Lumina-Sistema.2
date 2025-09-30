@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import MainLayout from '../components/layout/MainLayout'
 import DashboardHome from '../components/dashboard/DashboardHome'
 import PersonalInfo from '../components/personal/PersonalInfo'
@@ -14,13 +14,26 @@ import MinistriesPage from '../components/management/MinistriesPage'
 import FinancialPanel from '../components/management/FinancialPanel'
 import SystemStatus from '../components/admin/SystemStatus'
 import SystemSettings from '../components/admin/SystemSettings'
+import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog' // Importar o novo componente
+import { useAuthStore } from '../stores/authStore' // Importar useAuthStore
 
 interface DashboardPageProps {
   currentChurchId: string;
 }
 
 const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
+  const { user, isLoading } = useAuthStore(); // Obter user e isLoading do authStore
   const [activeModule, setActiveModule] = useState('dashboard')
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+
+  useEffect(() => {
+    // Exibir o diálogo se o usuário não for super_admin, não estiver carregando e o perfil não estiver completo
+    if (!isLoading && user && user.role !== 'super_admin' && !user.perfil_completo) {
+      setShowProfileDialog(true);
+    } else {
+      setShowProfileDialog(false);
+    }
+  }, [user, isLoading]);
 
   const renderModuleContent = () => {
     switch (activeModule) {
@@ -112,11 +125,19 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
   const handleModuleSelect = (moduleId: string) => {
     console.log(`Dashboard: Switching to module ${moduleId}`)
     setActiveModule(moduleId)
+    setShowProfileDialog(false); // Fechar o diálogo ao navegar
   }
 
   return (
     <MainLayout activeModule={activeModule} onModuleSelect={handleModuleSelect}>
       {renderModuleContent()}
+      {user && !user.perfil_completo && user.role !== 'super_admin' && (
+        <ProfileCompletionDialog
+          isOpen={showProfileDialog}
+          onClose={() => setShowProfileDialog(false)}
+          onNavigateToProfile={() => handleModuleSelect('personal-info')}
+        />
+      )}
     </MainLayout>
   )
 }

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from '../ui/checkbox'
 import { Badge } from '../ui/badge'
 import { toast } from 'sonner' // Importar toast
+import { supabase } from '../../integrations/supabase/client' // Importar supabase client
 import { 
   User, 
   MapPin, 
@@ -64,7 +65,7 @@ interface PersonalInfoData {
 }
 
 const PersonalInfo = () => {
-  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
+  const { user, currentChurchId, checkAuth } = useAuthStore() // Obter user, currentChurchId e checkAuth
   const [isEditing, setIsEditing] = useState(false)
   const [isFirstAccess, setIsFirstAccess] = useState(true)
   const [formData, setFormData] = useState<PersonalInfoData>({
@@ -99,16 +100,62 @@ const PersonalInfo = () => {
   useEffect(() => {
     console.log('PersonalInfo component mounted for user:', user?.name, 'church:', currentChurchId)
     if (user && currentChurchId) {
-      const hasCompletedProfile = localStorage.getItem(`profile-${user.id}-${currentChurchId}`)
-      if (hasCompletedProfile) {
-        setIsFirstAccess(false)
-        setFormData(JSON.parse(hasCompletedProfile))
-      } else {
-        setIsEditing(true)
-        setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }))
-      }
+      // Tentar carregar dados do Supabase
+      const loadProfileData = async () => {
+        const { data, error } = await supabase
+          .from('informacoes_pessoais')
+          .select('*')
+          .eq('membro_id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 = No rows found
+          console.error('Error loading personal info from Supabase:', error);
+          toast.error('Erro ao carregar informações pessoais.');
+        }
+
+        if (data) {
+          setIsFirstAccess(false);
+          setFormData({
+            nomeCompleto: user.name, // Nome vem do authStore
+            dataNascimento: data.data_nascimento || '',
+            estadoCivil: data.estado_civil || '',
+            profissao: data.profissao || '',
+            telefone: data.telefone || '',
+            email: user.email, // Email vem do authStore
+            endereco: data.endereco || '',
+            cidade: '', // Cidade e estado não estão na tabela informacoes_pessoais, mas podem ser inferidos do endereço ou adicionados
+            estado: '',
+            cep: '', // CEP também não está na tabela
+            conjuge: data.conjuge || '',
+            filhos: data.filhos || [],
+            paisCristaos: data.pais_cristaos || '',
+            familiarNaIgreja: data.familiar_na_igreja || '',
+            tempoIgreja: data.tempo_igreja || '',
+            batizado: data.batizado || false,
+            dataBatismo: data.data_batismo || '',
+            participaMinisterio: data.participa_ministerio || false,
+            ministerioAtual: data.ministerio_anterior || '', // Usando ministerio_anterior para o atual se não houver um campo 'atual'
+            experienciaAnterior: data.experiencia_anterior || '',
+            decisaoCristo: data.decisao_cristo || '',
+            dataConversao: data.data_conversao || '',
+            testemunho: data.testemunho || '',
+            diasDisponiveis: data.dias_disponiveis || [],
+            horariosDisponiveis: data.horarios_disponiveis || '',
+            interesseMinisterio: data.interesse_ministerio || []
+          });
+          // Se o perfil não estiver completo no authStore, mas há dados aqui, pode ser um caso de atualização
+          if (!user.perfil_completo) {
+            setIsEditing(true); // Força edição para completar
+          }
+        } else {
+          setIsFirstAccess(true);
+          setIsEditing(true);
+          setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }));
+        }
+      };
+      loadProfileData();
     }
-  }, [user, currentChurchId])
+  }, [user, currentChurchId, user?.perfil_completo]) // Adicionado user.perfil_completo como dependência
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -185,7 +232,7 @@ const PersonalInfo = () => {
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user || !currentChurchId) {
       toast.error('Erro: Usuário ou igreja não identificados.')
       return
@@ -199,8 +246,71 @@ const PersonalInfo = () => {
       return
     }
 
-    // Salvar dados
-    localStorage.setItem(`profile-${user.id}-${currentChurchId}`, JSON.stringify(formData))
+    // Preparar dados para informacoes_pessoais
+    const personalInfoPayload = {
+      membro_id: user.id,
+      telefone: formData.telefone,
+      endereco: formData.endereco,
+      data_nascimento: formData.dataNascimento || null,
+      estado_civil: formData.estadoCivil || null,
+      profissao: formData.profissao || null,
+      conjuge: formData.conjuge || null,
+      filhos: formData.filhos.length > 0 ? formData.filhos : null,
+      pais_cristaos: formData.paisCristaos || null,
+      familiar_na_igreja: formData.familiarNaIgreja || null,
+      tempo_igreja: formData.tempoIgreja || null,
+      batizado: formData.batizado,
+      data_batismo: formData.dataBatismo || null,
+      participa_ministerio: formData.participaMinisterio,
+      ministerio_anterior: formData.ministerioAtual || null, // Usando ministerioAtual para este campo
+      experiencia_anterior: formData.experienciaAnterior || null,
+      decisao_cristo: formData.decisaoCristo || null,
+      data_conversao: formData.dataConversao || null,
+      testemunho: formData.testemunho || null,
+      dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
+      horarios_disponiveis: formData.horariosDisponiveis || null,
+      interesse_ministerio: formData.interesseMinisterio.length > 0 ? formData.interesseMinisterio : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Tentar inserir ou atualizar em informacoes_pessoais
+    const { error: upsertError } = await supabase
+      .from('informacoes_pessoais')
+      .upsert(personalInfoPayload, { onConflict: 'membro_id' });
+
+    if (upsertError) {
+      console.error('Error saving personal info to Supabase:', upsertError);
+      toast.error('Erro ao salvar informações pessoais: ' + upsertError.message);
+      return;
+    }
+
+    // Atualizar o campo perfil_completo na tabela perfis
+    const { error: profileUpdateError } = await supabase
+      .from('perfis')
+      .update({ perfil_completo: true })
+      .eq('id', user.id);
+
+    if (profileUpdateError) {
+      console.error('Error updating perfil_completo in Supabase:', profileUpdateError);
+      toast.error('Erro ao atualizar status do perfil: ' + profileUpdateError.message);
+      return;
+    }
+
+    // Atualizar o nome do usuário no perfil (se alterado)
+    if (formData.nomeCompleto !== user.name) {
+      const { error: authUserUpdateError } = await supabase.auth.updateUser({
+        data: { full_name: formData.nomeCompleto }
+      });
+      if (authUserUpdateError) {
+        console.error('Error updating auth user name:', authUserUpdateError);
+        toast.error('Erro ao atualizar nome do usuário: ' + authUserUpdateError.message);
+        return;
+      }
+    }
+
+    // Chamar checkAuth para atualizar o estado do usuário no store
+    await checkAuth();
+
     setIsFirstAccess(false)
     setIsEditing(false)
     toast.success('Informações salvas com sucesso!')

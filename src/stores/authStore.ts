@@ -16,6 +16,7 @@ interface User {
   created_at: string
   approved_by?: string
   approved_at?: string
+  perfil_completo: boolean; // Adicionado: indica se o perfil pessoal está completo
 }
 
 export type { User }
@@ -123,6 +124,7 @@ export const useAuthStore = create<AuthState>()(
               churchName: churchName,
               status: profile.status as User['status'],
               created_at: session.user.created_at,
+              perfil_completo: profile.perfil_completo, // Adicionado
             };
 
             let newCurrentChurchId: string | null;
