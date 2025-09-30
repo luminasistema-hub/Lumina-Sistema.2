@@ -59,7 +59,7 @@ interface PersonalInfoData {
   
   // Disponibilidade
   diasDisponiveis: string[]
-  horariosDisponiveis: string // Corrigido para string
+  horariosDisponiveis: string
   interesseMinisterio: string[]
 }
 
@@ -92,7 +92,7 @@ const PersonalInfo = () => {
     dataConversao: '',
     testemunho: '',
     diasDisponiveis: [],
-    horariosDisponiveis: '', // Inicializado como string vazia
+    horariosDisponiveis: '',
     interesseMinisterio: []
   })
 
@@ -144,6 +144,45 @@ const PersonalInfo = () => {
         ? [...(prev[field as keyof PersonalInfoData] as string[]), value]
         : (prev[field as keyof PersonalInfoData] as string[]).filter(item => item !== value)
     }))
+  }
+
+  const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let cep = e.target.value.replace(/\D/g, '') // Remove tudo que não é dígito
+    
+    // Formata o CEP
+    if (cep.length > 5) {
+      cep = cep.substring(0, 5) + '-' + cep.substring(5, 8)
+    } else if (cep.length > 8) {
+      cep = cep.substring(0, 8)
+    }
+    
+    handleInputChange('cep', cep)
+
+    if (cep.length === 9) { // Se o CEP estiver completo (com o hífen)
+      const rawCep = cep.replace('-', '') // Remove o hífen para a requisição
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${rawCep}/json/`)
+        const data = await response.json()
+
+        if (data.erro) {
+          toast.error('CEP não encontrado.')
+          handleInputChange('endereco', '')
+          handleInputChange('cidade', '')
+          handleInputChange('estado', '')
+        } else {
+          handleInputChange('endereco', data.logradouro)
+          handleInputChange('cidade', data.localidade)
+          handleInputChange('estado', data.uf)
+          toast.success('Endereço preenchido automaticamente!')
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CEP:', error)
+        toast.error('Erro ao buscar CEP. Tente novamente.')
+        handleInputChange('endereco', '')
+        handleInputChange('cidade', '')
+        handleInputChange('estado', '')
+      }
+    }
   }
 
   const handleSave = () => {
@@ -284,6 +323,16 @@ const PersonalInfo = () => {
               <CardDescription>Onde você mora</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cep">CEP</Label>
+                <Input
+                  id="cep"
+                  value={formData.cep}
+                  onChange={handleCepChange}
+                  placeholder="00000-000"
+                  maxLength={9} // 8 dígitos + 1 hífen
+                />
+              </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="endereco">Endereço Completo *</Label>
                 <Input
@@ -314,15 +363,6 @@ const PersonalInfo = () => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cep">CEP</Label>
-                <Input
-                  id="cep"
-                  value={formData.cep}
-                  onChange={(e) => handleInputChange('cep', e.target.value)}
-                  placeholder="00000-000"
-                />
               </div>
             </CardContent>
           </Card>
