@@ -50,11 +50,9 @@ interface MemberProfile {
   id_igreja: string; 
   funcao: UserRole; 
   perfil_completo: boolean; 
-  nome_completo: string; // Alterado de full_name
+  nome_completo: string; 
   status: 'ativo' | 'pendente' | 'inativo'; 
   created_at: string; 
-  approved_by?: string; // Agora na tabela membros
-  approved_at?: string; // Agora na tabela membros
   
   // Fields from informacoes_pessoais (joined)
   telefone?: string;
@@ -65,8 +63,8 @@ interface MemberProfile {
   conjuge?: string;
   filhos?: Array<{nome: string, idade: string}>; 
   pais_cristaos?: string;
-  familiar_na_igreja?: string; // Nome de coluna corrigido
-  tempo_igreja?: string; // Nome de coluna corrigido
+  familiar_na_igreja?: string; 
+  tempo_igreja?: string; 
   batizado?: boolean;
   data_batismo?: string;
   participa_ministerio?: boolean;
@@ -74,7 +72,7 @@ interface MemberProfile {
   experiencia_anterior?: string;
   data_conversao?: string;
   dias_disponiveis?: string[]; 
-  horarios_disponiveis?: string; // Nome de coluna corrigido
+  horarios_disponiveis?: string; 
 
   // Fields from membros (agora a fonte primária)
   ultimo_teste_data?: string; 
@@ -143,7 +141,7 @@ const MemberManagementPage = () => {
 
     if (searchTerm) {
       filtered = filtered.filter(member => 
-        member.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) || // Alterado de full_name
+        member.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) || 
         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (member.telefone && member.telefone.includes(searchTerm))
       )
@@ -169,7 +167,7 @@ const MemberManagementPage = () => {
   const loadMembers = async (churchId: string) => {
     console.log('MemberManagementPage: Loading members for churchId:', churchId);
     const { data, error } = await supabase
-      .from('membros') // Alterado de 'perfis' para 'membros'
+      .from('membros') 
       .select(`
         id,
         id_igreja,
@@ -178,8 +176,6 @@ const MemberManagementPage = () => {
         nome_completo, 
         status,
         created_at,
-        approved_by, 
-        approved_at, 
         email,
         ultimo_teste_data, 
         ministerio_recomendado, 
@@ -226,8 +222,6 @@ const MemberManagementPage = () => {
       status: member.status,
       email: member.email, 
       created_at: member.created_at, 
-      approved_by: member.approved_by, 
-      approved_at: member.approved_at, 
       churchName: member.igrejas?.nome,
       // Map informacoes_pessoais fields
       telefone: member.informacoes_pessoais?.telefone,
@@ -277,9 +271,10 @@ const MemberManagementPage = () => {
       password: 'password_temp_123', 
       options: {
         data: {
-          full_name: newMember.name, // Mantém full_name para o trigger
-          church_id: currentChurchId,
+          full_name: newMember.name, 
+          church_name: currentChurch.name, // Pass church name for trigger
           initial_role: newMember.funcao,
+          church_id: currentChurchId,
         },
       },
     });
@@ -306,7 +301,7 @@ const MemberManagementPage = () => {
   const handleOpenEditMemberDialog = (member: Member) => {
     setSelectedMember(member);
     setEditMemberData({
-      nome_completo: member.nome_completo, // Alterado de full_name
+      nome_completo: member.nome_completo, 
       telefone: member.telefone,
       endereco: member.endereco,
       data_nascimento: member.data_nascimento,
@@ -315,8 +310,8 @@ const MemberManagementPage = () => {
       conjuge: member.conjuge,
       filhos: member.filhos,
       pais_cristaos: member.pais_cristaos,
-      familiar_na_igreja: member.familiar_na_igreja, // Corrigido
-      tempo_igreja: member.tempo_igreja, // Corrigido
+      familiar_na_igreja: member.familiar_na_igreja, 
+      tempo_igreja: member.tempo_igreja, 
       batizado: member.batizado,
       data_batismo: member.data_batismo,
       participa_ministerio: member.participa_ministerio,
@@ -324,7 +319,7 @@ const MemberManagementPage = () => {
       experiencia_anterior: member.experiencia_anterior,
       data_conversao: member.data_conversao,
       dias_disponiveis: member.dias_disponiveis,
-      horarios_disponiveis: member.horarios_disponiveis, // Corrigido
+      horarios_disponiveis: member.horarios_disponiveis, 
       funcao: member.funcao,
       status: member.status,
       ultimo_teste_data: member.ultimo_teste_data, 
@@ -345,7 +340,7 @@ const MemberManagementPage = () => {
       .update({
         funcao: editMemberData.funcao,
         status: editMemberData.status,
-        nome_completo: editMemberData.nome_completo, // Alterado de full_name
+        nome_completo: editMemberData.nome_completo, 
         ministerio_recomendado: editMemberData.ministerio_recomendado,
         ultimo_teste_data: editMemberData.ultimo_teste_data,
       })
@@ -405,7 +400,6 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Supabase agora lida com o cascade delete de auth.users -> membros -> informacoes_pessoais
     const { error: authError } = await supabase.auth.admin.deleteUser(memberId);
 
     if (authError) {
@@ -426,68 +420,7 @@ const MemberManagementPage = () => {
     loadMembers(currentChurchId); 
   };
 
-  const approveUser = async (memberId: string) => {
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.');
-      return;
-    }
-
-    // Update membros table
-    const { error: membrosError } = await supabase
-      .from('membros') 
-      .update({
-        status: 'ativo',
-        approved_by: user?.name || 'Administrador', 
-        approved_at: new Date().toISOString(),
-      })
-      .eq('id', memberId);
-
-    if (membrosError) {
-      console.error('Error approving user in membros table:', membrosError.message);
-      toast.error('Erro ao aprovar usuário na tabela de membros: ' + membrosError.message);
-      return;
-    }
-
-    const currentChurch = getChurchById(currentChurchId);
-    if (currentChurch) {
-      await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers + 1 });
-    }
-
-    toast.success('Usuário aprovado com sucesso!');
-    loadMembers(currentChurchId);
-  };
-
-  const rejectUser = async (memberId: string) => {
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.');
-      return;
-    }
-
-    // Update membros table
-    const { error: membrosError } = await supabase
-      .from('membros') 
-      .update({
-        status: 'inativo',
-      })
-      .eq('id', memberId);
-
-    if (membrosError) {
-      console.error('Error rejecting user in membros table:', membrosError.message);
-      toast.error('Erro ao rejeitar usuário na tabela de membros: ' + membrosError.message);
-      return;
-    }
-
-    const memberToReject = members.find(m => m.id === memberId);
-    if (memberToReject && memberToReject.status === 'ativo') {
-      const currentChurch = getChurchById(currentChurchId);
-      if (currentChurch) {
-        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
-      }
-    }
-
-    toast.success('Usuário rejeitado com sucesso!');
-    loadMembers(currentChurchId);
-  };
+  // Funções approveUser e rejectUser removidas
 
   const handleGenerateRegistrationLink = () => {
     console.log('--- handleGenerateRegistrationLink called ---');
@@ -628,7 +561,7 @@ const MemberManagementPage = () => {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="text-center">
-              <div className="text-xl md:text-2xl font-bold text-purple-600">{statsData.leaders}</div>
+              <div className="text-xl md:text-2xl font-bold text-yellow-600">{statsData.leaders}</div>
               <div className="text-sm text-gray-600">Líderes</div>
             </div>
           </CardContent>
@@ -930,27 +863,7 @@ const MemberManagementPage = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  {member.status === 'pendente' && (user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'pastor') && (
-                    <>
-                      <Button 
-                        size="sm" 
-                        className="bg-green-500 hover:bg-green-600"
-                        onClick={() => approveUser(member.id)}
-                      >
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        Aprovar
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="text-red-600"
-                        onClick={() => rejectUser(member.id)}
-                      >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Rejeitar
-                      </Button>
-                    </>
-                  )}
+                  {/* Botões de aprovar/rejeitar removidos */}
                   <Button 
                     variant="outline" 
                     size="sm"

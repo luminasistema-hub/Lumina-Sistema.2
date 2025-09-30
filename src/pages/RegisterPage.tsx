@@ -54,7 +54,7 @@ const RegisterPage = () => {
       password,
       options: {
         data: {
-          full_name: name, // Mantém full_name para o trigger handle_new_user
+          full_name: name, 
           church_name: churchName,
           initial_role: initialRoleFromUrl,
           church_id: churchIdFromUrl,

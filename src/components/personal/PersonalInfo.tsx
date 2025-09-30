@@ -119,12 +119,12 @@ const PersonalInfo = () => {
 
         if (personalInfoRecord) {
           setFormData({
-            nomeCompleto: user.name, // Nome vem do authStore
+            nomeCompleto: user.name, 
             dataNascimento: personalInfoRecord.data_nascimento || '',
             estadoCivil: personalInfoRecord.estado_civil || '',
             profissao: personalInfoRecord.profissao || '',
             telefone: personalInfoRecord.telefone || '',
-            email: user.email, // Email vem do authStore
+            email: user.email, 
             endereco: personalInfoRecord.endereco || '',
             conjuge: personalInfoRecord.conjuge || '',
             filhos: personalInfoRecord.filhos || [],
@@ -321,9 +321,9 @@ const PersonalInfo = () => {
     }
     console.log('PersonalInfo: informacoes_pessoais upsert successful.');
 
-    // Atualizar o campo perfil_completo na tabela membros (antiga perfis)
+    // Atualizar o campo perfil_completo na tabela membros
     const { error: membrosUpdateError } = await supabase
-      .from('membros') // Alterado de 'perfis' para 'membros'
+      .from('membros') 
       .update({ perfil_completo: true })
       .eq('id', user.id);
 
@@ -797,7 +797,7 @@ const PersonalInfo = () => {
               <p className="font-medium">{formData.batizado ? 'Sim' : 'Não'}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Participa de Ministério</p>
+              <p className className="text-sm text-gray-500">Participa de Ministério</p>
               <p className="font-medium">{formData.participaMinisterio ? 'Sim' : 'Não'}</p>
             </div>
           </CardContent>

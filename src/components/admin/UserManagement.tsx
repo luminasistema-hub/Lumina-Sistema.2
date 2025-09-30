@@ -39,16 +39,14 @@ interface MemberDBProfile {
   nome_completo: string; 
   status: 'ativo' | 'pendente' | 'inativo';
   created_at: string;
-  approved_by?: string; 
-  approved_at?: string; 
   email: string; 
-  ministerio_recomendado?: string; // Adicionado para mapear para 'ministry' no frontend
+  ministerio_recomendado?: string; 
 }
 
 const UserManagement = ({}: UserManagementProps) => {
   const { user, currentChurchId } = useAuthStore() 
   const { updateChurch, getChurchById } = useChurchStore() 
-  const [users, setUsers] = useState<User[]>([]) // Usando a interface User do authStore
+  const [users, setUsers] = useState<User[]>([]) 
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -91,7 +89,7 @@ const UserManagement = ({}: UserManagementProps) => {
   const loadUsers = async (churchId: string) => {
     console.log('UserManagement: Loading users for churchId:', churchId);
     const { data, error } = await supabase
-      .from('membros') // Alterado de 'perfis' para 'membros'
+      .from('membros') 
       .select(`
         id,
         id_igreja,
@@ -100,8 +98,6 @@ const UserManagement = ({}: UserManagementProps) => {
         nome_completo, 
         status,
         created_at,
-        approved_by,
-        approved_at,
         email,
         ministerio_recomendado
       `)
@@ -115,77 +111,20 @@ const UserManagement = ({}: UserManagementProps) => {
 
     const usersData: User[] = data.map((member: MemberDBProfile) => ({
       id: member.id,
-      name: member.nome_completo, // Mapeia nome_completo do DB para name do frontend
+      name: member.nome_completo, 
       email: member.email,
       role: member.funcao,
       churchId: member.id_igreja,
       status: member.status,
       created_at: member.created_at,
-      approved_by: member.approved_by,
-      approved_at: member.approved_at,
       perfil_completo: member.perfil_completo,
-      ministry: member.ministerio_recomendado, // Mapeia ministerio_recomendado para ministry
+      ministry: member.ministerio_recomendado, 
     }));
     setUsers(usersData);
     setFilteredUsers(usersData);
   };
 
-  const approveUser = async (userId: string) => {
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('membros') // Alterado de 'perfis' para 'membros'
-      .update({
-        status: 'ativo',
-        approved_by: user?.name || 'Administrador',
-        approved_at: new Date().toISOString(),
-      })
-      .eq('id', userId);
-
-    if (error) {
-      console.error('Error approving user:', error);
-      toast.error('Erro ao aprovar usuário: ' + error.message);
-      return;
-    }
-
-    const currentChurch = getChurchById(currentChurchId);
-    if (currentChurch) {
-      await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers + 1 });
-    }
-    toast.success('Usuário aprovado com sucesso!');
-    loadUsers(currentChurchId);
-  };
-
-  const rejectUser = async (userId: string) => {
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('membros') // Alterado de 'perfis' para 'membros'
-      .update({ status: 'inativo' })
-      .eq('id', userId);
-
-    if (error) {
-      console.error('Error rejecting user:', error);
-      toast.error('Erro ao rejeitar usuário: ' + error.message);
-      return;
-    }
-
-    const userToReject = users.find(u => u.id === userId);
-    if (userToReject && userToReject.status === 'ativo') {
-      const currentChurch = getChurchById(currentChurchId);
-      if (currentChurch) {
-        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
-      }
-    }
-    toast.success('Usuário rejeitado!');
-    loadUsers(currentChurchId);
-  };
+  // Funções approveUser e rejectUser removidas
 
   const handleEditUser = async () => {
     if (!selectedUser || !editUser.role || !currentChurchId) {
@@ -194,11 +133,11 @@ const UserManagement = ({}: UserManagementProps) => {
     }
 
     const { error } = await supabase
-      .from('membros') // Alterado de 'perfis' para 'membros'
+      .from('membros') 
       .update({
         funcao: editUser.role,
-        nome_completo: editUser.name, // Mapeia editUser.name para nome_completo
-        ministerio_recomendado: editUser.ministry, // Mapeia editUser.ministry para ministerio_recomendado
+        nome_completo: editUser.name, 
+        ministerio_recomendado: editUser.ministry, 
         status: editUser.status,
       })
       .eq('id', selectedUser.id);
@@ -240,7 +179,6 @@ const UserManagement = ({}: UserManagementProps) => {
       return;
     }
 
-    // Supabase agora lida com o cascade delete de auth.users -> membros -> informacoes_pessoais
     const { error: authError } = await supabase.auth.admin.deleteUser(userId);
 
     if (authError) {
@@ -444,35 +382,11 @@ const UserManagement = ({}: UserManagementProps) => {
                     )}
                   </div>
 
-                  {u.approved_by && u.approved_at && (
-                    <div className="text-xs text-green-600">
-                      ✅ Aprovado por {u.approved_by} em {new Date(u.approved_at).toLocaleDateString('pt-BR')}
-                    </div>
-                  )}
+                  {/* approved_by e approved_at removidos */}
                 </div>
 
                 <div className="flex gap-2">
-                  {u.status === 'pendente' && (user?.role === 'admin' || user?.role === 'super_admin') && (
-                    <>
-                      <Button 
-                        size="sm" 
-                        className="bg-green-500 hover:bg-green-600"
-                        onClick={() => approveUser(u.id)}
-                      >
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        Aprovar
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="text-red-600"
-                        onClick={() => rejectUser(u.id)}
-                      >
-                        <UserX className="w-4 h-4 mr-2" />
-                        Rejeitar
-                      </Button>
-                    </>
-                  )}
+                  {/* Botões de aprovar/rejeitar removidos */}
                   {(user?.role === 'admin' || user?.role === 'super_admin') && (
                     <Button 
                       variant="outline" 
@@ -480,9 +394,9 @@ const UserManagement = ({}: UserManagementProps) => {
                       onClick={() => {
                         setSelectedUser(u)
                         setEditUser({
-                          name: u.name, // Mapeia para nome_completo no DB
+                          name: u.name, 
                           role: u.role,
-                          ministry: u.ministry, // Mapeia para ministerio_recomendado no DB
+                          ministry: u.ministry, 
                           status: u.status
                         })
                         setIsEditDialogOpen(true)

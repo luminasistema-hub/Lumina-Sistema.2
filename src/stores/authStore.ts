@@ -14,8 +14,6 @@ interface User {
   ministry?: string
   status: 'ativo' | 'pendente' | 'inativo'
   created_at: string
-  approved_by?: string
-  approved_at?: string
   perfil_completo: boolean; // Adicionado: indica se o perfil pessoal está completo
 }
 
@@ -98,8 +96,8 @@ export const useAuthStore = create<AuthState>()(
             console.log('AuthStore: Session found for user ID:', session.user.id);
             console.log('AuthStore: Attempting to fetch profile from "membros" table.');
             const { data: profile, error: profileError } = await supabase
-              .from('membros') // Alterado de 'perfis' para 'membros'
-              .select('*, igrejas(id, nome)') // Join with 'igrejas' to get church name
+              .from('membros') 
+              .select('*, igrejas(id, nome)') 
               .eq('id', session.user.id)
               .maybeSingle(); 
             
@@ -119,7 +117,7 @@ export const useAuthStore = create<AuthState>()(
 
             const authenticatedUser: User = {
               id: session.user.id,
-              name: profile.nome_completo || session.user.user_metadata.full_name || session.user.email || 'Usuário', // Alterado de profile.full_name para profile.nome_completo
+              name: profile.nome_completo || session.user.user_metadata.full_name || session.user.email || 'Usuário', 
               email: session.user.email!,
               role: userRole,
               churchId: churchIdFromProfile,
