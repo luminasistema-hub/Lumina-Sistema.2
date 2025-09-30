@@ -8,8 +8,8 @@ import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
+import { supabase } from '../../integrations/supabase/client'
 import { 
   DollarSign, 
   CreditCard, 
@@ -28,129 +28,173 @@ import {
   Users
 } from 'lucide-react'
 
+// Interface atualizada para corresponder à tabela transacoes_financeiras
 interface Contribution {
   id: string
-  churchId: string // Adicionado para multi-igrejas
+  tipo: 'Entrada' | 'Saída' // Sempre 'Entrada' para contribuições de membros
+  categoria: 'Dízimos' | 'Ofertas' | 'Doações Especiais' | 'Missões' | 'Obras'
+  subcategoria?: string // Pode ser usado para campanhas específicas
   valor: number
-  tipo: 'Dízimo' | 'Oferta' | 'Doação Especial' | 'Missões' | 'Obras'
+  data_transacao: string // Renomeado de data_contribuicao
+  descricao: string
   metodo_pagamento: 'PIX' | 'Cartão' | 'Dinheiro' | 'Transferência'
-  data_contribuicao: string
-  contribuinte: {
-    id: string
-    nome: string
-    email?: string
-  }
-  campanha?: string
-  observacoes?: string
+  responsavel?: string // Quem registrou (pode ser o próprio membro ou um financeiro)
   status: 'Pendente' | 'Confirmado' | 'Cancelado'
-  recibo_gerado: boolean
+  comprovante?: string
+  observacoes?: string
+  membro_id: string // ID do membro que contribuiu
+  membro_nome?: string // Nome do membro
+  recibo_emitido: boolean
+  numero_documento?: string
+  centro_custo?: string
+  aprovado_por?: string
+  data_aprovacao?: string
+  id_igreja: string // ID da igreja
 }
 
 const OfferingsPage = () => {
-  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
+  const { user, currentChurchId } = useAuthStore()
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedType, setSelectedType] = useState('all')
+  const [loading, setLoading] = useState(true)
 
   const canViewFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
   const canManageFinancial = user?.role === 'admin' || user?.role === 'financeiro'
 
   const [newContribution, setNewContribution] = useState({
     valor: 0,
-    tipo: 'Oferta' as Contribution['tipo'],
+    tipo: 'Oferta' as Contribution['categoria'], // Usar categoria aqui
     metodo_pagamento: 'PIX' as Contribution['metodo_pagamento'],
-    observacoes: ''
+    observacoes: '',
+    campanha: '' // Adicionado campo de campanha
   })
 
-  // Mock data
-  useEffect(() => {
-    if (currentChurchId) {
-      const storedContributions = localStorage.getItem(`contributions-${currentChurchId}`)
-      if (storedContributions) {
-        setContributions(JSON.parse(storedContributions))
-      } else {
-        const mockContributions: Contribution[] = [
-          {
-            id: '1',
-            churchId: currentChurchId,
-            valor: 150.00,
-            tipo: 'Dízimo',
-            metodo_pagamento: 'PIX',
-            data_contribuicao: '2025-09-10T10:00:00',
-            contribuinte: { id: user?.id || '1', nome: user?.name || 'Usuário Atual' },
-            status: 'Confirmado',
-            recibo_gerado: true
-          },
-          {
-            id: '2',
-            churchId: currentChurchId,
-            valor: 50.00,
-            tipo: 'Oferta',
-            metodo_pagamento: 'Cartão',
-            data_contribuicao: '2025-09-08T19:30:00',
-            contribuinte: { id: user?.id || '1', nome: user?.name || 'Usuário Atual' },
-            campanha: 'Reforma do Templo',
-            status: 'Confirmado',
-            recibo_gerado: true
-          }
-        ]
-        setContributions(mockContributions)
-        localStorage.setItem(`contributions-${currentChurchId}`, JSON.stringify(mockContributions))
-      }
-    } else {
+  const loadContributions = async () => {
+    if (!currentChurchId || !user?.id) {
       setContributions([])
+      setLoading(false)
+      return
     }
-  }, [currentChurchId, user])
 
-  const handleContribute = () => {
+    setLoading(true)
+    try {
+      let query = supabase
+        .from('transacoes_financeiras')
+        .select('*')
+        .eq('id_igreja', currentChurchId)
+        .eq('tipo', 'Entrada') // Apenas entradas são contribuições
+
+      // Membros só podem ver suas próprias contribuições
+      if (!canViewFinancial) {
+        query = query.eq('membro_id', user.id)
+      }
+
+      const { data, error } = await query.order('data_transacao', { ascending: false })
+
+      if (error) {
+        console.error('Error loading contributions:', error)
+        toast.error('Erro ao carregar contribuições: ' + error.message)
+        setContributions([])
+        return
+      }
+
+      setContributions(data as Contribution[])
+    } catch (error) {
+      console.error('Unexpected error loading contributions:', error)
+      toast.error('Erro inesperado ao carregar contribuições.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadContributions()
+  }, [currentChurchId, user?.id, canViewFinancial])
+
+  const handleContribute = async () => {
     if (newContribution.valor <= 0) {
       toast.error('Por favor, insira um valor válido')
       return
     }
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
+    if (!currentChurchId || !user?.id) {
+      toast.error('Nenhuma igreja ativa ou usuário selecionado.')
       return
     }
 
-    const contribution: Contribution = {
-      id: Date.now().toString(),
-      churchId: currentChurchId,
-      valor: newContribution.valor,
-      tipo: newContribution.tipo,
-      metodo_pagamento: newContribution.metodo_pagamento,
-      data_contribuicao: new Date().toISOString(),
-      contribuinte: { id: user?.id || '', nome: user?.name || '' },
-      observacoes: newContribution.observacoes,
-      status: 'Pendente',
-      recibo_gerado: false
-    }
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('transacoes_financeiras')
+        .insert({
+          id_igreja: currentChurchId,
+          tipo: 'Entrada',
+          categoria: newContribution.tipo,
+          subcategoria: newContribution.campanha || null, // Usar campanha como subcategoria
+          valor: newContribution.valor,
+          data_transacao: new Date().toISOString().split('T')[0],
+          descricao: `${newContribution.tipo} de ${user.name}`,
+          metodo_pagamento: newContribution.metodo_pagamento,
+          responsavel: user.name, // Quem registrou
+          status: 'Pendente', // Inicia como pendente
+          observacoes: newContribution.observacoes,
+          membro_id: user.id,
+          membro_nome: user.name,
+          recibo_emitido: false,
+        })
+        .select()
+        .single()
 
-    const updatedContributions = [contribution, ...contributions]
-    setContributions(updatedContributions)
-    localStorage.setItem(`contributions-${currentChurchId}`, JSON.stringify(updatedContributions))
-    
-    // Integração com o sistema financeiro
-    console.log('Registrando transação financeira:', {
-      tipo: 'Entrada',
-      categoria: contribution.tipo === 'Dízimo' ? 'Dízimos' : 'Ofertas',
-      valor: contribution.valor,
-      data: contribution.data_contribuicao.split('T')[0],
-      descricao: `${contribution.tipo} - ${contribution.contribuinte.nome}`,
-      metodo_pagamento: contribution.metodo_pagamento,
-      membro_id: contribution.contribuinte.id,
-      membro_nome: contribution.contribuinte.nome,
-      status: 'Confirmado'
-    })
-    
-    setIsContributeDialogOpen(false)
-    setNewContribution({
-      valor: 0,
-      tipo: 'Oferta',
-      metodo_pagamento: 'PIX',
-      observacoes: ''
-    })
-    toast.success('Contribuição registrada com sucesso! Transação enviada ao sistema financeiro.')
+      if (error) {
+        console.error('Error inserting contribution:', error)
+        toast.error('Erro ao registrar contribuição: ' + error.message)
+        return
+      }
+
+      toast.success('Contribuição registrada com sucesso! Aguardando confirmação.')
+      setIsContributeDialogOpen(false)
+      setNewContribution({
+        valor: 0,
+        tipo: 'Oferta',
+        metodo_pagamento: 'PIX',
+        observacoes: '',
+        campanha: ''
+      })
+      loadContributions() // Recarrega a lista
+    } catch (error) {
+      console.error('Unexpected error during contribution:', error)
+      toast.error('Erro inesperado ao registrar contribuição.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generateReceipt = async (contributionId: string) => {
+    if (!canManageFinancial) {
+      toast.error('Você não tem permissão para gerar recibos.')
+      return
+    }
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({ recibo_emitido: true })
+        .eq('id', contributionId)
+
+      if (error) {
+        console.error('Error generating receipt:', error)
+        toast.error('Erro ao gerar recibo: ' + error.message)
+        return
+      }
+      toast.success('Recibo marcado como emitido!')
+      loadContributions()
+    } catch (error) {
+      console.error('Unexpected error generating receipt:', error)
+      toast.error('Erro inesperado ao gerar recibo.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const getStatusColor = (status: Contribution['status']) => {
@@ -162,24 +206,30 @@ const OfferingsPage = () => {
     }
   }
 
-  const getTypeColor = (tipo: Contribution['tipo']) => {
-    switch (tipo) {
-      case 'Dízimo': return 'bg-blue-100 text-blue-800'
-      case 'Oferta': return 'bg-green-100 text-green-800'
-      case 'Doação Especial': return 'bg-purple-100 text-purple-800'
+  const getTypeColor = (categoria: Contribution['categoria']) => {
+    switch (categoria) {
+      case 'Dízimos': return 'bg-blue-100 text-blue-800'
+      case 'Ofertas': return 'bg-green-100 text-green-800'
+      case 'Doações Especiais': return 'bg-purple-100 text-purple-800'
       case 'Missões': return 'bg-orange-100 text-orange-800'
       case 'Obras': return 'bg-red-100 text-red-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const totalContributions = contributions
+  const filteredContributions = contributions.filter(c => {
+    const matchesPeriod = true // Lógica de filtro de período mais complexa, deixada para depois
+    const matchesType = selectedType === 'all' || c.categoria === selectedType
+    return matchesPeriod && matchesType
+  })
+
+  const totalContributionsValue = filteredContributions
     .filter(c => c.status === 'Confirmado')
     .reduce((sum, c) => sum + c.valor, 0)
 
-  const monthlyContributions = contributions
+  const monthlyContributionsValue = filteredContributions
     .filter(c => {
-      const date = new Date(c.data_contribuicao)
+      const date = new Date(c.data_transacao)
       const now = new Date()
       return date.getMonth() === now.getMonth() && 
              date.getFullYear() === now.getFullYear() &&
@@ -193,6 +243,15 @@ const OfferingsPage = () => {
         Selecione uma igreja para visualizar as contribuições.
       </div>
     )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="ml-4 text-lg text-gray-600">Carregando contribuições...</p>
+      </div>
+    );
   }
 
   return (
@@ -213,7 +272,7 @@ const OfferingsPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Contribuído</p>
                 <p className="text-xl md:text-2xl font-bold text-gray-900">
-                  R$ {totalContributions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {totalContributionsValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-10 h-10 md:w-12 md:h-12 bg-green-50 rounded-lg flex items-center justify-center">
@@ -229,7 +288,7 @@ const OfferingsPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Este Mês</p>
                 <p className="text-xl md:text-2xl font-bold text-gray-900">
-                  R$ {monthlyContributions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {monthlyContributionsValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-50 rounded-lg flex items-center justify-center">
@@ -244,7 +303,7 @@ const OfferingsPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Contribuições</p>
-                <p className="text-xl md:text-2xl font-bold text-gray-900">{contributions.length}</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-900">{filteredContributions.length}</p>
               </div>
               <div className="w-10 h-10 md:w-12 md:h-12 bg-purple-50 rounded-lg flex items-center justify-center">
                 <Receipt className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />
@@ -259,7 +318,7 @@ const OfferingsPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Recibos</p>
                 <p className="text-xl md:text-2xl font-bold text-gray-900">
-                  {contributions.filter(c => c.recibo_gerado).length}
+                  {filteredContributions.filter(c => c.recibo_emitido).length}
                 </p>
               </div>
               <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-50 rounded-lg flex items-center justify-center">
@@ -292,9 +351,9 @@ const OfferingsPage = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Tipos</SelectItem>
-              <SelectItem value="Dízimo">Dízimo</SelectItem>
-              <SelectItem value="Oferta">Oferta</SelectItem>
-              <SelectItem value="Doação Especial">Doação Especial</SelectItem>
+              <SelectItem value="Dízimos">Dízimo</SelectItem>
+              <SelectItem value="Ofertas">Oferta</SelectItem>
+              <SelectItem value="Doações Especiais">Doação Especial</SelectItem>
               <SelectItem value="Missões">Missões</SelectItem>
               <SelectItem value="Obras">Obras</SelectItem>
             </SelectContent>
@@ -332,14 +391,14 @@ const OfferingsPage = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="tipo">Tipo de Contribuição</Label>
-                  <Select value={newContribution.tipo} onValueChange={(value) => setNewContribution({...newContribution, tipo: value as Contribution['tipo']})}>
+                  <Select value={newContribution.tipo} onValueChange={(value) => setNewContribution({...newContribution, tipo: value as Contribution['categoria']})}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Dízimo">Dízimo</SelectItem>
-                      <SelectItem value="Oferta">Oferta</SelectItem>
-                      <SelectItem value="Doação Especial">Doação Especial</SelectItem>
+                      <SelectItem value="Dízimos">Dízimo</SelectItem>
+                      <SelectItem value="Ofertas">Oferta</SelectItem>
+                      <SelectItem value="Doações Especiais">Doação Especial</SelectItem>
                       <SelectItem value="Missões">Missões</SelectItem>
                       <SelectItem value="Obras">Obras</SelectItem>
                     </SelectContent>
@@ -362,12 +421,22 @@ const OfferingsPage = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="campanha">Campanha (Opcional)</Label>
+                  <Input
+                    id="campanha"
+                    value={newContribution.campanha}
+                    onChange={(e) => setNewContribution({...newContribution, campanha: e.target.value})}
+                    placeholder="Ex: Reforma do Templo"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="observacoes">Observações</Label>
                   <Textarea
                     id="observacoes"
                     value={newContribution.observacoes}
                     onChange={(e) => setNewContribution({...newContribution, observacoes: e.target.value})}
-                    placeholder="Campanha, finalidade, etc."
+                    placeholder="Finalidade, etc."
                     rows={2}
                   />
                 </div>
@@ -393,7 +462,7 @@ const OfferingsPage = () => {
 
       {/* Contributions List */}
       <div className="space-y-4">
-        {contributions.map((contribution) => (
+        {filteredContributions.map((contribution) => (
           <Card key={contribution.id} className="border-0 shadow-sm">
             <CardContent className="p-4 md:p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -403,8 +472,8 @@ const OfferingsPage = () => {
                       R$ {contribution.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </h3>
                     <div className="flex gap-2">
-                      <Badge className={getTypeColor(contribution.tipo)}>
-                        {contribution.tipo}
+                      <Badge className={getTypeColor(contribution.categoria)}>
+                        {contribution.categoria}
                       </Badge>
                       <Badge className={getStatusColor(contribution.status)}>
                         {contribution.status}
@@ -422,13 +491,13 @@ const OfferingsPage = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      <span>{new Date(contribution.data_contribuicao).toLocaleDateString('pt-BR')}</span>
+                      <span>{new Date(contribution.data_transacao).toLocaleDateString('pt-BR')}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
-                      <span>{contribution.contribuinte.nome}</span>
+                      <span>{contribution.membro_nome || contribution.responsavel}</span>
                     </div>
-                    {contribution.recibo_gerado && (
+                    {contribution.recibo_emitido && (
                       <div className="flex items-center gap-2">
                         <Receipt className="w-4 h-4" />
                         <span>Recibo disponível</span>
@@ -436,9 +505,9 @@ const OfferingsPage = () => {
                     )}
                   </div>
 
-                  {contribution.campanha && (
+                  {contribution.subcategoria && (
                     <p className="text-sm text-blue-600 mt-2">
-                      📋 {contribution.campanha}
+                      📋 {contribution.subcategoria}
                     </p>
                   )}
 
@@ -454,10 +523,20 @@ const OfferingsPage = () => {
                     <Eye className="w-4 h-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Ver</span>
                   </Button>
-                  {contribution.recibo_gerado && (
-                    <Button variant="outline" size="sm">
+                  {canManageFinancial && !contribution.recibo_emitido && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => generateReceipt(contribution.id)}
+                    >
                       <Download className="w-4 h-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Recibo</span>
+                      <span className="hidden sm:inline">Gerar Recibo</span>
+                    </Button>
+                  )}
+                  {canManageFinancial && contribution.recibo_emitido && (
+                    <Button variant="outline" size="sm" disabled>
+                      <Download className="w-4 h-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Recibo Emitido</span>
                     </Button>
                   )}
                 </div>
@@ -467,7 +546,7 @@ const OfferingsPage = () => {
         ))}
       </div>
 
-      {contributions.length === 0 && (
+      {filteredContributions.length === 0 && (
         <Card className="border-0 shadow-sm">
           <CardContent className="p-8 md:p-12 text-center">
             <Heart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
