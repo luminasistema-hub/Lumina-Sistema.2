@@ -283,9 +283,9 @@ const VocationalTest = () => {
         .select('*')
         .eq('membro_id', user.id)
         .eq('is_ultimo', true)
-        .single();
+        .maybeSingle(); // Alterado para .maybeSingle()
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      if (error) {
         console.error('VocationalTest: Error loading previous test:', error);
         toast.error('Erro ao carregar teste vocacional anterior.');
         setIsLoadingResults(false);
