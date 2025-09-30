@@ -315,7 +315,7 @@ const PersonalInfo = () => {
       experiencia_anterior: formData.experienciaAnterior || null,
       data_conversao: formData.dataConversao || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horarios_disponiveis: formData.horariosDisponiveis || null,
+      horariosDisponiveis: formData.horariosDisponiveis || null,
       updated_at: new Date().toISOString(),
     };
 
