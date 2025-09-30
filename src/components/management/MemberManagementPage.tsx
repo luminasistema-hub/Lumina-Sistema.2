@@ -73,7 +73,7 @@ interface MemberProfile {
   dias_disponiveis?: string[]; // ARRAY
   horarios_disponiveis?: string;
   interesse_ministerio?: string[]; // ARRAY
-  // Fields from membros (for vocational test results, if joined)
+  // Fields from membros (joined)
   ultimo_teste_data?: string; // from public.membros.ultimo_teste_data
   ministerio_recomendado?: string; // from public.membros.ministerio_recomendado
   // Other fields from auth.users or derived
@@ -206,6 +206,10 @@ const MemberManagementPage = () => {
           horarios_disponiveis,
           interesse_ministerio
         ),
+        membros (
+          ultimo_teste_data,
+          ministerio_recomendado
+        ),
         igrejas (
           nome
         )
@@ -252,9 +256,9 @@ const MemberManagementPage = () => {
       dias_disponiveis: profile.informacoes_pessoais?.dias_disponiveis,
       horarios_disponiveis: profile.informacoes_pessoais?.horarios_disponiveis,
       interesse_ministerio: profile.informacoes_pessoais?.interesse_ministerio,
-      // Assuming these are from a joined 'membros' table or similar, for now, mock
-      ultimo_teste_data: undefined, 
-      ministerio_recomendado: undefined,
+      // Map membros fields
+      ultimo_teste_data: profile.membros?.ultimo_teste_data, 
+      ministerio_recomendado: profile.membros?.ministerio_recomendado,
     }));
 
     // Fetch emails and created_at from auth.users for each profile
@@ -1232,6 +1236,305 @@ const MemberManagementPage = () => {
                 </div>
               </TabsContent>
             </Tabs>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Member Dialog */}
+      {selectedMember && (
+        <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Membro: {selectedMember.full_name}</DialogTitle>
+              <DialogDescription>
+                Atualize as informações do membro
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-full_name">Nome Completo</Label>
+                  <Input
+                    id="edit-full_name"
+                    value={editMemberData.full_name || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, full_name: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={selectedMember.email} // Email cannot be changed directly here
+                    disabled
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-telefone">Telefone</Label>
+                  <Input
+                    id="edit-telefone"
+                    value={editMemberData.telefone || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, telefone: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-data_nascimento">Data de Nascimento</Label>
+                  <Input
+                    id="edit-data_nascimento"
+                    type="date"
+                    value={editMemberData.data_nascimento || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, data_nascimento: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-endereco">Endereço</Label>
+                <Input
+                  id="edit-endereco"
+                  value={editMemberData.endereco || ''}
+                  onChange={(e) => setEditMemberData({...editMemberData, endereco: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-funcao">Função</Label>
+                  <Select value={editMemberData.funcao} onValueChange={(value) => setEditMemberData({...editMemberData, funcao: value as UserRole})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="membro">Membro</SelectItem>
+                      <SelectItem value="voluntario">Voluntário</SelectItem>
+                      <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
+                      <SelectItem value="pastor">Pastor</SelectItem>
+                      <SelectItem value="financeiro">Financeiro</SelectItem>
+                      <SelectItem value="midia_tecnologia">Mídia e Tecnologia</SelectItem>
+                      <SelectItem value="integra">Integração</SelectItem>
+                      {user?.role === 'admin' && <SelectItem value="admin">Administrador</SelectItem>}
+                      {user?.role === 'super_admin' && <SelectItem value="super_admin">Super Administrador</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select value={editMemberData.status} onValueChange={(value) => setEditMemberData({...editMemberData, status: value as Member['status']})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Additional Personal Info Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-estado_civil">Estado Civil</Label>
+                  <Select value={editMemberData.estado_civil} onValueChange={(value) => setEditMemberData({...editMemberData, estado_civil: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                      <SelectItem value="casado">Casado(a)</SelectItem>
+                      <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                      <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-profissao">Profissão</Label>
+                  <Input
+                    id="edit-profissao"
+                    value={editMemberData.profissao || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, profissao: e.target.value})}
+                  />
+                </div>
+                {editMemberData.estado_civil === 'casado' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-conjuge">Cônjuge</Label>
+                    <Input
+                      id="edit-conjuge"
+                      value={editMemberData.conjuge || ''}
+                      onChange={(e) => setEditMemberData({...editMemberData, conjuge: e.target.value})}
+                    />
+                  </div>
+                )}
+                {/* Filhos - simplified for now, full implementation would need dynamic fields */}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-filhos">Filhos (JSON)</Label>
+                  <Textarea
+                    id="edit-filhos"
+                    value={JSON.stringify(editMemberData.filhos || [], null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setEditMemberData({...editMemberData, filhos: JSON.parse(e.target.value)});
+                      } catch (err) {
+                        console.error("Invalid JSON for filhos", err);
+                        toast.error("Formato JSON inválido para filhos.");
+                      }
+                    }}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Spiritual Info Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-batizado">Batizado</Label>
+                  <Select value={editMemberData.batizado?.toString()} onValueChange={(value) => setEditMemberData({...editMemberData, batizado: value === 'true'})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Sim</SelectItem>
+                      <SelectItem value="false">Não</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editMemberData.batizado && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-data_batismo">Data do Batismo</Label>
+                    <Input
+                      id="edit-data_batismo"
+                      type="date"
+                      value={editMemberData.data_batismo || ''}
+                      onChange={(e) => setEditMemberData({...editMemberData, data_batismo: e.target.value})}
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tempo_igreja">Tempo na Igreja</Label>
+                  <Input
+                    id="edit-tempo_igreja"
+                    value={editMemberData.tempo_igreja || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, tempo_igreja: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-decisao_cristo">Decisão por Cristo</Label>
+                  <Input
+                    id="edit-decisao_cristo"
+                    value={editMemberData.decisao_cristo || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, decisao_cristo: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-data_conversao">Data da Conversão</Label>
+                  <Input
+                    id="edit-data_conversao"
+                    type="date"
+                    value={editMemberData.data_conversao || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, data_conversao: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-testemunho">Testemunho</Label>
+                  <Textarea
+                    id="edit-testemunho"
+                    value={editMemberData.testemunho || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, testemunho: e.target.value})}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Ministry Info Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-participa_ministerio">Participa de Ministério</Label>
+                  <Select value={editMemberData.participa_ministerio?.toString()} onValueChange={(value) => setEditMemberData({...editMemberData, participa_ministerio: value === 'true'})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Sim</SelectItem>
+                      <SelectItem value="false">Não</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editMemberData.participa_ministerio && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-ministerio_anterior">Ministério Anterior</Label>
+                      <Input
+                        id="edit-ministerio_anterior"
+                        value={editMemberData.ministerio_anterior || ''}
+                        onChange={(e) => setEditMemberData({...editMemberData, ministerio_anterior: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="edit-experiencia_anterior">Experiência Anterior</Label>
+                      <Textarea
+                        id="edit-experiencia_anterior"
+                        value={editMemberData.experiencia_anterior || ''}
+                        onChange={(e) => setEditMemberData({...editMemberData, experiencia_anterior: e.target.value})}
+                        rows={2}
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-dias_disponiveis">Dias Disponíveis (JSON)</Label>
+                  <Textarea
+                    id="edit-dias_disponiveis"
+                    value={JSON.stringify(editMemberData.dias_disponiveis || [], null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setEditMemberData({...editMemberData, dias_disponiveis: JSON.parse(e.target.value)});
+                      } catch (err) {
+                        console.error("Invalid JSON for dias_disponiveis", err);
+                        toast.error("Formato JSON inválido para dias disponíveis.");
+                      }
+                    }}
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-horarios_disponiveis">Horários Disponíveis</Label>
+                  <Input
+                    id="edit-horarios_disponiveis"
+                    value={editMemberData.horarios_disponiveis || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, horarios_disponiveis: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-interesse_ministerio">Interesse em Ministérios (JSON)</Label>
+                  <Textarea
+                    id="edit-interesse_ministerio"
+                    value={JSON.stringify(editMemberData.interesse_ministerio || [], null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setEditMemberData({...editMemberData, interesse_ministerio: JSON.parse(e.target.value)});
+                      } catch (err) {
+                        console.error("Invalid JSON for interesse_ministerio", err);
+                        toast.error("Formato JSON inválido para interesse em ministérios.");
+                      }
+                    }}
+                    rows={2}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditMemberDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleEditMember}>
+                  Salvar Alterações
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}
