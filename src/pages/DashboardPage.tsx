@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'; // Importar useLocation
 import MainLayout from '../components/layout/MainLayout'
 import DashboardHome from '../components/dashboard/DashboardHome'
 import PersonalInfo from '../components/personal/PersonalInfo'
@@ -23,8 +24,18 @@ interface DashboardPageProps {
 
 const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
   const { user, isLoading } = useAuthStore(); // Obter user e isLoading do authStore
+  const location = useLocation(); // Hook para acessar o objeto location
   const [activeModule, setActiveModule] = useState('dashboard')
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+
+  useEffect(() => {
+    // Verifica se há um estado de navegação para definir o módulo ativo
+    if (location.state && (location.state as any).activeModule) {
+      setActiveModule((location.state as any).activeModule);
+      // Limpa o estado para evitar que o módulo seja redefinido em futuras navegações
+      window.history.replaceState({}, document.title); 
+    }
+  }, [location.state]);
 
   useEffect(() => {
     // Exibir o diálogo se o usuário não for super_admin, não estiver carregando e o perfil não estiver completo

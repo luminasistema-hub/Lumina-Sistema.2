@@ -256,8 +256,8 @@ const MemberManagementPage = () => {
       dias_disponiveis: profile.informacoes_pessoais?.dias_disponiveis,
       horarios_disponiveis: profile.informacoes_pessoais?.horarios_disponiveis,
       // Map membros fields
-      ultimo_teste_data: profile.membros?.ultimo_teste_data, 
-      ministerio_recomendado: profile.membros?.ministerio_recomendado,
+      ultimo_teste_data: profile.membros?.[0]?.ultimo_teste_data, // Access first element if 'membros' is an array
+      ministerio_recomendado: profile.membros?.[0]?.ministerio_recomendado, // Access first element if 'membros' is an array
     }));
 
     // Fetch emails and created_at from auth.users for each profile
@@ -399,7 +399,7 @@ const MemberManagementPage = () => {
         conjuge: editMemberData.conjuge,
         filhos: editMemberData.filhos,
         pais_cristaos: editMemberData.pais_cristaos,
-        familiar_na_igreja: editMemberData.familiarNaIgreja,
+        familiarNaIgreja: editMemberData.familiarNaIgreja,
         tempo_igreja: editMemberData.tempo_igreja,
         batizado: editMemberData.batizado,
         data_batismo: editMemberData.data_batismo,
@@ -779,12 +779,12 @@ const MemberManagementPage = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Ministérios</SelectItem>
-                <SelectItem value="Louvor e Adoração">Louvor e Adoração</SelectItem>
                 <SelectItem value="Mídia e Tecnologia">Mídia e Tecnologia</SelectItem>
+                <SelectItem value="Louvor e Adoração">Louvor e Adoração</SelectItem>
                 <SelectItem value="Diaconato">Diaconato</SelectItem>
-                <SelectItem value="Kids">Kids</SelectItem>
-                <SelectItem value="Ensino e Discipulado">Ensino e Discipulado</SelectItem>
                 <SelectItem value="Integração">Integração</SelectItem>
+                <SelectItem value="Ensino e Discipulado">Ensino e Discipulado</SelectItem>
+                <SelectItem value="Kids">Kids</SelectItem>
                 <SelectItem value="Organização e Administração">Organização e Administração</SelectItem>
                 <SelectItem value="Ação Social">Ação Social</SelectItem>
               </SelectContent>
@@ -1235,7 +1235,7 @@ const MemberManagementPage = () => {
                   {selectedMember.ministerio_recomendado && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Ministério Recomendado</Label>
-                      <p className="text-gray-900">{selectedMember.ministerio_recomendado}</p>
+                      <p className="text-gray-900 font-bold text-purple-700">{selectedMember.ministerio_recomendado}</p>
                     </div>
                   )}
                   {selectedMember.ultimo_teste_data && (

@@ -21,8 +21,12 @@ import {
   Mail,
   Save,
   Edit,
-  CheckCircle
+  CheckCircle,
+  Target,
+  History,
+  ArrowRight
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom' // Importar useNavigate
 
 interface PersonalInfoData {
   // Dados Pessoais
@@ -58,8 +62,16 @@ interface PersonalInfoData {
   horariosDisponiveis: string
 }
 
+interface VocationalTestResult {
+  id: string;
+  data_teste: string;
+  ministerio_recomendado: string;
+  is_ultimo: boolean;
+}
+
 const PersonalInfo = () => {
   const { user, currentChurchId, checkAuth } = useAuthStore()
+  const navigate = useNavigate(); // Inicializar useNavigate
   const [isEditing, setIsEditing] = useState(false)
   const [isFirstAccess, setIsFirstAccess] = useState(true) // Controla a mensagem de boas-vindas
   const [formData, setFormData] = useState<PersonalInfoData>({
@@ -80,10 +92,12 @@ const PersonalInfo = () => {
     participaMinisterio: false,
     ministerioAtual: '',
     experienciaAnterior: '',
-    dataConversao: '', // Removido decisaoCristo
+    dataConversao: '',
     diasDisponiveis: [],
     horariosDisponiveis: ''
   })
+  const [latestVocationalTest, setLatestVocationalTest] = useState<VocationalTestResult | null>(null);
+  const [vocationalTestHistory, setVocationalTestHistory] = useState<VocationalTestResult[]>([]);
 
   useEffect(() => {
     console.log('PersonalInfo component mounted/updated for user:', user?.name, 'church:', currentChurchId, 'perfil_completo:', user?.perfil_completo)
@@ -124,7 +138,7 @@ const PersonalInfo = () => {
             participaMinisterio: personalInfoRecord.participa_ministerio || false,
             ministerioAtual: personalInfoRecord.ministerio_anterior || '',
             experienciaAnterior: personalInfoRecord.experiencia_anterior || '',
-            dataConversao: personalInfoRecord.data_conversao || '', // Removido decisaoCristo
+            dataConversao: personalInfoRecord.data_conversao || '',
             diasDisponiveis: personalInfoRecord.dias_disponiveis || [],
             horariosDisponiveis: personalInfoRecord.horarios_disponiveis || ''
           });
@@ -134,6 +148,36 @@ const PersonalInfo = () => {
         }
       };
       loadProfileData();
+
+      const loadVocationalTests = async () => {
+        console.log('Attempting to load vocational tests for user ID:', user.id);
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        const { data: tests, error: testsError } = await supabase
+          .from('testes_vocacionais')
+          .select('id, data_teste, ministerio_recomendado, is_ultimo')
+          .eq('membro_id', user.id)
+          .gte('data_teste', sixMonthsAgo.toISOString().split('T')[0]) // Filter for last 6 months
+          .order('data_teste', { ascending: false });
+
+        if (testsError) {
+          console.error('Error loading vocational tests:', testsError);
+          toast.error('Erro ao carregar histórico de testes vocacionais.');
+          return;
+        }
+
+        console.log('Vocational tests data received:', tests);
+        if (tests && tests.length > 0) {
+          const latest = tests.find(test => test.is_ultimo) || tests[0]; // Get latest or most recent
+          setLatestVocationalTest(latest);
+          setVocationalTestHistory(tests.filter(test => test.id !== latest.id));
+        } else {
+          setLatestVocationalTest(null);
+          setVocationalTestHistory([]);
+        }
+      };
+      loadVocationalTests();
 
       // Controla o modo de edição e a mensagem de primeiro acesso com base em user.perfil_completo
       if (!user.perfil_completo) {
@@ -264,19 +308,16 @@ const PersonalInfo = () => {
       conjuge: formData.conjuge || null,
       filhos: formData.filhos.length > 0 ? formData.filhos : null,
       pais_cristaos: formData.paisCristaos || null,
-      familiarNaIgreja: formData.familiarNaIgreja || null,
+      familiar_na_igreja: formData.familiarNaIgreja || null,
       tempo_igreja: formData.tempoIgreja || null,
       batizado: formData.batizado,
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
       ministerio_anterior: formData.ministerioAtual || null, // Usando ministerioAtual para este campo
       experiencia_anterior: formData.experienciaAnterior || null,
-      // decisao_cristo: formData.decisaoCristo || null, // Removido
       data_conversao: formData.dataConversao || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
       horarios_disponiveis: formData.horariosDisponiveis || null,
-      // interesseMinisterio removido
-      // testemunho removido
       updated_at: new Date().toISOString(),
     };
 
@@ -566,7 +607,6 @@ const PersonalInfo = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Removido o campo "Decisão por Cristo" */}
                 <div className="space-y-2">
                   <Label htmlFor="dataConversao">Data da Conversão</Label>
                   <Input
@@ -810,6 +850,76 @@ const PersonalInfo = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Nova Seção: Resultados do Teste Vocacional */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-purple-500" />
+            Resultados do Teste Vocacional
+          </CardTitle>
+          <CardDescription>Seu ministério recomendado e histórico de testes</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {latestVocationalTest ? (
+            <>
+              <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-purple-900">Último Teste Realizado</h3>
+                  <Badge className="bg-purple-100 text-purple-800">
+                    {new Date(latestVocationalTest.data_teste).toLocaleDateString('pt-BR')}
+                  </Badge>
+                </div>
+                <p className="text-lg font-bold text-purple-800">
+                  Ministério Recomendado: {latestVocationalTest.ministerio_recomendado}
+                </p>
+              </div>
+
+              {vocationalTestHistory.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <History className="w-4 h-4" />
+                    Histórico (últimos 6 meses)
+                  </h4>
+                  <div className="space-y-2">
+                    {vocationalTestHistory.map(test => (
+                      <div key={test.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <span className="text-sm text-gray-700">
+                          {new Date(test.data_teste).toLocaleDateString('pt-BR')}
+                        </span>
+                        <Badge variant="outline">
+                          {test.ministerio_recomendado}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate('/dashboard', { state: { activeModule: 'vocational-test' } })}
+              >
+                <ArrowRight className="w-4 h-4 mr-2" />
+                Ver Detalhes do Teste / Refazer
+              </Button>
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <Target className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 mb-3">
+                Você ainda não realizou o teste vocacional.
+              </p>
+              <Button 
+                onClick={() => navigate('/dashboard', { state: { activeModule: 'vocational-test' } })}
+              >
+                <ArrowRight className="w-4 h-4 mr-2" />
+                Fazer Teste Vocacional
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {isEditing && (
         <div className="space-y-6">
