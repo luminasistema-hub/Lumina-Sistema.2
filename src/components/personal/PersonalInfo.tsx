@@ -53,8 +53,6 @@ interface PersonalInfoData {
   participaMinisterio: boolean
   ministerioAtual: string
   experienciaAnterior: string
-  
-  // Informações Espirituais (apenas dataConversao permanece)
   dataConversao: string
   
   // Disponibilidade
@@ -299,7 +297,7 @@ const PersonalInfo = () => {
 
     // Preparar dados para informacoes_pessoais
     const personalInfoPayload = {
-      membro_id: user.id,
+      membro_id: user.id, // Adicionado o membro_id aqui
       telefone: formData.telefone,
       endereco: formData.endereco,
       data_nascimento: formData.dataNascimento || null,
@@ -308,8 +306,8 @@ const PersonalInfo = () => {
       conjuge: formData.conjuge || null,
       filhos: formData.filhos.length > 0 ? formData.filhos : null,
       pais_cristaos: formData.paisCristaos || null,
-      familiar_na_igreja: formData.familiarNaIgreja || null,
-      tempo_igreja: formData.tempoIgreja || null,
+      familiarNaIgreja: formData.familiarNaIgreja || null,
+      tempoIgreja: formData.tempoIgreja || null,
       batizado: formData.batizado,
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
