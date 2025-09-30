@@ -31,7 +31,8 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Building
+  Building,
+  ClipboardList // Importar o ícone ClipboardList
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useNavigate } from 'react-router-dom' 
@@ -163,6 +164,13 @@ const moduleCategories: ModuleCategory[] = [
         title: 'Painel Financeiro',
         icon: <DollarSign className="w-4 h-4" />,
         roles: ['pastor', 'admin', 'financeiro'],
+        status: 'complete'
+      },
+      { // NOVO ITEM DE MENU
+        id: 'journey-config',
+        title: 'Configuração da Jornada',
+        icon: <ClipboardList className="w-4 h-4" />,
+        roles: ['admin', 'pastor'], // Apenas administradores e pastores podem configurar
         status: 'complete'
       }
     ]

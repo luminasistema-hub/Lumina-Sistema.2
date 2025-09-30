@@ -15,6 +15,7 @@ import MinistriesPage from '../components/management/MinistriesPage'
 import FinancialPanel from '../components/management/FinancialPanel'
 import SystemStatus from '../components/admin/SystemStatus'
 import SystemSettings from '../components/admin/SystemSettings'
+import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada' // Importar o novo componente
 import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog' 
 import { useAuthStore } from '../stores/authStore' 
 
@@ -67,6 +68,8 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
         return <MinistriesPage />
       case 'financial-panel':
         return <FinancialPanel />
+      case 'journey-config': // NOVA ROTA
+        return <ConfiguracaoJornada />
       case 'live-streaming':
         return (
           <div className="p-6">
