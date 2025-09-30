@@ -97,7 +97,18 @@ export const useAuthStore = create<AuthState>()(
             console.log('AuthStore: Attempting to fetch profile from "membros" table.');
             const { data: profile, error: profileError } = await supabase
               .from('membros') 
-              .select('*, igrejas(id, nome)') 
+              .select(`
+                id,
+                nome_completo,
+                email,
+                funcao,
+                id_igreja,
+                status,
+                created_at,
+                perfil_completo,
+                ministerio_recomendado,
+                igrejas(id, nome)
+              `)
               .eq('id', session.user.id)
               .maybeSingle(); 
             
