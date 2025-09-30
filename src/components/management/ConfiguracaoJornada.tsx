@@ -3,7 +3,7 @@ import { supabase } from '../../integrations/supabase/client';
 import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2, GripVertical, Video, FileText, HelpCircle, Link, CheckCircle } from 'lucide-react';
+import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2, GripVertical, Video, FileText, HelpCircle, Link, CheckCircle, BookOpen } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
@@ -215,7 +215,7 @@ const ConfiguracaoJornada = () => {
             id_trilha: trilha.id,
             ordem: novaOrdem,
             titulo: formEtapaData.titulo,
-            descricao: formEtataData.descricao,
+            descricao: formEtapaData.descricao,
             cor: formEtapaData.cor,
           });
 
