@@ -321,12 +321,8 @@ const MemberManagementPage = () => {
       // The handle_new_user trigger should handle inserting into 'perfis' and 'informacoes_pessoais'
       // We just need to update the church's member count if the status is 'ativo'
       // For now, new members from this form will also be 'pendente'
-      if (currentChurchId) {
-        const updatedChurch = await updateChurch(currentChurchId, { currentMembers: (currentChurch?.currentMembers || 0) + 1 });
-        if (updatedChurch) {
-          console.log('Church member count updated:', updatedChurch.currentMembers);
-        }
-      }
+      // The trigger now sets status to 'pendente' and does not increment member count.
+      // The member count will be incremented upon approval.
       toast.success('Membro cadastrado com sucesso! Um email de confirmação foi enviado.');
       loadMembers(currentChurchId); // Reload members to show the new one
     } else {
@@ -366,6 +362,8 @@ const MemberManagementPage = () => {
       interesse_ministerio: member.interesse_ministerio,
       funcao: member.funcao,
       status: member.status,
+      ultimo_teste_data: member.ultimo_teste_data, // Include these fields
+      ministerio_recomendado: member.ministerio_recomendado, // Include these fields
     });
     setIsEditMemberDialogOpen(true);
   };
@@ -427,6 +425,29 @@ const MemberManagementPage = () => {
       return;
     }
 
+    // Update membros table for vocational test related fields
+    const { error: membrosError } = await supabase
+      .from('membros')
+      .update({
+        ministerio_recomendado: editMemberData.ministerio_recomendado,
+        ultimo_teste_data: editMemberData.ultimo_teste_data,
+        // Also update other fields that might be duplicated in 'membros' if they are editable here
+        nome_completo: editMemberData.full_name,
+        funcao: editMemberData.funcao,
+        status: editMemberData.status,
+        telefone: editMemberData.telefone,
+        data_nascimento: editMemberData.data_nascimento,
+        // email is from auth.users, not directly editable here
+      })
+      .eq('id', selectedMember.id);
+
+    if (membrosError) {
+      console.error('Error updating membros table:', membrosError);
+      toast.error('Erro ao atualizar dados do membro: ' + membrosError.message);
+      return;
+    }
+
+
     setIsEditMemberDialogOpen(false);
     setSelectedMember(null);
     setEditMemberData({});
@@ -444,7 +465,7 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Supabase handles cascade delete from auth.users -> perfis -> informacoes_pessoais
+    // Supabase handles cascade delete from auth.users -> perfis -> informacoes_pessoais -> membros
     const { error: authError } = await supabase.auth.admin.deleteUser(memberId);
 
     if (authError) {
@@ -453,7 +474,7 @@ const MemberManagementPage = () => {
       return;
     }
 
-    // Update church member count
+    // Update church member count if the user was active
     const memberToDelete = members.find(m => m.id === memberId);
     if (memberToDelete && memberToDelete.status === 'ativo') {
       const currentChurch = getChurchById(currentChurchId);
@@ -472,7 +493,8 @@ const MemberManagementPage = () => {
       return;
     }
 
-    const { error } = await supabase
+    // Update perfis table
+    const { error: profileError } = await supabase
       .from('perfis')
       .update({
         status: 'ativo',
@@ -481,9 +503,23 @@ const MemberManagementPage = () => {
       })
       .eq('id', memberId);
 
-    if (error) {
-      console.error('Error approving user:', error.message);
-      toast.error('Erro ao aprovar usuário: ' + error.message);
+    if (profileError) {
+      console.error('Error approving user profile:', profileError.message);
+      toast.error('Erro ao aprovar perfil do usuário: ' + profileError.message);
+      return;
+    }
+
+    // Update membros table
+    const { error: membrosError } = await supabase
+      .from('membros')
+      .update({
+        status: 'ativo',
+      })
+      .eq('id', memberId);
+
+    if (membrosError) {
+      console.error('Error approving user in membros table:', membrosError.message);
+      toast.error('Erro ao aprovar usuário na tabela de membros: ' + membrosError.message);
       return;
     }
 
@@ -503,19 +539,41 @@ const MemberManagementPage = () => {
       return;
     }
 
-    const { error } = await supabase
+    // Update perfis table
+    const { error: profileError } = await supabase
       .from('perfis')
       .update({
         status: 'inativo',
-        // approved_by: user?.name || 'Administrador', // Add these fields to perfis table if needed
-        // approved_at: new Date().toISOString(),
       })
       .eq('id', memberId);
 
-    if (error) {
-      console.error('Error rejecting user:', error.message);
-      toast.error('Erro ao rejeitar usuário: ' + error.message);
+    if (profileError) {
+      console.error('Error rejecting user profile:', profileError.message);
+      toast.error('Erro ao rejeitar perfil do usuário: ' + profileError.message);
       return;
+    }
+
+    // Update membros table
+    const { error: membrosError } = await supabase
+      .from('membros')
+      .update({
+        status: 'inativo',
+      })
+      .eq('id', memberId);
+
+    if (membrosError) {
+      console.error('Error rejecting user in membros table:', membrosError.message);
+      toast.error('Erro ao rejeitar usuário na tabela de membros: ' + membrosError.message);
+      return;
+    }
+
+    // If the user was active, decrement member count
+    const memberToReject = members.find(m => m.id === memberId);
+    if (memberToReject && memberToReject.status === 'ativo') {
+      const currentChurch = getChurchById(currentChurchId);
+      if (currentChurch) {
+        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
+      }
     }
 
     toast.success('Usuário rejeitado com sucesso!');
