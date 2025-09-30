@@ -101,46 +101,50 @@ const PersonalInfo = () => {
     console.log('PersonalInfo component mounted/updated for user:', user?.name, 'church:', currentChurchId, 'perfil_completo:', user?.perfil_completo)
     if (user && currentChurchId) {
       const loadProfileData = async () => {
-        const { data, error } = await supabase
+        console.log('Attempting to load personal info for user ID:', user.id);
+        const { data: personalInfoRecord, error } = await supabase
           .from('informacoes_pessoais')
           .select('*')
           .eq('membro_id', user.id)
-          .single();
+          .maybeSingle(); // Alterado de .single() para .maybeSingle()
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 = No rows found
+        if (error) {
           console.error('Error loading personal info from Supabase:', error);
           toast.error('Erro ao carregar informações pessoais.');
+          return;
         }
 
-        if (data) {
+        console.log('Personal info data received:', personalInfoRecord);
+
+        if (personalInfoRecord) {
           // Se há dados, preenche o formulário
           setFormData({
             nomeCompleto: user.name,
-            dataNascimento: data.data_nascimento || '',
-            estadoCivil: data.estado_civil || '',
-            profissao: data.profissao || '',
-            telefone: data.telefone || '',
+            dataNascimento: personalInfoRecord.data_nascimento || '',
+            estadoCivil: personalInfoRecord.estado_civil || '',
+            profissao: personalInfoRecord.profissao || '',
+            telefone: personalInfoRecord.telefone || '',
             email: user.email,
-            endereco: data.endereco || '',
+            endereco: personalInfoRecord.endereco || '',
             cidade: '', // Estes campos não estão na tabela informacoes_pessoais
             estado: '', // Estes campos não estão na tabela informacoes_pessoais
             cep: '', // Estes campos não estão na tabela informacoes_pessoais
-            conjuge: data.conjuge || '',
-            filhos: data.filhos || [],
-            paisCristaos: data.pais_cristaos || '',
-            familiarNaIgreja: data.familiar_na_igreja || '',
-            tempoIgreja: data.tempo_igreja || '',
-            batizado: data.batizado || false,
-            dataBatismo: data.data_batismo || '',
-            participaMinisterio: data.participa_ministerio || false,
-            ministerioAtual: data.ministerio_anterior || '',
-            experienciaAnterior: data.experiencia_anterior || '',
-            decisaoCristo: data.decisao_cristo || '',
-            dataConversao: data.data_conversao || '',
-            testemunho: data.testemunho || '',
-            diasDisponiveis: data.dias_disponiveis || [],
-            horariosDisponiveis: data.horarios_disponiveis || '',
-            interesseMinisterio: data.interesse_ministerio || []
+            conjuge: personalInfoRecord.conjuge || '',
+            filhos: personalInfoRecord.filhos || [],
+            paisCristaos: personalInfoRecord.pais_cristaos || '',
+            familiarNaIgreja: personalInfoRecord.familiar_na_igreja || '',
+            tempoIgreja: personalInfoRecord.tempo_igreja || '',
+            batizado: personalInfoRecord.batizado || false,
+            dataBatismo: personalInfoRecord.data_batismo || '',
+            participaMinisterio: personalInfoRecord.participa_ministerio || false,
+            ministerioAtual: personalInfoRecord.ministerio_anterior || '',
+            experienciaAnterior: personalInfoRecord.experiencia_anterior || '',
+            decisaoCristo: personalInfoRecord.decisao_cristo || '',
+            dataConversao: personalInfoRecord.data_conversao || '',
+            testemunho: personalInfoRecord.testemunho || '',
+            diasDisponiveis: personalInfoRecord.dias_disponiveis || [],
+            horariosDisponiveis: personalInfoRecord.horarios_disponiveis || '',
+            interesseMinisterio: personalInfoRecord.interesse_ministerio || []
           });
         } else {
           // Se não há dados, inicializa com nome e email do usuário
@@ -260,7 +264,7 @@ const PersonalInfo = () => {
       conjuge: formData.conjuge || null,
       filhos: formData.filhos.length > 0 ? formData.filhos : null,
       pais_cristaos: formData.paisCristaos || null,
-      familiarNaIgreja: formData.familiarNaIgreja || null,
+      familiar_na_igreja: formData.familiarNaIgreja || null,
       tempo_igreja: formData.tempoIgreja || null,
       batizado: formData.batizado,
       data_batismo: formData.dataBatismo || null,
@@ -271,7 +275,7 @@ const PersonalInfo = () => {
       data_conversao: formData.dataConversao || null,
       testemunho: formData.testemunho || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horariosDisponiveis: formData.horariosDisponiveis || null,
+      horarios_disponiveis: formData.horariosDisponiveis || null,
       interesse_ministerio: formData.interesseMinisterio.length > 0 ? formData.interesseMinisterio : null,
       updated_at: new Date().toISOString(),
     };
@@ -552,7 +556,7 @@ const PersonalInfo = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
-                    <SelectContent>
+                  <SelectContent>
                       <SelectItem value="sim">Sim, ambos</SelectItem>
                       <SelectItem value="um">Apenas um</SelectItem>
                       <SelectItem value="nao">Não</SelectItem>
