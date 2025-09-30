@@ -306,8 +306,8 @@ const PersonalInfo = () => {
       conjuge: formData.conjuge || null,
       filhos: formData.filhos.length > 0 ? formData.filhos : null,
       pais_cristaos: formData.paisCristaos || null,
-      familiarNaIgreja: formData.familiarNaIgreja || null,
-      tempoIgreja: formData.tempoIgreja || null,
+      familiar_na_igreja: formData.familiarNaIgreja || null, // Corrigido
+      tempo_igreja: formData.tempoIgreja || null, // Corrigido
       batizado: formData.batizado,
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
@@ -315,7 +315,7 @@ const PersonalInfo = () => {
       experiencia_anterior: formData.experienciaAnterior || null,
       data_conversao: formData.dataConversao || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horariosDisponiveis: formData.horariosDisponiveis || null,
+      horarios_disponiveis: formData.horariosDisponiveis || null, // Corrigido
       updated_at: new Date().toISOString(),
     };
 
