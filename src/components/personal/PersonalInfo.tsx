@@ -35,9 +35,6 @@ interface PersonalInfoData {
   
   // Endereço
   endereco: string
-  cidade: string
-  estado: string
-  cep: string
   
   // Informações Familiares
   conjuge: string
@@ -56,12 +53,10 @@ interface PersonalInfoData {
   // Informações Espirituais
   decisaoCristo: string
   dataConversao: string
-  testemunho: string
   
   // Disponibilidade
   diasDisponiveis: string[]
   horariosDisponiveis: string
-  interesseMinisterio: string[]
 }
 
 const PersonalInfo = () => {
@@ -76,9 +71,6 @@ const PersonalInfo = () => {
     telefone: '',
     email: user?.email || '',
     endereco: '',
-    cidade: '',
-    estado: '',
-    cep: '',
     conjuge: '',
     filhos: [],
     paisCristaos: '',
@@ -91,10 +83,8 @@ const PersonalInfo = () => {
     experienciaAnterior: '',
     decisaoCristo: '',
     dataConversao: '',
-    testemunho: '',
     diasDisponiveis: [],
-    horariosDisponiveis: '',
-    interesseMinisterio: []
+    horariosDisponiveis: ''
   })
 
   useEffect(() => {
@@ -106,7 +96,7 @@ const PersonalInfo = () => {
           .from('informacoes_pessoais')
           .select('*')
           .eq('membro_id', user.id)
-          .maybeSingle(); // Alterado de .single() para .maybeSingle()
+          .maybeSingle();
 
         if (error) {
           console.error('Error loading personal info from Supabase:', error);
@@ -126,9 +116,6 @@ const PersonalInfo = () => {
             telefone: personalInfoRecord.telefone || '',
             email: user.email,
             endereco: personalInfoRecord.endereco || '',
-            cidade: '', // Estes campos não estão na tabela informacoes_pessoais
-            estado: '', // Estes campos não estão na tabela informacoes_pessoais
-            cep: '', // Estes campos não estão na tabela informacoes_pessoais
             conjuge: personalInfoRecord.conjuge || '',
             filhos: personalInfoRecord.filhos || [],
             paisCristaos: personalInfoRecord.pais_cristaos || '',
@@ -141,10 +128,8 @@ const PersonalInfo = () => {
             experienciaAnterior: personalInfoRecord.experiencia_anterior || '',
             decisaoCristo: personalInfoRecord.decisao_cristo || '',
             dataConversao: personalInfoRecord.data_conversao || '',
-            testemunho: personalInfoRecord.testemunho || '',
             diasDisponiveis: personalInfoRecord.dias_disponiveis || [],
-            horariosDisponiveis: personalInfoRecord.horarios_disponiveis || '',
-            interesseMinisterio: personalInfoRecord.interesse_ministerio || []
+            horariosDisponiveis: personalInfoRecord.horarios_disponiveis || ''
           });
         } else {
           // Se não há dados, inicializa com nome e email do usuário
@@ -200,6 +185,32 @@ const PersonalInfo = () => {
     }))
   }
 
+  const formatPhoneNumber = (value: string) => {
+    if (!value) return "";
+    value = value.replace(/\D/g, ""); // Remove tudo que não é dígito
+    if (value.length > 11) value = value.substring(0, 11); // Limita a 11 dígitos
+
+    if (value.length > 10) {
+      // (00)9 0000-0000
+      return `(${value.substring(0, 2)}) ${value.substring(2, 3)} ${value.substring(3, 7)}-${value.substring(7, 11)}`;
+    } else if (value.length > 6) {
+      // (00) 0000-0000
+      return `(${value.substring(0, 2)}) ${value.substring(2, 6)}-${value.substring(6, 10)}`;
+    } else if (value.length > 2) {
+      // (00) 0000
+      return `(${value.substring(0, 2)}) ${value.substring(2, 6)}`;
+    } else if (value.length > 0) {
+      // (00
+      return `(${value.substring(0, 2)}`;
+    }
+    return value;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formattedValue = formatPhoneNumber(e.target.value);
+    handleInputChange('telefone', formattedValue);
+  };
+
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let cep = e.target.value.replace(/\D/g, '') // Remove tudo que não é dígito
     
@@ -210,7 +221,8 @@ const PersonalInfo = () => {
       cep = cep.substring(0, 8)
     }
     
-    handleInputChange('cep', cep)
+    // Não salvar cidade, estado, cep no formData, apenas usar para preencher o endereço
+    // handleInputChange('cep', cep) 
 
     if (cep.length === 9) { // Se o CEP estiver completo (com o hífen)
       const rawCep = cep.replace('-', '') // Remove o hífen para a requisição
@@ -221,20 +233,14 @@ const PersonalInfo = () => {
         if (data.erro) {
           toast.error('CEP não encontrado.')
           handleInputChange('endereco', '')
-          handleInputChange('cidade', '')
-          handleInputChange('estado', '')
         } else {
-          handleInputChange('endereco', data.logradouro)
-          handleInputChange('cidade', data.localidade)
-          handleInputChange('estado', data.uf)
+          handleInputChange('endereco', `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`)
           toast.success('Endereço preenchido automaticamente!')
         }
       } catch (error) {
         console.error('Erro ao buscar CEP:', error)
         toast.error('Erro ao buscar CEP. Tente novamente.')
         handleInputChange('endereco', '')
-        handleInputChange('cidade', '')
-        handleInputChange('estado', '')
       }
     }
   }
@@ -270,13 +276,12 @@ const PersonalInfo = () => {
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
       ministerio_anterior: formData.ministerioAtual || null, // Usando ministerioAtual para este campo
-      experienciaAnterior: formData.experienciaAnterior || null,
+      experiencia_anterior: formData.experienciaAnterior || null,
       decisao_cristo: formData.decisaoCristo || null,
       data_conversao: formData.dataConversao || null,
-      testemunho: formData.testemunho || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
       horarios_disponiveis: formData.horariosDisponiveis || null,
-      interesse_ministerio: formData.interesseMinisterio.length > 0 ? formData.interesseMinisterio : null,
+      // interesseMinisterio removido
       updated_at: new Date().toISOString(),
     };
 
@@ -423,8 +428,9 @@ const PersonalInfo = () => {
                 <Input
                   id="telefone"
                   value={formData.telefone}
-                  onChange={(e) => handleInputChange('telefone', e.target.value)}
-                  placeholder="(11) 99999-9999"
+                  onChange={handlePhoneChange}
+                  placeholder="(00)9 0000-0000"
+                  maxLength={15} // (XX)9 XXXX-XXXX
                 />
               </div>
               <div className="space-y-2">
@@ -449,47 +455,24 @@ const PersonalInfo = () => {
               </CardTitle>
               <CardDescription>Onde você mora</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="cep">CEP</Label>
                 <Input
                   id="cep"
-                  value={formData.cep}
                   onChange={handleCepChange}
                   placeholder="00000-000"
                   maxLength={9} // 8 dígitos + 1 hífen
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2">
                 <Label htmlFor="endereco">Endereço Completo *</Label>
                 <Input
                   id="endereco"
                   value={formData.endereco}
                   onChange={(e) => handleInputChange('endereco', e.target.value)}
-                  placeholder="Rua, número, bairro"
+                  placeholder="Rua, número, bairro, cidade - UF"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cidade">Cidade</Label>
-                <Input
-                  id="cidade"
-                  value={formData.cidade}
-                  onChange={(e) => handleInputChange('cidade', e.target.value)}
-                  placeholder="Sua cidade"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="estado">Estado</Label>
-                <Select value={formData.estado} onValueChange={(value) => handleInputChange('estado', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="UF" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estadosBrasil.map(estado => (
-                      <SelectItem key={estado} value={estado}>{estado}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </CardContent>
           </Card>
@@ -615,17 +598,6 @@ const PersonalInfo = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="testemunho">Testemunho (Opcional)</Label>
-                <Textarea
-                  id="testemunho"
-                  value={formData.testemunho}
-                  onChange={(e) => handleInputChange('testemunho', e.target.value)}
-                  placeholder="Conte brevemente sua história com Jesus..."
-                  rows={3}
-                />
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="tempoIgreja">Há quanto tempo frequenta a igreja?</Label>
@@ -701,12 +673,12 @@ const PersonalInfo = () => {
             </CardContent>
           </Card>
 
-          {/* Disponibilidade e Interesses */}
+          {/* Disponibilidade */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
-                Disponibilidade e Interesses
+                Disponibilidade
               </CardTitle>
               <CardDescription>Quando você pode servir</CardDescription>
             </CardHeader>
@@ -742,22 +714,6 @@ const PersonalInfo = () => {
                     <SelectItem value="qualquer">Qualquer horário</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-4">
-                <Label>Ministérios de interesse:</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {ministerios.map(ministerio => (
-                    <div key={ministerio} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={ministerio}
-                        checked={formData.interesseMinisterio.includes(ministerio)}
-                        onCheckedChange={(checked) => handleCheckboxChange('interesseMinisterio', ministerio, checked as boolean)}
-                      />
-                      <Label htmlFor={ministerio} className="text-sm">{ministerio}</Label>
-                    </div>
-                  ))}
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -848,25 +804,25 @@ const PersonalInfo = () => {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Heart className="w-5 h-5" />
-              Interesses
+              Disponibilidade
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div>
-              <p className="text-sm text-gray-500">Ministérios de Interesse</p>
+              <p className="text-sm text-gray-500">Dias Disponíveis</p>
               <div className="flex flex-wrap gap-1 mt-1">
-                {formData.interesseMinisterio.length > 0 ? (
-                  formData.interesseMinisterio.slice(0, 2).map(ministerio => (
-                    <Badge key={ministerio} variant="outline" className="text-xs">
-                      {ministerio}
+                {formData.diasDisponiveis.length > 0 ? (
+                  formData.diasDisponiveis.slice(0, 2).map(dia => (
+                    <Badge key={dia} variant="outline" className="text-xs">
+                      {dia}
                     </Badge>
                   ))
                 ) : (
                   <p className="text-sm text-gray-400">Nenhum informado</p>
                 )}
-                {formData.interesseMinisterio.length > 2 && (
+                {formData.diasDisponiveis.length > 2 && (
                   <Badge variant="outline" className="text-xs">
-                    +{formData.interesseMinisterio.length - 2}
+                    +{formData.diasDisponiveis.length - 2}
                   </Badge>
                 )}
               </div>
