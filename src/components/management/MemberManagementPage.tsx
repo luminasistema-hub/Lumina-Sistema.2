@@ -51,14 +51,18 @@ interface MemberProfile {
   perfil_completo: boolean; // Corresponds to perfis.perfil_completo
   full_name: string; // Corresponds to perfis.full_name
   status: 'ativo' | 'pendente' | 'inativo'; // Corresponds to perfis.status
+  created_at: string; // From auth.users or perfis
+  approved_by?: string; // From perfis
+  approved_at?: string; // From perfis
+  
   // Fields from informacoes_pessoais (joined)
   telefone?: string;
-  endereco?: string; // Assuming this is stored in informacoes_pessoais
-  data_nascimento?: string; // Assuming this is stored in informacoes_pessoais
+  endereco?: string;
+  data_nascimento?: string;
   estado_civil?: string;
   profissao?: string;
   conjuge?: string;
-  filhos?: Array<{nome: string, idade: number}>; // JSONB
+  filhos?: Array<{nome: string, idade: string}>; // JSONB
   pais_cristaos?: string;
   familiar_na_igreja?: string;
   tempo_igreja?: string;
@@ -73,15 +77,14 @@ interface MemberProfile {
   dias_disponiveis?: string[]; // ARRAY
   horarios_disponiveis?: string;
   interesse_ministerio?: string[]; // ARRAY
+
   // Fields from membros (joined)
   ultimo_teste_data?: string; // from public.membros.ultimo_teste_data
   ministerio_recomendado?: string; // from public.membros.ministerio_recomendado
+  
   // Other fields from auth.users or derived
   email: string; // From auth.users
-  created_at: string; // From auth.users
   churchName?: string; // Joined from public.igrejas
-  approved_by?: string; // Not directly in schema, might be derived or added to perfis
-  approved_at?: string; // Not directly in schema, might be derived or added to perfis
 }
 
 // The 'Member' type used in the component should be MemberProfile
@@ -183,6 +186,8 @@ const MemberManagementPage = () => {
         full_name,
         status,
         created_at,
+        approved_by,
+        approved_at,
         informacoes_pessoais (
           telefone,
           endereco,
@@ -233,6 +238,8 @@ const MemberManagementPage = () => {
       status: profile.status,
       email: profile.email || 'N/A', // Email is not directly in perfis, but in auth.users. We'll need to fetch it or assume it's available. For now, mock.
       created_at: profile.created_at, // Not directly in perfis, but in auth.users. For now, mock.
+      approved_by: profile.approved_by,
+      approved_at: profile.approved_at,
       churchName: profile.igrejas?.nome,
       // Map informacoes_pessoais fields
       telefone: profile.informacoes_pessoais?.telefone,
@@ -435,8 +442,8 @@ const MemberManagementPage = () => {
         nome_completo: editMemberData.full_name,
         funcao: editMemberData.funcao,
         status: editMemberData.status,
-        telefone: editMemberData.telefone,
-        data_nascimento: editMemberData.data_nascimento,
+        // telefone: editMemberData.telefone, // Telefone is in informacoes_pessoais
+        // data_nascimento: editMemberData.data_nascimento, // Data_nascimento is in informacoes_pessoais
         // email is from auth.users, not directly editable here
       })
       .eq('id', selectedMember.id);
