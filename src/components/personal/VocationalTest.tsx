@@ -7,6 +7,7 @@ import { Progress } from '../ui/progress'
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group'
 import { Label } from '../ui/label'
 import { toast } from 'sonner' // Importar toast
+import { supabase } from '../../integrations/supabase/client' // Importar supabase client
 import { 
   Brain, 
   Heart, 
@@ -53,6 +54,8 @@ const VocationalTest = () => {
   const [answers, setAnswers] = useState<Record<number, number>>({})
   const [results, setResults] = useState<MinistryResult[]>([])
   const [topMinistry, setTopMinistry] = useState<MinistryResult | null>(null)
+  const [hasPreviousTest, setHasPreviousTest] = useState(false)
+  const [isLoadingResults, setIsLoadingResults] = useState(true)
 
   // Perguntas do teste (5 para cada ministério)
   const questions: Question[] = [
@@ -268,28 +271,83 @@ const VocationalTest = () => {
   }
 
   useEffect(() => {
-    if (user && currentChurchId) {
-      const storedTestResults = localStorage.getItem(`vocational-test-${user.id}-${currentChurchId}`)
-      if (storedTestResults) {
-        const parsedResults = JSON.parse(storedTestResults)
-        setResults(parsedResults.results)
-        setTopMinistry(parsedResults.topMinistry)
-        setCurrentStep('results')
+    const loadPreviousTest = async () => {
+      if (!user?.id) {
+        setIsLoadingResults(false);
+        return;
       }
+
+      console.log('VocationalTest: Loading previous test results for user:', user.id);
+      const { data, error } = await supabase
+        .from('testes_vocacionais')
+        .select('*')
+        .eq('membro_id', user.id)
+        .eq('is_ultimo', true)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('VocationalTest: Error loading previous test:', error);
+        toast.error('Erro ao carregar teste vocacional anterior.');
+        setIsLoadingResults(false);
+        return;
+      }
+
+      if (data) {
+        console.log('VocationalTest: Previous test found:', data);
+        setHasPreviousTest(true);
+        
+        const ministryScores: Record<string, number> = {
+          midia: data.soma_midia || 0,
+          louvor: data.soma_louvor || 0,
+          diaconato: data.soma_diaconato || 0,
+          integracao: data.soma_integra || 0,
+          ensino: data.soma_ensino || 0,
+          kids: data.soma_kids || 0,
+          organizacao: data.soma_organizacao || 0,
+          acao_social: data.soma_acao_social || 0
+        };
+
+        const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
+          const score = ministryScores[ministryKey];
+          const maxScore = 25; // 5 perguntas x 5 pontos max
+          const percentage = (score / maxScore) * 100;
+          
+          return {
+            ...ministryData[ministryKey as keyof typeof ministryData],
+            score,
+            percentage: Math.round(percentage)
+          };
+        });
+
+        calculatedResults.sort((a, b) => b.score - a.score);
+        setResults(calculatedResults);
+        setTopMinistry(calculatedResults[0]);
+        setCurrentStep('results');
+      } else {
+        console.log('VocationalTest: No previous test found.');
+        setHasPreviousTest(false);
+      }
+      setIsLoadingResults(false);
+    };
+
+    if (user?.id) {
+      loadPreviousTest();
+    } else {
+      setIsLoadingResults(false);
     }
-  }, [user, currentChurchId])
+  }, [user?.id]);
 
   const handleAnswerChange = (questionId: number, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: parseInt(value) }))
   }
 
-  const calculateResults = () => {
+  const calculateAndSaveResults = async () => {
     if (!user || !currentChurchId) {
       toast.error('Erro: Usuário ou igreja não identificados.')
       return
     }
 
-    console.log('Calculating vocational test results...')
+    console.log('Calculating vocational test results and saving to Supabase...');
     
     const ministryScores: Record<string, number> = {
       midia: 0,
@@ -326,23 +384,51 @@ const VocationalTest = () => {
     
     setResults(calculatedResults)
     setTopMinistry(calculatedResults[0])
-    setCurrentStep('results')
 
-    // Salvar resultado
-    const testResult = {
-      date: new Date().toISOString(),
-      results: calculatedResults,
-      topMinistry: calculatedResults[0].name
+    // Preparar dados para inserção no Supabase
+    const testDataToSave: any = {
+      membro_id: user.id,
+      data_teste: new Date().toISOString().split('T')[0],
+      soma_midia: ministryScores.midia,
+      soma_louvor: ministryScores.louvor,
+      soma_diaconato: ministryScores.diaconato,
+      soma_integra: ministryScores.integracao,
+      soma_ensino: ministryScores.ensino,
+      soma_kids: ministryScores.kids,
+      soma_organizacao: ministryScores.organizacao,
+      soma_acao_social: ministryScores.acao_social,
+      ministerio_recomendado: calculatedResults[0].name,
+      is_ultimo: true, // Será ajustado pelo trigger
+    };
+
+    // Adicionar respostas individuais
+    questions.forEach(q => {
+      testDataToSave[`q${q.id}`] = answers[q.id] || 0;
+    });
+
+    const { data, error } = await supabase
+      .from('testes_vocacionais')
+      .insert([testDataToSave])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('VocationalTest: Error saving test results to Supabase:', error);
+      toast.error('Erro ao salvar os resultados do teste.');
+      return;
     }
-    localStorage.setItem(`vocational-test-${user.id}-${currentChurchId}`, JSON.stringify(testResult))
-    toast.success('Teste vocacional concluído e resultados salvos!')
+
+    console.log('VocationalTest: Test results saved to Supabase:', data);
+    setHasPreviousTest(true);
+    setCurrentStep('results');
+    toast.success('Teste vocacional concluído e resultados salvos!');
   }
 
   const nextQuestion = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1)
     } else {
-      calculateResults()
+      calculateAndSaveResults()
     }
   }
 
@@ -358,6 +444,7 @@ const VocationalTest = () => {
     setAnswers({})
     setResults([])
     setTopMinistry(null)
+    setHasPreviousTest(false)
   }
 
   const progress = ((currentQuestion + 1) / questions.length) * 100
@@ -368,6 +455,15 @@ const VocationalTest = () => {
         Selecione uma igreja para realizar o teste vocacional.
       </div>
     )
+  }
+
+  if (isLoadingResults) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="ml-4 text-lg text-gray-600">Carregando resultados anteriores...</p>
+      </div>
+    );
   }
 
   // Intro Screen

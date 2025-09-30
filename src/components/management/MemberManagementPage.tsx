@@ -40,7 +40,8 @@ import {
   XCircle,
   CheckCircle,
   DollarSign,
-  Headphones
+  Headphones,
+  Target
 } from 'lucide-react'
 
 // Define a more accurate interface based on Supabase tables
@@ -71,12 +72,9 @@ interface MemberProfile {
   participa_ministerio?: boolean;
   ministerio_anterior?: string;
   experiencia_anterior?: string;
-  decisao_cristo?: string;
   data_conversao?: string;
-  testemunho?: string;
   dias_disponiveis?: string[]; // ARRAY
   horarios_disponiveis?: string;
-  interesse_ministerio?: string[]; // ARRAY
 
   // Fields from membros (joined)
   ultimo_teste_data?: string; // from public.membros.ultimo_teste_data
@@ -204,12 +202,9 @@ const MemberManagementPage = () => {
           participa_ministerio,
           ministerio_anterior,
           experiencia_anterior,
-          decisao_cristo,
           data_conversao,
-          testemunho,
           dias_disponiveis,
-          horarios_disponiveis,
-          interesse_ministerio
+          horarios_disponiveis
         ),
         membros (
           ultimo_teste_data,
@@ -250,19 +245,16 @@ const MemberManagementPage = () => {
       conjuge: profile.informacoes_pessoais?.conjuge,
       filhos: profile.informacoes_pessoais?.filhos,
       pais_cristaos: profile.informacoes_pessoais?.pais_cristaos,
-      familiar_na_igreja: profile.informacoes_pessoais?.familiar_na_igreja,
+      familiarNaIgreja: profile.informacoes_pessoais?.familiar_na_igreja,
       tempo_igreja: profile.informacoes_pessoais?.tempo_igreja,
       batizado: profile.informacoes_pessoais?.batizado,
       data_batismo: profile.informacoes_pessoais?.data_batismo,
       participa_ministerio: profile.informacoes_pessoais?.participa_ministerio,
       ministerio_anterior: profile.informacoes_pessoais?.ministerio_anterior,
       experiencia_anterior: profile.informacoes_pessoais?.experiencia_anterior,
-      decisao_cristo: profile.informacoes_pessoais?.decisao_cristo,
       data_conversao: profile.informacoes_pessoais?.data_conversao,
-      testemunho: profile.informacoes_pessoais?.testemunho,
       dias_disponiveis: profile.informacoes_pessoais?.dias_disponiveis,
       horarios_disponiveis: profile.informacoes_pessoais?.horarios_disponiveis,
-      interesse_ministerio: profile.informacoes_pessoais?.interesse_ministerio,
       // Map membros fields
       ultimo_teste_data: profile.membros?.ultimo_teste_data, 
       ministerio_recomendado: profile.membros?.ministerio_recomendado,
@@ -354,19 +346,16 @@ const MemberManagementPage = () => {
       conjuge: member.conjuge,
       filhos: member.filhos,
       pais_cristaos: member.pais_cristaos,
-      familiar_na_igreja: member.familiar_na_igreja,
+      familiarNaIgreja: member.familiarNaIgreja,
       tempo_igreja: member.tempo_igreja,
       batizado: member.batizado,
       data_batismo: member.data_batismo,
       participa_ministerio: member.participa_ministerio,
       ministerio_anterior: member.ministerio_anterior,
       experiencia_anterior: member.experiencia_anterior,
-      decisao_cristo: member.decisao_cristo,
       data_conversao: member.data_conversao,
-      testemunho: member.testemunho,
       dias_disponiveis: member.dias_disponiveis,
       horarios_disponiveis: member.horarios_disponiveis,
-      interesse_ministerio: member.interesse_ministerio,
       funcao: member.funcao,
       status: member.status,
       ultimo_teste_data: member.ultimo_teste_data, // Include these fields
@@ -410,19 +399,16 @@ const MemberManagementPage = () => {
         conjuge: editMemberData.conjuge,
         filhos: editMemberData.filhos,
         pais_cristaos: editMemberData.pais_cristaos,
-        familiar_na_igreja: editMemberData.familiar_na_igreja,
+        familiar_na_igreja: editMemberData.familiarNaIgreja,
         tempo_igreja: editMemberData.tempo_igreja,
         batizado: editMemberData.batizado,
         data_batismo: editMemberData.data_batismo,
         participa_ministerio: editMemberData.participa_ministerio,
         ministerio_anterior: editMemberData.ministerio_anterior,
         experiencia_anterior: editMemberData.experiencia_anterior,
-        decisao_cristo: editMemberData.decisao_cristo,
         data_conversao: editMemberData.data_conversao,
-        testemunho: editMemberData.testemunho,
         dias_disponiveis: editMemberData.dias_disponiveis,
         horarios_disponiveis: editMemberData.horarios_disponiveis,
-        interesse_ministerio: editMemberData.interesse_ministerio,
       })
       .eq('membro_id', selectedMember.id);
 
@@ -799,7 +785,7 @@ const MemberManagementPage = () => {
                 <SelectItem value="Kids">Kids</SelectItem>
                 <SelectItem value="Ensino e Discipulado">Ensino e Discipulado</SelectItem>
                 <SelectItem value="Integração">Integração</SelectItem>
-                <SelectItem value="Organização">Organização</SelectItem>
+                <SelectItem value="Organização e Administração">Organização e Administração</SelectItem>
                 <SelectItem value="Ação Social">Ação Social</SelectItem>
               </SelectContent>
             </Select>
@@ -1004,7 +990,7 @@ const MemberManagementPage = () => {
                     )}
                     {member.ministerio_recomendado && (
                       <div className="flex items-center gap-2">
-                        <Church className="w-4 h-4" />
+                        <Target className="w-4 h-4" />
                         <span>{member.ministerio_recomendado}</span>
                       </div>
                     )}
@@ -1177,10 +1163,10 @@ const MemberManagementPage = () => {
                       <p className="text-gray-900">{selectedMember.pais_cristaos}</p>
                     </div>
                   )}
-                  {selectedMember.familiar_na_igreja && (
+                  {selectedMember.familiarNaIgreja && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Familiar na Igreja</Label>
-                      <p className="text-gray-900">{selectedMember.familiar_na_igreja}</p>
+                      <p className="text-gray-900">{selectedMember.familiarNaIgreja}</p>
                     </div>
                   )}
                 </div>
@@ -1215,24 +1201,12 @@ const MemberManagementPage = () => {
                       <p className="text-gray-900">{selectedMember.tempo_igreja}</p>
                     </div>
                   )}
-                  {selectedMember.decisao_cristo && (
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Decisão por Cristo</Label>
-                      <p className="text-gray-900">{selectedMember.decisao_cristo}</p>
-                    </div>
-                  )}
                   {selectedMember.data_conversao && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Data da Conversão</Label>
                       <p className="text-gray-900">
                         {new Date(selectedMember.data_conversao).toLocaleDateString('pt-BR')}
                       </p>
-                    </div>
-                  )}
-                  {selectedMember.testemunho && (
-                    <div className="md:col-span-2">
-                      <Label className="text-sm font-medium text-gray-500">Testemunho</Label>
-                      <p className="text-gray-900 whitespace-pre-wrap">{selectedMember.testemunho}</p>
                     </div>
                   )}
                 </div>
@@ -1286,16 +1260,6 @@ const MemberManagementPage = () => {
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Horários Disponíveis</Label>
                       <p className="text-gray-900">{selectedMember.horarios_disponiveis}</p>
-                    </div>
-                  )}
-                  {selectedMember.interesse_ministerio && selectedMember.interesse_ministerio.length > 0 && (
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Interesse em Ministérios</Label>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {selectedMember.interesse_ministerio.map((min, index) => (
-                          <Badge key={index} variant="outline">{min}</Badge>
-                        ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -1487,29 +1451,12 @@ const MemberManagementPage = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-decisao_cristo">Decisão por Cristo</Label>
-                  <Input
-                    id="edit-decisao_cristo"
-                    value={editMemberData.decisao_cristo || ''}
-                    onChange={(e) => setEditMemberData({...editMemberData, decisao_cristo: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="edit-data_conversao">Data da Conversão</Label>
                   <Input
                     id="edit-data_conversao"
                     type="date"
                     value={editMemberData.data_conversao || ''}
                     onChange={(e) => setEditMemberData({...editMemberData, data_conversao: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="edit-testemunho">Testemunho</Label>
-                  <Textarea
-                    id="edit-testemunho"
-                    value={editMemberData.testemunho || ''}
-                    onChange={(e) => setEditMemberData({...editMemberData, testemunho: e.target.value})}
-                    rows={3}
                   />
                 </div>
               </div>
@@ -1574,19 +1521,22 @@ const MemberManagementPage = () => {
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="edit-interesse_ministerio">Interesse em Ministérios (JSON)</Label>
-                  <Textarea
-                    id="edit-interesse_ministerio"
-                    value={JSON.stringify(editMemberData.interesse_ministerio || [], null, 2)}
-                    onChange={(e) => {
-                      try {
-                        setEditMemberData({...editMemberData, interesse_ministerio: JSON.parse(e.target.value)});
-                      } catch (err) {
-                        console.error("Invalid JSON for interesse_ministerio", err);
-                        toast.error("Formato JSON inválido para interesse em ministérios.");
-                      }
-                    }}
-                    rows={2}
+                  <Label htmlFor="edit-ministerio_recomendado">Ministério Recomendado</Label>
+                  <Input
+                    id="edit-ministerio_recomendado"
+                    value={editMemberData.ministerio_recomendado || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, ministerio_recomendado: e.target.value})}
+                    disabled // This field is usually set by the vocational test
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-ultimo_teste_data">Data Último Teste Vocacional</Label>
+                  <Input
+                    id="edit-ultimo_teste_data"
+                    type="date"
+                    value={editMemberData.ultimo_teste_data || ''}
+                    onChange={(e) => setEditMemberData({...editMemberData, ultimo_teste_data: e.target.value})}
+                    disabled // This field is usually set by the vocational test
                   />
                 </div>
               </div>
