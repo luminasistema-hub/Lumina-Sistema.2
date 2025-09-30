@@ -65,9 +65,9 @@ interface PersonalInfoData {
 }
 
 const PersonalInfo = () => {
-  const { user, currentChurchId, checkAuth } = useAuthStore() // Obter user, currentChurchId e checkAuth
+  const { user, currentChurchId, checkAuth } = useAuthStore()
   const [isEditing, setIsEditing] = useState(false)
-  const [isFirstAccess, setIsFirstAccess] = useState(true)
+  const [isFirstAccess, setIsFirstAccess] = useState(true) // Controla a mensagem de boas-vindas
   const [formData, setFormData] = useState<PersonalInfoData>({
     nomeCompleto: user?.name || '',
     dataNascimento: '',
@@ -98,9 +98,8 @@ const PersonalInfo = () => {
   })
 
   useEffect(() => {
-    console.log('PersonalInfo component mounted for user:', user?.name, 'church:', currentChurchId)
+    console.log('PersonalInfo component mounted/updated for user:', user?.name, 'church:', currentChurchId, 'perfil_completo:', user?.perfil_completo)
     if (user && currentChurchId) {
-      // Tentar carregar dados do Supabase
       const loadProfileData = async () => {
         const { data, error } = await supabase
           .from('informacoes_pessoais')
@@ -114,18 +113,18 @@ const PersonalInfo = () => {
         }
 
         if (data) {
-          setIsFirstAccess(false);
+          // Se há dados, preenche o formulário
           setFormData({
-            nomeCompleto: user.name, // Nome vem do authStore
+            nomeCompleto: user.name,
             dataNascimento: data.data_nascimento || '',
             estadoCivil: data.estado_civil || '',
             profissao: data.profissao || '',
             telefone: data.telefone || '',
-            email: user.email, // Email vem do authStore
+            email: user.email,
             endereco: data.endereco || '',
-            cidade: '', // Cidade e estado não estão na tabela informacoes_pessoais, mas podem ser inferidos do endereço ou adicionados
-            estado: '',
-            cep: '', // CEP também não está na tabela
+            cidade: '', // Estes campos não estão na tabela informacoes_pessoais
+            estado: '', // Estes campos não estão na tabela informacoes_pessoais
+            cep: '', // Estes campos não estão na tabela informacoes_pessoais
             conjuge: data.conjuge || '',
             filhos: data.filhos || [],
             paisCristaos: data.pais_cristaos || '',
@@ -134,7 +133,7 @@ const PersonalInfo = () => {
             batizado: data.batizado || false,
             dataBatismo: data.data_batismo || '',
             participaMinisterio: data.participa_ministerio || false,
-            ministerioAtual: data.ministerio_anterior || '', // Usando ministerio_anterior para o atual se não houver um campo 'atual'
+            ministerioAtual: data.ministerio_anterior || '',
             experienciaAnterior: data.experiencia_anterior || '',
             decisaoCristo: data.decisao_cristo || '',
             dataConversao: data.data_conversao || '',
@@ -143,19 +142,23 @@ const PersonalInfo = () => {
             horariosDisponiveis: data.horarios_disponiveis || '',
             interesseMinisterio: data.interesse_ministerio || []
           });
-          // Se o perfil não estiver completo no authStore, mas há dados aqui, pode ser um caso de atualização
-          if (!user.perfil_completo) {
-            setIsEditing(true); // Força edição para completar
-          }
         } else {
-          setIsFirstAccess(true);
-          setIsEditing(true);
+          // Se não há dados, inicializa com nome e email do usuário
           setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }));
         }
       };
       loadProfileData();
+
+      // Controla o modo de edição e a mensagem de primeiro acesso com base em user.perfil_completo
+      if (!user.perfil_completo) {
+        setIsFirstAccess(true);
+        setIsEditing(true);
+      } else {
+        setIsFirstAccess(false);
+        setIsEditing(false);
+      }
     }
-  }, [user, currentChurchId, user?.perfil_completo]) // Adicionado user.perfil_completo como dependência
+  }, [user, currentChurchId, user?.perfil_completo]) // Dependências atualizadas
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -267,9 +270,9 @@ const PersonalInfo = () => {
       decisao_cristo: formData.decisaoCristo || null,
       data_conversao: formData.dataConversao || null,
       testemunho: formData.testemunho || null,
-      diasDisponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
+      dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
       horariosDisponiveis: formData.horariosDisponiveis || null,
-      interesseMinisterio: formData.interesseMinisterio.length > 0 ? formData.interesseMinisterio : null,
+      interesse_ministerio: formData.interesseMinisterio.length > 0 ? formData.interesseMinisterio : null,
       updated_at: new Date().toISOString(),
     };
 
@@ -346,15 +349,18 @@ const PersonalInfo = () => {
     )
   }
 
-  if (isFirstAccess && isEditing) {
+  // Renderiza o formulário completo se for o primeiro acesso ou estiver editando
+  if (isFirstAccess || isEditing) {
     return (
       <div className="p-6 space-y-6">
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
-          <h1 className="text-3xl font-bold mb-2">Bem-vindo(a), {user?.name}! 🙏</h1>
-          <p className="text-blue-100 text-lg">
-            Para começarmos, precisamos conhecer você melhor. Preencha suas informações pessoais.
-          </p>
-        </div>
+        {isFirstAccess && (
+          <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
+            <h1 className="text-3xl font-bold mb-2">Bem-vindo(a), {user?.name}! 🙏</h1>
+            <p className="text-blue-100 text-lg">
+              Para começarmos, precisamos conhecer você melhor. Preencha suas informações pessoais.
+            </p>
+          </div>
+        )}
 
         <form className="space-y-8">
           {/* Dados Pessoais */}
@@ -763,6 +769,7 @@ const PersonalInfo = () => {
     )
   }
 
+  // Renderiza o resumo das informações se o perfil estiver completo e não estiver editando
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -827,7 +834,7 @@ const PersonalInfo = () => {
               <p className="font-medium">{formData.batizado ? 'Sim' : 'Não'}</p>
             </div>
             <div>
-              <p className className="text-sm text-gray-500">Participa de Ministério</p>
+              <p className="text-sm text-gray-500">Participa de Ministério</p>
               <p className="font-medium">{formData.participaMinisterio ? 'Sim' : 'Não'}</p>
             </div>
           </CardContent>
