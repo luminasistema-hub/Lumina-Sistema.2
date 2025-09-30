@@ -84,65 +84,63 @@ const ConfiguracaoJornada = () => {
     })
   );
 
-  const carregarJornadaCompleta = async () => {
-    if (!currentChurchId) {
-      setLoading(false);
-      setEtapasAninhadas([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const { data: trilha, error: trilhaError } = await supabase
-        .from('trilhas_crescimento')
-        .select('id')
-        .eq('id_igreja', currentChurchId)
-        .eq('is_ativa', true)
-        .single();
-      
-      if (trilhaError && trilhaError.code !== 'PGRST116') {
-        console.error('Erro ao buscar trilha ativa:', trilhaError);
-        setEtapasAninhadas([]);
+  useEffect(() => {
+    const carregarJornadaCompleta = async () => {
+      if (!currentChurchId) {
+        setLoading(false);
         return;
       }
-
-      if (trilha) {
-        const { data: etapasResult, error: etapasError } = await supabase
-          .from('etapas_trilha')
-          .select('*')
-          .eq('id_trilha', trilha.id)
-          .order('ordem', { ascending: true });
-
-        if (etapasError) throw etapasError;
-        const etapas = etapasResult || [];
-        const etapaIds = etapas.map(e => e.id);
-
-        const { data: passosResult, error: passosError } = await supabase
-          .from('passos_etapa')
-          .select('*')
-          .in('id_etapa', etapaIds)
-          .order('ordem', { ascending: true });
-
-        if (passosError) throw passosError;
-        const passos = passosResult || [];
-
-        const dadosAninhados = etapas.map(etapa => ({
-          ...etapa,
-          passos: passos.filter(passo => passo.id_etapa === etapa.id)
-        }));
+      setLoading(true);
+      try {
+        // 1. Busca a trilha principal da igreja
+        const { data: trilha, error: trilhaError } = await supabase
+          .from('trilhas_crescimento')
+          .select('id')
+          .eq('id_igreja', currentChurchId)
+          .single();
         
-        setEtapasAninhadas(dadosAninhados);
-      } else {
-        setEtapasAninhadas([]);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar jornada completa:", error);
-      toast.error("Erro ao carregar a jornada. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = No rows found
+          console.error('Erro ao buscar trilha ativa:', trilhaError);
+          setEtapasAninhadas([]);
+          return;
+        }
 
-  useEffect(() => {
+        if (trilha) {
+          // 2. Busca as etapas principais dessa trilha
+          const { data: etapasData, error: etapasDataError } = await supabase
+            .from('etapas_trilha')
+            .select('*')
+            .eq('id_trilha', trilha.id)
+            .order('ordem', { ascending: true });
+          if (etapasDataError) throw etapasDataError;
+
+          // 3. Busca todos os passos de todas as etapas de uma vez
+          const etapaIds = (etapasData || []).map(e => e.id);
+          const { data: passosData, error: passosError } = await supabase
+            .from('passos_etapa')
+            .select('*')
+            .in('id_etapa', etapaIds)
+            .order('ordem', { ascending: true });
+          if (passosError) throw passosError;
+
+          // 4. Combina os dados: aninha os passos dentro de suas respectivas etapas
+          const etapasComPassos = (etapasData || []).map(etapa => ({
+            ...etapa,
+            passos: (passosData || []).filter(passo => passo.id_etapa === etapa.id) || []
+          }));
+          setEtapasAninhadas(etapasComPassos);
+        } else {
+          setEtapasAninhadas([]);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar a jornada completa:", error);
+        toast.error("Erro ao carregar a jornada. Tente novamente.");
+        setEtapasAninhadas([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     carregarJornadaCompleta();
   }, [currentChurchId]);
 
