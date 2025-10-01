@@ -47,7 +47,7 @@ interface Event {
   updated_at: string
   id_igreja: string
   // Propriedades para detalhes que serão carregadas sob demanda ou via join
-  participantes_count: number // Contagem de participantes
+  participantes_count: number // Contagem de participantes (agora um número direto)
   is_registered?: boolean // Se o usuário logado está inscrito
 }
 
@@ -75,6 +75,7 @@ const EventsPage = () => {
   const [filterType, setFilterType] = useState<string>('all')
   const [loading, setLoading] = useState(true)
 
+  // Permissões: admin, pastor e líder de ministério podem gerenciar eventos
   const canManageEvents = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
 
   const [newEvent, setNewEvent] = useState({
@@ -124,7 +125,8 @@ const EventsPage = () => {
 
       const fetchedEvents: Event[] = data.map((event: any) => ({
         ...event,
-        participantes_count: event.participantes_count[0]?.count || 0,
+        // Acessar o count de forma segura, garantindo que seja um número
+        participantes_count: event.participantes_count?.[0]?.count || 0, 
         is_registered: false, // Será atualizado na próxima etapa
       }))
 
@@ -368,7 +370,7 @@ const EventsPage = () => {
 
       const eventWithCount: Event = {
         ...eventData,
-        participantes_count: eventData.participantes_count[0]?.count || 0,
+        participantes_count: eventData.participantes_count?.[0]?.count || 0, // Acessar de forma segura
         is_registered: false, // Será atualizado abaixo
       };
 
@@ -502,6 +504,8 @@ const EventsPage = () => {
               <SelectItem value="Conferência">Conferência</SelectItem>
               <SelectItem value="Retiro">Retiro</SelectItem>
               <SelectItem value="Evangelismo">Evangelismo</SelectItem>
+              <SelectItem value="Casamento">Casamento</SelectItem>
+              <SelectItem value="Funeral">Funeral</SelectItem>
               <SelectItem value="Outro">Outro</SelectItem>
             </SelectContent>
           </Select>
@@ -532,11 +536,12 @@ const EventsPage = () => {
                         value={newEvent.nome}
                         onChange={(e) => setNewEvent({...newEvent, nome: e.target.value})}
                         placeholder="Nome do evento"
+                        disabled={!canManageEvents}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="tipo">Tipo de Evento</Label>
-                      <Select value={newEvent.tipo} onValueChange={(value) => setNewEvent({...newEvent, tipo: value as Event['tipo']})}>
+                      <Select value={newEvent.tipo} onValueChange={(value) => setNewEvent({...newEvent, tipo: value as Event['tipo']})} disabled={!canManageEvents}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -561,6 +566,7 @@ const EventsPage = () => {
                         type="datetime-local"
                         value={newEvent.data_hora}
                         onChange={(e) => setNewEvent({...newEvent, data_hora: e.target.value})}
+                        disabled={!canManageEvents}
                       />
                     </div>
                     <div className="space-y-2">
@@ -570,6 +576,7 @@ const EventsPage = () => {
                         value={newEvent.local}
                         onChange={(e) => setNewEvent({...newEvent, local: e.target.value})}
                         placeholder="Local do evento"
+                        disabled={!canManageEvents}
                       />
                     </div>
                   </div>
@@ -582,6 +589,7 @@ const EventsPage = () => {
                       onChange={(e) => setNewEvent({...newEvent, descricao: e.target.value})}
                       placeholder="Descrição do evento"
                       rows={3}
+                      disabled={!canManageEvents}
                     />
                   </div>
 
@@ -594,6 +602,7 @@ const EventsPage = () => {
                         value={newEvent.capacidade_maxima || ''}
                         onChange={(e) => setNewEvent({...newEvent, capacidade_maxima: parseInt(e.target.value) || undefined})}
                         placeholder="Número máximo de participantes"
+                        disabled={!canManageEvents}
                       />
                     </div>
                     <div className="space-y-2">
@@ -605,6 +614,7 @@ const EventsPage = () => {
                         value={newEvent.valor_inscricao || ''}
                         onChange={(e) => setNewEvent({...newEvent, valor_inscricao: parseFloat(e.target.value) || undefined})}
                         placeholder="0.00"
+                        disabled={!canManageEvents}
                       />
                     </div>
                   </div>
@@ -615,15 +625,16 @@ const EventsPage = () => {
                       checked={newEvent.inscricoes_abertas}
                       onChange={(e) => setNewEvent({...newEvent, inscricoes_abertas: e.target.checked})}
                       className="form-checkbox h-4 w-4 text-purple-600"
+                      disabled={!canManageEvents}
                     />
                     <Label htmlFor="inscricoes_abertas">Inscrições Abertas</Label>
                   </div>
 
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} disabled={!canManageEvents}>
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreateEvent}>
+                    <Button onClick={handleCreateEvent} disabled={!canManageEvents}>
                       Criar Evento
                     </Button>
                   </div>
@@ -631,7 +642,7 @@ const EventsPage = () => {
               </DialogContent>
             </Dialog>
           )}
-          <Button variant="outline">
+          <Button variant="outline" disabled={!canManageEvents}>
             <Download className="w-4 h-4 mr-2" />
             Exportar
           </Button>
@@ -794,11 +805,12 @@ const EventsPage = () => {
                     value={editEventData.nome}
                     onChange={(e) => setEditEventData({...editEventData, nome: e.target.value})}
                     placeholder="Nome do evento"
+                    disabled={!canManageEvents}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-tipo">Tipo de Evento</Label>
-                  <Select value={editEventData.tipo} onValueChange={(value) => setEditEventData({...editEventData, tipo: value as Event['tipo']})}>
+                  <Select value={editEventData.tipo} onValueChange={(value) => setEditEventData({...editEventData, tipo: value as Event['tipo']})} disabled={!canManageEvents}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -823,6 +835,7 @@ const EventsPage = () => {
                     type="datetime-local"
                     value={editEventData.data_hora}
                     onChange={(e) => setEditEventData({...editEventData, data_hora: e.target.value})}
+                    disabled={!canManageEvents}
                   />
                 </div>
                 <div className="space-y-2">
@@ -832,6 +845,7 @@ const EventsPage = () => {
                     value={editEventData.local}
                     onChange={(e) => setEditEventData({...editEventData, local: e.target.value})}
                     placeholder="Local do evento"
+                    disabled={!canManageEvents}
                   />
                 </div>
               </div>
@@ -844,6 +858,7 @@ const EventsPage = () => {
                   onChange={(e) => setEditEventData({...editEventData, descricao: e.target.value})}
                   placeholder="Descrição do evento"
                   rows={3}
+                  disabled={!canManageEvents}
                 />
               </div>
 
@@ -856,6 +871,7 @@ const EventsPage = () => {
                     value={editEventData.capacidade_maxima || ''}
                     onChange={(e) => setEditEventData({...editEventData, capacidade_maxima: parseInt(e.target.value) || undefined})}
                     placeholder="Número máximo de participantes"
+                    disabled={!canManageEvents}
                   />
                 </div>
                 <div className="space-y-2">
@@ -867,6 +883,7 @@ const EventsPage = () => {
                     value={editEventData.valor_inscricao || ''}
                     onChange={(e) => setEditEventData({...editEventData, valor_inscricao: parseFloat(e.target.value) || undefined})}
                     placeholder="0.00"
+                    disabled={!canManageEvents}
                   />
                 </div>
               </div>
@@ -877,12 +894,13 @@ const EventsPage = () => {
                   checked={editEventData.inscricoes_abertas}
                   onChange={(e) => setEditEventData({...editEventData, inscricoes_abertas: e.target.checked})}
                   className="form-checkbox h-4 w-4 text-purple-600"
+                  disabled={!canManageEvents}
                 />
                 <Label htmlFor="edit-inscricoes_abertas">Inscrições Abertas</Label>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-status">Status do Evento</Label>
-                <Select value={editEventData.status} onValueChange={(value) => setEditEventData({...editEventData, status: value as Event['status']})}>
+                <Select value={editEventData.status} onValueChange={(value) => setEditEventData({...editEventData, status: value as Event['status']})} disabled={!canManageEvents}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -897,10 +915,10 @@ const EventsPage = () => {
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={!canManageEvents}>
                   Cancelar
                 </Button>
-                <Button onClick={handleEditEvent}>
+                <Button onClick={handleEditEvent} disabled={!canManageEvents}>
                   Salvar Alterações
                 </Button>
               </div>
