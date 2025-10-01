@@ -5,11 +5,12 @@ import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
-import { Church, useChurchStore } from '../../stores/churchStore';
-import { Search, Filter, Edit, History, DollarSign, CheckCircle, XCircle, Clock, Shield, Users, Loader2 } from 'lucide-react';
+import { Church, useChurchStore, PaymentRecord } from '../../stores/churchStore';
+import { Search, Filter, Edit, History, DollarSign, CheckCircle, XCircle, Clock, Shield, Users, Loader2, Calendar, AlertTriangle } from 'lucide-react';
 import ManageChurchSubscriptionDialog from './ManageChurchSubscriptionDialog';
 import ViewPaymentHistoryDialog from './ViewPaymentHistoryDialog';
 import { useAuthStore } from '../../stores/authStore';
+import { v4 as uuidv4 } from 'uuid'; // Para gerar IDs únicos
 
 interface MasterAdminChurchTableProps {
   churches: Church[];
