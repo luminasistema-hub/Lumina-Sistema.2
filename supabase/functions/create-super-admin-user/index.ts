@@ -27,67 +27,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let churchId: string;
-
-    // 1. Ensure 'Super Admin Church' exists
-    const { data: existingChurch, error: fetchChurchError } = await supabaseAdmin
-      .from('igrejas')
-      .select('id, admin_user_id')
-      .eq('nome', 'Super Admin Church')
-      .maybeSingle();
-
-    if (fetchChurchError && fetchChurchError.code !== 'PGRST116') { // PGRST116 means no rows found
-      console.error('Error checking Super Admin Church:', fetchChurchError);
-      return new Response(JSON.stringify({ error: 'Erro ao verificar igreja de Super Admin.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    let adminChurchRecord = existingChurch;
-
-    if (!adminChurchRecord) {
-      console.log('Super Admin Church not found, creating...');
-      const { data: newChurch, error: createChurchError } = await supabaseAdmin
-        .from('igrejas')
-        .insert({
-          nome: 'Super Admin Church',
-          plano_id: '00000000-0000-0000-0000-000000000001', // Corrigido para o UUID do plano padrão
-          limite_membros: -1, // -1 for unlimited
-          membros_atuais: 0,
-          status: 'active',
-          admin_user_id: null, // Will be set after user creation
-        })
-        .select('id, admin_user_id')
-        .single();
-
-      if (createChurchError) {
-        console.error('Error creating Super Admin Church:', createChurchError);
-        return new Response(JSON.stringify({ error: 'Erro ao criar igreja de Super Admin.' }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      adminChurchRecord = newChurch;
-      console.log('Super Admin Church created with ID:', adminChurchRecord.id);
-    }
-    churchId = adminChurchRecord.id;
-
-    // 2. Create the user in auth.users
+    // 1. Create the user in auth.users
     const { data: userResponse, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true, // Automatically confirm email for admin users
       user_metadata: {
         full_name: name,
-        church_name: 'Super Admin Church',
         initial_role: 'super_admin',
-        church_id: churchId,
+        church_id: null, // Super Admin is explicitly NOT tied to a specific church
       },
     });
 
     if (createUserError) {
-      console.error('Error creating Super Admin user in auth.users:', createUserError); // Log mais específico
+      console.error('Error creating Super Admin user in auth.users:', createUserError);
       return new Response(JSON.stringify({ error: createUserError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -95,14 +48,15 @@ serve(async (req) => {
     }
 
     const newUserId = userResponse.user.id;
-    console.log('Super Admin user created in auth.users with ID:', newUserId); // Log de sucesso
+    console.log('Super Admin user created in auth.users with ID:', newUserId);
 
-    // 3. Insert the corresponding profile into public.membros
+    // 2. Insert the corresponding profile into public.membros
+    // For Super Admin, id_igreja must be NULL
     const { error: insertMemberError } = await supabaseAdmin
       .from('membros')
       .insert({
         id: newUserId,
-        id_igreja: churchId,
+        id_igreja: null, // Super Admin is explicitly NOT tied to a specific church
         nome_completo: name,
         email: email,
         funcao: 'super_admin',
@@ -111,7 +65,7 @@ serve(async (req) => {
       });
 
     if (insertMemberError) {
-      console.error('Error inserting member profile into public.membros:', insertMemberError); // Log mais específico
+      console.error('Error inserting member profile into public.membros:', insertMemberError);
       // Attempt to delete the auth user if profile creation fails
       await supabaseAdmin.auth.admin.deleteUser(newUserId);
       return new Response(JSON.stringify({ error: 'Erro ao criar perfil do membro: ' + insertMemberError.message }), {
@@ -119,25 +73,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    console.log('Member profile created for Super Admin with ID:', newUserId); // Log de sucesso
-
-    // 4. If Super Admin Church doesn't have an admin_user_id, set it
-    // Removendo esta parte, pois o Super Admin não deve ser o admin de uma igreja específica.
-    // A "Super Admin Church" é uma entidade conceitual para o sistema.
-    /*
-    if (!adminChurchRecord.admin_user_id) {
-      const { error: updateChurchAdminError } = await supabaseAdmin
-        .from('igrejas')
-        .update({ admin_user_id: newUserId })
-        .eq('id', churchId);
-
-      if (updateChurchAdminError) {
-        console.warn('Could not set admin_user_id for Super Admin Church:', updateChurchAdminError);
-      } else {
-        console.log('admin_user_id set for Super Admin Church.');
-      }
-    }
-    */
+    console.log('Member profile created for Super Admin with ID:', newUserId);
 
     return new Response(JSON.stringify({ message: 'Super Admin cadastrado com sucesso!' }), {
       status: 200,
@@ -146,7 +82,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Unexpected error in Edge Function:', error);
-    return new Response(JSON.stringify({ error: 'Ocorreu um erro inesperado: ' + error.message }), { // Adicionando mensagem de erro
+    return new Response(JSON.stringify({ error: 'Ocorreu um erro inesperado: ' + error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -143,8 +143,11 @@ export const useAuthStore = create<AuthState>()(
                 email: session.user.email!,
                 role: profile.funcao,
                 churchId: churchIdForUser,
-                churchName: profile.igrejas?.nome || 'N/A',
-                isProfileComplete: profile.perfil_completo,
+                churchName: profile.igrejas?.nome || (profile.funcao === 'super_admin' ? 'Global' : 'Igreja não encontrada'), // Ajuste para Super Admin
+                ministry: profile.ministerio_recomendado, // Adicionado para garantir que o campo exista
+                status: profile.status, // Adicionado para garantir que o campo exista
+                created_at: profile.created_at, // Adicionado para garantir que o campo exista
+                perfil_completo: profile.perfil_completo,
               },
               isLoading: false,
               currentChurchId: churchIdForUser,
@@ -154,8 +157,11 @@ export const useAuthStore = create<AuthState>()(
               email: session.user.email!,
               role: profile.funcao,
               churchId: churchIdForUser,
-              churchName: profile.igrejas?.nome || 'N/A',
-              isProfileComplete: profile.perfil_completo,
+              churchName: profile.igrejas?.nome || (profile.funcao === 'super_admin' ? 'Global' : 'Igreja não encontrada'), // Ajuste para Super Admin
+              ministry: profile.ministerio_recomendado,
+              status: profile.status,
+              created_at: profile.created_at,
+              perfil_completo: profile.perfil_completo,
             });
           } else {
             console.log('AuthStore: No authenticated user found in session. Setting isLoading to false.');
