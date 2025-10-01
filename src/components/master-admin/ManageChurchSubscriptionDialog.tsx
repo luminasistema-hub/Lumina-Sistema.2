@@ -5,8 +5,8 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
-import { Church, SubscriptionPlan, useChurchStore } from '../../stores/churchStore';
-import { Save, X, Loader2 } from 'lucide-react';
+import { Church, SubscriptionPlan, useChurchStore, SubscriptionPlanData } from '../../stores/churchStore';
+import { Edit, Save, Loader2 } from 'lucide-react';
 
 interface ManageChurchSubscriptionDialogProps {
   isOpen: boolean;
@@ -16,7 +16,7 @@ interface ManageChurchSubscriptionDialogProps {
 }
 
 const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogProps> = ({ isOpen, onClose, church, onSave }) => {
-  const { getSubscriptionPlans, getPlanDetails } = useChurchStore();
+  const { subscriptionPlans, getPlanDetails } = useChurchStore();
   const [formData, setFormData] = useState<Partial<Church>>({});
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,7 +28,7 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
         status: church.status,
         adminUserId: church.adminUserId,
         valor_mensal_assinatura: church.valor_mensal_assinatura,
-        data_proximo_pagamento: church.data_proximo_pagamento,
+        data_proximo_pagamento: church.data_proximo_pagamento ? church.data_proximo_pagamento.split('T')[0] : '',
         ultimo_pagamento_status: church.ultimo_pagamento_status,
       });
     } else {
@@ -36,48 +36,55 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
     }
   }, [church]);
 
+  useEffect(() => {
+    if (formData.subscriptionPlan) {
+      const planDetails = getPlanDetails(formData.subscriptionPlan);
+      if (planDetails) {
+        setFormData(prev => ({ ...prev, valor_mensal_assinatura: planDetails.preco_mensal }));
+      }
+    }
+  }, [formData.subscriptionPlan, getPlanDetails]);
+
   const handleInputChange = (field: keyof Church, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (field === 'subscriptionPlan') {
-      const planDetails = getPlanDetails(value as SubscriptionPlan);
-      setFormData(prev => ({ ...prev, valor_mensal_assinatura: planDetails.monthlyValue }));
-    }
   };
 
-  const handleSubmit = async () => {
-    if (!church?.id || !formData.name || !formData.subscriptionPlan || !formData.status) {
-      toast.error('Por favor, preencha todos os campos obrigatórios.');
-      return;
-    }
+  const handleSave = async () => {
+    if (!church) return;
     setIsLoading(true);
     try {
       await onSave(church.id, formData);
+      toast.success('Assinatura da igreja atualizada com sucesso!');
       onClose();
     } catch (error) {
       console.error('Failed to save church subscription:', error);
-      toast.error('Erro ao salvar as informações da igreja.');
+      toast.error('Erro ao salvar as alterações.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (!isOpen || !church) return null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Gerenciar Assinatura da Igreja</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Edit className="w-5 h-5 text-purple-600" />
+            Gerenciar Assinatura da Igreja
+          </DialogTitle>
           <DialogDescription>
             Edite os detalhes da igreja e da sua assinatura.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="name">Nome da Igreja</Label>
+            <Label htmlFor="churchName">Nome da Igreja</Label>
             <Input
-              id="name"
+              id="churchName"
               value={formData.name || ''}
               onChange={(e) => handleInputChange('name', e.target.value)}
-              placeholder="Nome da Igreja"
             />
           </div>
           <div className="space-y-2">
@@ -90,22 +97,23 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
                 <SelectValue placeholder="Selecione um plano" />
               </SelectTrigger>
               <SelectContent>
-                {getSubscriptionPlans().map(plan => (
-                  <SelectItem key={plan.value} value={plan.value}>
-                    {plan.label} (R$ {plan.monthlyValue.toFixed(2)}/mês)
+                {subscriptionPlans.map(plan => (
+                  <SelectItem key={plan.id} value={plan.id}>
+                    {plan.nome} (R$ {plan.preco_mensal.toFixed(2)})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="monthlyValue">Valor Mensal</Label>
+            <Label htmlFor="monthlyValue">Valor Mensal (R$)</Label>
             <Input
               id="monthlyValue"
               type="number"
-              value={formData.valor_mensal_assinatura?.toFixed(2) || '0.00'}
-              disabled
-              className="bg-gray-100"
+              step="0.01"
+              value={formData.valor_mensal_assinatura || ''}
+              onChange={(e) => handleInputChange('valor_mensal_assinatura', parseFloat(e.target.value) || 0)}
+              placeholder="0.00"
             />
           </div>
           <div className="space-y-2">
@@ -122,7 +130,7 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
                 <SelectItem value="pending">Pendente</SelectItem>
                 <SelectItem value="inactive">Inativa</SelectItem>
                 <SelectItem value="trial">Teste</SelectItem>
-                <SelectItem value="blocked">Bloqueada (Falta de Pagamento)</SelectItem>
+                <SelectItem value="blocked">Bloqueada</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -155,10 +163,9 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
         </div>
         <DialogFooter className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={onClose} disabled={isLoading}>
-            <X className="w-4 h-4 mr-2" />
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={isLoading}>
+          <Button onClick={handleSave} disabled={isLoading}>
             {isLoading ? (
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
