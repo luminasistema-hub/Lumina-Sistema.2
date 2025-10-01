@@ -102,19 +102,6 @@ const SuperAdminRegisterPage = () => {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="churchName">Nome da Igreja</Label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="churchName"
-                    type="text"
-                    value="Super Admin Church"
-                    className="pl-10 h-12 bg-gray-100"
-                    disabled
-                  />
-                </div>
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
