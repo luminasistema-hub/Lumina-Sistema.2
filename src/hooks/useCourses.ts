@@ -3,6 +3,24 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
 import { Course, CourseModule, Lesson, StudentInscription, NewCourse } from '@/types/course'
+import { v4 as uuidv4 } from 'uuid'
+
+const uploadCourseCover = async (file: File): Promise<string> => {
+  const fileName = `${uuidv4()}-${file.name}`
+  const { data, error } = await supabase.storage
+    .from('course_covers')
+    .upload(fileName, file)
+
+  if (error) {
+    throw new Error(`Erro no upload da imagem: ${error.message}`)
+  }
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('course_covers')
+    .getPublicUrl(data.path)
+
+  return publicUrl
+}
 
 // Função para buscar e estruturar todos os dados dos cursos
 const fetchCoursesData = async (churchId: string): Promise<Course[]> => {
@@ -86,10 +104,20 @@ export const useCourses = () => {
   })
 
   const createCourseMutation = useMutation({
-    mutationFn: async (newCourse: NewCourse) => {
+    mutationFn: async ({ courseData, coverFile }: { courseData: NewCourse, coverFile: File | null }) => {
+      let coverImageUrl: string | undefined = undefined;
+      if (coverFile) {
+        coverImageUrl = await uploadCourseCover(coverFile);
+      }
+
       const { data, error } = await supabase
         .from('cursos')
-        .insert([{ ...newCourse, id_igreja: currentChurchId, status: 'Rascunho' }])
+        .insert([{ 
+          ...courseData, 
+          id_igreja: currentChurchId, 
+          status: 'Rascunho',
+          imagem_capa: coverImageUrl 
+        }])
         .select()
         .single()
 

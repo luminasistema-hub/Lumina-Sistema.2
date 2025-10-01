@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Progress } from '../ui/progress'
 import { toast } from 'sonner'
+import { ImageUploader } from '../ui/ImageUploader'
 import { 
   Play, Clock, Users, Plus, Edit, FileText, Trash2, Youtube, BookOpen
 } from 'lucide-react'
@@ -24,6 +25,8 @@ const CoursesPage = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'student' | 'teacher' | 'admin'>('student')
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const canManageCourses = user?.role === 'admin' || user?.role === 'pastor'
   const canTeach = canManageCourses || user?.role === 'lider_ministerio'
@@ -44,7 +47,7 @@ const CoursesPage = () => {
       toast.error('Preencha os campos obrigatórios: Nome e Descrição.')
       return
     }
-    createCourse(newCourseData as NewCourse)
+    createCourse({ courseData: newCourseData as NewCourse, coverFile })
     setIsCreateDialogOpen(false)
     setNewCourseData({ // Reset form
       nome: '',
@@ -56,6 +59,11 @@ const CoursesPage = () => {
       certificado_disponivel: true,
       nota_minima_aprovacao: 70
     })
+    setCoverFile(null)
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+    }
+    setPreviewUrl(null)
   }
 
   const getStatusColor = (status: Course['status']) => {
@@ -118,6 +126,14 @@ const CoursesPage = () => {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
+                    <Label>Imagem de Capa</Label>
+                    <ImageUploader 
+                      onFileSelect={setCoverFile}
+                      previewUrl={previewUrl}
+                      setPreviewUrl={setPreviewUrl}
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="nome">Nome do Curso *</Label>
                     <Input id="nome" value={newCourseData.nome} onChange={(e) => setNewCourseData({...newCourseData, nome: e.target.value})} />
                   </div>
@@ -175,16 +191,19 @@ const CoursesPage = () => {
         <TabsContent value="student" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {myCourses.map((course) => (
-              <Card key={course.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader>
+              <Card key={course.id} className="flex flex-col border-0 shadow-sm hover:shadow-md transition-shadow">
+                {course.imagem_capa && (
+                  <img src={course.imagem_capa} alt={`Capa do curso ${course.nome}`} className="rounded-t-lg w-full h-40 object-cover" />
+                )}
+                <CardHeader className={course.imagem_capa ? 'pt-4' : ''}>
                   <CardTitle className="text-lg mb-2">{course.nome}</CardTitle>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Badge className={getCategoryColor(course.categoria)}>{course.categoria}</Badge>
                     <Badge variant="outline">{course.nivel}</Badge>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">{course.descricao}</p>
+                <CardContent className="flex-grow flex flex-col">
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-grow">{course.descricao}</p>
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs">
                       <span>Professor: {course.professor?.nome_completo || 'N/A'}</span>

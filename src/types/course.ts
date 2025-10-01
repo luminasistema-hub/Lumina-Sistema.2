@@ -53,6 +53,7 @@ export interface Course {
   certificado_disponivel: boolean;
   nota_minima_aprovacao?: number;
   valor?: number;
+  imagem_capa?: string;
 }
 
 export type NewCourse = Omit<Course, 'id' | 'id_igreja' | 'modulos' | 'alunos_inscritos' | 'status' | 'professor'> & {
