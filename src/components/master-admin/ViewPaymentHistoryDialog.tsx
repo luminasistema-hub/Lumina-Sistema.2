@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { Church, PaymentRecord } from '../../stores/churchStore';
-import { Plus, X, History, DollarSign, Calendar, CheckCircle, Clock, AlertTriangle, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Plus, X, History, DollarSign, Calendar, CheckCircle, Clock, AlertTriangle, Edit, Trash2, Loader2, Save } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid'; // Para gerar IDs únicos
 
 interface ViewPaymentHistoryDialogProps {
