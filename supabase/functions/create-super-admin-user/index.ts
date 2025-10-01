@@ -87,7 +87,7 @@ serve(async (req) => {
     });
 
     if (createUserError) {
-      console.error('Error creating Super Admin user:', createUserError);
+      console.error('Error creating Super Admin user in auth.users:', createUserError); // Log mais específico
       return new Response(JSON.stringify({ error: createUserError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -95,7 +95,7 @@ serve(async (req) => {
     }
 
     const newUserId = userResponse.user.id;
-    console.log('Super Admin user created in auth.users:', newUserId);
+    console.log('Super Admin user created in auth.users with ID:', newUserId); // Log de sucesso
 
     // 3. Insert the corresponding profile into public.membros
     const { error: insertMemberError } = await supabaseAdmin
@@ -111,7 +111,7 @@ serve(async (req) => {
       });
 
     if (insertMemberError) {
-      console.error('Error inserting member profile:', insertMemberError);
+      console.error('Error inserting member profile into public.membros:', insertMemberError); // Log mais específico
       // Attempt to delete the auth user if profile creation fails
       await supabaseAdmin.auth.admin.deleteUser(newUserId);
       return new Response(JSON.stringify({ error: 'Erro ao criar perfil do membro: ' + insertMemberError.message }), {
@@ -119,9 +119,12 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    console.log('Member profile created for Super Admin.');
+    console.log('Member profile created for Super Admin with ID:', newUserId); // Log de sucesso
 
     // 4. If Super Admin Church doesn't have an admin_user_id, set it
+    // Removendo esta parte, pois o Super Admin não deve ser o admin de uma igreja específica.
+    // A "Super Admin Church" é uma entidade conceitual para o sistema.
+    /*
     if (!adminChurchRecord.admin_user_id) {
       const { error: updateChurchAdminError } = await supabaseAdmin
         .from('igrejas')
@@ -134,6 +137,7 @@ serve(async (req) => {
         console.log('admin_user_id set for Super Admin Church.');
       }
     }
+    */
 
     return new Response(JSON.stringify({ message: 'Super Admin cadastrado com sucesso!' }), {
       status: 200,
@@ -142,7 +146,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Unexpected error in Edge Function:', error);
-    return new Response(JSON.stringify({ error: 'Ocorreu um erro inesperado.' }), {
+    return new Response(JSON.stringify({ error: 'Ocorreu um erro inesperado: ' + error.message }), { // Adicionando mensagem de erro
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -119,84 +119,10 @@ export const useAuthStore = create<AuthState>()(
 
               // Special handling for super_admin if profile is missing
               if (session.user.user_metadata.initial_role === 'super_admin') {
-                  console.warn('AuthStore: Super Admin user found in auth.users but missing profile in public.membros. Attempting to create profile...');
-
-                  // Fetch Super Admin Church ID
-                  const { data: superAdminChurch, error: churchError } = await supabase
-                      .from('igrejas')
-                      .select('id')
-                      .eq('nome', 'Super Admin Church')
-                      .maybeSingle();
-
-                  if (churchError) {
-                      console.error('AuthStore: Error fetching "Super Admin Church":', churchError?.message);
-                      set({ user: null, isLoading: false, currentChurchId: null });
-                      return;
-                  }
-
-                  if (!superAdminChurch) {
-                      console.warn('AuthStore: "Super Admin Church" not found. This should ideally be pre-created. Attempting to create it now.');
-                      // Attempt to create the Super Admin Church if it doesn't exist
-                      const { data: newChurch, error: createChurchError } = await supabase
-                          .from('igrejas')
-                          .insert({
-                              id: '00000000-0000-0000-0000-000000000002', // Fixed UUID for Super Admin Church
-                              plano_id: '00000000-0000-0000-0000-000000000001', // Fixed UUID for Super Admin Default Plan
-                              nome: 'Super Admin Church',
-                              admin_user_id: session.user.id, // Assign current super admin as admin
-                              nome_responsavel: 'Super Admin',
-                              status: 'active',
-                              limite_membros: 999999
-                          })
-                          .select('id')
-                          .single();
-
-                      if (createChurchError || !newChurch) {
-                          console.error('AuthStore: Error creating "Super Admin Church":', createChurchError?.message);
-                          set({ user: null, isLoading: false, currentChurchId: null });
-                          return;
-                      }
-                      superAdminChurch.id = newChurch.id; // Use the newly created church's ID
-                      console.log('AuthStore: Successfully created "Super Admin Church" with ID:', superAdminChurch.id);
-                  }
-
-                  const superAdminChurchId = superAdminChurch.id;
-
-                  // Attempt to insert profile for super_admin
-                  const { data: newProfile, error: insertError } = await supabase
-                      .from('membros')
-                      .insert({
-                          id: session.user.id,
-                          id_igreja: superAdminChurchId,
-                          nome_completo: session.user.user_metadata.full_name || session.user.email,
-                          email: session.user.email!,
-                          funcao: 'super_admin',
-                          status: 'ativo',
-                          perfil_completo: true,
-                      })
-                      .select(`
-                        id,
-                        nome_completo,
-                        email,
-                        funcao,
-                        id_igreja,
-                        status,
-                        created_at,
-                        perfil_completo,
-                        ministerio_recomendado,
-                        igrejas(id, nome)
-                      `) // Select all fields again to match the original profile structure
-                      .single();
-
-                  if (insertError) {
-                      console.error('AuthStore: Error creating missing profile for super_admin:', insertError.message);
-                      set({ user: null, isLoading: false, currentChurchId: null });
-                      return;
-                  }
-
-                  console.log('AuthStore: Successfully created missing profile for super_admin.');
-                  // Now use the newly created profile
-                  profile = newProfile;
+                  console.warn('AuthStore: Super Admin user found in auth.users but missing profile in public.membros. This indicates an incomplete registration. User will be treated as unauthenticated.');
+                  // Do NOT attempt to create profile here. This should be handled by the registration process (Edge Function).
+                  set({ user: null, isLoading: false, currentChurchId: null });
+                  return;
               }
             }
             
