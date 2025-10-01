@@ -126,12 +126,38 @@ export const useAuthStore = create<AuthState>()(
                       .from('igrejas')
                       .select('id')
                       .eq('nome', 'Super Admin Church')
-                      .single();
+                      .maybeSingle();
 
-                  if (churchError || !superAdminChurch) {
-                      console.error('AuthStore: Could not find "Super Admin Church" to create profile for super_admin:', churchError?.message);
+                  if (churchError) {
+                      console.error('AuthStore: Error fetching "Super Admin Church":', churchError?.message);
                       set({ user: null, isLoading: false, currentChurchId: null });
                       return;
+                  }
+
+                  if (!superAdminChurch) {
+                      console.warn('AuthStore: "Super Admin Church" not found. This should ideally be pre-created. Attempting to create it now.');
+                      // Attempt to create the Super Admin Church if it doesn't exist
+                      const { data: newChurch, error: createChurchError } = await supabase
+                          .from('igrejas')
+                          .insert({
+                              id: '00000000-0000-0000-0000-000000000002', // Fixed UUID for Super Admin Church
+                              plano_id: '00000000-0000-0000-0000-000000000001', // Fixed UUID for Super Admin Default Plan
+                              nome: 'Super Admin Church',
+                              admin_user_id: session.user.id, // Assign current super admin as admin
+                              nome_responsavel: 'Super Admin',
+                              status: 'active',
+                              limite_membros: 999999
+                          })
+                          .select('id')
+                          .single();
+
+                      if (createChurchError || !newChurch) {
+                          console.error('AuthStore: Error creating "Super Admin Church":', createChurchError?.message);
+                          set({ user: null, isLoading: false, currentChurchId: null });
+                          return;
+                      }
+                      superAdminChurch.id = newChurch.id; // Use the newly created church's ID
+                      console.log('AuthStore: Successfully created "Super Admin Church" with ID:', superAdminChurch.id);
                   }
 
                   const superAdminChurchId = superAdminChurch.id;
