@@ -197,11 +197,14 @@ export const useAuthStore = create<AuthState>()(
                   console.log('AuthStore: Successfully created missing profile for super_admin.');
                   // Now use the newly created profile
                   profile = newProfile;
-              } else {
-                  // For non-super_admin users, if profile is missing, it's an error.
-                  set({ user: null, isLoading: false, currentChurchId: null });
-                  return;
               }
+            }
+            
+            // Re-check if profile is still null/undefined after all attempts
+            if (!profile) {
+                console.error('AuthStore: Profile data is still null/undefined after all attempts. Cannot proceed.');
+                set({ user: null, isLoading: false, currentChurchId: null });
+                return;
             }
 
             console.log('AuthStore: Profile data successfully fetched. perfil_completo:', profile.perfil_completo);
