@@ -2,14 +2,14 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { Gauge, TrendingUp, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react'; // Removido Speedometer, mantido Gauge
+import { Gauge, TrendingUp, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const MasterAdminWebPerformanceInsights: React.FC = () => {
   // Dados fictícios para simular métricas de performance web
   const webMetrics = {
-    lcp: { value: 2.2, unit: 's', threshold: 2.5, status: 'good' }, // Largest Contentful Paint
-    fid: { value: 50, unit: 'ms', threshold: 100, status: 'good' }, // First Input Delay
-    cls: { value: 0.08, unit: '', threshold: 0.1, status: 'good' }, // Cumulative Layout Shift
+    lcp: { value: 2.2, unit: 's', threshold: 2.5, status: 'good' },
+    fid: { value: 50, unit: 'ms', threshold: 100, status: 'good' },
+    cls: { value: 0.08, unit: '', threshold: 0.1, status: 'good' },
     pageLoadTime: { value: 3.5, unit: 's', threshold: 4.0, status: 'average' },
     bounceRate: { value: 35, unit: '%', threshold: 40, status: 'good' },
     totalPageViews: { value: '150k', status: 'good' },
@@ -37,7 +37,7 @@ const MasterAdminWebPerformanceInsights: React.FC = () => {
     <Card className="border-0 shadow-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Gauge className="w-5 h-5 text-orange-500" /> {/* Ícone Speedometer substituído por Gauge */}
+          <Gauge className="w-5 h-5 text-orange-500" />
           Insights de Performance Web
         </CardTitle>
         <CardDescription>
@@ -110,7 +110,7 @@ const MasterAdminWebPerformanceInsights: React.FC = () => {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4 text-center">
             <Users className="w-8 h-8 text-teal-500 mx-auto mb-2" />
-            <div className="text-xl font-bold">{webMetrics.totalPageViews}</div>
+            <div className="text-xl font-bold">{webMetrics.totalPageViews.value}</div>
             <div className="text-sm text-gray-600">Visualizações Totais de Página (30 dias)</div>
           </CardContent>
         </Card>

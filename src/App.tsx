@@ -68,7 +68,7 @@ function App() {
         />
         <Route 
           path="/dashboard" 
-          element={user && user.role !== 'super_admin' && currentChurchId ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/login" replace />} 
+          element={user && (user.role === 'super_admin' || currentChurchId) ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/login" replace />} 
         />
 
         {/* Rota Raiz - Redirecionamento inicial */}
