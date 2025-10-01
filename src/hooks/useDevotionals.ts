@@ -151,13 +151,17 @@ export const useDevotionals = (filters: any) => {
 
   const likeMutation = useMutation({
     mutationFn: async ({ devotionalId, hasLiked }: { devotionalId: string, hasLiked: boolean }) => {
-        if (!user) throw new Error("Usuário não autenticado.");
+        if (!user || !currentChurchId) throw new Error("Usuário não autenticado ou igreja não selecionada.");
 
         if (hasLiked) {
             const { error } = await supabase.from('devocional_curtidas').delete().match({ devocional_id: devotionalId, membro_id: user.id });
             if (error) throw error;
         } else {
-            const { error } = await supabase.from('devocional_curtidas').insert({ devocional_id: devotionalId, membro_id: user.id });
+            const { error } = await supabase.from('devocional_curtidas').insert({ 
+                devocional_id: devotionalId, 
+                membro_id: user.id,
+                id_igreja: currentChurchId
+            });
             if (error) throw error;
         }
     },
@@ -172,8 +176,13 @@ export const useDevotionals = (filters: any) => {
 
   const commentMutation = useMutation({
       mutationFn: async ({ devotionalId, content }: { devotionalId: string, content: string }) => {
-          if (!user) throw new Error("Usuário não autenticado.");
-          const { error } = await supabase.from('devocional_comentarios').insert({ devocional_id: devotionalId, autor_id: user.id, conteudo: content });
+          if (!user || !currentChurchId) throw new Error("Usuário não autenticado ou igreja não selecionada.");
+          const { error } = await supabase.from('devocional_comentarios').insert({ 
+              devocional_id: devotionalId, 
+              autor_id: user.id, 
+              conteudo: content,
+              id_igreja: currentChurchId
+          });
           if (error) throw error;
       },
       onSuccess: (_, vars) => {
