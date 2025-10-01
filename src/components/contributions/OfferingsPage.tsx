@@ -131,19 +131,20 @@ const OfferingsPage = () => {
 
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      // Criar transação financeira pendente
+      const { data: transactionData, error: transactionError } = await supabase
         .from('transacoes_financeiras')
         .insert({
           id_igreja: currentChurchId,
           tipo: 'Entrada',
           categoria: newContribution.tipo,
-          subcategoria: newContribution.campanha || null, // Usar campanha como subcategoria
+          subcategoria: newContribution.campanha || null,
           valor: newContribution.valor,
           data_transacao: new Date().toISOString().split('T')[0],
           descricao: `${newContribution.tipo} de ${user.name}`,
           metodo_pagamento: newContribution.metodo_pagamento,
-          responsavel: user.name, // Quem registrou
-          status: 'Pendente', // Inicia como pendente
+          responsavel: user.name,
+          status: 'Pendente',
           observacoes: newContribution.observacoes,
           membro_id: user.id,
           membro_nome: user.name,
@@ -152,13 +153,41 @@ const OfferingsPage = () => {
         .select()
         .single()
 
-      if (error) {
-        console.error('Error inserting contribution:', error)
-        toast.error('Erro ao registrar contribuição: ' + error.message)
+      if (transactionError) {
+        console.error('Error inserting contribution:', transactionError)
+        toast.error('Erro ao registrar contribuição: ' + transactionError.message)
         return
       }
 
-      toast.success('Contribuição registrada com sucesso! Aguardando confirmação.')
+      // Enviar notificação para administradores
+      const { data: admins, error: adminsError } = await supabase
+        .from('membros')
+        .select('id, email, nome_completo')
+        .eq('id_igreja', currentChurchId)
+        .in('funcao', ['admin', 'pastor', 'financeiro'])
+
+      if (!adminsError && admins && admins.length > 0) {
+        // Criar notificação para aprovação
+        const notificationPromises = admins.map(admin => 
+          supabase.from('eventos_aplicacao').insert({
+            user_id: admin.id,
+            church_id: currentChurchId,
+            event_name: 'nova_contribuicao_pendente',
+            event_details: {
+              tipo: 'financeiro',
+              titulo: 'Nova Contribuição Pendente',
+              mensagem: `${user.name} realizou uma contribuição de R$ ${newContribution.valor.toFixed(2)} que aguarda aprovação.`,
+              transaction_id: transactionData.id,
+              valor: newContribution.valor,
+              categoria: newContribution.tipo,
+              data: new Date().toISOString()
+            }
+          })
+        )
+        await Promise.all(notificationPromises)
+      }
+
+      toast.success('Contribuição registrada com sucesso! Aguardando aprovação da gestão financeira.')
       setIsContributeDialogOpen(false)
       setNewContribution({
         valor: 0,

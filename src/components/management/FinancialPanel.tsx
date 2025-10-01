@@ -48,7 +48,8 @@ import {
   Wallet,
   PlusCircle,
   MinusCircle,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react'
 
 interface FinancialTransaction {
@@ -143,6 +144,7 @@ const FinancialPanel = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [viewMode, setViewMode] = useState<'dashboard' | 'transactions' | 'budget' | 'goals' | 'reports'>('dashboard')
   const [loadingData, setLoadingData] = useState(true)
+  const [pendingNotifications, setPendingNotifications] = useState<any[]>([])
 
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
@@ -251,6 +253,18 @@ const FinancialPanel = () => {
       if (transactionsError) throw transactionsError
       setTransactions(transactionsData as FinancialTransaction[])
 
+      // Load pending contributions notifications
+      const { data: notificationsData, error: notificationsError } = await supabase
+        .from('eventos_aplicacao')
+        .select('*')
+        .eq('church_id', currentChurchId)
+        .eq('event_name', 'nova_contribuicao_pendente')
+        .order('timestamp', { ascending: false })
+
+      if (notificationsError) {
+        console.error('Error loading notifications:', notificationsError)
+      }
+
       // Load Budgets
       const { data: budgetsData, error: budgetsError } = await supabase
         .from('orcamentos')
@@ -274,8 +288,7 @@ const FinancialPanel = () => {
       if (goalsError) throw goalsError
       setGoals(goalsData as FinancialGoal[])
 
-      // Load Reports (if any were saved, though typically reports are generated on demand)
-      // For now, we'll keep reports as in-memory generated.
+      // Load Reports
       setReports([])
 
     } catch (error: any) {
@@ -416,6 +429,7 @@ const FinancialPanel = () => {
     }
     setLoadingData(true)
     try {
+      // Update transaction status
       const { error } = await supabase
         .from('transacoes_financeiras')
         .update({ 
@@ -427,11 +441,64 @@ const FinancialPanel = () => {
         .eq('id_igreja', currentChurchId)
 
       if (error) throw error
+
+      // Delete related notification
+      const { error: notificationError } = await supabase
+        .from('eventos_aplicacao')
+        .delete()
+        .eq('event_details->transaction_id', transactionId)
+        .eq('event_name', 'nova_contribuicao_pendente')
+
+      if (notificationError) {
+        console.error('Error deleting notification:', notificationError)
+      }
+
       toast.success('Transação aprovada com sucesso!')
       loadFinancialData()
     } catch (error: any) {
       console.error('Error approving transaction:', error.message)
       toast.error('Erro ao aprovar transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const rejectTransaction = async (transactionId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+    setLoadingData(true)
+    try {
+      // Update transaction status
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({ 
+          status: 'Cancelado',
+          aprovado_por: user?.name || 'Admin',
+          data_aprovacao: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', transactionId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+
+      // Delete related notification
+      const { error: notificationError } = await supabase
+        .from('eventos_aplicacao')
+        .delete()
+        .eq('event_details->transaction_id', transactionId)
+        .eq('event_name', 'nova_contribuicao_pendente')
+
+      if (notificationError) {
+        console.error('Error deleting notification:', notificationError)
+      }
+
+      toast.success('Transação rejeitada com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error rejecting transaction:', error.message)
+      toast.error('Erro ao rejeitar transação: ' + error.message)
     } finally {
       setLoadingData(false)
     }
@@ -1249,7 +1316,71 @@ const FinancialPanel = () => {
             )}
           </div>
 
-          {/* Transactions List */}
+          {/* Pending Transactions Section */}
+          {pendingTransactions.length > 0 && (
+            <div className="pending-transactions-section space-y-4">
+              <h3 className="text-lg font-semibold text-orange-700">Transações Pendentes de Aprovação</h3>
+              {pendingTransactions.map((transaction) => (
+                <Card key={transaction.id} className="border-orange-200 bg-orange-50">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            R$ {transaction.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </h3>
+                          <Badge className="bg-yellow-100 text-yellow-800">
+                            <Clock className="w-3 h-3 mr-1" />
+                            Pendente
+                          </Badge>
+                          <Badge variant="outline">{transaction.categoria}</Badge>
+                        </div>
+                        <p className="text-gray-700 mb-2">{transaction.descricao}</p>
+                        <div className="flex gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>{new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <CreditCard className="w-4 h-4" />
+                            <span>{transaction.metodo_pagamento}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Building className="w-4 h-4" />
+                            <span>{transaction.responsavel}</span>
+                          </div>
+                        </div>
+                        {transaction.observacoes && (
+                          <p className="text-sm text-gray-600 mt-2">💬 {transaction.observacoes}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          className="bg-green-500 hover:bg-green-600"
+                          onClick={() => approveTransaction(transaction.id)}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Aprovar
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-red-600"
+                          onClick={() => rejectTransaction(transaction.id)}
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Rejeitar
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* All Transactions List */}
           <div className="space-y-4">
             {transactions
               .filter(t => 
