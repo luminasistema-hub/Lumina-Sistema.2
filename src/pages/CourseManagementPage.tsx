@@ -1,3 +1,4 @@
+import React from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
@@ -19,7 +20,7 @@ const fetchCourseById = async (courseId: string) => {
   return data as Course
 }
 
-const CourseManagementPage = () => {
+const CourseManagementPage: React.FC = () => {
   const { courseId } = useParams<{ courseId: string }>()
   
   const { data: course, isLoading, error } = useQuery<Course>({

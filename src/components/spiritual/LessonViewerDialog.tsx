@@ -1,3 +1,4 @@
+import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Lesson } from '@/types/course'
 import { AspectRatio } from '@/components/ui/aspect-ratio'
@@ -24,7 +25,7 @@ const getYouTubeEmbedUrl = (url: string) => {
   }
 };
 
-export const LessonViewerDialog = ({ lesson, open, onOpenChange }: LessonViewerDialogProps) => {
+export const LessonViewerDialog: React.FC<LessonViewerDialogProps> = ({ lesson, open, onOpenChange }) => {
   if (!lesson) return null;
 
   const videoUrl = lesson.tipo === 'Video' ? getYouTubeEmbedUrl(lesson.conteudo || '') : null;

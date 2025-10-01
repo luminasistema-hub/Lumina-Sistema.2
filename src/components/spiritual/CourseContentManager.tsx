@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Course, CourseModule, Lesson } from '@/types/course'
 import { useCourses } from '@/hooks/useCourses'
@@ -108,7 +108,7 @@ const AddLessonDialog = ({ moduleId, courseId, onLessonCreate }: { moduleId: str
   )
 }
 
-export const CourseContentManager = ({ course }: { course: Course }) => {
+export const CourseContentManager: React.FC<{ course: Course }> = ({ course }) => {
   const [isModuleDialogOpen, setIsModuleDialogOpen] = useState(false)
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null)

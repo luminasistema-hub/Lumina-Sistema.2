@@ -24,75 +24,62 @@ const uploadCourseCover = async (file: File): Promise<string> => {
 
 // Função para buscar e estruturar todos os dados dos cursos
 const fetchCoursesData = async (churchId: string): Promise<Course[]> => {
-  // 1. Buscar cursos e nome dos professores
   const { data: coursesData, error: coursesError } = await supabase
     .from('cursos')
-    .select('*, professor:membros(id, nome_completo)')
+    .select('*')
     .eq('id_igreja', churchId)
+    .order('created_at', { ascending: false })
 
-  if (coursesError) throw new Error(`Erro ao buscar cursos: ${coursesError.message}`)
-  if (!coursesData) return []
+  if (coursesError) throw new Error(coursesError.message)
 
   const courseIds = coursesData.map(c => c.id)
-  if (courseIds.length === 0) return []
 
-  // 2. Buscar módulos, aulas e inscrições em paralelo
-  const [
-    { data: modulesData, error: modulesError },
-    { data: inscriptionsData, error: inscriptionsError },
-  ] = await Promise.all([
-    supabase.from('cursos_modulos').select('*').in('id_curso', courseIds).order('ordem'),
-    supabase.from('cursos_inscricoes').select('*, membro:membros(id, nome_completo, email)').in('id_curso', courseIds),
-  ])
+  const { data: modulesData, error: modulesError } = await supabase
+    .from('cursos_modulos')
+    .select('*')
+    .in('id_curso', courseIds)
+    .order('ordem', { ascending: true })
 
-  if (modulesError) throw new Error(`Erro ao buscar módulos: ${modulesError.message}`)
-  if (inscriptionsError) throw new Error(`Erro ao buscar inscrições: ${inscriptionsError.message}`)
+  if (modulesError) throw new Error(modulesError.message)
 
-  const moduleIds = modulesData?.map(m => m.id) || []
-  const inscriptionIds = inscriptionsData?.map(i => i.id) || []
+  const moduleIds = modulesData.map(m => m.id)
 
-  const [
-    { data: lessonsData, error: lessonsError },
-    { data: progressData, error: progressError },
-  ] = await Promise.all([
-    moduleIds.length > 0 ? supabase.from('cursos_aulas').select('*').in('id_modulo', moduleIds).order('ordem') : Promise.resolve({ data: [], error: null }),
-    inscriptionIds.length > 0 ? supabase.from('cursos_progresso').select('*').in('id_inscricao', inscriptionIds) : Promise.resolve({ data: [], error: null }),
-  ])
+  const { data: lessonsData, error: lessonsError } = await supabase
+    .from('cursos_aulas')
+    .select('*')
+    .in('id_modulo', moduleIds)
+    .order('ordem', { ascending: true })
 
-  if (lessonsError) throw new Error(`Erro ao buscar aulas: ${lessonsError.message}`)
-  if (progressError) throw new Error(`Erro ao buscar progresso: ${progressError.message}`)
+  if (lessonsError) throw new Error(lessonsError.message)
 
-  // 3. Estruturar os dados aninhados
-  return coursesData.map(course => {
-    const courseModules = (modulesData || [])
-      .filter(m => m.id_curso === course.id)
+  const { data: inscriptionsData, error: inscriptionsError } = await supabase
+    .from('cursos_inscricoes')
+    .select('*')
+    .in('id_curso', courseIds)
+
+  if (inscriptionsError) throw new Error(inscriptionsError.message)
+
+  const coursesWithDetails: Course[] = coursesData.map(course => {
+    const courseModules = modulesData
+      .filter(module => module.id_curso === course.id)
       .map(module => ({
         ...module,
-        aulas: (lessonsData || []).filter(l => l.id_modulo === module.id),
+        aulas: lessonsData.filter(lesson => lesson.id_modulo === module.id)
       }))
 
-    const courseInscriptions = (inscriptionsData || [])
-      .filter(i => i.id_curso === course.id)
-      .map(inscription => {
-        const totalLessons = courseModules.reduce((acc, mod) => acc + mod.aulas.length, 0)
-        const completedLessons = (progressData || []).filter(p => p.id_inscricao === inscription.id && p.status === 'concluido').length
-        const progressPercentage = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0
-        
-        return {
-          ...inscription,
-          progresso: progressPercentage,
-        }
-      })
+    const courseInscriptions = inscriptionsData.filter(inscription => inscription.id_curso === course.id)
 
     return {
       ...course,
       modulos: courseModules,
       alunos_inscritos: courseInscriptions,
-    } as Course
+      professor: course.professor_id ? { id: course.professor_id, nome_completo: course.professor_nome || 'Professor' } : undefined
+    }
   })
+
+  return coursesWithDetails
 }
 
-// Hook principal
 export const useCourses = () => {
   const { currentChurchId } = useAuthStore()
   const queryClient = useQueryClient()

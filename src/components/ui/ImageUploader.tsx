@@ -1,6 +1,4 @@
-"use client"
-
-import { useCallback } from 'react'
+import React, { useCallback } from 'react'
 import { useDropzone, FileRejection } from 'react-dropzone'
 import { UploadCloud, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,7 +9,7 @@ interface ImageUploaderProps {
   setPreviewUrl: (url: string | null) => void;
 }
 
-export const ImageUploader = ({ onFileSelect, previewUrl, setPreviewUrl }: ImageUploaderProps) => {
+export const ImageUploader: React.FC<ImageUploaderProps> = ({ onFileSelect, previewUrl, setPreviewUrl }) => {
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
     if (fileRejections.length > 0) {
       fileRejections.forEach(({ errors }) => {
