@@ -16,11 +16,8 @@ import MasterAdminChurchTable from '../components/master-admin/MasterAdminChurch
 import ManageChurchSubscriptionDialog from '../components/master-admin/ManageChurchSubscriptionDialog'
 import DatabaseInfoTab from '../components/master-admin/DatabaseInfoTab'
 import AdminToolsTab from '../components/master-admin/AdminToolsTab'
-import SaaSReportsTab from '../components/master-admin/SaaSReportsTab'
-import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHistoryDialog'
+import SaaSReportsTab from '../components/master-admin/SaaSReportsTab';
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
-import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
-import MasterAdminWebPerformanceInsights from '../components/master-admin/MasterAdminWebPerformanceInsights'; // Importação do novo componente
 import { supabase } from '../integrations/supabase/client'; // Importar supabase
 import ManagePlansTab from '../components/master-admin/ManagePlansTab';
 
