@@ -33,10 +33,9 @@ interface TrilhaCrescimento {
 
 interface QuizPergunta {
   id?: string;
-  passo_id: string;
   ordem: number;
-  pergunta: string; // Corrigido de pergunta_texto para pergunta
-  opcoes_json: { opcoes: string[] };
+  pergunta_texto: string;
+  opcoes: string[];
   resposta_correta: number;
   pontuacao: number;
 }
@@ -58,6 +57,8 @@ interface EtapaTrilha {
   ordem: number;
   titulo: string;
   descricao: string;
+  tipo_conteudo: string;
+  conteudo: string;
   cor: string;
   created_at: string;
 }
@@ -126,22 +127,20 @@ const MemberJourney = () => {
     console.log('MemberJourney: Loading journey data for user:', user.id, 'church:', currentChurchId);
 
     try {
-      // 1. Buscar a trilha de crescimento da igreja (de forma mais segura)
-      const { data: trilhasData, error: trilhaError } = await supabase
+      // 1. Buscar a trilha de crescimento da igreja
+      const { data: trilhaData, error: trilhaError } = await supabase
         .from('trilhas_crescimento')
         .select('id, titulo, descricao')
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
-        .limit(1); // Usar limit(1) em vez de single() para mais resiliência
+        .single();
 
-      if (trilhaError) {
+      if (trilhaError && trilhaError.code !== 'PGRST116') {
         console.error('MemberJourney: Error loading trilha_crescimento:', trilhaError);
         toast.error('Erro ao carregar a trilha de crescimento da igreja.');
         setLoading(false);
         return;
       }
-
-      const trilhaData = trilhasData && trilhasData.length > 0 ? trilhasData[0] : null;
 
       if (!trilhaData) {
         console.log('MemberJourney: No active journey found for this church.');

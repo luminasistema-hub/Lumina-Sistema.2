@@ -16,14 +16,16 @@ import MasterAdminChurchTable from '../components/master-admin/MasterAdminChurch
 import ManageChurchSubscriptionDialog from '../components/master-admin/ManageChurchSubscriptionDialog'
 import DatabaseInfoTab from '../components/master-admin/DatabaseInfoTab'
 import AdminToolsTab from '../components/master-admin/AdminToolsTab'
-import SaaSReportsTab from '../components/master-admin/SaaSReportsTab';
+import SaaSReportsTab from '../components/master-admin/SaaSReportsTab'
+import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHistoryDialog'
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
-import { supabase } from '../integrations/supabase/client'; // Importar supabase
-import ManagePlansTab from '../components/master-admin/ManagePlansTab';
+import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
+import MasterAdminWebPerformanceInsights from '../components/master-admin/MasterAdminWebPerformanceInsights'; // Importação do novo componente
+import { supabase } from '../integrations/supabase/client' // Importar supabase
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
-  const { churches, loadChurches, updateChurch, loadSubscriptionPlans } = useChurchStore()
+  const { churches, loadChurches, addChurch, updateChurch, getSubscriptionPlans, getPlanDetails } = useChurchStore()
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false)
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null)
   const [isLoading, setIsLoading] = useState(true);
@@ -32,19 +34,17 @@ const MasterAdminPage = () => {
   // Novos estados para métricas globais
   const [totalUsersCount, setTotalUsersCount] = useState(0);
   const [activeMembersCount, setActiveMembersCount] = useState(0);
-  const [totalTransactionsCount, setTotalTransactionsCount] = useState(0);
 
   useEffect(() => {
     const fetchChurchesAndMetrics = async () => {
       setIsLoading(true);
       await loadChurches();
-      await loadSubscriptionPlans(); // Carrega os planos de assinatura
 
-      // Fetch total users from Supabase Edge Function
+      // Fetch total users from Supabase Auth
       try {
-        const { data, error } = await supabase.functions.invoke('get-total-users');
-        if (error) throw error;
-        setTotalUsersCount(data.totalUsers);
+        const { data: usersData, error: usersError } = await supabase.auth.admin.listUsers();
+        if (usersError) throw usersError;
+        setTotalUsersCount(usersData.users.length);
       } catch (error: any) {
         console.error('Error fetching total users:', error.message);
         toast.error('Erro ao carregar total de usuários: ' + error.message);
@@ -63,22 +63,10 @@ const MasterAdminPage = () => {
         toast.error('Erro ao carregar membros ativos: ' + error.message);
       }
 
-      // Fetch total transactions
-      try {
-        const { count, error: transactionsError } = await supabase
-          .from('transacoes_financeiras')
-          .select('id', { count: 'exact' });
-        if (transactionsError) throw transactionsError;
-        setTotalTransactionsCount(count || 0);
-      } catch (error: any) {
-        console.error('Error fetching total transactions:', error.message);
-        toast.error('Erro ao carregar total de transações: ' + error.message);
-      }
-
       setIsLoading(false);
     };
     fetchChurchesAndMetrics();
-  }, [loadChurches, loadSubscriptionPlans]);
+  }, [loadChurches]);
 
   if (user?.role !== 'super_admin') {
     return (
@@ -93,6 +81,40 @@ const MasterAdminPage = () => {
       </div>
     )
   }
+
+  const handleAddChurch = async () => {
+    if (!newChurch.name || !newChurch.subscriptionPlan) {
+      toast.error('Nome da igreja e plano de assinatura são obrigatórios.')
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const added = await addChurch(newChurch);
+      if (added) {
+        setIsAddChurchDialogOpen(false);
+        setNewChurch({
+          name: '',
+          subscriptionPlan: '0-100 membros',
+          status: 'active',
+          adminUserId: user?.id || null,
+        });
+        toast.success(`Igreja ${added.name} adicionada com sucesso!`);
+        // Recarregar métricas após adicionar igreja
+        const { data: usersData } = await supabase.auth.admin.listUsers();
+        setTotalUsersCount(usersData?.users.length || 0);
+        const { count } = await supabase.from('membros').select('id', { count: 'exact' }).eq('status', 'ativo');
+        setActiveMembersCount(count || 0);
+      } else {
+        toast.error('Falha ao adicionar a igreja.');
+      }
+    } catch (error) {
+      console.error('Error adding church:', error);
+      toast.error('Erro ao adicionar a igreja.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleUpdateChurch = useCallback(async (churchId: string, updates: Partial<Church>) => {
     setIsLoading(true);
@@ -116,7 +138,7 @@ const MasterAdminPage = () => {
 
   const [newChurch, setNewChurch] = useState({
     name: '',
-    subscriptionPlan: '' as SubscriptionPlan,
+    subscriptionPlan: '0-100 membros' as SubscriptionPlan,
     status: 'active' as Church['status'],
     adminUserId: user?.id || null,
   });
@@ -132,10 +154,9 @@ const MasterAdminPage = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="churches">Igrejas</TabsTrigger>
-            <TabsTrigger value="plans">Planos</TabsTrigger>
             <TabsTrigger value="database">Banco de Dados</TabsTrigger>
             <TabsTrigger value="tools">Ferramentas Admin</TabsTrigger>
             <TabsTrigger value="reports">Relatórios SaaS</TabsTrigger>
@@ -146,8 +167,9 @@ const MasterAdminPage = () => {
             <MasterAdminSystemOverview 
               totalUsersCount={totalUsersCount} 
               activeMembersCount={activeMembersCount} 
-              totalTransactionsCount={totalTransactionsCount}
             />
+            <MasterAdminServerStatus />
+            <MasterAdminWebPerformanceInsights />
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">
@@ -159,18 +181,80 @@ const MasterAdminPage = () => {
                 </CardTitle>
                 <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-purple-500 hover:bg-purple-600" disabled>
+                    <Button className="bg-purple-500 hover:bg-purple-600">
                       <Plus className="w-4 h-4 mr-2" />
-                      Adicionar Igreja (via Cadastro)
+                      Adicionar Igreja
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle>Adicionar Nova Igreja</DialogTitle>
                       <DialogDescription>
-                        O cadastro de novas igrejas agora é feito pela página de registro.
+                        Preencha os detalhes para cadastrar uma nova igreja.
                       </DialogDescription>
                     </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="churchName">Nome da Igreja</Label>
+                        <Input
+                          id="churchName"
+                          value={newChurch.name}
+                          onChange={(e) => setNewChurch({...newChurch, name: e.target.value})}
+                          placeholder="Nome da Igreja"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="subscriptionPlan">Plano de Assinatura</Label>
+                        <Select
+                          value={newChurch.subscriptionPlan}
+                          onValueChange={(value) => setNewChurch({...newChurch, subscriptionPlan: value as SubscriptionPlan})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um plano" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getSubscriptionPlans().map(plan => (
+                              <SelectItem key={plan.value} value={plan.value}>
+                                {plan.label} (R$ {plan.monthlyValue.toFixed(2)}/mês)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="status">Status</Label>
+                        <Select
+                          value={newChurch.status}
+                          onValueChange={(value) => setNewChurch({...newChurch, status: value as Church['status']})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Ativa</SelectItem>
+                            <SelectItem value="pending">Pendente</SelectItem>
+                            <SelectItem value="inactive">Inativa</SelectItem>
+                            <SelectItem value="trial">Teste</SelectItem>
+                            <SelectItem value="blocked">Bloqueada</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsAddChurchDialogOpen(false)} disabled={isLoading}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={handleAddChurch} disabled={isLoading}>
+                          {isLoading ? (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Adicionando...
+                            </div>
+                          ) : (
+                            'Adicionar Igreja'
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </DialogContent>
                 </Dialog>
               </CardHeader>
@@ -180,10 +264,6 @@ const MasterAdminPage = () => {
                 isLoading={isLoading}
               />
             </Card>
-          </TabsContent>
-
-          <TabsContent value="plans" className="space-y-6">
-            <ManagePlansTab />
           </TabsContent>
 
           <TabsContent value="database" className="space-y-6">

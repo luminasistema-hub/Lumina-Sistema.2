@@ -340,22 +340,8 @@ const VocationalTest = () => {
 
     console.log('Calculating vocational test results and saving to Supabase...');
     
-    // 1. Inativar testes anteriores
-    const { error: updateError } = await supabase
-      .from('testes_vocacionais')
-      .update({ is_ultimo: false })
-      .eq('membro_id', user.id);
-
-    if (updateError) {
-      console.error('VocationalTest: Error inactivating previous tests:', updateError);
-      toast.error('Erro ao arquivar testes anteriores.');
-      return;
-    }
-
-    // 2. Preparar e inserir o novo teste
     const testDataToSave: any = {
       membro_id: user.id,
-      id_igreja: currentChurchId,
       data_teste: new Date().toISOString().split('T')[0],
       is_ultimo: true, 
     };
@@ -377,17 +363,6 @@ const VocationalTest = () => {
     }
 
     console.log('VocationalTest: Test results saved to Supabase:', data);
-    
-    // 3. Atualizar o perfil do membro com o ministério recomendado
-    const { error: memberUpdateError } = await supabase
-      .from('membros')
-      .update({ ministerio_recomendado: data.ministerio_recomendado })
-      .eq('id', user.id);
-
-    if (memberUpdateError) {
-      console.error('VocationalTest: Error updating member profile:', memberUpdateError);
-      toast.warning('Resultado do teste salvo, mas houve um erro ao atualizar seu perfil.');
-    }
     
     const ministryScores: Record<string, number> = {
       midia: data.soma_midia || 0,

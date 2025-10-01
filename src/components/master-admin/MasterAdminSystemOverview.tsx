@@ -16,17 +16,23 @@ import {
   Church,
   Settings,
   Mic,
+  Database,
+  Server,
+  Shield,
   Activity,
+  Zap,
   Globe,
+  HardDrive,
+  Cpu,
+  Wifi
 } from 'lucide-react';
 
 interface MasterAdminSystemOverviewProps {
   totalUsersCount: number;
   activeMembersCount: number;
-  totalTransactionsCount: number;
 }
 
-const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ totalUsersCount, activeMembersCount, totalTransactionsCount }) => {
+const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ totalUsersCount, activeMembersCount }) => {
   const modules = [
     {
       name: 'Autenticação e Usuários',
@@ -150,6 +156,19 @@ const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ t
     }
   ];
 
+  // Métricas que podem ser dinâmicas ou simuladas
+  const systemMetrics = {
+    totalUsers: totalUsersCount, // Agora dinâmico
+    activeUsers: activeMembersCount, // Agora dinâmico
+    totalTransactions: 1543, // Simulado - requer tabela de transações
+    systemUptime: '99.7%', // Hardcoded - métrica de infraestrutura
+    lastBackup: '2025-09-24 03:00:00', // Hardcoded - métrica de infraestrutura
+    databaseSize: '245 MB', // Hardcoded - métrica de infraestrutura
+    storageUsed: '1.2 GB', // Hardcoded - métrica de infraestrutura
+    apiCalls: '45,231', // Hardcoded - métrica de infraestrutura
+    errorRate: '0.03%' // Hardcoded - métrica de infraestrutura
+  };
+
   const overallProgress = Math.round(modules.reduce((sum, module) => sum + module.progress, 0) / modules.length);
 
   return (
@@ -182,7 +201,7 @@ const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ t
               <div className="text-sm text-gray-600">Tipos de Usuário</div>
             </div>
             <div className="text-center p-4 bg-white rounded-lg border">
-              <div className="text-2xl md:text-3xl font-bold text-orange-600">{totalUsersCount}</div>
+              <div className="text-2xl md:text-3xl font-bold text-orange-600">{systemMetrics.totalUsers}</div>
               <div className="text-sm text-gray-600">Usuários Totais</div>
             </div>
           </div>
@@ -195,19 +214,33 @@ const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ t
       </Card>
 
       {/* System Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
             <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-            <div className="text-xl font-bold">{activeMembersCount}</div>
+            <div className="text-xl font-bold">{systemMetrics.activeUsers}</div>
             <div className="text-sm text-gray-600">Usuários Ativos (Membros)</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <DollarSign className="w-8 h-8 text-green-500 mx-auto mb-2" />
-            <div className="text-xl font-bold">{totalTransactionsCount}</div>
-            <div className="text-sm text-gray-600">Transações Totais</div>
+            <div className="text-xl font-bold">{systemMetrics.totalTransactions}</div>
+            <div className="text-sm text-gray-600">Transações (Simulado)</div> {/* Adicionado (Simulado) */}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <Zap className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+            <div className="text-xl font-bold">{systemMetrics.systemUptime}</div>
+            <div className="text-sm text-gray-600">Uptime Geral (Hardcoded)</div> {/* Adicionado (Hardcoded) */}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <Database className="w-8 h-8 text-purple-500 mx-auto mb-2" />
+            <div className="text-xl font-bold">{systemMetrics.databaseSize}</div>
+            <div className="text-sm text-gray-600">Banco de Dados (Hardcoded)</div> {/* Adicionado (Hardcoded) */}
           </CardContent>
         </Card>
       </div>

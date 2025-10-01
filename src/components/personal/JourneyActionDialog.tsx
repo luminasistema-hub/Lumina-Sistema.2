@@ -10,10 +10,9 @@ import { Card, CardContent } from '../ui/card';
 
 interface QuizPergunta {
   id?: string;
-  passo_id: string;
   ordem: number;
-  pergunta: string; // Corrigido de pergunta_texto para pergunta
-  opcoes_json: { opcoes: string[] };
+  pergunta_texto: string;
+  opcoes: string[];
   resposta_correta: number; // Índice da opção correta (0-based)
   pontuacao: number;
 }
@@ -123,7 +122,7 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
 
     if (showQuizResults) {
       const maxPossibleScore = passo.quiz_perguntas.reduce((sum, q) => sum + q.pontuacao, 0);
-      const percentageScore = maxPossibleScore > 0 ? (quizScore / maxPossibleScore) * 100 : 0;
+      const percentageScore = (quizScore / maxPossibleScore) * 100;
 
       return (
         <div className="space-y-6">
@@ -139,13 +138,12 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
             {passo.quiz_perguntas.map((q, qIndex) => {
               const userAnswer = selectedAnswers[qIndex];
               const isCorrect = userAnswer === q.resposta_correta;
-              const opcoes = q.opcoes_json?.opcoes || [];
               return (
                 <Card key={qIndex} className={`border-l-4 ${isCorrect ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
                   <CardContent className="p-4">
-                    <p className="font-semibold text-gray-900 mb-2">{qIndex + 1}. {q.pergunta}</p>
+                    <p className="font-semibold text-gray-900 mb-2">{qIndex + 1}. {q.pergunta_texto}</p>
                     <ul className="space-y-1">
-                      {opcoes.map((option, oIndex) => (
+                      {q.opcoes.map((option, oIndex) => (
                         <li key={oIndex} className={`text-sm ${oIndex === q.resposta_correta ? 'font-bold text-green-700' : ''} ${userAnswer === oIndex && !isCorrect ? 'text-red-700 line-through' : ''}`}>
                           {oIndex === userAnswer && <Star className="inline-block w-3 h-3 mr-1 text-yellow-500 fill-current" />}
                           {option}
@@ -153,8 +151,8 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
                         </li>
                       ))}
                     </ul>
-                    {userAnswer !== null && userAnswer !== undefined && !isCorrect && (
-                      <p className="text-xs text-red-600 mt-2">Sua resposta: {opcoes[userAnswer]}</p>
+                    {!isCorrect && userAnswer !== null && (
+                      <p className="text-xs text-red-600 mt-2">Sua resposta: {q.opcoes[userAnswer!]}</p>
                     )}
                   </CardContent>
                 </Card>
@@ -171,8 +169,6 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
       );
     }
 
-    const opcoes = currentQuestion.opcoes_json?.opcoes || [];
-
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-4">
@@ -185,13 +181,13 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-6">
-            <h4 className="text-lg font-semibold mb-4">{currentQuestion.pergunta}</h4>
+            <h4 className="text-lg font-semibold mb-4">{currentQuestion.pergunta_texto}</h4>
             <RadioGroup
               value={selectedAnswers[currentQuizQuestionIndex]?.toString() || ""}
               onValueChange={(value) => handleAnswerSelection(currentQuizQuestionIndex, parseInt(value))}
               className="space-y-3"
             >
-              {opcoes.map((option, index) => (
+              {currentQuestion.opcoes.map((option, index) => (
                 <div key={index} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
                   <RadioGroupItem value={index.toString()} id={`option-${index}`} />
                   <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">

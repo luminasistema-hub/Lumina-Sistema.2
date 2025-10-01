@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '../integrations/supabase/client' 
 
-export type SubscriptionPlan = string; // Alterado para string para armazenar o ID do plano (UUID)
+export type SubscriptionPlan = '0-100 membros' | '101-300 membros' | '301-500 membros' | 'ilimitado'
 
 export interface PaymentRecord {
   id: string;
@@ -20,7 +20,7 @@ export interface Church {
   address?: string // Mapeia para 'endereco' no DB
   contactEmail?: string // Mapeia para 'email' no DB
   contactPhone?: string // Mapeia para 'telefone_contato' no DB
-  subscriptionPlan: SubscriptionPlan // Agora é o ID do plano
+  subscriptionPlan: SubscriptionPlan
   memberLimit: number
   currentMembers: number
   status: 'active' | 'inactive' | 'pending' | 'trial' | 'blocked'
@@ -43,46 +43,29 @@ export interface Church {
   descricao?: string;
 }
 
-export interface SubscriptionPlanData {
-  id: string;
-  nome: string;
-  preco_mensal: number;
-  limite_membros: number;
-}
-
 interface ChurchState {
   churches: Church[]
-  subscriptionPlans: SubscriptionPlanData[]
-  loadSubscriptionPlans: () => Promise<void>
   updateChurch: (churchId: string, updates: Partial<Church>) => Promise<Church | null>
   getChurchById: (churchId: string) => Church | undefined
   loadChurches: () => Promise<void>
-  getPlanDetails: (planId: string) => SubscriptionPlanData | undefined
-  addSubscriptionPlan: (planData: Omit<SubscriptionPlanData, 'id'>) => Promise<SubscriptionPlanData | null>;
-  updateSubscriptionPlan: (planId: string, updates: Partial<Omit<SubscriptionPlanData, 'id' | 'limite_quizes_por_etapa' | 'limite_armazenamento_mb' | 'descricao'>>) => Promise<SubscriptionPlanData | null>;
-  deleteSubscriptionPlan: (planId: string) => Promise<boolean>;
+  getSubscriptionPlans: () => { label: string; value: SubscriptionPlan; memberLimit: number; monthlyValue: number }[]
+  getPlanDetails: (planId: SubscriptionPlan) => { label: string; value: SubscriptionPlan; memberLimit: number; monthlyValue: number }
 }
 
 export const useChurchStore = create<ChurchState>()(
   persist(
     (set, get) => ({
       churches: [],
-      subscriptionPlans: [],
 
-      loadSubscriptionPlans: async () => {
-        const { data, error } = await supabase
-          .from('planos_assinatura')
-          .select('id, nome, preco_mensal, limite_membros');
-        
-        if (error) {
-          console.error('churchStore: Error loading subscription plans:', error);
-          return;
-        }
-        set({ subscriptionPlans: data as SubscriptionPlanData[] });
-      },
+      getSubscriptionPlans: () => [
+        { label: '0 a 100 Membros', value: '0-100 membros', memberLimit: 100, monthlyValue: 99.00 },
+        { label: '101 a 300 Membros', value: '101-300 membros', memberLimit: 300, monthlyValue: 199.00 },
+        { label: '301 a 500 Membros', value: '301-500 membros', memberLimit: 500, monthlyValue: 299.00 },
+        { label: 'Ilimitado', value: 'ilimitado', memberLimit: Infinity, monthlyValue: 499.00 },
+      ],
 
-      getPlanDetails: (planId: string) => {
-        return get().subscriptionPlans.find(p => p.id === planId);
+      getPlanDetails: (planId: SubscriptionPlan) => {
+        return get().getSubscriptionPlans().find(p => p.value === planId) || { label: 'Desconhecido', value: planId, memberLimit: 0, monthlyValue: 0 };
       },
 
       loadChurches: async () => {
@@ -131,18 +114,9 @@ export const useChurchStore = create<ChurchState>()(
 
         if (updates.subscriptionPlan) {
           const planDetails = get().getPlanDetails(updates.subscriptionPlan);
-          if (planDetails) {
-            updatePayload.plano_id = planDetails.id;
-            updatePayload.limite_membros = planDetails.limite_membros;
-            // Apenas atualiza o valor se não for fornecido um valor manual
-            if (updates.valor_mensal_assinatura === undefined) {
-              updatePayload.valor_mensal_assinatura = planDetails.preco_mensal;
-            }
-          }
-        }
-        
-        if (updates.valor_mensal_assinatura !== undefined) {
-          updatePayload.valor_mensal_assinatura = updates.valor_mensal_assinatura;
+          updatePayload.plano_id = updates.subscriptionPlan;
+          updatePayload.limite_membros = planDetails.memberLimit;
+          updatePayload.valor_mensal_assinatura = planDetails.monthlyValue;
         }
         if (updates.name) updatePayload.nome = updates.name;
         if (updates.currentMembers !== undefined) updatePayload.membros_atuais = updates.currentMembers;
@@ -217,71 +191,6 @@ export const useChurchStore = create<ChurchState>()(
       getChurchById: (churchId: string) => {
         return get().churches.find((c) => c.id === churchId);
       },
-
-      addSubscriptionPlan: async (planData) => {
-        const { data, error } = await supabase
-          .from('planos_assinatura')
-          .insert({
-            nome: planData.nome,
-            preco_mensal: planData.preco_mensal,
-            limite_membros: planData.limite_membros,
-            // Valores padrão para outros campos obrigatórios
-            limite_quizes_por_etapa: 1,
-            limite_armazenamento_mb: 100,
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('churchStore: Error adding subscription plan:', error);
-          return null;
-        }
-
-        const newPlan = data as SubscriptionPlanData;
-        set((state) => ({
-          subscriptionPlans: [...state.subscriptionPlans, newPlan],
-        }));
-        return newPlan;
-      },
-
-      updateSubscriptionPlan: async (planId, updates) => {
-        const { data, error } = await supabase
-          .from('planos_assinatura')
-          .update(updates)
-          .eq('id', planId)
-          .select()
-          .single();
-
-        if (error) {
-          console.error('churchStore: Error updating subscription plan:', error);
-          return null;
-        }
-        
-        const updatedPlan = data as SubscriptionPlanData;
-        set((state) => ({
-          subscriptionPlans: state.subscriptionPlans.map((p) =>
-            p.id === planId ? { ...p, ...updatedPlan } : p
-          ),
-        }));
-        return updatedPlan;
-      },
-
-      deleteSubscriptionPlan: async (planId) => {
-        const { error } = await supabase
-          .from('planos_assinatura')
-          .delete()
-          .eq('id', planId);
-
-        if (error) {
-          console.error('churchStore: Error deleting subscription plan:', error);
-          return false;
-        }
-
-        set((state) => ({
-          subscriptionPlans: state.subscriptionPlans.filter((p) => p.id !== planId),
-        }));
-        return true;
-      },
     }),
     {
       name: 'connect-vida-churches',
@@ -289,7 +198,6 @@ export const useChurchStore = create<ChurchState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           get().loadChurches();
-          get().loadSubscriptionPlans(); // Carrega os planos na inicialização
         }
       },
     }

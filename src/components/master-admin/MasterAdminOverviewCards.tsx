@@ -11,8 +11,8 @@ const MasterAdminOverviewCards: React.FC<MasterAdminOverviewCardsProps> = ({ chu
   const totalChurches = churches.length;
   const activeChurches = churches.filter(c => c.status === 'active').length;
   const pendingPayments = churches.filter(c => c.ultimo_pagamento_status === 'Pendente' || c.ultimo_pagamento_status === 'Atrasado').length;
-  const totalMonthlyRevenue = churches.filter(c => c.status === 'active')
-                                     .reduce((sum, c) => sum + (c.valor_mensal_assinatura || 0), 0);
+  const totalMonthlyRevenue = churches.filter(c => c.status === 'active' && c.ultimo_pagamento_status === 'Pago')
+                                     .reduce((sum, c) => sum + c.valor_mensal_assinatura, 0);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
