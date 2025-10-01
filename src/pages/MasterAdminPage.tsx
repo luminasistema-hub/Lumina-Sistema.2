@@ -4,8 +4,8 @@ import { useChurchStore, Church, SubscriptionPlan } from '../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { Label } from '../ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Label } from '../components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs' // Importar Tabs
 import { toast } from 'sonner'
@@ -135,12 +135,84 @@ const MasterAdminPage = () => {
                   Igrejas Cadastradas
                 </CardTitle>
                 {/* DialogTrigger button movido para dentro do CardHeader */}
-                <DialogTrigger asChild>
-                  <Button className="bg-purple-500 hover:bg-purple-600">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Igreja
-                  </Button>
-                </DialogTrigger>
+                <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-purple-500 hover:bg-purple-600">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar Igreja
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Adicionar Nova Igreja</DialogTitle>
+                      <DialogDescription>
+                        Preencha os detalhes para cadastrar uma nova igreja.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="churchName">Nome da Igreja</Label>
+                        <Input
+                          id="churchName"
+                          value={newChurch.name}
+                          onChange={(e) => setNewChurch({...newChurch, name: e.target.value})}
+                          placeholder="Nome da Igreja"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="subscriptionPlan">Plano de Assinatura</Label>
+                        <Select
+                          value={newChurch.subscriptionPlan}
+                          onValueChange={(value) => setNewChurch({...newChurch, subscriptionPlan: value as SubscriptionPlan})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um plano" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getSubscriptionPlans().map(plan => (
+                              <SelectItem key={plan.value} value={plan.value}>
+                                {plan.label} (R$ {plan.monthlyValue.toFixed(2)}/mês)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="status">Status</Label>
+                        <Select
+                          value={newChurch.status}
+                          onValueChange={(value) => setNewChurch({...newChurch, status: value as Church['status']})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Ativa</SelectItem>
+                            <SelectItem value="pending">Pendente</SelectItem>
+                            <SelectItem value="inactive">Inativa</SelectItem>
+                            <SelectItem value="trial">Teste</SelectItem>
+                            <SelectItem value="blocked">Bloqueada</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsAddChurchDialogOpen(false)} disabled={isLoading}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={handleAddChurch} disabled={isLoading}>
+                          {isLoading ? (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Adicionando...
+                            </div>
+                          ) : (
+                            'Adicionar Igreja'
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               <MasterAdminChurchTable 
                 churches={churches} 
@@ -148,79 +220,6 @@ const MasterAdminPage = () => {
                 isLoading={isLoading}
               />
             </Card>
-            {/* O Dialog completo é um irmão do Card, não aninhado dentro do CardHeader */}
-            <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Nova Igreja</DialogTitle>
-                  <DialogDescription>
-                    Preencha os detalhes para cadastrar uma nova igreja.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="churchName">Nome da Igreja</Label>
-                    <Input
-                      id="churchName"
-                      value={newChurch.name}
-                      onChange={(e) => setNewChurch({...newChurch, name: e.target.value})}
-                      placeholder="Nome da Igreja"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="subscriptionPlan">Plano de Assinatura</Label>
-                    <Select
-                      value={newChurch.subscriptionPlan}
-                      onValueChange={(value) => setNewChurch({...newChurch, subscriptionPlan: value as SubscriptionPlan})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um plano" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getSubscriptionPlans().map(plan => (
-                          <SelectItem key={plan.value} value={plan.value}>
-                            {plan.label} (R$ {plan.monthlyValue.toFixed(2)}/mês)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={newChurch.status}
-                      onValueChange={(value) => setNewChurch({...newChurch, status: value as Church['status']})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Ativa</SelectItem>
-                        <SelectItem value="pending">Pendente</SelectItem>
-                        <SelectItem value="inactive">Inativa</SelectItem>
-                        <SelectItem value="trial">Teste</SelectItem>
-                        <SelectItem value="blocked">Bloqueada</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setIsAddChurchDialogOpen(false)} disabled={isLoading}>
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleAddChurch} disabled={isLoading}>
-                      {isLoading ? (
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Adicionando...
-                        </div>
-                      ) : (
-                        'Adicionar Igreja'
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
           </TabsContent>
 
           <TabsContent value="database" className="space-y-6">
