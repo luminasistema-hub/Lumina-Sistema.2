@@ -6,7 +6,8 @@ import DashboardPage from './pages/DashboardPage'
 import MasterAdminPage from './pages/MasterAdminPage'
 import MasterAdminLoginPage from './pages/MasterAdminLoginPage'
 import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage'
-import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage' // Importar a nova página
+import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
+import CourseManagementPage from './pages/CourseManagementPage'
 import { useEffect } from 'react'
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
@@ -69,6 +70,10 @@ function App() {
         <Route 
           path="/dashboard" 
           element={user && (user.role === 'super_admin' || currentChurchId) ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/login" replace />} 
+        />
+        <Route 
+          path="/cursos/:courseId/gerenciar"
+          element={user && user.role && ['admin', 'pastor', 'lider_ministerio'].includes(user.role) ? <CourseManagementPage /> : <Navigate to="/dashboard" replace />}
         />
 
         {/* Rota Raiz - Redirecionamento inicial */}

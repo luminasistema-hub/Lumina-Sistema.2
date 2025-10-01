@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useCourses } from '../../hooks/useCourses'
+import { useMembers } from '../../hooks/useMembers'
 import { Course, NewCourse } from '../../types/course'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -21,6 +23,7 @@ import {
 const CoursesPage = () => {
   const { user } = useAuthStore()
   const { courses, isLoading, createCourse } = useCourses()
+  const { members: potentialTeachers } = useMembers(['admin', 'pastor', 'lider_ministerio'])
   
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -39,7 +42,8 @@ const CoursesPage = () => {
     nivel: 'Básico',
     duracao_horas: 0,
     certificado_disponivel: true,
-    nota_minima_aprovacao: 70
+    nota_minima_aprovacao: 70,
+    professor_id: undefined,
   })
 
   const handleCreateCourse = () => {
@@ -57,7 +61,8 @@ const CoursesPage = () => {
       nivel: 'Básico',
       duracao_horas: 0,
       certificado_disponivel: true,
-      nota_minima_aprovacao: 70
+      nota_minima_aprovacao: 70,
+      professor_id: undefined,
     })
     setCoverFile(null)
     if (previewUrl) {
@@ -140,6 +145,23 @@ const CoursesPage = () => {
                   <div className="space-y-2">
                     <Label htmlFor="descricao">Descrição *</Label>
                     <Textarea id="descricao" value={newCourseData.descricao} onChange={(e) => setNewCourseData({...newCourseData, descricao: e.target.value})} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Professor Responsável</Label>
+                      <Select value={newCourseData.professor_id} onValueChange={(v) => setNewCourseData({...newCourseData, professor_id: v})}>
+                        <SelectTrigger><SelectValue placeholder="Selecione um professor" /></SelectTrigger>
+                        <SelectContent>
+                          {potentialTeachers.map(teacher => (
+                            <SelectItem key={teacher.id} value={teacher.id}>{teacher.nome_completo}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Duração (horas)</Label>
+                      <Input type="number" value={newCourseData.duracao_horas} onChange={(e) => setNewCourseData({...newCourseData, duracao_horas: parseInt(e.target.value) || 0})} />
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
@@ -244,7 +266,11 @@ const CoursesPage = () => {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm"><Edit className="w-4 h-4" /></Button>
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/cursos/${course.id}/gerenciar`}>
+                          <Edit className="w-4 h-4 mr-2" /> Gerenciar
+                        </Link>
+                      </Button>
                       <Button variant="outline" size="sm" className="text-red-600"><Trash2 className="w-4 h-4" /></Button>
                     </div>
                   </div>
