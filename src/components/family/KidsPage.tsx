@@ -882,6 +882,7 @@ const KidsPage = () => {
                     <SelectValue placeholder="Selecione o responsável" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado para permitir valor vazio */}
                     {memberOptions.map(member => (
                       <SelectItem key={member.id} value={member.id}>
                         {member.nome_completo} ({member.email})
