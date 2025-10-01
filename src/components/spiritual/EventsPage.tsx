@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -10,6 +10,7 @@ import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
+import { supabase } from '../../integrations/supabase/client'
 import { 
   Calendar, 
   MapPin, 
@@ -23,9 +24,12 @@ import {
   Filter,
   Search,
   Download,
-  Share2
+  Share2,
+  Loader2,
+  UserX
 } from 'lucide-react'
 
+// Interface atualizada para corresponder à tabela 'eventos'
 interface Event {
   id: string
   nome: string
@@ -36,103 +40,122 @@ interface Event {
   capacidade_maxima?: number
   inscricoes_abertas: boolean
   valor_inscricao?: number
-  responsavel: string
+  responsavel: string // Nome do responsável
+  responsavel_id?: string // ID do responsável (membro)
   status: 'Planejado' | 'Confirmado' | 'Em Andamento' | 'Finalizado' | 'Cancelado'
-  participantes: Array<{
-    id: string
-    nome: string
-    email: string
-    telefone?: string
-    presente?: boolean
-    data_inscricao: string
-  }>
-  ministerios_envolvidos: string[]
-  recursos_necessarios: string[]
-  observacoes?: string
+  created_at: string
+  updated_at: string
+  id_igreja: string
+  // Propriedades para detalhes que serão carregadas sob demanda ou via join
+  participantes_count: number // Contagem de participantes
+  is_registered?: boolean // Se o usuário logado está inscrito
+}
+
+// Interface para os participantes do evento (tabela evento_participantes)
+interface EventParticipant {
+  id: string
+  evento_id: string
+  membro_id: string
+  presente: boolean
+  data_inscricao: string
+  membro_nome?: string // Para exibição
+  membro_email?: string // Para exibição
 }
 
 const EventsPage = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore()
   const [events, setEvents] = useState<Event[]>([])
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list')
-  const [filterType, setFilterType] = useState<string>('all')
+  const [eventParticipants, setEventParticipants] = useState<EventParticipant[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [filterType, setFilterType] = useState<string>('all')
+  const [loading, setLoading] = useState(true)
 
   const canManageEvents = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
 
-  const [newEvent, setNewEvent] = useState<Partial<Event>>({
+  const [newEvent, setNewEvent] = useState({
     nome: '',
     data_hora: '',
     local: '',
     descricao: '',
-    tipo: 'Culto',
+    tipo: 'Culto' as Event['tipo'],
+    capacidade_maxima: undefined as number | undefined,
     inscricoes_abertas: true,
-    status: 'Planejado',
-    participantes: [],
-    ministerios_envolvidos: [],
-    recursos_necessarios: []
+    valor_inscricao: undefined as number | undefined,
   })
 
-  // Mock data
-  useEffect(() => {
-    console.log('EventsPage: Loading events data...')
-    const mockEvents: Event[] = [
-      {
-        id: '1',
-        nome: 'Culto de Domingo',
-        data_hora: '2025-09-15T19:00:00',
-        local: 'Templo Principal',
-        descricao: 'Culto dominical com louvor, palavra e oração',
-        tipo: 'Culto',
-        inscricoes_abertas: false,
-        responsavel: 'Pastor João Silva',
-        status: 'Confirmado',
-        participantes: [
-          { id: '1', nome: 'Maria Santos', email: 'maria@email.com', presente: true, data_inscricao: '2025-09-10' },
-          { id: '2', nome: 'Carlos Silva', email: 'carlos@email.com', presente: false, data_inscricao: '2025-09-11' }
-        ],
-        ministerios_envolvidos: ['Louvor e Adoração', 'Mídia'],
-        recursos_necessarios: ['Som', 'Projetor', 'Instrumentos']
-      },
-      {
-        id: '2',
-        nome: 'Conferência de Avivamento',
-        data_hora: '2025-09-20T19:30:00',
-        local: 'Auditório Central',
-        descricao: 'Uma noite especial de avivamento com pregação poderosa',
-        tipo: 'Conferência',
-        capacidade_maxima: 500,
-        inscricoes_abertas: true,
-        valor_inscricao: 25.00,
-        responsavel: 'Pastor Maria Oliveira',
-        status: 'Planejado',
-        participantes: [],
-        ministerios_envolvidos: ['Organização', 'Diaconato'],
-        recursos_necessarios: ['Som profissional', 'Iluminação especial', 'Decoração']
-      },
-      {
-        id: '3',
-        nome: 'Retiro de Jovens',
-        data_hora: '2025-10-05T08:00:00',
-        local: 'Chácara Bethel',
-        descricao: 'Fim de semana de comunhão e crescimento espiritual para jovens',
-        tipo: 'Retiro',
-        capacidade_maxima: 80,
-        inscricoes_abertas: true,
-        valor_inscricao: 120.00,
-        responsavel: 'Líder Pedro Costa',
-        status: 'Confirmado',
-        participantes: [],
-        ministerios_envolvidos: ['Ministério Jovem', 'Cozinha'],
-        recursos_necessarios: ['Transporte', 'Alimentação', 'Equipamentos']
+  const [editEventData, setEditEventData] = useState({
+    id: '',
+    nome: '',
+    data_hora: '',
+    local: '',
+    descricao: '',
+    tipo: 'Culto' as Event['tipo'],
+    capacidade_maxima: undefined as number | undefined,
+    inscricoes_abertas: true,
+    valor_inscricao: undefined as number | undefined,
+    status: 'Planejado' as Event['status'],
+  })
+
+  const loadEvents = useCallback(async () => {
+    if (!currentChurchId) {
+      setEvents([])
+      setFilteredEvents([])
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('eventos')
+        .select(`
+          *,
+          participantes_count:evento_participantes(count)
+        `)
+        .eq('id_igreja', currentChurchId)
+        .order('data_hora', { ascending: true })
+
+      if (error) throw error
+
+      const fetchedEvents: Event[] = data.map((event: any) => ({
+        ...event,
+        participantes_count: event.participantes_count[0]?.count || 0,
+        is_registered: false, // Será atualizado na próxima etapa
+      }))
+
+      // Verificar se o usuário está inscrito em cada evento
+      if (user?.id) {
+        const { data: userRegistrations, error: regError } = await supabase
+          .from('evento_participantes')
+          .select('evento_id')
+          .eq('membro_id', user.id)
+          .in('evento_id', fetchedEvents.map(e => e.id));
+
+        if (regError) console.error('Error fetching user registrations:', regError);
+
+        const registeredEventIds = new Set(userRegistrations?.map(r => r.evento_id));
+        fetchedEvents.forEach(event => {
+          event.is_registered = registeredEventIds.has(event.id);
+        });
       }
-    ]
-    setEvents(mockEvents)
-    setFilteredEvents(mockEvents)
-  }, [])
+
+      setEvents(fetchedEvents)
+    } catch (error: any) {
+      console.error('Error loading events:', error.message)
+      toast.error('Erro ao carregar eventos: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [currentChurchId, user?.id])
+
+  useEffect(() => {
+    loadEvents()
+  }, [loadEvents])
 
   useEffect(() => {
     let filtered = events
@@ -152,45 +175,252 @@ const EventsPage = () => {
     setFilteredEvents(filtered)
   }, [events, filterType, searchTerm])
 
-  const handleCreateEvent = () => {
-    if (!newEvent.nome || !newEvent.data_hora || !newEvent.local) {
+  const handleCreateEvent = async () => {
+    if (!newEvent.nome || !newEvent.data_hora || !newEvent.local || !currentChurchId) {
       toast.error('Preencha todos os campos obrigatórios')
       return
     }
 
-    const event: Event = {
-      id: Date.now().toString(),
-      nome: newEvent.nome!,
-      data_hora: newEvent.data_hora!,
-      local: newEvent.local!,
-      descricao: newEvent.descricao || '',
-      tipo: newEvent.tipo as Event['tipo'] || 'Culto',
-      capacidade_maxima: newEvent.capacidade_maxima,
-      inscricoes_abertas: newEvent.inscricoes_abertas || false,
-      valor_inscricao: newEvent.valor_inscricao,
-      responsavel: user?.name || '',
-      status: 'Planejado',
-      participantes: [],
-      ministerios_envolvidos: newEvent.ministerios_envolvidos || [],
-      recursos_necessarios: newEvent.recursos_necessarios || []
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('eventos')
+        .insert({
+          id_igreja: currentChurchId,
+          nome: newEvent.nome,
+          data_hora: newEvent.data_hora,
+          local: newEvent.local,
+          descricao: newEvent.descricao || null,
+          tipo: newEvent.tipo,
+          capacidade_maxima: newEvent.capacidade_maxima || null,
+          inscricoes_abertas: newEvent.inscricoes_abertas,
+          valor_inscricao: newEvent.valor_inscricao || null,
+          responsavel: user?.name || 'Sistema', // Nome do usuário logado como responsável
+          responsavel_id: user?.id || null, // ID do usuário logado como responsável
+          status: 'Planejado',
+        })
+
+      if (error) throw error
+      toast.success('Evento criado com sucesso!')
+      setIsCreateDialogOpen(false)
+      setNewEvent({
+        nome: '', data_hora: '', local: '', descricao: '', tipo: 'Culto',
+        capacidade_maxima: undefined, inscricoes_abertas: true, valor_inscricao: undefined
+      })
+      loadEvents()
+    } catch (error: any) {
+      console.error('Error creating event:', error.message)
+      toast.error('Erro ao criar evento: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditEvent = async () => {
+    if (!editEventData.id || !editEventData.nome || !editEventData.data_hora || !editEventData.local || !currentChurchId) {
+      toast.error('Preencha todos os campos obrigatórios para edição')
+      return
     }
 
-    setEvents([...events, event])
-    setIsCreateDialogOpen(false)
-    setNewEvent({
-      nome: '',
-      data_hora: '',
-      local: '',
-      descricao: '',
-      tipo: 'Culto',
-      inscricoes_abertas: true,
-      status: 'Planejado',
-      participantes: [],
-      ministerios_envolvidos: [],
-      recursos_necessarios: []
-    })
-    toast.success('Evento criado com sucesso!')
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('eventos')
+        .update({
+          nome: editEventData.nome,
+          data_hora: editEventData.data_hora,
+          local: editEventData.local,
+          descricao: editEventData.descricao || null,
+          tipo: editEventData.tipo,
+          capacidade_maxima: editEventData.capacidade_maxima || null,
+          inscricoes_abertas: editEventData.inscricoes_abertas,
+          valor_inscricao: editEventData.valor_inscricao || null,
+          status: editEventData.status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editEventData.id)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Evento atualizado com sucesso!')
+      setIsEditDialogOpen(false)
+      setSelectedEvent(null)
+      loadEvents()
+    } catch (error: any) {
+      console.error('Error updating event:', error.message)
+      toast.error('Erro ao atualizar evento: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este evento? Esta ação é irreversível e removerá todos os participantes associados.')) {
+      return
+    }
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('eventos')
+        .delete()
+        .eq('id', eventId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Evento excluído com sucesso!')
+      loadEvents()
+    } catch (error: any) {
+      console.error('Error deleting event:', error.message)
+      toast.error('Erro ao excluir evento: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRegisterForEvent = async (event: Event) => {
+    if (!user?.id || !currentChurchId) {
+      toast.error('Você precisa estar logado para se inscrever em um evento.')
+      return
+    }
+    if (event.participantes_count >= (event.capacidade_maxima || Infinity)) {
+      toast.error('Capacidade máxima do evento atingida.')
+      return;
+    }
+    if (event.valor_inscricao && event.valor_inscricao > 0) {
+      toast.info('Este evento possui valor de inscrição. A funcionalidade de pagamento será implementada em breve.');
+      // Implementar lógica de pagamento aqui
+      // Por enquanto, vamos permitir a inscrição sem pagamento real
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('evento_participantes')
+        .insert({
+          evento_id: event.id,
+          membro_id: user.id,
+          data_inscricao: new Date().toISOString(),
+          presente: false, // Inicialmente não presente
+          id_igreja: currentChurchId, // Adicionar id_igreja para RLS
+        })
+
+      if (error) throw error
+      toast.success('Inscrição realizada com sucesso!')
+      loadEvents()
+    } catch (error: any) {
+      console.error('Error registering for event:', error.message)
+      toast.error('Erro ao se inscrever no evento: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUnregisterForEvent = async (eventId: string) => {
+    if (!user?.id || !currentChurchId) {
+      toast.error('Você precisa estar logado para cancelar a inscrição.')
+      return
+    }
+
+    if (!confirm('Tem certeza que deseja cancelar sua inscrição neste evento?')) {
+      return;
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('evento_participantes')
+        .delete()
+        .eq('evento_id', eventId)
+        .eq('membro_id', user.id)
+        .eq('id_igreja', currentChurchId) // Adicionar id_igreja para RLS
+
+      if (error) throw error
+      toast.success('Inscrição cancelada com sucesso!')
+      loadEvents()
+    } catch (error: any) {
+      console.error('Error unregistering for event:', error.message)
+      toast.error('Erro ao cancelar inscrição: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadEventDetails = async (eventId: string) => {
+    if (!currentChurchId) return;
+    setLoading(true);
+    try {
+      const { data: eventData, error: eventError } = await supabase
+        .from('eventos')
+        .select(`
+          *,
+          participantes_count:evento_participantes(count)
+        `)
+        .eq('id', eventId)
+        .eq('id_igreja', currentChurchId)
+        .single();
+
+      if (eventError) throw eventError;
+
+      const eventWithCount: Event = {
+        ...eventData,
+        participantes_count: eventData.participantes_count[0]?.count || 0,
+        is_registered: false, // Será atualizado abaixo
+      };
+
+      // Verificar se o usuário logado está inscrito
+      if (user?.id) {
+        const { data: userRegistration, error: regError } = await supabase
+          .from('evento_participantes')
+          .select('id')
+          .eq('evento_id', eventId)
+          .eq('membro_id', user.id)
+          .eq('id_igreja', currentChurchId)
+          .maybeSingle();
+        if (regError) console.error('Error checking user registration:', regError);
+        eventWithCount.is_registered = !!userRegistration;
+      }
+
+      // Carregar lista de participantes para o modal de detalhes
+      const { data: participantsData, error: participantsError } = await supabase
+        .from('evento_participantes')
+        .select(`
+          id,
+          evento_id,
+          membro_id,
+          presente,
+          data_inscricao,
+          membros(nome_completo, email)
+        `)
+        .eq('evento_id', eventId)
+        .eq('id_igreja', currentChurchId);
+
+      if (participantsError) throw participantsError;
+
+      const formattedParticipants: EventParticipant[] = participantsData.map((p: any) => ({
+        id: p.id,
+        evento_id: p.evento_id,
+        membro_id: p.membro_id,
+        presente: p.presente,
+        data_inscricao: p.data_inscricao,
+        membro_nome: p.membros?.nome_completo || 'Desconhecido',
+        membro_email: p.membros?.email || 'N/A',
+      }));
+
+      setSelectedEvent(eventWithCount);
+      setEventParticipants(formattedParticipants);
+      setIsDetailDialogOpen(true);
+    } catch (error: any) {
+      console.error('Error loading event details:', error.message);
+      toast.error('Erro ao carregar detalhes do evento: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status: Event['status']) => {
     switch (status) {
@@ -219,6 +449,24 @@ const EventsPage = () => {
       date: date.toLocaleDateString('pt-BR'),
       time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     }
+  }
+
+  if (!currentChurchId) {
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para gerenciar os eventos.
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin">
+        </Loader2>
+        <p className="ml-4 text-lg text-gray-600">Carregando eventos...</p>
+      </div>
+    );
   }
 
   return (
@@ -360,6 +608,16 @@ const EventsPage = () => {
                       />
                     </div>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="inscricoes_abertas"
+                      checked={newEvent.inscricoes_abertas}
+                      onChange={(e) => setNewEvent({...newEvent, inscricoes_abertas: e.target.checked})}
+                      className="form-checkbox h-4 w-4 text-purple-600"
+                    />
+                    <Label htmlFor="inscricoes_abertas">Inscrições Abertas</Label>
+                  </div>
 
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -419,12 +677,12 @@ const EventsPage = () => {
                       <div className="flex items-center gap-4 text-sm text-gray-600">
                         <div className="flex items-center gap-1">
                           <Users className="w-4 h-4" />
-                          <span>{event.participantes.length} participantes</span>
+                          <span>{event.participantes_count} participantes</span>
                           {event.capacidade_maxima && (
                             <span>/ {event.capacidade_maxima}</span>
                           )}
                         </div>
-                        {event.valor_inscricao && (
+                        {event.valor_inscricao && event.valor_inscricao > 0 && (
                           <div className="font-medium text-green-600">
                             R$ {event.valor_inscricao.toFixed(2)}
                           </div>
@@ -434,23 +692,63 @@ const EventsPage = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => loadEventDetails(event.id)}>
                     <Eye className="w-4 h-4 mr-2" />
                     Ver Detalhes
                   </Button>
-                  {event.inscricoes_abertas && (
-                    <Button size="sm" className="bg-green-500 hover:bg-green-600">
+                  {event.inscricoes_abertas && !event.is_registered && (
+                    <Button 
+                      size="sm" 
+                      className="bg-green-500 hover:bg-green-600"
+                      onClick={() => handleRegisterForEvent(event)}
+                      disabled={event.participantes_count >= (event.capacidade_maxima || Infinity)}
+                    >
                       <UserCheck className="w-4 h-4 mr-2" />
                       Inscrever-se
                     </Button>
                   )}
+                  {event.inscricoes_abertas && event.is_registered && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="text-red-600 hover:bg-red-50"
+                      onClick={() => handleUnregisterForEvent(event.id)}
+                    >
+                      <UserX className="w-4 h-4 mr-2" />
+                      Cancelar Inscrição
+                    </Button>
+                  )}
                   {canManageEvents && (
                     <>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setEditEventData({
+                            id: event.id,
+                            nome: event.nome,
+                            data_hora: event.data_hora.slice(0, 16), // Formato para input datetime-local
+                            local: event.local,
+                            descricao: event.descricao,
+                            tipo: event.tipo,
+                            capacidade_maxima: event.capacidade_maxima,
+                            inscricoes_abertas: event.inscricoes_abertas,
+                            valor_inscricao: event.valor_inscricao,
+                            status: event.status,
+                          });
+                          setIsEditDialogOpen(true);
+                        }}
+                      >
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteEvent(event.id)}
+                      >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </>
@@ -475,6 +773,232 @@ const EventsPage = () => {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Edit Event Dialog */}
+      {selectedEvent && (
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Evento: {selectedEvent.nome}</DialogTitle>
+              <DialogDescription>
+                Atualize as informações do evento
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-nome">Nome do Evento *</Label>
+                  <Input
+                    id="edit-nome"
+                    value={editEventData.nome}
+                    onChange={(e) => setEditEventData({...editEventData, nome: e.target.value})}
+                    placeholder="Nome do evento"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tipo">Tipo de Evento</Label>
+                  <Select value={editEventData.tipo} onValueChange={(value) => setEditEventData({...editEventData, tipo: value as Event['tipo']})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Culto">Culto</SelectItem>
+                      <SelectItem value="Conferência">Conferência</SelectItem>
+                      <SelectItem value="Retiro">Retiro</SelectItem>
+                      <SelectItem value="Evangelismo">Evangelismo</SelectItem>
+                      <SelectItem value="Casamento">Casamento</SelectItem>
+                      <SelectItem value="Funeral">Funeral</SelectItem>
+                      <SelectItem value="Outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-data_hora">Data e Hora *</Label>
+                  <Input
+                    id="edit-data_hora"
+                    type="datetime-local"
+                    value={editEventData.data_hora}
+                    onChange={(e) => setEditEventData({...editEventData, data_hora: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-local">Local *</Label>
+                  <Input
+                    id="edit-local"
+                    value={editEventData.local}
+                    onChange={(e) => setEditEventData({...editEventData, local: e.target.value})}
+                    placeholder="Local do evento"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-descricao">Descrição</Label>
+                <Textarea
+                  id="edit-descricao"
+                  value={editEventData.descricao}
+                  onChange={(e) => setEditEventData({...editEventData, descricao: e.target.value})}
+                  placeholder="Descrição do evento"
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-capacidade">Capacidade Máxima</Label>
+                  <Input
+                    id="edit-capacidade"
+                    type="number"
+                    value={editEventData.capacidade_maxima || ''}
+                    onChange={(e) => setEditEventData({...editEventData, capacidade_maxima: parseInt(e.target.value) || undefined})}
+                    placeholder="Número máximo de participantes"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-valor">Valor da Inscrição (R$)</Label>
+                  <Input
+                    id="edit-valor"
+                    type="number"
+                    step="0.01"
+                    value={editEventData.valor_inscricao || ''}
+                    onChange={(e) => setEditEventData({...editEventData, valor_inscricao: parseFloat(e.target.value) || undefined})}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="edit-inscricoes_abertas"
+                  checked={editEventData.inscricoes_abertas}
+                  onChange={(e) => setEditEventData({...editEventData, inscricoes_abertas: e.target.checked})}
+                  className="form-checkbox h-4 w-4 text-purple-600"
+                />
+                <Label htmlFor="edit-inscricoes_abertas">Inscrições Abertas</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-status">Status do Evento</Label>
+                <Select value={editEventData.status} onValueChange={(value) => setEditEventData({...editEventData, status: value as Event['status']})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Planejado">Planejado</SelectItem>
+                    <SelectItem value="Confirmado">Confirmado</SelectItem>
+                    <SelectItem value="Em Andamento">Em Andamento</SelectItem>
+                    <SelectItem value="Finalizado">Finalizado</SelectItem>
+                    <SelectItem value="Cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleEditEvent}>
+                  Salvar Alterações
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Event Detail Modal */}
+      {selectedEvent && (
+        <Dialog open={isDetailDialogOpen} onOpenChange={() => setIsDetailDialogOpen(false)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">{selectedEvent.nome}</DialogTitle>
+              <DialogDescription>
+                Detalhes do evento e lista de participantes
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Data</Label>
+                  <p className="text-gray-900">{formatDateTime(selectedEvent.data_hora).date}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Hora</Label>
+                  <p className="text-gray-900">{formatDateTime(selectedEvent.data_hora).time}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Local</Label>
+                  <p className="text-gray-900">{selectedEvent.local}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Tipo</Label>
+                  <Badge className={getTypeColor(selectedEvent.tipo)}>{selectedEvent.tipo}</Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Status</Label>
+                  <Badge className={getStatusColor(selectedEvent.status)}>{selectedEvent.status}</Badge>
+                </div>
+                {selectedEvent.capacidade_maxima && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Capacidade Máxima</Label>
+                    <p className="text-gray-900">{selectedEvent.capacidade_maxima} pessoas</p>
+                  </div>
+                )}
+                {selectedEvent.valor_inscricao && selectedEvent.valor_inscricao > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500">Valor da Inscrição</Label>
+                    <p className="text-green-600 font-bold">R$ {selectedEvent.valor_inscricao.toFixed(2)}</p>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Inscrições Abertas</Label>
+                  <p className="text-gray-900">{selectedEvent.inscricoes_abertas ? 'Sim' : 'Não'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Responsável</Label>
+                  <p className="text-gray-900">{selectedEvent.responsavel}</p>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Descrição</Label>
+                <p className="text-gray-700">{selectedEvent.descricao}</p>
+              </div>
+
+              <div className="pt-4 border-t">
+                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Participantes ({eventParticipants.length})
+                </h3>
+                {eventParticipants.length > 0 ? (
+                  <div className="space-y-2">
+                    {eventParticipants.map(participant => (
+                      <div key={participant.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <p className="font-medium">{participant.membro_nome}</p>
+                          <p className="text-sm text-gray-600">{participant.membro_email}</p>
+                        </div>
+                        <Badge variant="outline">
+                          Inscrito em {new Date(participant.data_inscricao).toLocaleDateString('pt-BR')}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-600 italic">Nenhum participante inscrito ainda.</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )
