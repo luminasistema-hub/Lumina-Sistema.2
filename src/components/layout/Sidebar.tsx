@@ -126,21 +126,6 @@ const moduleCategories: ModuleCategory[] = [
       }
     ]
   },
-  // Removido o módulo 'kids' da categoria 'family'
-  // {
-  //   id: 'family',
-  //   title: 'Família',
-  //   icon: <Baby className="w-5 h-5" />,
-  //   modules: [
-  //     {
-  //       id: 'kids',
-  //       title: 'Kids',
-  //       icon: <Baby className="w-4 h-4" />,
-  //       roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'voluntario', 'integra'],
-  //       status: 'complete'
-  //     }
-  //   ]
-  // },
   {
     id: 'management',
     title: 'Gestão',
@@ -174,11 +159,11 @@ const moduleCategories: ModuleCategory[] = [
         roles: ['admin', 'pastor'], 
         status: 'complete'
       },
-      { // NOVO MÓDULO KIDS EM GESTÃO
+      { 
         id: 'kids-management',
         title: 'Gestão Kids',
         icon: <Baby className="w-4 h-4" />,
-        roles: ['admin', 'pastor', 'lider_ministerio', 'membro'], // Membros podem ver seus próprios filhos
+        roles: ['admin', 'pastor', 'lider_ministerio', 'membro'], 
         status: 'complete'
       }
     ]
@@ -242,7 +227,7 @@ interface SidebarProps {
 
 const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['personal', 'management']) // Expandir 'management' por padrão
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['personal', 'management'])
   const { user, setCurrentChurchId } = useAuthStore()
   const { churches, loadChurches } = useChurchStore()
   const navigate = useNavigate()
@@ -445,6 +430,24 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }
             >
               <Shield className="w-4 h-4" />
               {!isCollapsed && <span className="ml-3">Painel Master</span>}
+            </Button>
+          </div>
+        )}
+
+        {/* Link para Registro de Super Admin (visível se não houver super admin logado) */}
+        {!user && (
+          <div className="px-4 mb-4">
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start",
+                isCollapsed ? "px-2" : "px-3",
+                "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+              )}
+              onClick={() => navigate('/super-admin-register')}
+            >
+              <Shield className="w-4 h-4" />
+              {!isCollapsed && <span className="ml-3">Registrar Super Admin</span>}
             </Button>
           </div>
         )}

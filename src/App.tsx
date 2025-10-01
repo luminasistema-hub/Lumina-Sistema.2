@@ -4,7 +4,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import MasterAdminPage from './pages/MasterAdminPage'
-import MasterAdminLoginPage from './pages/MasterAdminLoginPage' // Importar o novo portal de login
+import MasterAdminLoginPage from './pages/MasterAdminLoginPage'
+import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage' // Importar a nova página
 import { useEffect } from 'react'
 
 function App() {
@@ -34,7 +35,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-church-blue-50 to-church-purple-50">
       <Routes>
-        {/* Rotas de Login e Registro */}
+        {/* Rotas de Login e Registro Comum */}
         <Route 
           path="/login" 
           element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <LoginPage />} 
@@ -43,9 +44,15 @@ function App() {
           path="/register" 
           element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <RegisterPage />} 
         />
+        
+        {/* Rotas de Login e Registro de Super Admin */}
         <Route 
           path="/master-admin-login" 
           element={user?.role === 'super_admin' ? <Navigate to="/master-admin" replace /> : <MasterAdminLoginPage />} 
+        />
+        <Route 
+          path="/super-admin-register" 
+          element={user?.role === 'super_admin' ? <Navigate to="/master-admin" replace /> : <SuperAdminRegisterPage />} 
         />
 
         {/* Rotas Protegidas */}
