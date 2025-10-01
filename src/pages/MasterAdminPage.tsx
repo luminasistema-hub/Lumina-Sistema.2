@@ -7,19 +7,20 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs' // Importar Tabs
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { toast } from 'sonner'
 import { Church as ChurchIcon, Plus, Edit, Trash2, Users, DollarSign, CheckCircle, XCircle, Clock, Globe, Loader2, Database, Key, BarChart3 } from 'lucide-react'
 import MainLayout from '../components/layout/MainLayout'
 import MasterAdminOverviewCards from '../components/master-admin/MasterAdminOverviewCards'
 import MasterAdminChurchTable from '../components/master-admin/MasterAdminChurchTable'
 import ManageChurchSubscriptionDialog from '../components/master-admin/ManageChurchSubscriptionDialog'
-import DatabaseInfoTab from '../components/master-admin/DatabaseInfoTab' // Novo
-import AdminToolsTab from '../components/master-admin/AdminToolsTab' // Novo
-import SaaSReportsTab from '../components/master-admin/SaaSReportsTab' // Novo
-import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHistoryDialog' // Já existente, mas garantir import
-import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview'; // Importar novo componente
-import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus'; // Importar novo componente
+import DatabaseInfoTab from '../components/master-admin/DatabaseInfoTab'
+import AdminToolsTab from '../components/master-admin/AdminToolsTab'
+import SaaSReportsTab from '../components/master-admin/SaaSReportsTab'
+import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHistoryDialog'
+import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
+import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
+import { supabase } from '../integrations/supabase/client' // Importar supabase
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
@@ -27,22 +28,43 @@ const MasterAdminPage = () => {
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false)
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null)
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview'); // Novo estado para a aba ativa
+  const [activeTab, setActiveTab] = useState('overview');
 
-  const [newChurch, setNewChurch] = useState({
-    name: '',
-    subscriptionPlan: '0-100 membros' as SubscriptionPlan,
-    status: 'active' as Church['status'],
-    adminUserId: user?.id || null, 
-  })
+  // Novos estados para métricas globais
+  const [totalUsersCount, setTotalUsersCount] = useState(0);
+  const [activeMembersCount, setActiveMembersCount] = useState(0);
 
   useEffect(() => {
-    const fetchChurches = async () => {
+    const fetchChurchesAndMetrics = async () => {
       setIsLoading(true);
       await loadChurches();
+
+      // Fetch total users from Supabase Auth
+      try {
+        const { data: usersData, error: usersError } = await supabase.auth.admin.listUsers();
+        if (usersError) throw usersError;
+        setTotalUsersCount(usersData.users.length);
+      } catch (error: any) {
+        console.error('Error fetching total users:', error.message);
+        toast.error('Erro ao carregar total de usuários: ' + error.message);
+      }
+
+      // Fetch active members from public.membros
+      try {
+        const { count, error: membersError } = await supabase
+          .from('membros')
+          .select('id', { count: 'exact' })
+          .eq('status', 'ativo');
+        if (membersError) throw membersError;
+        setActiveMembersCount(count || 0);
+      } catch (error: any) {
+        console.error('Error fetching active members:', error.message);
+        toast.error('Erro ao carregar membros ativos: ' + error.message);
+      }
+
       setIsLoading(false);
     };
-    fetchChurches();
+    fetchChurchesAndMetrics();
   }, [loadChurches]);
 
   if (user?.role !== 'super_admin') {
@@ -77,6 +99,11 @@ const MasterAdminPage = () => {
           adminUserId: user?.id || null,
         });
         toast.success(`Igreja ${added.name} adicionada com sucesso!`);
+        // Recarregar métricas após adicionar igreja
+        const { data: usersData } = await supabase.auth.admin.listUsers();
+        setTotalUsersCount(usersData?.users.length || 0);
+        const { count } = await supabase.from('membros').select('id', { count: 'exact' }).eq('status', 'ativo');
+        setActiveMembersCount(count || 0);
       } else {
         toast.error('Falha ao adicionar a igreja.');
       }
@@ -94,6 +121,9 @@ const MasterAdminPage = () => {
       const updated = await updateChurch(churchId, updates);
       if (updated) {
         toast.success(`Igreja ${updated.name} atualizada com sucesso!`);
+        // Recarregar métricas se o status de um membro for alterado (indiretamente)
+        const { count } = await supabase.from('membros').select('id', { count: 'exact' }).eq('status', 'ativo');
+        setActiveMembersCount(count || 0);
       } else {
         toast.error('Falha ao atualizar a igreja.');
       }
@@ -126,8 +156,11 @@ const MasterAdminPage = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <MasterAdminOverviewCards churches={churches} />
-            <MasterAdminSystemOverview /> {/* Novo componente */}
-            <MasterAdminServerStatus /> {/* Novo componente */}
+            <MasterAdminSystemOverview 
+              totalUsersCount={totalUsersCount} 
+              activeMembersCount={activeMembersCount} 
+            />
+            <MasterAdminServerStatus />
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">
@@ -137,7 +170,6 @@ const MasterAdminPage = () => {
                   <ChurchIcon className="w-6 h-6 text-purple-500" />
                   Igrejas Cadastradas
                 </CardTitle>
-                {/* DialogTrigger button movido para dentro do CardHeader */}
                 <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
                   <DialogTrigger asChild>
                     <Button className="bg-purple-500 hover:bg-purple-600">

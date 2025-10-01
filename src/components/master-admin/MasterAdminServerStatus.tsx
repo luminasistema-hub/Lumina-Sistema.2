@@ -4,6 +4,9 @@ import { Badge } from '../ui/badge';
 import { Server } from 'lucide-react';
 
 const MasterAdminServerStatus: React.FC = () => {
+  // As métricas de status do servidor abaixo são hardcoded.
+  // Em um ambiente de produção real, elas seriam obtidas de um sistema de monitoramento de infraestrutura (ex: Prometheus, Grafana, AWS CloudWatch, etc.)
+  // e não são diretamente acessíveis via API cliente do Supabase.
   const serverStatus = [
     { name: 'API Server', status: 'online', response: '45ms', uptime: '99.9%' },
     { name: 'Database', status: 'online', response: '12ms', uptime: '99.8%' },
