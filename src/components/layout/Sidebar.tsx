@@ -232,8 +232,10 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
   const navigate = useNavigate()
 
   useEffect(() => {
-    loadChurches()
-  }, [loadChurches])
+    if (user?.role === 'super_admin') {
+      loadChurches()
+    }
+  }, [loadChurches, user?.role])
 
   if (!user) return null
 
@@ -374,27 +376,6 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
           {user?.role === 'super_admin' && (
             <p className="text-xs text-gray-500 mt-2 truncate">👑 Painel Master</p>
           )}
-        </div>
-      )}
-
-      {/* Church Selector for Non-Super Admin */}
-      {user?.role !== 'super_admin' && !isCollapsed && (
-        <div className="p-4 border-b border-gray-100">
-          <Label htmlFor="church-selector" className="text-xs font-medium text-gray-600 mb-1 block">
-            Igreja Ativa
-          </Label>
-          <Select value={currentChurchId || ''} onValueChange={handleChurchSelect}>
-            <SelectTrigger id="church-selector" className="w-full">
-              <SelectValue placeholder="Selecione uma igreja" />
-            </SelectTrigger>
-            <SelectContent>
-              {churches.map(church => (
-                <SelectItem key={church.id} value={church.id}>
-                  {church.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       )}
 
