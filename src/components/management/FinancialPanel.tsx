@@ -1499,14 +1499,14 @@ const FinancialPanel = () => {
                               setNewTransaction({
                                 tipo: transaction.tipo,
                                 categoria: transaction.categoria,
-                                subcategoria: transaction.subcategoria || '',
+                                subcategoria: transaction.subcategoria || undefined,
                                 valor: transaction.valor,
                                 data_transacao: transaction.data_transacao,
                                 descricao: transaction.descricao,
                                 metodo_pagamento: transaction.metodo_pagamento,
-                                observacoes: transaction.observacoes || '',
-                                centro_custo: transaction.centro_custo || '',
-                                numero_documento: transaction.numero_documento || ''
+                                observacoes: transaction.observacoes || undefined,
+                                centro_custo: transaction.centro_custo || undefined,
+                                numero_documento: transaction.numero_documento || undefined
                               })
                               setIsEditTransactionOpen(true)
                             }}
@@ -1661,10 +1661,10 @@ const FinancialPanel = () => {
                               setBudgetToEdit(budget)
                               setNewBudget({
                                 categoria: budget.categoria,
-                                subcategoria: budget.subcategoria || '',
+                                subcategoria: budget.subcategoria || undefined,
                                 valor_orcado: budget.valor_orcado,
                                 mes_ano: budget.mes_ano,
-                                descricao: budget.descricao || '',
+                                descricao: budget.descricao || undefined,
                                 alertas_configurados: budget.alertas_configurados
                               })
                               setIsEditBudgetOpen(true)
@@ -1844,10 +1844,10 @@ const FinancialPanel = () => {
                                 nome: goal.nome,
                                 valor_meta: goal.valor_meta,
                                 data_limite: goal.data_limite,
-                                categoria: goal.categoria || '',
-                                descricao: goal.descricao || '',
+                                categoria: goal.categoria || undefined,
+                                descricao: goal.descricao || undefined,
                                 campanha_ativa: goal.campanha_ativa,
-                                status: goal.status // Adicionar status para edição
+                                status: goal.status
                               })
                               setIsEditGoalOpen(true)
                             }}
