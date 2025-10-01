@@ -139,6 +139,12 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
     setShowProfileDialog(false); 
   }
 
+  // Nova função para lidar com a navegação do diálogo de perfil
+  const handleNavigateToProfileFromDialog = () => {
+    setActiveModule('personal-info'); // Define o módulo ativo para informações pessoais
+    setShowProfileDialog(false); // Fecha o diálogo explicitamente
+  };
+
   return (
     <MainLayout activeModule={activeModule} onModuleSelect={handleModuleSelect}>
       {renderModuleContent()}
@@ -146,7 +152,7 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
         <ProfileCompletionDialog
           isOpen={showProfileDialog}
           onClose={() => setShowProfileDialog(false)}
-          onNavigateToProfile={() => handleModuleSelect('personal-info')}
+          onNavigateToProfile={handleNavigateToProfileFromDialog} // Usa a nova função aqui
         />
       )}
     </MainLayout>
