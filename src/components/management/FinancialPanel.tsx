@@ -335,7 +335,7 @@ const FinancialPanel = () => {
       toast.success('Transação adicionada com sucesso!')
       setIsAddTransactionOpen(false)
       setNewTransaction({
-        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+        tipo: 'Entrada', categoria: undefined, subcategoria: undefined, valor: 0, data_transacao: new Date().toISOString().split('T')[0],
         descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
       })
       loadFinancialData()
@@ -384,7 +384,7 @@ const FinancialPanel = () => {
       setIsEditTransactionOpen(false)
       setTransactionToEdit(null)
       setNewTransaction({
-        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+        tipo: 'Entrada', categoria: undefined, subcategoria: undefined, valor: 0, data_transacao: new Date().toISOString().split('T')[0],
         descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
       })
       loadFinancialData()
@@ -562,7 +562,7 @@ const FinancialPanel = () => {
       toast.success('Orçamento criado com sucesso!')
       setIsAddBudgetOpen(false)
       setNewBudget({
-        categoria: '', subcategoria: '', valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
+        categoria: undefined, subcategoria: undefined, valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
         descricao: '', alertas_configurados: true
       })
       loadFinancialData()
@@ -607,7 +607,7 @@ const FinancialPanel = () => {
       setIsEditBudgetOpen(false)
       setBudgetToEdit(null)
       setNewBudget({
-        categoria: '', subcategoria: '', valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
+        categoria: undefined, subcategoria: undefined, valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
         descricao: '', alertas_configurados: true
       })
       loadFinancialData()
@@ -673,7 +673,7 @@ const FinancialPanel = () => {
       toast.success('Meta financeira criada com sucesso!')
       setIsAddGoalOpen(false)
       setNewGoal({
-        nome: '', valor_meta: 0, data_limite: '', categoria: '',
+        nome: '', valor_meta: 0, data_limite: '', categoria: undefined,
         descricao: '', campanha_ativa: false, status: 'Ativo'
       })
       loadFinancialData()
@@ -717,7 +717,7 @@ const FinancialPanel = () => {
       setIsEditGoalOpen(false)
       setGoalToEdit(null)
       setNewGoal({
-        nome: '', valor_meta: 0, data_limite: '', categoria: '',
+        nome: '', valor_meta: 0, data_limite: '', categoria: undefined,
         descricao: '', campanha_ativa: false, status: 'Ativo'
       })
       loadFinancialData()
