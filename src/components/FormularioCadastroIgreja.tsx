@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,19 +7,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import { Building, Mail, Lock, Eye, EyeOff, User, Loader2 } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
-import { useChurchStore } from '../stores/churchStore';
 
 const FormularioCadastroIgreja = () => {
   const navigate = useNavigate();
-  const { addChurch, getSubscriptionPlans } = useChurchStore();
 
   const [churchName, setChurchName] = useState('');
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState('0-100 membros');
+  const [selectedPlan, setSelectedPlan] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  const [subscriptionPlans, setSubscriptionPlans] = useState<{ value: string; label: string; monthlyValue: number }[]>([]);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+        const { data, error } = await supabase
+            .from('planos_assinatura')
+            .select('id, nome, preco_mensal');
+        
+        if (data) {
+            const formattedPlans = data.map(plan => ({
+                value: plan.id, // O valor agora é o UUID
+                label: plan.nome,
+                monthlyValue: plan.preco_mensal
+            }));
+            setSubscriptionPlans(formattedPlans);
+            // Define um plano padrão se houver planos
+            if (formattedPlans.length > 0) {
+              setSelectedPlan(formattedPlans[0].value);
+            }
+        }
+    };
+    fetchPlans();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +52,6 @@ const FormularioCadastroIgreja = () => {
       setIsLoading(false);
       return;
     }
-
     if (adminPassword.length < 6) {
       toast.error('A senha deve ter pelo menos 6 caracteres.');
       setIsLoading(false);
@@ -38,75 +59,36 @@ const FormularioCadastroIgreja = () => {
     }
 
     try {
-      // 1. Create the user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: adminEmail,
         password: adminPassword,
         options: {
           data: {
-            full_name: adminName,
             church_name: churchName,
-            initial_role: 'admin', // The first user is always an admin
+            full_name: adminName,
+            plano_id: selectedPlan,
+            initial_role: 'admin',
           },
         },
       });
 
-      if (authError) {
-        console.error('FormularioCadastroIgreja: Supabase signUp error:', authError.message);
-        toast.error(authError.message);
-        setIsLoading(false);
-        return;
+      if (error) {
+        throw new Error(error.message);
       }
 
-      if (!authData.user) {
-        toast.error('Erro desconhecido ao criar usuário administrador.');
-        setIsLoading(false);
-        return;
-      }
-
-      const newAdminUserId = authData.user.id;
-
-      // 2. Add the church to the store (which also saves to Supabase)
-      const newChurch = await addChurch({
-        name: churchName,
-        subscriptionPlan: selectedPlan as any, // Cast to SubscriptionPlan
-        status: 'active',
-        adminUserId: newAdminUserId,
-      });
-
-      if (!newChurch) {
-        // If church creation fails, attempt to delete the auth user
-        await supabase.auth.admin.deleteUser(newAdminUserId);
-        toast.error('Falha ao cadastrar a igreja. Tente novamente.');
-        setIsLoading(false);
-        return;
-      }
-
-      // 3. Insert the corresponding profile into public.membros
-      // This step is now handled by the `handle_new_user` trigger in Supabase
-      // However, we need to ensure the `perfil_completo` is set to true for the admin
-      const { error: updateMemberError } = await supabase
-        .from('membros')
-        .update({ perfil_completo: true })
-        .eq('id', newAdminUserId);
-
-      if (updateMemberError) {
-        console.error('FormularioCadastroIgreja: Error updating member profile:', updateMemberError.message);
-        // This is a non-critical error for the user, but log it
-      }
-
-      toast.success('Igreja e conta de administrador criadas com sucesso! Você já pode fazer login.');
+      toast.success('Igreja e conta de administrador criadas com sucesso! Verifique seu email para confirmar.');
       navigate('/login');
 
-    } catch (err) {
-      console.error('FormularioCadastroIgreja: Unexpected error during registration:', err);
-      toast.error('Ocorreu um erro inesperado. Tente novamente.');
+    } catch (err: any) {
+      console.error('FormularioCadastroIgreja: Erro no cadastro:', err);
+      const mensagem = err.message.includes('User already registered')
+        ? 'Este e-mail já está cadastrado.'
+        : 'Ocorreu um erro ao realizar o cadastro. Tente novamente.';
+      toast.error(mensagem);
     } finally {
       setIsLoading(false);
     }
   };
-
-  const subscriptionPlans = getSubscriptionPlans();
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -183,7 +165,7 @@ const FormularioCadastroIgreja = () => {
 
       <div className="space-y-2">
         <Label htmlFor="subscriptionPlan">Plano de Assinatura *</Label>
-        <Select value={selectedPlan} onValueChange={setSelectedPlan}>
+        <Select value={selectedPlan} onValueChange={setSelectedPlan} disabled={subscriptionPlans.length === 0}>
           <SelectTrigger id="subscriptionPlan">
             <SelectValue placeholder="Selecione um plano" />
           </SelectTrigger>

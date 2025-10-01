@@ -40,7 +40,6 @@ export interface Church {
 
 interface ChurchState {
   churches: Church[]
-  addChurch: (church: Omit<Church, 'id' | 'created_at' | 'updated_at' | 'currentMembers' | 'valor_mensal_assinatura' | 'ultimo_pagamento_status' | 'historico_pagamentos' | 'server_memory_limit' | 'server_execution_timeout' | 'db_connection_pool' | 'db_query_cache_mb'>) => Promise<Church | null>
   updateChurch: (churchId: string, updates: Partial<Church>) => Promise<Church | null>
   getChurchById: (churchId: string) => Church | undefined
   loadChurches: () => Promise<void>
@@ -97,63 +96,6 @@ export const useChurchStore = create<ChurchState>()(
           db_connection_pool: c.db_connection_pool,
           db_query_cache_mb: c.db_query_cache_mb,
         })) as Church[] });
-      },
-
-      addChurch: async (newChurchData) => {
-        console.log('churchStore: Adding new church to Supabase:', newChurchData);
-        const planDetails = get().getPlanDetails(newChurchData.subscriptionPlan);
-        const memberLimit = planDetails.memberLimit;
-        const monthlyValue = planDetails.monthlyValue;
-
-        const { data, error } = await supabase
-          .from('igrejas')
-          .insert({
-            nome: newChurchData.name,
-            plano_id: newChurchData.subscriptionPlan,
-            limite_membros: memberLimit,
-            membros_atuais: 0,
-            status: newChurchData.status,
-            admin_user_id: newChurchData.adminUserId,
-            valor_mensal_assinatura: monthlyValue,
-            data_proximo_pagamento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
-            ultimo_pagamento_status: 'Pendente',
-            historico_pagamentos: [],
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('churchStore: Error adding church to Supabase:', error);
-          return null;
-        }
-
-        const addedChurch: Church = {
-          id: data.id,
-          name: data.nome,
-          subscriptionPlan: data.plano_id,
-          memberLimit: data.limite_membros,
-          currentMembers: data.membros_atuais,
-          status: data.status,
-          created_at: data.criado_em,
-          adminUserId: data.admin_user_id,
-          address: data.address,
-          contactEmail: data.contactEmail,
-          contactPhone: data.contactPhone,
-          updated_at: data.updated_at,
-          valor_mensal_assinatura: data.valor_mensal_assinatura,
-          data_proximo_pagamento: data.data_proximo_pagamento,
-          ultimo_pagamento_status: data.ultimo_pagamento_status,
-          historico_pagamentos: data.historico_pagamentos,
-          server_memory_limit: data.server_memory_limit,
-          server_execution_timeout: data.server_execution_timeout,
-          db_connection_pool: data.db_connection_pool,
-          db_query_cache_mb: data.db_query_cache_mb,
-        };
-
-        set((state) => ({
-          churches: [...state.churches, addedChurch],
-        }));
-        return addedChurch;
       },
 
       updateChurch: async (churchId, updates) => {
