@@ -2253,7 +2253,6 @@ const FinancialPanel = () => {
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                   {categoriesEntrada.map(cat => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}

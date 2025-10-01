@@ -430,14 +430,14 @@ const OfferingsPage = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="tipo">Tipo de Contribuição</Label>
-                  <Select value={newContribution.tipo} onValueChange={(value) => setNewContribution({...newContribution, tipo: value as Contribution['categoria']})}>
+                  <Select value={newContribution.tipo} onValueChange={(value) => setNewContribution({...newContribution, tipo: value})}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Dízimos">Dízimo</SelectItem>
-                      <SelectItem value="Ofertas">Oferta</SelectItem>
-                      <SelectItem value="Doações Especiais">Doação Especial</SelectItem>
+                      <SelectItem value="Oferta">Oferta</SelectItem>
+                      <SelectItem value="Dízimo">Dízimo</SelectItem>
+                      <SelectItem value="Doação Especial">Doação Especial</SelectItem>
                       <SelectItem value="Missões">Missões</SelectItem>
                       <SelectItem value="Obras">Obras</SelectItem>
                     </SelectContent>
@@ -446,15 +446,15 @@ const OfferingsPage = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="metodo">Método de Pagamento</Label>
-                  <Select value={newContribution.metodo_pagamento} onValueChange={(value) => setNewContribution({...newContribution, metodo_pagamento: value as Contribution['metodo_pagamento']})}>
+                  <Select value={newContribution.metodo_pagamento} onValueChange={(value) => setNewContribution({...newContribution, metodo_pagamento: value})}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione o método" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="PIX">PIX</SelectItem>
-                      <SelectItem value="Cartão">Cartão de Crédito/Débito</SelectItem>
+                      <SelectItem value="Cartão">Cartão</SelectItem>
                       <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                      <SelectItem value="Transferência">Transferência Bancária</SelectItem>
+                      <SelectItem value="Transferência">Transferência</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
