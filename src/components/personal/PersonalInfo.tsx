@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -24,9 +24,13 @@ import {
   CheckCircle,
   Target,
   History,
-  ArrowRight
+  ArrowRight,
+  Baby,
+  Plus,
+  Trash2
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom' 
+import AddKidDialog from './AddKidDialog'; // Importar o novo componente
 
 interface PersonalInfoData {
   // Dados Pessoais
@@ -42,7 +46,6 @@ interface PersonalInfoData {
   
   // Informações Familiares
   conjuge: string
-  filhos: Array<{nome: string, idade: string}>
   paisCristaos: string
   familiarNaIgreja: string
   
@@ -67,6 +70,16 @@ interface VocationalTestResult {
   is_ultimo: boolean;
 }
 
+interface Kid {
+  id: string;
+  nome_crianca: string;
+  data_nascimento: string;
+  idade: number;
+  alergias?: string;
+  medicamentos?: string;
+  informacoes_especiais?: string;
+}
+
 const PersonalInfo = () => {
   const { user, currentChurchId, checkAuth } = useAuthStore()
   const navigate = useNavigate(); 
@@ -81,7 +94,6 @@ const PersonalInfo = () => {
     email: user?.email || '',
     endereco: '',
     conjuge: '',
-    filhos: [],
     paisCristaos: '',
     familiarNaIgreja: '',
     tempoIgreja: '',
@@ -96,121 +108,121 @@ const PersonalInfo = () => {
   })
   const [latestVocationalTest, setLatestVocationalTest] = useState<VocationalTestResult | null>(null);
   const [vocationalTestHistory, setVocationalTestHistory] = useState<VocationalTestResult[]>([]);
+  const [userKids, setUserKids] = useState<Kid[]>([]); // Estado para armazenar os filhos do usuário
+  const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false); // Estado para controlar o diálogo de adicionar filho
+
+  const loadProfileAndKidsData = useCallback(async () => {
+    if (!user || !currentChurchId) {
+      return;
+    }
+
+    console.log('PersonalInfo: Attempting to load personal info for user ID:', user.id);
+    // Buscar dados da tabela informacoes_pessoais
+    const { data: personalInfoRecord, error: personalInfoError } = await supabase
+      .from('informacoes_pessoais')
+      .select('*')
+      .eq('membro_id', user.id)
+      .maybeSingle();
+
+    if (personalInfoError) {
+      console.error('Error loading personal info from Supabase:', personalInfoError);
+      toast.error('Erro ao carregar informações pessoais.');
+      return;
+    }
+
+    console.log('Personal info data received:', personalInfoRecord);
+
+    if (personalInfoRecord) {
+      setFormData({
+        nomeCompleto: user.name, 
+        dataNascimento: personalInfoRecord.data_nascimento || '',
+        estadoCivil: personalInfoRecord.estado_civil || '',
+        profissao: personalInfoRecord.profissao || '',
+        telefone: personalInfoRecord.telefone || '',
+        email: user.email, 
+        endereco: personalInfoRecord.endereco || '',
+        conjuge: personalInfoRecord.conjuge || '',
+        paisCristaos: personalInfoRecord.pais_cristaos || '',
+        familiarNaIgreja: personalInfoRecord.familiar_na_igreja || '',
+        tempoIgreja: personalInfoRecord.tempo_igreja || '',
+        batizado: personalInfoRecord.batizado || false,
+        dataBatismo: personalInfoRecord.data_batismo || '',
+        participaMinisterio: personalInfoRecord.participa_ministerio || false,
+        ministerioAtual: personalInfoRecord.ministerio_anterior || '', 
+        experienciaAnterior: personalInfoRecord.experiencia_anterior || '',
+        dataConversao: personalInfoRecord.data_conversao || '',
+        diasDisponiveis: personalInfoRecord.dias_disponiveis || [],
+        horariosDisponiveis: personalInfoRecord.horarios_disponiveis || ''
+      });
+    } else {
+      setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }));
+    }
+
+    // Carregar filhos do usuário
+    const { data: kidsData, error: kidsError } = await supabase
+      .from('criancas')
+      .select('id, nome_crianca, data_nascimento, alergias, medicamentos, informacoes_especiais')
+      .eq('responsavel_id', user.id)
+      .order('nome_crianca', { ascending: true });
+
+    if (kidsError) {
+      console.error('Error loading user kids:', kidsError);
+      toast.error('Erro ao carregar informações dos filhos.');
+      return;
+    }
+
+    const formattedKids: Kid[] = (kidsData || []).map(k => ({
+      ...k,
+      idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / (365.25 * 24 * 60 * 60 * 1000)),
+    }));
+    setUserKids(formattedKids);
+
+    // Carregar testes vocacionais
+    const loadVocationalTests = async () => {
+      console.log('Attempting to load vocational tests for user ID:', user.id);
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      const { data: tests, error: testsError } = await supabase
+        .from('testes_vocacionais')
+        .select('id, data_teste, ministerio_recomendado, is_ultimo')
+        .eq('membro_id', user.id)
+        .gte('data_teste', sixMonthsAgo.toISOString().split('T')[0]) 
+        .order('data_teste', { ascending: false });
+
+      if (testsError) {
+        console.error('Error loading vocational tests:', testsError);
+        toast.error('Erro ao carregar histórico de testes vocacionais.');
+        return;
+      }
+
+      console.log('Vocational tests data received:', tests);
+      if (tests && tests.length > 0) {
+        const latest = tests.find(test => test.is_ultimo) || tests[0]; 
+        setLatestVocationalTest(latest);
+        setVocationalTestHistory(tests.filter(test => test.id !== latest.id));
+      } else {
+        setLatestVocationalTest(null);
+        setVocationalTestHistory([]);
+      }
+    };
+    loadVocationalTests();
+
+    if (!user.perfil_completo) {
+      setIsFirstAccess(true);
+      setIsEditing(true);
+    } else {
+      setIsFirstAccess(false);
+      setIsEditing(false);
+    }
+  }, [user, currentChurchId, user?.perfil_completo]);
 
   useEffect(() => {
-    console.log('PersonalInfo component mounted/updated for user:', user?.name, 'church:', currentChurchId, 'perfil_completo:', user?.perfil_completo)
-    if (user && currentChurchId) {
-      const loadProfileData = async () => {
-        console.log('Attempting to load personal info for user ID:', user.id);
-        // Buscar dados da tabela informacoes_pessoais
-        const { data: personalInfoRecord, error: personalInfoError } = await supabase
-          .from('informacoes_pessoais')
-          .select('*')
-          .eq('membro_id', user.id)
-          .maybeSingle();
-
-        if (personalInfoError) {
-          console.error('Error loading personal info from Supabase:', personalInfoError);
-          toast.error('Erro ao carregar informações pessoais.');
-          return;
-        }
-
-        console.log('Personal info data received:', personalInfoRecord);
-
-        if (personalInfoRecord) {
-          setFormData({
-            nomeCompleto: user.name, 
-            dataNascimento: personalInfoRecord.data_nascimento || '',
-            estadoCivil: personalInfoRecord.estado_civil || '',
-            profissao: personalInfoRecord.profissao || '',
-            telefone: personalInfoRecord.telefone || '',
-            email: user.email, 
-            endereco: personalInfoRecord.endereco || '',
-            conjuge: personalInfoRecord.conjuge || '',
-            filhos: personalInfoRecord.filhos || [],
-            paisCristaos: personalInfoRecord.pais_cristaos || '',
-            familiarNaIgreja: personalInfoRecord.familiar_na_igreja || '',
-            tempoIgreja: personalInfoRecord.tempo_igreja || '',
-            batizado: personalInfoRecord.batizado || false,
-            dataBatismo: personalInfoRecord.data_batismo || '',
-            participaMinisterio: personalInfoRecord.participa_ministerio || false,
-            ministerioAtual: personalInfoRecord.ministerio_anterior || '',
-            experienciaAnterior: personalInfoRecord.experiencia_anterior || '',
-            dataConversao: personalInfoRecord.data_conversao || '',
-            diasDisponiveis: personalInfoRecord.dias_disponiveis || [],
-            horariosDisponiveis: personalInfoRecord.horarios_disponiveis || ''
-          });
-        } else {
-          setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }));
-        }
-      };
-      loadProfileData();
-
-      const loadVocationalTests = async () => {
-        console.log('Attempting to load vocational tests for user ID:', user.id);
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-        const { data: tests, error: testsError } = await supabase
-          .from('testes_vocacionais')
-          .select('id, data_teste, ministerio_recomendado, is_ultimo')
-          .eq('membro_id', user.id)
-          .gte('data_teste', sixMonthsAgo.toISOString().split('T')[0]) 
-          .order('data_teste', { ascending: false });
-
-        if (testsError) {
-          console.error('Error loading vocational tests:', testsError);
-          toast.error('Erro ao carregar histórico de testes vocacionais.');
-          return;
-        }
-
-        console.log('Vocational tests data received:', tests);
-        if (tests && tests.length > 0) {
-          const latest = tests.find(test => test.is_ultimo) || tests[0]; 
-          setLatestVocationalTest(latest);
-          setVocationalTestHistory(tests.filter(test => test.id !== latest.id));
-        } else {
-          setLatestVocationalTest(null);
-          setVocationalTestHistory([]);
-        }
-      };
-      loadVocationalTests();
-
-      if (!user.perfil_completo) {
-        setIsFirstAccess(true);
-        setIsEditing(true);
-      } else {
-        setIsFirstAccess(false);
-        setIsEditing(false);
-      }
-    }
-  }, [user, currentChurchId, user?.perfil_completo]) 
+    loadProfileAndKidsData();
+  }, [loadProfileAndKidsData]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const addFilho = () => {
-    setFormData(prev => ({
-      ...prev,
-      filhos: [...prev.filhos, { nome: '', idade: '' }]
-    }))
-  }
-
-  const removeFilho = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      filhos: prev.filhos.filter((_, i) => i !== index)
-    }))
-  }
-
-  const handleFilhoChange = (index: number, field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      filhos: prev.filhos.map((filho, i) => 
-        i === index ? { ...filho, [field]: value } : filho
-      )
-    }))
   }
 
   const handleCheckboxChange = (field: string, value: string, checked: boolean) => {
@@ -295,7 +307,6 @@ const PersonalInfo = () => {
       estado_civil: formData.estadoCivil || null,
       profissao: formData.profissao || null,
       conjuge: formData.conjuge || null,
-      filhos: formData.filhos.length > 0 ? formData.filhos : null,
       pais_cristaos: formData.paisCristaos || null,
       familiar_na_igreja: formData.familiarNaIgreja || null, 
       tempo_igreja: formData.tempoIgreja || null, 
@@ -303,10 +314,10 @@ const PersonalInfo = () => {
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
       ministerio_anterior: formData.ministerioAtual || null, 
-      experienciaAnterior: formData.experienciaAnterior || null,
+      experiencia_anterior: formData.experienciaAnterior || null,
       data_conversao: formData.dataConversao || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horariosDisponiveis: formData.horariosDisponiveis || null, 
+      horarios_disponiveis: formData.horariosDisponiveis || null, 
       updated_at: new Date().toISOString(),
     };
 
@@ -356,6 +367,33 @@ const PersonalInfo = () => {
     setIsEditing(false)
     toast.success('Informações salvas com sucesso!')
   }
+
+  const handleDeleteKid = async (kidId: string) => {
+    if (!confirm('Tem certeza que deseja remover esta criança? Esta ação é irreversível.')) {
+      return;
+    }
+    if (!user?.id || !currentChurchId) {
+      toast.error('Erro: Usuário ou igreja não identificados.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('criancas')
+        .delete()
+        .eq('id', kidId)
+        .eq('responsavel_id', user.id) // Garante que o usuário só pode deletar seus próprios filhos
+        .eq('id_igreja', currentChurchId);
+
+      if (error) throw error;
+
+      toast.success('Criança removida com sucesso!');
+      loadProfileAndKidsData(); // Recarrega a lista de filhos
+    } catch (error: any) {
+      console.error('Error deleting kid:', error.message);
+      toast.error('Erro ao remover criança: ' + error.message);
+    }
+  };
 
   const estadosBrasil = [
     'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS',
@@ -522,35 +560,37 @@ const PersonalInfo = () => {
               
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label>Filhos</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addFilho}>
+                  <Label className="flex items-center gap-2">
+                    <Baby className="w-5 h-5 text-pink-500" />
+                    Filhos Cadastrados
+                  </Label>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setIsAddKidDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
                     Adicionar Filho
                   </Button>
                 </div>
-                {formData.filhos.map((filho, index) => (
-                  <div key={index} className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="Nome do filho"
-                      value={filho.nome}
-                      onChange={(e) => handleFilhoChange(index, 'nome', e.target.value)}
-                    />
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Idade"
-                        value={filho.idade}
-                        onChange={(e) => handleFilhoChange(index, 'idade', e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeFilho(index)}
-                      >
-                        Remover
-                      </Button>
-                    </div>
+                {userKids.length > 0 ? (
+                  <div className="space-y-2">
+                    {userKids.map((kid, index) => (
+                      <div key={kid.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium">{kid.nome_crianca}</p>
+                          <p className="text-sm text-gray-600">{kid.idade} anos</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteKid(kid.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className="text-sm text-gray-500 italic">Nenhum filho cadastrado.</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -651,6 +691,18 @@ const PersonalInfo = () => {
             </Button>
           </div>
         </form>
+
+        {user && currentChurchId && (
+          <AddKidDialog
+            isOpen={isAddKidDialogOpen}
+            onClose={() => setIsAddKidDialogOpen(false)}
+            responsibleId={user.id}
+            responsibleName={user.name}
+            responsibleEmail={user.email}
+            churchId={currentChurchId}
+            onKidAdded={loadProfileAndKidsData} // Recarrega os dados após adicionar um filho
+          />
+        )}
       </div>
     )
   }
@@ -755,6 +807,55 @@ const PersonalInfo = () => {
         </Card>
       </div>
 
+      {/* Seção de Filhos Cadastrados */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Baby className="w-5 h-5 text-pink-500" />
+            Meus Filhos
+          </CardTitle>
+          <CardDescription>Crianças vinculadas ao seu perfil</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {userKids.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {userKids.map((kid) => (
+                <div key={kid.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium">{kid.nome_crianca}</p>
+                    <p className="text-sm text-gray-600">{kid.idade} anos</p>
+                    {(kid.alergias || kid.medicamentos) && (
+                      <p className="text-xs text-red-500">
+                        Atenção: {kid.alergias ? 'Alergias' : ''} {kid.medicamentos ? 'Medicamentos' : ''}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDeleteKid(kid.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <Baby className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 mb-3">
+                Nenhuma criança cadastrada em seu perfil.
+              </p>
+              <Button onClick={() => setIsAddKidDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Cadastrar Primeiro Filho
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -836,6 +937,18 @@ const PersonalInfo = () => {
             </Button>
           </div>
         </div>
+      )}
+
+      {user && currentChurchId && (
+        <AddKidDialog
+          isOpen={isAddKidDialogOpen}
+          onClose={() => setIsAddKidDialogOpen(false)}
+          responsibleId={user.id}
+          responsibleName={user.name}
+          responsibleEmail={user.email}
+          churchId={currentChurchId}
+          onKidAdded={loadProfileAndKidsData} // Recarrega os dados após adicionar um filho
+        />
       )}
     </div>
   )

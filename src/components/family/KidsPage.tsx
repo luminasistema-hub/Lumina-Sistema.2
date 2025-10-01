@@ -86,7 +86,6 @@ const KidsPage = () => {
   const { user, currentChurchId } = useAuthStore()
   const [kids, setKids] = useState<Kid[]>([])
   const [checkinRecords, setCheckinRecords] = useState<CheckinRecord[]>([])
-  const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false)
   const [isEditKidDialogOpen, setIsEditKidDialogOpen] = useState(false)
   const [kidToEdit, setKidToEdit] = useState<Kid | null>(null)
   const [selectedKidDetails, setSelectedKidDetails] = useState<Kid | null>(null) // Para o modal de detalhes
@@ -98,19 +97,6 @@ const KidsPage = () => {
 
   const canManageKids = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
   const canDeleteKids = user?.role === 'admin' || user?.role === 'pastor'
-
-  const [newKidForm, setNewKidForm] = useState({
-    nome_crianca: '',
-    data_nascimento: '',
-    responsavel_id: user?.id || '', // Padrão para o próprio usuário
-    informacoes_especiais: '',
-    alergias: '',
-    medicamentos: '',
-    autorizacao_fotos: true,
-    contato_emergencia_nome: '',
-    contato_emergencia_telefone: '',
-    contato_emergencia_parentesco: ''
-  })
 
   const [editKidForm, setEditKidForm] = useState({
     nome_crianca: '',
@@ -223,61 +209,6 @@ const KidsPage = () => {
     loadKidsData();
     loadMemberOptions();
   }, [loadKidsData, loadMemberOptions]);
-
-  const handleAddKid = async () => {
-    if (!newKidForm.nome_crianca || !newKidForm.data_nascimento || !newKidForm.responsavel_id || !currentChurchId) {
-      toast.error('Nome, data de nascimento e responsável são obrigatórios.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const responsibleMember = memberOptions.find(m => m.id === newKidForm.responsavel_id);
-      if (!responsibleMember) {
-        toast.error('Responsável não encontrado.');
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('criancas')
-        .insert({
-          id_igreja: currentChurchId,
-          nome_crianca: newKidForm.nome_crianca,
-          data_nascimento: newKidForm.data_nascimento,
-          responsavel_id: newKidForm.responsavel_id,
-          email_responsavel: responsibleMember.email,
-          informacoes_especiais: newKidForm.informacoes_especiais || null,
-          alergias: newKidForm.alergias || null,
-          medicamentos: newKidForm.medicamentos || null,
-          autorizacao_fotos: newKidForm.autorizacao_fotos,
-          contato_emergencia: newKidForm.contato_emergencia_nome ? {
-            nome: newKidForm.contato_emergencia_nome,
-            telefone: newKidForm.contato_emergencia_telefone,
-            parentesco: newKidForm.contato_emergencia_parentesco
-          } : null,
-          status_checkin: 'Ausente',
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast.success('Criança cadastrada com sucesso!');
-      setIsAddKidDialogOpen(false);
-      setNewKidForm({
-        nome_crianca: '', data_nascimento: '', responsavel_id: user?.id || '',
-        informacoes_especiais: '', alergias: '', medicamentos: '', autorizacao_fotos: true,
-        contato_emergencia_nome: '', contato_emergencia_telefone: '', contato_emergencia_parentesco: ''
-      });
-      loadKidsData();
-    } catch (error: any) {
-      console.error('Error adding kid:', error.message);
-      toast.error('Erro ao cadastrar criança: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleEditKid = async () => {
     if (!kidToEdit?.id || !editKidForm.nome_crianca || !editKidForm.data_nascimento || !editKidForm.responsavel_id || !currentChurchId) {
@@ -584,7 +515,7 @@ const KidsPage = () => {
             </Select>
 
             {canManageKids && (
-              <Dialog open={isAddKidDialogOpen} onOpenChange={setIsAddKidDialogOpen}>
+              <Dialog> {/* Removido isAddKidDialogOpen e Trigger */}
                 <DialogTrigger asChild>
                   <Button className="bg-pink-500 hover:bg-pink-600">
                     <Plus className="w-4 h-4 mr-2" />
@@ -600,115 +531,12 @@ const KidsPage = () => {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="nome_crianca">Nome da Criança *</Label>
-                        <Input
-                          id="nome_crianca"
-                          value={newKidForm.nome_crianca}
-                          onChange={(e) => setNewKidForm({...newKidForm, nome_crianca: e.target.value})}
-                          placeholder="Nome completo"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="data_nascimento">Data de Nascimento *</Label>
-                        <Input
-                          id="data_nascimento"
-                          type="date"
-                          value={newKidForm.data_nascimento}
-                          onChange={(e) => setNewKidForm({...newKidForm, data_nascimento: e.target.value})}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="responsavel_id">Responsável *</Label>
-                      <Select
-                        value={newKidForm.responsavel_id}
-                        onValueChange={(value) => setNewKidForm({...newKidForm, responsavel_id: value})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o responsável" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {memberOptions.map(member => (
-                            <SelectItem key={member.id} value={member.id}>
-                              {member.nome_completo} ({member.email})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="alergias">Alergias</Label>
-                      <Textarea
-                        id="alergias"
-                        value={newKidForm.alergias}
-                        onChange={(e) => setNewKidForm({...newKidForm, alergias: e.target.value})}
-                        placeholder="Descreva alergias alimentares ou medicamentosas"
-                        rows={2}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="medicamentos">Medicamentos</Label>
-                      <Textarea
-                        id="medicamentos"
-                        value={newKidForm.medicamentos}
-                        onChange={(e) => setNewKidForm({...newKidForm, medicamentos: e.target.value})}
-                        placeholder="Medicamentos de uso contínuo ou de emergência"
-                        rows={2}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="informacoes_especiais">Informações Especiais</Label>
-                      <Textarea
-                        id="informacoes_especiais"
-                        value={newKidForm.informacoes_especiais}
-                        onChange={(e) => setNewKidForm({...newKidForm, informacoes_especiais: e.target.value})}
-                        placeholder="Comportamento, necessidades especiais, etc."
-                        rows={2}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Contato de Emergência (Opcional)</Label>
-                      <Input
-                        placeholder="Nome do contato"
-                        value={newKidForm.contato_emergencia_nome}
-                        onChange={(e) => setNewKidForm({...newKidForm, contato_emergencia_nome: e.target.value})}
-                      />
-                      <Input
-                        placeholder="Telefone do contato"
-                        value={newKidForm.contato_emergencia_telefone}
-                        onChange={(e) => setNewKidForm({...newKidForm, contato_emergencia_telefone: e.target.value})}
-                      />
-                      <Input
-                        placeholder="Parentesco"
-                        value={newKidForm.contato_emergencia_parentesco}
-                        onChange={(e) => setNewKidForm({...newKidForm, contato_emergencia_parentesco: e.target.value})}
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="autorizacao_fotos"
-                        checked={newKidForm.autorizacao_fotos}
-                        onCheckedChange={(checked) => setNewKidForm({...newKidForm, autorizacao_fotos: checked as boolean})}
-                      />
-                      <Label htmlFor="autorizacao_fotos">Autorizo fotos e vídeos para divulgação</Label>
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setIsAddKidDialogOpen(false)}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={handleAddKid}>
-                        Cadastrar
-                      </Button>
-                    </div>
+                    <p className="text-sm text-gray-600">
+                      O cadastro de novas crianças agora é feito através da área pessoal do responsável.
+                    </p>
+                    <Button variant="outline" onClick={() => toast.info('Acesse a área pessoal do membro para cadastrar um filho.')}>
+                      Entendi
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
