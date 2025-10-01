@@ -45,6 +45,7 @@ interface PersonalInfoData {
   endereco: string | null
   conjugeId: string | null
   conjugeNome?: string
+  conjugeNomeExterno: string | null
   dataCasamento: string | null
   paisCristaos: string | null
   tempoIgreja: string | null
@@ -95,6 +96,7 @@ const PersonalInfo = () => {
     email: user?.email || '',
     endereco: null,
     conjugeId: null,
+    conjugeNomeExterno: null,
     dataCasamento: null,
     paisCristaos: null,
     tempoIgreja: null,
@@ -114,6 +116,7 @@ const PersonalInfo = () => {
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
   const [conjugeSearchTerm, setConjugeSearchTerm] = useState('');
   const [filteredConjugeOptions, setFilteredConjugeOptions] = useState<MemberOption[]>([]);
+  const [isConjugeMember, setIsConjugeMember] = useState(true);
 
   const loadProfileAndKidsData = useCallback(async () => {
     if (!user || !currentChurchId) return;
@@ -139,6 +142,9 @@ const PersonalInfo = () => {
           .eq('id', personalInfoRecord.conjuge_id)
           .single();
         if (conjugeData) conjugeNome = conjugeData.nome_completo;
+        setIsConjugeMember(true);
+      } else if (personalInfoRecord.conjuge_nome_externo) {
+        setIsConjugeMember(false);
       }
 
       setFormData({
@@ -151,6 +157,7 @@ const PersonalInfo = () => {
         endereco: personalInfoRecord.endereco,
         conjugeId: personalInfoRecord.conjuge_id,
         conjugeNome: conjugeNome,
+        conjugeNomeExterno: personalInfoRecord.conjuge_nome_externo,
         dataCasamento: personalInfoRecord.data_casamento,
         paisCristaos: personalInfoRecord.pais_cristaos,
         tempoIgreja: personalInfoRecord.tempo_igreja,
@@ -275,7 +282,8 @@ const PersonalInfo = () => {
       data_nascimento: formData.dataNascimento || null,
       estado_civil: formData.estadoCivil || null,
       profissao: formData.profissao || null,
-      conjuge_id: formData.conjugeId || null,
+      conjuge_id: isConjugeMember ? formData.conjugeId || null : null,
+      conjuge_nome_externo: !isConjugeMember ? formData.conjugeNomeExterno || null : null,
       data_casamento: formData.dataCasamento || null,
       pais_cristaos: formData.paisCristaos || null,
       tempo_igreja: formData.tempoIgreja || null,
@@ -417,19 +425,41 @@ const PersonalInfo = () => {
             <CardContent className="space-y-4">
               {formData.estadoCivil === 'casado' && (
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="conjugeId">Nome do Cônjuge</Label>
-                    <Select value={formData.conjugeId || ''} onValueChange={(value) => handleInputChange('conjugeId', value)}>
-                      <SelectTrigger><SelectValue placeholder="Selecione o cônjuge (membro da igreja)" /></SelectTrigger>
-                      <SelectContent>
-                        <Input placeholder="Buscar membro..." value={conjugeSearchTerm} onChange={(e) => setConjugeSearchTerm(e.target.value)} className="mb-2" />
-                        <SelectItem value="nenhum">Nenhum</SelectItem>
-                        {filteredConjugeOptions.map(member => (
-                          <SelectItem key={member.id} value={member.id}>{member.nome_completo}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox
+                      id="isConjugeMember"
+                      checked={isConjugeMember}
+                      onCheckedChange={(checked) => setIsConjugeMember(checked as boolean)}
+                    />
+                    <Label htmlFor="isConjugeMember">Cônjuge é membro da igreja?</Label>
                   </div>
+
+                  {isConjugeMember ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="conjugeId">Nome do Cônjuge</Label>
+                      <Select value={formData.conjugeId || ''} onValueChange={(value) => handleInputChange('conjugeId', value)}>
+                        <SelectTrigger><SelectValue placeholder="Selecione o cônjuge (membro da igreja)" /></SelectTrigger>
+                        <SelectContent>
+                          <Input placeholder="Buscar membro..." value={conjugeSearchTerm} onChange={(e) => setConjugeSearchTerm(e.target.value)} className="mb-2" />
+                          <SelectItem value="nenhum">Nenhum</SelectItem>
+                          {filteredConjugeOptions.map(member => (
+                            <SelectItem key={member.id} value={member.id}>{member.nome_completo}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="conjugeNomeExterno">Nome do Cônjuge</Label>
+                      <Input
+                        id="conjugeNomeExterno"
+                        value={formData.conjugeNomeExterno || ''}
+                        onChange={(e) => handleInputChange('conjugeNomeExterno', e.target.value)}
+                        placeholder="Digite o nome completo do cônjuge"
+                      />
+                    </div>
+                  )}
+                  
                   <div className="space-y-2">
                     <Label htmlFor="dataCasamento">Data do Casamento</Label>
                     <Input id="dataCasamento" type="date" value={formData.dataCasamento || ''} onChange={(e) => handleInputChange('dataCasamento', e.target.value)} />
