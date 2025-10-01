@@ -1,9 +1,10 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage' // Importar a nova página de registro
+import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import MasterAdminPage from './pages/MasterAdminPage'
+import MasterAdminLoginPage from './pages/MasterAdminLoginPage' // Importar o novo portal de login
 import { useEffect } from 'react'
 
 function App() {
@@ -33,25 +34,38 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-church-blue-50 to-church-purple-50">
       <Routes>
+        {/* Rotas de Login e Registro */}
         <Route 
           path="/login" 
-          element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
+          element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <LoginPage />} 
         />
         <Route 
           path="/register" 
-          element={user ? <Navigate to="/dashboard" replace /> : <RegisterPage />} 
+          element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <RegisterPage />} 
         />
-        {user?.role === 'super_admin' ? (
-          <Route path="/master-admin" element={<MasterAdminPage />} />
-        ) : (
-          <Route 
-            path="/dashboard" 
-            element={user && currentChurchId ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/login" replace />} 
-          />
-        )}
+        <Route 
+          path="/master-admin-login" 
+          element={user?.role === 'super_admin' ? <Navigate to="/master-admin" replace /> : <MasterAdminLoginPage />} 
+        />
+
+        {/* Rotas Protegidas */}
+        <Route 
+          path="/master-admin" 
+          element={user?.role === 'super_admin' ? <MasterAdminPage /> : <Navigate to="/master-admin-login" replace />} 
+        />
+        <Route 
+          path="/dashboard" 
+          element={user && user.role !== 'super_admin' && currentChurchId ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/login" replace />} 
+        />
+
+        {/* Rota Raiz - Redirecionamento inicial */}
         <Route 
           path="/" 
-          element={<Navigate to={user?.role === 'super_admin' ? "/master-admin" : (user ? "/dashboard" : "/login")} replace />} 
+          element={
+            user 
+              ? (user.role === 'super_admin' ? <Navigate to="/master-admin" replace /> : <Navigate to="/dashboard" replace />)
+              : <Navigate to="/login" replace />
+          } 
         />
       </Routes>
     </div>
