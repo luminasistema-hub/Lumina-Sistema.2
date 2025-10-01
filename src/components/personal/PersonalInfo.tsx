@@ -45,9 +45,10 @@ interface PersonalInfoData {
   endereco: string
   
   // Informações Familiares
-  conjuge: string
+  conjugeId: string | null // Alterado para ID do cônjuge
+  conjugeNome?: string // Para exibição
+  dataCasamento: string // Novo campo
   paisCristaos: string
-  familiarNaIgreja: string
   
   // Informações Ministeriais (mantidas no estado, mas não no formulário)
   tempoIgreja: string
@@ -80,6 +81,12 @@ interface Kid {
   informacoes_especiais?: string;
 }
 
+interface MemberOption {
+  id: string;
+  nome_completo: string;
+  email: string;
+}
+
 const PersonalInfo = () => {
   const { user, currentChurchId, checkAuth } = useAuthStore()
   const navigate = useNavigate(); 
@@ -93,9 +100,9 @@ const PersonalInfo = () => {
     telefone: '',
     email: user?.email || '',
     endereco: '',
-    conjuge: '',
+    conjugeId: null,
+    dataCasamento: '', // Inicializa o novo campo
     paisCristaos: '',
-    familiarNaIgreja: '',
     tempoIgreja: '',
     batizado: false,
     dataBatismo: '',
@@ -110,6 +117,10 @@ const PersonalInfo = () => {
   const [vocationalTestHistory, setVocationalTestHistory] = useState<VocationalTestResult[]>([]);
   const [userKids, setUserKids] = useState<Kid[]>([]); // Estado para armazenar os filhos do usuário
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false); // Estado para controlar o diálogo de adicionar filho
+  const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]); // Para o seletor de cônjuge
+  const [conjugeSearchTerm, setConjugeSearchTerm] = useState('');
+  const [filteredConjugeOptions, setFilteredConjugeOptions] = useState<MemberOption[]>([]);
+
 
   const loadProfileAndKidsData = useCallback(async () => {
     if (!user || !currentChurchId) {
@@ -120,7 +131,10 @@ const PersonalInfo = () => {
     // Buscar dados da tabela informacoes_pessoais
     const { data: personalInfoRecord, error: personalInfoError } = await supabase
       .from('informacoes_pessoais')
-      .select('*')
+      .select(`
+        *,
+        conjuge_profile:membros!informacoes_pessoais_conjuge_id_fkey(nome_completo, email)
+      `)
       .eq('membro_id', user.id)
       .maybeSingle();
 
@@ -141,9 +155,10 @@ const PersonalInfo = () => {
         telefone: personalInfoRecord.telefone || '',
         email: user.email, 
         endereco: personalInfoRecord.endereco || '',
-        conjuge: personalInfoRecord.conjuge || '',
+        conjugeId: personalInfoRecord.conjuge_id || null,
+        conjugeNome: personalInfoRecord.conjuge_profile?.nome_completo || '',
+        dataCasamento: personalInfoRecord.data_casamento || '', // Carrega o novo campo
         paisCristaos: personalInfoRecord.pais_cristaos || '',
-        familiarNaIgreja: personalInfoRecord.familiar_na_igreja || '',
         tempoIgreja: personalInfoRecord.tempo_igreja || '',
         batizado: personalInfoRecord.batizado || false,
         dataBatismo: personalInfoRecord.data_batismo || '',
@@ -217,9 +232,46 @@ const PersonalInfo = () => {
     }
   }, [user, currentChurchId, user?.perfil_completo]);
 
+  const loadMemberOptions = useCallback(async () => {
+    if (!currentChurchId || !user?.id) {
+      setMemberOptions([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('membros')
+        .select('id, nome_completo, email')
+        .eq('id_igreja', currentChurchId)
+        .eq('status', 'ativo')
+        .neq('id', user.id) // Não listar o próprio usuário como cônjuge
+        .order('nome_completo', { ascending: true });
+
+      if (error) throw error;
+      setMemberOptions(data as MemberOption[]);
+      setFilteredConjugeOptions(data as MemberOption[]);
+    } catch (error: any) {
+      console.error('Error loading member options:', error.message);
+      toast.error('Erro ao carregar opções de membros: ' + error.message);
+    }
+  }, [currentChurchId, user?.id]);
+
   useEffect(() => {
     loadProfileAndKidsData();
-  }, [loadProfileAndKidsData]);
+    loadMemberOptions();
+  }, [loadProfileAndKidsData, loadMemberOptions]);
+
+  useEffect(() => {
+    if (conjugeSearchTerm) {
+      setFilteredConjugeOptions(
+        memberOptions.filter(member =>
+          member.nome_completo.toLowerCase().includes(conjugeSearchTerm.toLowerCase()) ||
+          member.email.toLowerCase().includes(conjugeSearchTerm.toLowerCase())
+        )
+      );
+    } else {
+      setFilteredConjugeOptions(memberOptions);
+    }
+  }, [conjugeSearchTerm, memberOptions]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -306,9 +358,9 @@ const PersonalInfo = () => {
       data_nascimento: formData.dataNascimento || null,
       estado_civil: formData.estadoCivil || null,
       profissao: formData.profissao || null,
-      conjuge: formData.conjuge || null,
+      conjuge_id: formData.conjugeId || null, // Salva o ID do cônjuge
+      data_casamento: formData.dataCasamento || null, // Salva o novo campo
       pais_cristaos: formData.paisCristaos || null,
-      familiar_na_igreja: formData.familiarNaIgreja || null, 
       tempo_igreja: formData.tempoIgreja || null, 
       batizado: formData.batizado,
       data_batismo: formData.dataBatismo || null,
@@ -547,15 +599,42 @@ const PersonalInfo = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {formData.estadoCivil === 'casado' && (
-                <div className="space-y-2">
-                  <Label htmlFor="conjuge">Nome do Cônjuge</Label>
-                  <Input
-                    id="conjuge"
-                    value={formData.conjuge}
-                    onChange={(e) => handleInputChange('conjuge', e.target.value)}
-                    placeholder="Nome do seu cônjuge"
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="conjugeId">Nome do Cônjuge</Label>
+                    <Select
+                      value={formData.conjugeId || ''}
+                      onValueChange={(value) => handleInputChange('conjugeId', value === '' ? null : value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o cônjuge (membro da igreja)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <Input
+                          placeholder="Buscar membro..."
+                          value={conjugeSearchTerm}
+                          onChange={(e) => setConjugeSearchTerm(e.target.value)}
+                          className="mb-2"
+                        />
+                        <SelectItem value="">Nenhum</SelectItem>
+                        {filteredConjugeOptions.map(member => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.nome_completo} ({member.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dataCasamento">Data do Casamento</Label>
+                    <Input
+                      id="dataCasamento"
+                      type="date"
+                      value={formData.dataCasamento}
+                      onChange={(e) => handleInputChange('dataCasamento', e.target.value)}
+                    />
+                  </div>
+                </>
               )}
               
               <div className="space-y-4">
@@ -576,6 +655,11 @@ const PersonalInfo = () => {
                         <div className="flex-1">
                           <p className="font-medium">{kid.nome_crianca}</p>
                           <p className="text-sm text-gray-600">{kid.idade} anos</p>
+                          {(kid.alergias || kid.medicamentos) && (
+                            <p className="text-xs text-red-500">
+                              Atenção: {kid.alergias ? 'Alergias' : ''} {kid.medicamentos ? 'Medicamentos' : ''}
+                            </p>
+                          )}
                         </div>
                         <Button
                           type="button"
@@ -607,15 +691,6 @@ const PersonalInfo = () => {
                       <SelectItem value="nao-sei">Não sei</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="familiarNaIgreja">Tem familiares na igreja?</Label>
-                  <Input
-                    id="familiarNaIgreja"
-                    value={formData.familiarNaIgreja}
-                    onChange={(e) => handleInputChange('familiarNaIgreja', e.target.value)}
-                    placeholder="Quem trouxe você ou quem conhece"
-                  />
                 </div>
               </div>
             </CardContent>
