@@ -5,8 +5,32 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
-import { Building, Mail, Lock, Eye, EyeOff, User, Loader2, Phone, Home, FileText } from 'lucide-react'; // Adicionado Phone, Home, FileText
+import { Building, Mail, Lock, Eye, EyeOff, User, Loader2, Phone, Home, FileText } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
+
+// Funções de validação para padrões brasileiros
+const validateCnpj = (cnpj: string) => {
+  if (!cnpj) return true; // Opcional, se for obrigatório, remover esta linha
+  cnpj = cnpj.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
+  if (cnpj.length !== 14) return false;
+  // Validação básica de CNPJ (pode ser mais complexa)
+  return /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(cnpj) || /^\d{14}$/.test(cnpj);
+};
+
+const validateCpf = (cpf: string) => {
+  if (!cpf) return true; // Opcional, se for obrigatório, remover esta linha
+  cpf = cpf.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
+  if (cpf.length !== 11) return false;
+  // Validação básica de CPF (pode ser mais complexa)
+  return /^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(cpf) || /^\d{11}$/.test(cpf);
+};
+
+const validatePhone = (phone: string) => {
+  if (!phone) return true; // Opcional, se for obrigatório, remover esta linha
+  phone = phone.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
+  // Aceita 10 ou 11 dígitos (com ou sem DDD)
+  return /^\(\d{2}\)\s\d{4,5}-\d{4}$/.test(phone) || /^\d{10,11}$/.test(phone);
+};
 
 const FormularioCadastroIgreja = () => {
   const navigate = useNavigate();
@@ -16,10 +40,10 @@ const FormularioCadastroIgreja = () => {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('');
-  const [cnpj, setCnpj] = useState(''); // Novo estado
-  const [cpfResponsavel, setCpfResponsavel] = useState(''); // Novo estado
-  const [telefoneContato, setTelefoneContato] = useState(''); // Novo estado
-  const [endereco, setEndereco] = useState(''); // Novo estado
+  const [cnpj, setCnpj] = useState('');
+  const [cpfResponsavel, setCpfResponsavel] = useState('');
+  const [telefoneContato, setTelefoneContato] = useState('');
+  const [endereco, setEndereco] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -33,12 +57,11 @@ const FormularioCadastroIgreja = () => {
         
         if (data) {
             const formattedPlans = data.map(plan => ({
-                value: plan.id, // O valor agora é o UUID
+                value: plan.id,
                 label: plan.nome,
                 monthlyValue: plan.preco_mensal
             }));
             setSubscriptionPlans(formattedPlans);
-            // Define um plano padrão se houver planos
             if (formattedPlans.length > 0) {
               setSelectedPlan(formattedPlans[0].value);
             }
@@ -51,13 +74,31 @@ const FormularioCadastroIgreja = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    if (!churchName || !adminName || !adminEmail || !adminPassword || !selectedPlan) {
+    // Validações de campos obrigatórios
+    if (!churchName || !adminName || !adminEmail || !adminPassword || !selectedPlan || !cnpj || !cpfResponsavel || !telefoneContato || !endereco) {
       toast.error('Por favor, preencha todos os campos obrigatórios.');
       setIsLoading(false);
       return;
     }
     if (adminPassword.length < 6) {
       toast.error('A senha deve ter pelo menos 6 caracteres.');
+      setIsLoading(false);
+      return;
+    }
+
+    // Validações de formato
+    if (!validateCnpj(cnpj)) {
+      toast.error('Por favor, insira um CNPJ válido.');
+      setIsLoading(false);
+      return;
+    }
+    if (!validateCpf(cpfResponsavel)) {
+      toast.error('Por favor, insira um CPF válido para o responsável.');
+      setIsLoading(false);
+      return;
+    }
+    if (!validatePhone(telefoneContato)) {
+      toast.error('Por favor, insira um telefone de contato válido (ex: (DD) 9XXXX-XXXX).');
       setIsLoading(false);
       return;
     }
@@ -72,10 +113,10 @@ const FormularioCadastroIgreja = () => {
             nome_completo_responsavel: adminName,
             plano_id: selectedPlan,
             initial_role: 'admin',
-            cnpj: cnpj, // Novo campo
-            cpf_responsavel: cpfResponsavel, // Novo campo
-            telefone_contato: telefoneContato, // Novo campo
-            endereco: endereco, // Novo campo
+            cnpj: cnpj,
+            cpf_responsavel: cpfResponsavel,
+            telefone_contato: telefoneContato,
+            endereco: endereco,
           },
         },
       });
@@ -173,61 +214,65 @@ const FormularioCadastroIgreja = () => {
 
       {/* Novos Campos */}
       <div className="space-y-2">
-        <Label htmlFor="cnpj">CNPJ (Opcional)</Label>
+        <Label htmlFor="cnpj">CNPJ *</Label>
         <div className="relative">
           <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
             id="cnpj"
             type="text"
-            placeholder="CNPJ da igreja"
+            placeholder="XX.XXX.XXX/XXXX-XX"
             value={cnpj}
             onChange={(e) => setCnpj(e.target.value)}
             className="pl-10 h-12"
+            required
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="cpfResponsavel">CPF do Responsável (Opcional)</Label>
+        <Label htmlFor="cpfResponsavel">CPF do Responsável *</Label>
         <div className="relative">
           <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
             id="cpfResponsavel"
             type="text"
-            placeholder="CPF do responsável"
+            placeholder="XXX.XXX.XXX-XX"
             value={cpfResponsavel}
             onChange={(e) => setCpfResponsavel(e.target.value)}
             className="pl-10 h-12"
+            required
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="telefoneContato">Telefone de Contato (Opcional)</Label>
+        <Label htmlFor="telefoneContato">Telefone de Contato *</Label>
         <div className="relative">
           <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
             id="telefoneContato"
             type="tel"
-            placeholder="Telefone para contato"
+            placeholder="(DD) 9XXXX-XXXX"
             value={telefoneContato}
             onChange={(e) => setTelefoneContato(e.target.value)}
             className="pl-10 h-12"
+            required
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="endereco">Endereço (Opcional)</Label>
+        <Label htmlFor="endereco">Endereço *</Label>
         <div className="relative">
           <Home className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
             id="endereco"
             type="text"
-            placeholder="Endereço da igreja"
+            placeholder="Endereço completo da igreja"
             value={endereco}
             onChange={(e) => setEndereco(e.target.value)}
             className="pl-10 h-12"
+            required
           />
         </div>
       </div>
