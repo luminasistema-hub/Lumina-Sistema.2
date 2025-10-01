@@ -20,6 +20,7 @@ import SaaSReportsTab from '../components/master-admin/SaaSReportsTab'
 import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHistoryDialog'
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
 import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
+import MasterAdminWebPerformanceInsights from '../components/master-admin/MasterAdminWebPerformanceInsights'; // Importação do novo componente
 import { supabase } from '../integrations/supabase/client' // Importar supabase
 // import { SpeedInsights } from "@vercel/speed-insights/react"; // Importação do SpeedInsights
 
@@ -169,6 +170,7 @@ const MasterAdminPage = () => {
               activeMembersCount={activeMembersCount} 
             />
             <MasterAdminServerStatus />
+            <MasterAdminWebPerformanceInsights /> {/* Novo componente adicionado aqui */}
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">
