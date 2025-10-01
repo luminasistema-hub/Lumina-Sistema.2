@@ -316,9 +316,7 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }
 
   const handleChurchSelect = (churchId: string) => {
     setCurrentChurchId(churchId)
-    if (user?.role === 'super_admin') {
-      navigate('/dashboard')
-    }
+    // No need to navigate to /dashboard here, as the App.tsx router handles it
   }
 
   const currentChurch = currentChurchId ? churches.find(c => c.id === currentChurchId) : null
@@ -371,14 +369,17 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }
               </Badge>
             </div>
           </div>
-          {user.churchName && (
+          {user.churchName && user.role !== 'super_admin' && (
             <p className="text-xs text-gray-500 mt-2 truncate">📍 {user.churchName}</p>
+          )}
+          {user.role === 'super_admin' && (
+            <p className="text-xs text-gray-500 mt-2 truncate">👑 Painel Master</p>
           )}
         </div>
       )}
 
-      {/* Church Selector for Super Admin */}
-      {user.role === 'super_admin' && !isCollapsed && (
+      {/* Church Selector for Non-Super Admin */}
+      {user.role !== 'super_admin' && !isCollapsed && (
         <div className="p-4 border-b border-gray-100">
           <Label htmlFor="church-selector" className="text-xs font-medium text-gray-600 mb-1 block">
             Igreja Ativa
