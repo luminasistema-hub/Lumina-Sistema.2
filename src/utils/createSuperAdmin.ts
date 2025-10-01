@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 export const createSuperAdminUser = async (email: string, password: string, fullName: string) => {
   try {
     // 1. Primeiro, verificar se uma igreja chamada 'Super Admin Church' existe, ou criá-la.
-    // Isso é necessário porque o trigger handle_new_user espera um church_id.
     let churchId = null;
     const { data: existingChurch, error: fetchChurchError } = await supabase
       .from('igrejas')
@@ -47,7 +46,7 @@ export const createSuperAdminUser = async (email: string, password: string, full
 
     // 2. Registrar o usuário com o papel de super_admin e o ID da igreja
     console.log('Tentando cadastrar Super Admin:', email);
-    const { data, error } = await supabase.auth.signUp({
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -60,12 +59,53 @@ export const createSuperAdminUser = async (email: string, password: string, full
       },
     });
 
-    if (error) {
-      console.error('Erro no cadastro do Super Admin:', error.message);
-      toast.error('Erro ao cadastrar Super Admin: ' + error.message);
-    } else if (data.user) {
+    if (signUpError) {
+      console.error('Erro no cadastro do Super Admin:', signUpError.message);
+      toast.error('Erro ao cadastrar Super Admin: ' + signUpError.message);
+      return;
+    }
+
+    if (authData.user) {
+      console.log('Usuário Super Admin criado em auth.users:', authData.user.id);
+
+      // 3. Verificar e garantir que o perfil do membro foi criado
+      const { data: memberProfile, error: fetchMemberError } = await supabase
+        .from('membros')
+        .select('id')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (fetchMemberError && fetchMemberError.code !== 'PGRST116') { // PGRST116 significa 'no rows found'
+        console.error('Erro ao verificar perfil do membro:', fetchMemberError);
+        toast.error('Erro ao verificar perfil do membro.');
+        return;
+      }
+
+      if (!memberProfile) {
+        console.log('Perfil do membro não encontrado, inserindo manualmente...');
+        const { error: insertMemberError } = await supabase
+          .from('membros')
+          .insert({
+            id: authData.user.id,
+            id_igreja: churchId,
+            nome_completo: fullName,
+            email: email,
+            funcao: 'super_admin',
+            status: 'ativo',
+            perfil_completo: true, // Super admin já começa com perfil completo
+          });
+
+        if (insertMemberError) {
+          console.error('Erro ao inserir perfil do membro manualmente:', insertMemberError);
+          toast.error('Erro ao inserir perfil do membro manualmente: ' + insertMemberError.message);
+          return;
+        }
+        console.log('Perfil do membro inserido manualmente.');
+      } else {
+        console.log('Perfil do membro já existe.');
+      }
+
       toast.success('Super Admin cadastrado com sucesso! Você já pode fazer login.');
-      console.log('Usuário Super Admin criado:', data.user);
     } else {
       toast.error('Erro desconhecido no registro do Super Admin.');
     }
