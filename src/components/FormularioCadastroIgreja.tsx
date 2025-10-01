@@ -64,8 +64,8 @@ const FormularioCadastroIgreja = () => {
         password: adminPassword,
         options: {
           data: {
-            church_name: churchName,
-            full_name: adminName,
+            nome_igreja: churchName, // Ajustado para 'nome_igreja'
+            nome_completo_responsavel: adminName, // Ajustado para 'nome_completo_responsavel'
             plano_id: selectedPlan,
             initial_role: 'admin',
           },
