@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { CourseContentManager } from '@/components/spiritual/CourseContentManager'
 
 const fetchCourseById = async (courseId: string) => {
   const { data, error } = await supabase
@@ -60,15 +61,7 @@ const CourseManagementPage = () => {
           <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
         <TabsContent value="content">
-          <Card>
-            <CardHeader>
-              <CardTitle>Estrutura do Curso</CardTitle>
-              <CardDescription>Adicione módulos e aulas (vídeos, textos, quizzes).</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center text-muted-foreground py-8">Em breve: Gerenciador de conteúdo do curso.</p>
-            </CardContent>
-          </Card>
+          <CourseContentManager course={course} />
         </TabsContent>
         <TabsContent value="students">
           <Card>

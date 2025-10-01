@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useCourses } from '../../hooks/useCourses'
 import { useMembers } from '../../hooks/useMembers'
-import { Course, NewCourse } from '../../types/course'
+import { Course, NewCourse, Lesson } from '../../types/course'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -16,16 +16,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Progress } from '../ui/progress'
 import { toast } from 'sonner'
 import { ImageUploader } from '../ui/ImageUploader'
+import { LessonViewerDialog } from './LessonViewerDialog'
 import { 
-  Play, Clock, Users, Plus, Edit, FileText, Trash2, Youtube, BookOpen
+  Play, Clock, Users, Plus, Edit, FileText, Trash2, Youtube, BookOpen, CheckCircle, HelpCircle
 } from 'lucide-react'
 
 const CoursesPage = () => {
   const { user } = useAuthStore()
-  const { courses, isLoading, createCourse } = useCourses()
+  const { courses, isLoading, createCourse, enrollInCourse } = useCourses()
   const { members: potentialTeachers } = useMembers(['admin', 'pastor', 'lider_ministerio'])
   
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
+  const [viewingLesson, setViewingLesson] = useState<Lesson | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'student' | 'teacher' | 'admin'>('student')
   const [coverFile, setCoverFile] = useState<File | null>(null)
@@ -71,6 +73,14 @@ const CoursesPage = () => {
     setPreviewUrl(null)
   }
 
+  const handleEnroll = (courseId: string) => {
+    enrollInCourse(courseId, {
+      onSuccess: () => {
+        setSelectedCourse(null)
+      }
+    })
+  }
+
   const getStatusColor = (status: Course['status']) => {
     switch (status) {
       case 'Rascunho': return 'bg-gray-100 text-gray-800'
@@ -94,6 +104,9 @@ const CoursesPage = () => {
 
   const myCourses = courses.filter(course => 
     course.alunos_inscritos.some(insc => insc.id_membro === user?.id)
+  )
+  const availableCourses = courses.filter(course => 
+    !course.alunos_inscritos.some(insc => insc.id_membro === user?.id)
   )
   const teachingCourses = courses.filter(course => course.professor?.id === user?.id)
 
@@ -211,6 +224,7 @@ const CoursesPage = () => {
         </div>
 
         <TabsContent value="student" className="space-y-6">
+          <h2 className="text-2xl font-semibold">Meus Cursos</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {myCourses.map((course) => (
               <Card key={course.id} className="flex flex-col border-0 shadow-sm hover:shadow-md transition-shadow">
@@ -241,6 +255,32 @@ const CoursesPage = () => {
               </Card>
             ))}
           </div>
+          {myCourses.length === 0 && <p className="text-muted-foreground">Você ainda não está inscrito em nenhum curso.</p>}
+          
+          <h2 className="text-2xl font-semibold mt-12">Cursos Disponíveis</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableCourses.map((course) => (
+              <Card key={course.id} className="flex flex-col border-0 shadow-sm hover:shadow-md transition-shadow">
+                {course.imagem_capa && (
+                  <img src={course.imagem_capa} alt={`Capa do curso ${course.nome}`} className="rounded-t-lg w-full h-40 object-cover" />
+                )}
+                <CardHeader className={course.imagem_capa ? 'pt-4' : ''}>
+                  <CardTitle className="text-lg mb-2">{course.nome}</CardTitle>
+                  <div className="flex gap-2 flex-wrap">
+                    <Badge className={getCategoryColor(course.categoria)}>{course.categoria}</Badge>
+                    <Badge variant="outline">{course.nivel}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-grow flex flex-col justify-between">
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">{course.descricao}</p>
+                  <Button className="w-full mt-4" variant="secondary" onClick={() => setSelectedCourse(course)}>
+                    Ver Detalhes
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {availableCourses.length === 0 && <p className="text-muted-foreground">Não há novos cursos disponíveis no momento.</p>}
         </TabsContent>
 
         {canTeach && (
@@ -285,34 +325,46 @@ const CoursesPage = () => {
         <Dialog open={!!selectedCourse} onOpenChange={() => setSelectedCourse(null)}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{selectedCourse.nome}</DialogTitle>
+              {selectedCourse.imagem_capa && <img src={selectedCourse.imagem_capa} alt={selectedCourse.nome} className="w-full h-48 object-cover rounded-t-lg mb-4" />}
+              <DialogTitle className="text-2xl">{selectedCourse.nome}</DialogTitle>
               <DialogDescription>Professor: {selectedCourse.professor?.nome_completo || 'N/A'}</DialogDescription>
+              <p className="text-sm text-muted-foreground pt-2">{selectedCourse.descricao}</p>
             </DialogHeader>
             <div className="space-y-6 py-4">
-              {selectedCourse.modulos.map((modulo) => (
+              {selectedCourse.modulos.sort((a,b) => a.ordem - b.ordem).map((modulo) => (
                 <div key={modulo.id} className="border rounded-lg p-4">
                   <h4 className="font-semibold mb-3">{modulo.titulo}</h4>
                   <div className="space-y-3">
-                    {modulo.aulas.map((aula) => (
+                    {modulo.aulas.sort((a,b) => a.ordem - b.ordem).map((aula) => (
                       <div key={aula.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-3">
                           {aula.tipo === 'Video' && <Youtube className="w-5 h-5 text-red-500" />}
                           {aula.tipo === 'Texto' && <BookOpen className="w-5 h-5 text-blue-500" />}
+                          {aula.tipo === 'Quiz' && <HelpCircle className="w-5 h-5 text-green-500" />}
                           <div>
                             <div className="font-medium">{aula.titulo}</div>
-                            <div className="text-sm text-gray-600">{aula.duracao_minutos} min</div>
+                            <div className="text-sm text-gray-600">{aula.duracao_minutos || 1} min</div>
                           </div>
                         </div>
-                        <Button size="sm"><Play className="w-4 h-4 mr-2" /> Acessar</Button>
+                        <Button size="sm" onClick={() => setViewingLesson(aula)}><Play className="w-4 h-4 mr-2" /> Acessar</Button>
                       </div>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
+            {!myCourses.find(c => c.id === selectedCourse.id) && (
+              <div className="p-6 border-t">
+                <Button className="w-full" size="lg" onClick={() => handleEnroll(selectedCourse.id)}>
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Inscrever-se neste curso
+                </Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       )}
+      <LessonViewerDialog lesson={viewingLesson} open={!!viewingLesson} onOpenChange={() => setViewingLesson(null)} />
     </div>
   )
 }

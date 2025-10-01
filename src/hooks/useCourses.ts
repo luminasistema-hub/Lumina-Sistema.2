@@ -133,10 +133,60 @@ export const useCourses = () => {
     },
   })
 
+  const enrollInCourseMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      const { user } = useAuthStore.getState()
+      if (!user) throw new Error('Usuário não autenticado')
+
+      const { data, error } = await supabase
+        .from('cursos_inscricoes')
+        .insert({ id_curso: courseId, id_membro: user.id, status: 'ativo' })
+      
+      if (error) throw new Error(error.message)
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Inscrição realizada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['courses', currentChurchId] })
+    },
+    onError: (err) => {
+      toast.error(`Erro ao se inscrever: ${err.message}`)
+    }
+  })
+
+  const createModuleMutation = useMutation({
+    mutationFn: async (moduleData: { id_curso: string; titulo: string; ordem: number }) => {
+      const { data, error } = await supabase.from('cursos_modulos').insert(moduleData).select().single()
+      if (error) throw new Error(error.message)
+      return data
+    },
+    onSuccess: (data) => {
+      toast.success('Módulo criado com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['course', data.id_curso] })
+    },
+    onError: (err) => toast.error(`Erro ao criar módulo: ${err.message}`)
+  })
+
+  const createLessonMutation = useMutation({
+    mutationFn: async (lessonData: Partial<Lesson>) => {
+      const { data, error } = await supabase.from('cursos_aulas').insert(lessonData).select().single()
+      if (error) throw new Error(error.message)
+      return data
+    },
+    onSuccess: (data) => {
+      toast.success('Aula criada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['course', data.id_curso] }) // Assumindo que o cursoId está no contexto
+    },
+    onError: (err) => toast.error(`Erro ao criar aula: ${err.message}`)
+  })
+
   return {
     courses,
     isLoading,
     error,
     createCourse: createCourseMutation.mutate,
+    enrollInCourse: enrollInCourseMutation.mutate,
+    createModule: createModuleMutation.mutate,
+    createLesson: createLessonMutation.mutate,
   }
 }
