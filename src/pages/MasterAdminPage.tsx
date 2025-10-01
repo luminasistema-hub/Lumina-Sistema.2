@@ -21,7 +21,7 @@ import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHist
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
 import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
 import MasterAdminWebPerformanceInsights from '../components/master-admin/MasterAdminWebPerformanceInsights'; // Importação do novo componente
-import { supabase } from '../integrations/supabase/client' // Importar supabase
+import { supabase } from '../integrations/supabase/client'; // Importar supabase
 import ManagePlansTab from '../components/master-admin/ManagePlansTab';
 
 const MasterAdminPage = () => {
