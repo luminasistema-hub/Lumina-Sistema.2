@@ -200,7 +200,7 @@ export const useAuthStore = create<AuthState>()(
               console.log('AuthStore: Supabase Auth State Change Event:', event, session);
               if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
                 console.log('AuthStore: Auth event detected, calling checkAuth().');
-                await get().checkAuth();
+                await (get() as any).checkAuth();
               } else if (event === 'SIGNED_OUT') {
                 console.log('AuthStore: SIGNED_OUT event detected, clearing state.');
                 set({ user: null, currentChurchId: null, isLoading: false });

@@ -127,10 +127,10 @@ const Header = () => {
 
           <div className="flex items-center gap-2 md:gap-3 px-2 md:px-3 py-2 bg-gray-50 rounded-lg">
             <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-xs md:text-sm">
-              {user?.name.charAt(0).toUpperCase()}
+              {user?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="text-right hidden sm:block">
-              <p className="text-xs md:text-sm font-medium text-gray-900 truncate max-w-20 md:max-w-none">{user?.name}</p>
+              <p className="text-xs md:text-sm font-medium text-gray-900 truncate max-w-20 md:max-w-none">{user?.name || 'Usuário'}</p>
               <Badge className={`text-xs ${getRoleColor(user?.role)}`}>
                 {getRoleIcon(user?.role)}
                 <span className="ml-1 hidden md:inline">{getRoleLabel(user?.role)}</span>

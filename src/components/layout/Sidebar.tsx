@@ -358,10 +358,10 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-              {user?.name.charAt(0).toUpperCase()}
+              {user?.name?.charAt(0).toUpperCase() || 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 truncate">{user?.name}</p>
+              <p className="font-medium text-gray-900 truncate">{user?.name || 'Usuário'}</p>
               <Badge className={cn("text-xs", getRoleColor(user?.role))}>
                 {getRoleIcon(user?.role)}
                 <span className="ml-1">{getRoleLabel(user?.role)}</span>

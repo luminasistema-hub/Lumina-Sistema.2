@@ -22,7 +22,6 @@ import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSys
 import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
 import MasterAdminWebPerformanceInsights from '../components/master-admin/MasterAdminWebPerformanceInsights'; // Importação do novo componente
 import { supabase } from '../integrations/supabase/client' // Importar supabase
-// import { SpeedInsights } from "@vercel/speed-insights/react"; // Importação do SpeedInsights
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
@@ -170,7 +169,7 @@ const MasterAdminPage = () => {
               activeMembersCount={activeMembersCount} 
             />
             <MasterAdminServerStatus />
-            <MasterAdminWebPerformanceInsights /> {/* Novo componente adicionado aqui */}
+            <MasterAdminWebPerformanceInsights />
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">
@@ -280,7 +279,6 @@ const MasterAdminPage = () => {
           </TabsContent>
         </Tabs>
       </div>
-      {/* <SpeedInsights /> */}
     </MainLayout>
   )
 }
