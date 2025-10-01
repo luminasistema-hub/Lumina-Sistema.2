@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { Church, SubscriptionPlan, useChurchStore } from '../../stores/churchStore';
-import { Save, X } from 'lucide-react';
+import { Save, X, Loader2 } from 'lucide-react';
 
 interface ManageChurchSubscriptionDialogProps {
   isOpen: boolean;
