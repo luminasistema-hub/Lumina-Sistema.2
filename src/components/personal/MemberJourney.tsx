@@ -127,20 +127,21 @@ const MemberJourney = () => {
 
     try {
       // 1. Buscar a trilha de crescimento da igreja (de forma mais segura)
-      const { data: trilhaData, error: trilhaError } = await supabase
+      const { data: trilhasData, error: trilhaError } = await supabase
         .from('trilhas_crescimento')
         .select('id, titulo, descricao')
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
-        .limit(1) // Garante que pegamos apenas uma, mesmo que existam múltiplas
-        .single();
+        .limit(1); // Usar limit(1) em vez de single() para mais resiliência
 
-      if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = 0 rows
+      if (trilhaError) {
         console.error('MemberJourney: Error loading trilha_crescimento:', trilhaError);
         toast.error('Erro ao carregar a trilha de crescimento da igreja.');
         setLoading(false);
         return;
       }
+
+      const trilhaData = trilhasData && trilhasData.length > 0 ? trilhasData[0] : null;
 
       if (!trilhaData) {
         console.log('MemberJourney: No active journey found for this church.');
