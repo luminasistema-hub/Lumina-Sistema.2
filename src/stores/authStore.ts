@@ -95,7 +95,7 @@ export const useAuthStore = create<AuthState>()(
           if (session && session.user) {
             console.log('AuthStore: Session found for user ID:', session.user.id);
             console.log('AuthStore: Attempting to fetch profile from "membros" table.');
-            const { data: profile, error: profileError } = await supabase
+            let { data: profile, error: profileError } = await supabase
               .from('membros') 
               .select(`
                 id,
@@ -115,9 +115,67 @@ export const useAuthStore = create<AuthState>()(
             console.log('AuthStore: Profile fetch result - data:', profile, 'error:', profileError);
 
             if (profileError || !profile) { 
-              console.error('AuthStore: Error fetching user profile or profile not found:', profileError?.message || 'Profile data is null/undefined. Setting user to null and isLoading to false.');
-              set({ user: null, isLoading: false, currentChurchId: null });
-              return;
+              console.error('AuthStore: Error fetching user profile or profile not found:', profileError?.message || 'Profile data is null/undefined.');
+
+              // Special handling for super_admin if profile is missing
+              if (session.user.user_metadata.initial_role === 'super_admin') {
+                  console.warn('AuthStore: Super Admin user found in auth.users but missing profile in public.membros. Attempting to create profile...');
+
+                  // Fetch Super Admin Church ID
+                  const { data: superAdminChurch, error: churchError } = await supabase
+                      .from('igrejas')
+                      .select('id')
+                      .eq('nome', 'Super Admin Church')
+                      .single();
+
+                  if (churchError || !superAdminChurch) {
+                      console.error('AuthStore: Could not find "Super Admin Church" to create profile for super_admin:', churchError?.message);
+                      set({ user: null, isLoading: false, currentChurchId: null });
+                      return;
+                  }
+
+                  const superAdminChurchId = superAdminChurch.id;
+
+                  // Attempt to insert profile for super_admin
+                  const { data: newProfile, error: insertError } = await supabase
+                      .from('membros')
+                      .insert({
+                          id: session.user.id,
+                          id_igreja: superAdminChurchId,
+                          nome_completo: session.user.user_metadata.full_name || session.user.email,
+                          email: session.user.email!,
+                          funcao: 'super_admin',
+                          status: 'ativo',
+                          perfil_completo: true,
+                      })
+                      .select(`
+                        id,
+                        nome_completo,
+                        email,
+                        funcao,
+                        id_igreja,
+                        status,
+                        created_at,
+                        perfil_completo,
+                        ministerio_recomendado,
+                        igrejas(id, nome)
+                      `) // Select all fields again to match the original profile structure
+                      .single();
+
+                  if (insertError) {
+                      console.error('AuthStore: Error creating missing profile for super_admin:', insertError.message);
+                      set({ user: null, isLoading: false, currentChurchId: null });
+                      return;
+                  }
+
+                  console.log('AuthStore: Successfully created missing profile for super_admin.');
+                  // Now use the newly created profile
+                  profile = newProfile;
+              } else {
+                  // For non-super_admin users, if profile is missing, it's an error.
+                  set({ user: null, isLoading: false, currentChurchId: null });
+                  return;
+              }
             }
 
             console.log('AuthStore: Profile data successfully fetched. perfil_completo:', profile.perfil_completo);
