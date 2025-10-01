@@ -52,7 +52,7 @@ serve(async (req) => {
         .from('igrejas')
         .insert({
           nome: 'Super Admin Church',
-          plano_id: 'ilimitado',
+          plano_id: '00000000-0000-0000-0000-000000000001', // Corrigido para o UUID do plano padrão
           limite_membros: -1, // -1 for unlimited
           membros_atuais: 0,
           status: 'active',
