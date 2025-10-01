@@ -43,6 +43,7 @@ import {
   Headphones,
   Target
 } from 'lucide-react'
+import { trackEvent } from '../../lib/analytics'; // Importar trackEvent
 
 // Define a more accurate interface based on Supabase tables
 interface MemberProfile {
@@ -287,6 +288,7 @@ const MemberManagementPage = () => {
 
     if (authData.user) {
       toast.success('Membro cadastrado com sucesso! Um email de confirmação foi enviado.');
+      trackEvent('add_member', { memberId: authData.user.id, memberRole: newMember.funcao }); // Rastrear evento
       loadMembers(currentChurchId); 
     } else {
       toast.error('Erro desconhecido ao cadastrar membro.');
@@ -387,6 +389,7 @@ const MemberManagementPage = () => {
     setSelectedMember(null);
     setEditMemberData({});
     toast.success('Membro atualizado com sucesso!');
+    trackEvent('edit_member_profile', { memberId: selectedMember.id, updatedFields: Object.keys(editMemberData) }); // Rastrear evento
     loadMembers(currentChurchId); 
   };
 
@@ -417,6 +420,7 @@ const MemberManagementPage = () => {
     }
 
     toast.success('Usuário removido do sistema com sucesso!');
+    trackEvent('delete_member', { memberId: memberId }); // Rastrear evento
     loadMembers(currentChurchId); 
   };
 
@@ -454,12 +458,14 @@ const MemberManagementPage = () => {
     const link = `${baseUrl}/register?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`;
     setGeneratedLink(link);
     setIsGenerateLinkDialogOpen(true);
+    trackEvent('generate_registration_link', { churchId: currentChurchId }); // Rastrear evento
     console.log('--- Generated Link:', link);
   };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(generatedLink)
     toast.success('Link copiado para a área de transferência!')
+    trackEvent('copy_registration_link', { churchId: currentChurchId }); // Rastrear evento
   }
 
   const getRoleIcon = (role: UserRole) => {
@@ -643,7 +649,10 @@ const MemberManagementPage = () => {
 
         <div className="flex gap-2 w-full lg:w-auto">
           {canManageMembers && (
-            <Dialog open={isAddMemberDialogOpen} onOpenChange={setIsAddMemberDialogOpen}>
+            <Dialog open={isAddMemberDialogOpen} onOpenChange={(open) => {
+              setIsAddMemberDialogOpen(open);
+              if (open) trackEvent('open_add_member_dialog'); // Rastrear abertura do diálogo
+            }}>
               <DialogTrigger asChild>
                 <Button className="bg-blue-500 hover:bg-blue-600 flex-1 lg:flex-none">
                   <Plus className="w-4 h-4 mr-2" />
@@ -867,7 +876,10 @@ const MemberManagementPage = () => {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => setSelectedMember(member)}
+                    onClick={() => {
+                      setSelectedMember(member);
+                      trackEvent('view_member_profile', { memberId: member.id }); // Rastrear evento
+                    }}
                   >
                     <Eye className="w-4 h-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Ver Perfil</span>

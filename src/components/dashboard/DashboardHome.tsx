@@ -1,13 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // Importar useEffect
 import { useAuthStore } from '../../stores/authStore';
 import WelcomeCard from './WelcomeCard';
 import DashboardStatsGrid from './DashboardStatsGrid';
 import DashboardQuickActions from './DashboardQuickActions';
 import MemberDashboardContent from './MemberDashboardContent';
 import AdminPastorDashboardContent from './AdminPastorDashboardContent';
+import { trackEvent } from '../../lib/analytics'; // Importar trackEvent
 
 const DashboardHome = () => {
   const { user, currentChurchId } = useAuthStore();
+
+  useEffect(() => {
+    if (user && currentChurchId) {
+      trackEvent('view_page', { page: 'DashboardHome', userRole: user.role });
+    }
+  }, [user, currentChurchId]);
 
   if (!user || !currentChurchId) {
     return (

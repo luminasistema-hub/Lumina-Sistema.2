@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { Gauge, Speedometer, TrendingUp, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Gauge, TrendingUp, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react'; // Removido Speedometer, mantido Gauge
 
 const MasterAdminWebPerformanceInsights: React.FC = () => {
   // Dados fictícios para simular métricas de performance web
@@ -37,7 +37,7 @@ const MasterAdminWebPerformanceInsights: React.FC = () => {
     <Card className="border-0 shadow-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Speedometer className="w-5 h-5 text-orange-500" />
+          <Gauge className="w-5 h-5 text-orange-500" /> {/* Ícone Speedometer substituído por Gauge */}
           Insights de Performance Web
         </CardTitle>
         <CardDescription>
