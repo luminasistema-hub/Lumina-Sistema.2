@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from '../ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
-import { Baby, Plus } from 'lucide-react';
+import { Baby, Plus, Loader2 } from 'lucide-react'; // Adicionado Loader2 aqui
 
 interface AddKidDialogProps {
   isOpen: boolean;
