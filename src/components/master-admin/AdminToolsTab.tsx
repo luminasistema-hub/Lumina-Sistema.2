@@ -51,6 +51,7 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
       fetchChurchAdmins(selectedChurchId);
     } else {
       setChurchAdmins([]);
+      setSelectedAdminEmail(''); // Clear selected admin when church is unselected
     }
   }, [selectedChurchId]);
 
@@ -112,7 +113,11 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
           {selectedChurchId && (
             <div className="space-y-2">
               <Label htmlFor="select-admin">Selecione o Administrador</Label>
-              <Select value={selectedAdminEmail} onValueChange={setSelectedAdminEmail} disabled={isLoadingAdmins}>
+              <Select 
+                value={selectedAdminEmail} 
+                onValueChange={setSelectedAdminEmail} 
+                disabled={isLoadingAdmins || churchAdmins.length === 0}
+              >
                 <SelectTrigger id="select-admin">
                   {isLoadingAdmins ? (
                     <div className="flex items-center gap-2">
@@ -125,7 +130,7 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
                 </SelectTrigger>
                 <SelectContent>
                   {churchAdmins.length === 0 ? (
-                    <SelectItem value="" disabled>Nenhum administrador encontrado</SelectItem>
+                    <SelectItem value="no-admins" disabled>Nenhum administrador encontrado</SelectItem>
                   ) : (
                     churchAdmins.map(admin => (
                       <SelectItem key={admin.id} value={admin.email}>
