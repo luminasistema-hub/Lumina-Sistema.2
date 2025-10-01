@@ -33,9 +33,10 @@ interface TrilhaCrescimento {
 
 interface QuizPergunta {
   id?: string;
+  passo_id: string;
   ordem: number;
-  pergunta_texto: string;
-  opcoes: string[];
+  pergunta: string; // Corrigido de pergunta_texto para pergunta
+  opcoes_json: { opcoes: string[] };
   resposta_correta: number;
   pontuacao: number;
 }
@@ -57,8 +58,6 @@ interface EtapaTrilha {
   ordem: number;
   titulo: string;
   descricao: string;
-  tipo_conteudo: string;
-  conteudo: string;
   cor: string;
   created_at: string;
 }
