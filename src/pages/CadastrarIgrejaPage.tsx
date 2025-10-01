@@ -18,10 +18,10 @@ const CadastrarIgrejaPage = () => {
         <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur">
           <CardHeader className="text-center pb-8">
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4">
-              <Church className="w-8 h-8 text-white" />
+              <img src="/favicon.ico" alt="Lumina Logo" className="w-10 h-10" />
             </div>
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Sistema Connect Vida
+              Lumina
             </CardTitle>
             <CardDescription className="text-base">
               Cadastre sua igreja e crie sua conta de administrador
@@ -48,8 +48,8 @@ const CadastrarIgrejaPage = () => {
 
         <div className="text-center text-sm text-gray-500 mt-6 bg-white/80 p-4 rounded-lg">
           <p className="flex items-center justify-center gap-2 mb-2">
-            <Church className="w-4 h-4" />
-            Sistema Connect Vida - Produção
+            <img src="/favicon.ico" alt="Lumina Icon" className="w-4 h-4" />
+            Lumina - Sistema de Gestão Eclesiástica
           </p>
           <p className="text-xs">
             Ao cadastrar sua igreja, você será o administrador principal.

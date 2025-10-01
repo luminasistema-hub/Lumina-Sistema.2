@@ -72,10 +72,10 @@ const SuperAdminRegisterPage = () => {
         <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur">
           <CardHeader className="text-center pb-8">
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-600 to-orange-700 rounded-full flex items-center justify-center mb-4">
-              <Shield className="w-8 h-8 text-white" />
+              <img src="/favicon.ico" alt="Lumina Logo" className="w-10 h-10" />
             </div>
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-red-600 to-orange-700 bg-clip-text text-transparent">
-              Registro Master Admin
+              Lumina - Registro Master
             </CardTitle>
             <CardDescription className="text-base">
               Crie sua conta de Super Administrador
@@ -173,7 +173,7 @@ const SuperAdminRegisterPage = () => {
         <div className="text-center text-sm text-gray-500 mt-6 bg-white/80 p-4 rounded-lg">
           <p className="flex items-center justify-center gap-2 mb-2">
             <Shield className="w-4 h-4" />
-            Sistema Connect Vida - Acesso Administrativo
+            Lumina - Acesso Administrativo
           </p>
           <p className="text-xs">
             Este portal é destinado apenas a Super Administradores do sistema.

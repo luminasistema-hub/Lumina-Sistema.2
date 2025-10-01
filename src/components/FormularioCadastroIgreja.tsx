@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -34,6 +34,7 @@ const validatePhone = (phone: string) => {
 
 const FormularioCadastroIgreja = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [churchName, setChurchName] = useState('');
   const [adminName, setAdminName] = useState('');
@@ -62,13 +63,17 @@ const FormularioCadastroIgreja = () => {
                 monthlyValue: plan.preco_mensal
             }));
             setSubscriptionPlans(formattedPlans);
-            if (formattedPlans.length > 0) {
+            
+            const planFromUrl = searchParams.get('plano');
+            if (planFromUrl && formattedPlans.some(p => p.value === planFromUrl)) {
+              setSelectedPlan(planFromUrl);
+            } else if (formattedPlans.length > 0) {
               setSelectedPlan(formattedPlans[0].value);
             }
         }
     };
     fetchPlans();
-  }, []);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

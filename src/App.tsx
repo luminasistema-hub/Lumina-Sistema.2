@@ -6,7 +6,8 @@ import DashboardPage from './pages/DashboardPage'
 import MasterAdminPage from './pages/MasterAdminPage'
 import MasterAdminLoginPage from './pages/MasterAdminLoginPage'
 import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage'
-import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage' // Importar a nova página
+import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
+import LandingPage from './pages/LandingPage'
 import { useEffect } from 'react'
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
@@ -37,6 +38,12 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-church-blue-50 to-church-purple-50">
       <Routes>
+        {/* Rota da Landing Page */}
+        <Route 
+          path="/" 
+          element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <LandingPage />} 
+        />
+
         {/* Rotas de Login e Registro Comum */}
         <Route 
           path="/login" 
@@ -68,17 +75,7 @@ function App() {
         />
         <Route 
           path="/dashboard" 
-          element={user && user.role !== 'super_admin' && currentChurchId ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/login" replace />} 
-        />
-
-        {/* Rota Raiz - Redirecionamento inicial */}
-        <Route 
-          path="/" 
-          element={
-            user 
-              ? (user.role === 'super_admin' ? <Navigate to="/master-admin" replace /> : <Navigate to="/dashboard" replace />)
-              : <Navigate to="/login" replace />
-          } 
+          element={user && user.role !== 'super_admin' && currentChurchId ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/" replace />} 
         />
       </Routes>
       <SpeedInsights />
