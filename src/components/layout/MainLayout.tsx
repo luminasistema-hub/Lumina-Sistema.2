@@ -10,12 +10,14 @@ interface MainLayoutProps {
 }
 
 const MainLayout = ({ children, activeModule = 'dashboard', onModuleSelect }: MainLayoutProps) => {
-  const { currentChurchId } = useAuthStore() // Obter currentChurchId do authStore
+  const { user } = useAuthStore() // Obter user do authStore
 
   const handleModuleSelect = (moduleId: string) => {
     console.log(`MainLayout: Selected module: ${moduleId}`)
     onModuleSelect?.(moduleId)
   }
+
+  if (!user) return null; // Adicionado para garantir que user existe antes de renderizar filhos
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -23,13 +25,12 @@ const MainLayout = ({ children, activeModule = 'dashboard', onModuleSelect }: Ma
       <Sidebar 
         activeModule={activeModule} 
         onModuleSelect={handleModuleSelect}
-        currentChurchId={currentChurchId} // Passar currentChurchId para Sidebar
       />
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <Header currentChurchId={currentChurchId} /> {/* Passar currentChurchId para Header */}
+        <Header />
         
         {/* Page Content */}
         <main className="flex-1 overflow-auto">

@@ -35,7 +35,7 @@ serve(async (req) => {
       user_metadata: {
         full_name: name,
         initial_role: 'super_admin',
-        church_id: null, // Super Admin is explicitly NOT tied to a specific church
+        // church_id não é mais necessário
       },
     });
 
@@ -50,30 +50,25 @@ serve(async (req) => {
     const newUserId = userResponse.user.id;
     console.log('Super Admin user created in auth.users with ID:', newUserId);
 
-    // 2. Insert the corresponding profile into public.membros
-    // For Super Admin, id_igreja must be NULL
-    const { error: insertMemberError } = await supabaseAdmin
-      .from('membros')
+    // 2. Insert the corresponding profile into public.super_admins
+    const { error: insertSuperAdminError } = await supabaseAdmin
+      .from('super_admins')
       .insert({
         id: newUserId,
-        id_igreja: null, // Super Admin is explicitly NOT tied to a specific church
         nome_completo: name,
         email: email,
-        funcao: 'super_admin',
-        status: 'ativo',
-        perfil_completo: true,
       });
 
-    if (insertMemberError) {
-      console.error('Error inserting member profile into public.membros:', insertMemberError);
+    if (insertSuperAdminError) {
+      console.error('Error inserting profile into public.super_admins:', insertSuperAdminError);
       // Attempt to delete the auth user if profile creation fails
       await supabaseAdmin.auth.admin.deleteUser(newUserId);
-      return new Response(JSON.stringify({ error: 'Erro ao criar perfil do membro: ' + insertMemberError.message }), {
+      return new Response(JSON.stringify({ error: 'Erro ao criar perfil do Super Admin: ' + insertSuperAdminError.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    console.log('Member profile created for Super Admin with ID:', newUserId);
+    console.log('Super Admin profile created with ID:', newUserId);
 
     return new Response(JSON.stringify({ message: 'Super Admin cadastrado com sucesso!' }), {
       status: 200,

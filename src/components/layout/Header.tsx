@@ -22,11 +22,7 @@ import {
 import { Input } from '../ui/input'
 import { useState, useEffect } from 'react' 
 
-interface HeaderProps {
-  currentChurchId: string | null; 
-}
-
-const Header = ({ currentChurchId }: HeaderProps) => {
+const Header = () => {
   const { user, logout } = useAuthStore()
   const { getChurchById, loadChurches } = useChurchStore() 
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -37,15 +33,15 @@ const Header = ({ currentChurchId }: HeaderProps) => {
   }, [loadChurches])
 
   useEffect(() => {
-    if (currentChurchId) {
-      const church = getChurchById(currentChurchId)
+    if (user?.churchId) {
+      const church = getChurchById(user.churchId)
       setCurrentChurchName(church?.name || 'Igreja Desconhecida')
     } else if (user?.role === 'super_admin') {
       setCurrentChurchName('Painel Master')
     } else {
       setCurrentChurchName('Nenhuma Igreja Selecionada')
     }
-  }, [currentChurchId, getChurchById, user?.role])
+  }, [user?.churchId, user?.role, getChurchById])
 
   if (!user) return null
 

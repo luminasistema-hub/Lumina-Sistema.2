@@ -14,7 +14,7 @@ interface User {
   ministry?: string
   status: 'ativo' | 'pendente' | 'inativo'
   created_at: string
-  perfil_completo: boolean; // Adicionado: indica se o perfil pessoal está completo
+  perfil_completo: boolean;
 }
 
 export type { User }
@@ -94,6 +94,35 @@ export const useAuthStore = create<AuthState>()(
 
           if (session && session.user) {
             console.log('AuthStore: Session found for user ID:', session.user.id);
+            
+            // Verificar se é um Super Admin
+            let { data: superAdminProfile, error: superAdminError } = await supabase
+              .from('super_admins')
+              .select('id, nome_completo, email')
+              .eq('id', session.user.id)
+              .maybeSingle();
+
+            if (superAdminProfile) {
+              console.log('AuthStore: User is a Super Admin.');
+              set({
+                user: {
+                  id: session.user.id,
+                  email: session.user.email!,
+                  role: 'super_admin',
+                  churchId: null,
+                  churchName: 'Painel Master',
+                  ministry: null,
+                  status: 'ativo',
+                  created_at: session.user.created_at,
+                  perfil_completo: true, // Super Admins não precisam completar perfil
+                },
+                isLoading: false,
+                currentChurchId: null,
+              });
+              return;
+            }
+
+            // Se não for Super Admin, buscar perfil normal
             console.log('AuthStore: Attempting to fetch profile from "membros" table.');
             let { data: profile, error: profileError } = await supabase
               .from('membros') 
@@ -116,48 +145,33 @@ export const useAuthStore = create<AuthState>()(
 
             if (profileError || !profile) { 
               console.error('AuthStore: Error fetching user profile or profile not found:', profileError?.message || 'Profile data is null/undefined.');
-
-              // Special handling for super_admin if profile is missing
-              if (session.user.user_metadata.initial_role === 'super_admin') {
-                  console.warn('AuthStore: Super Admin user found in auth.users but missing profile in public.membros. This indicates an incomplete registration. User will be treated as unauthenticated.');
-                  // Do NOT attempt to create profile here. This should be handled by the registration process (Edge Function).
-                  set({ user: null, isLoading: false, currentChurchId: null });
-                  return;
-              }
-            }
-            
-            // Re-check if profile is still null/undefined after all attempts
-            if (!profile) {
-                console.error('AuthStore: Profile data is still null/undefined after all attempts. Cannot proceed.');
-                set({ user: null, isLoading: false, currentChurchId: null });
-                return;
+              set({ user: null, isLoading: false, currentChurchId: null });
+              return;
             }
 
             console.log('AuthStore: Profile data successfully fetched. perfil_completo:', profile.perfil_completo);
-
-            const churchIdForUser = profile.funcao === 'super_admin' ? null : profile.id_igreja;
 
             set({
               user: {
                 id: session.user.id,
                 email: session.user.email!,
                 role: profile.funcao,
-                churchId: churchIdForUser,
-                churchName: profile.igrejas?.nome || (profile.funcao === 'super_admin' ? 'Global' : 'Igreja não encontrada'), // Ajuste para Super Admin
-                ministry: profile.ministerio_recomendado, // Adicionado para garantir que o campo exista
-                status: profile.status, // Adicionado para garantir que o campo exista
-                created_at: profile.created_at, // Adicionado para garantir que o campo exista
+                churchId: profile.id_igreja,
+                churchName: profile.igrejas?.nome || 'Igreja não encontrada',
+                ministry: profile.ministerio_recomendado,
+                status: profile.status,
+                created_at: profile.created_at,
                 perfil_completo: profile.perfil_completo,
               },
               isLoading: false,
-              currentChurchId: churchIdForUser,
+              currentChurchId: profile.id_igreja,
             });
             console.log('AuthStore: User set:', {
               id: session.user.id,
               email: session.user.email!,
               role: profile.funcao,
-              churchId: churchIdForUser,
-              churchName: profile.igrejas?.nome || (profile.funcao === 'super_admin' ? 'Global' : 'Igreja não encontrada'), // Ajuste para Super Admin
+              churchId: profile.id_igreja,
+              churchName: profile.igrejas?.nome || 'Igreja não encontrada',
               ministry: profile.ministerio_recomendado,
               status: profile.status,
               created_at: profile.created_at,

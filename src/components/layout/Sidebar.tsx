@@ -222,13 +222,12 @@ const moduleCategories: ModuleCategory[] = [
 interface SidebarProps {
   activeModule?: string
   onModuleSelect?: (moduleId: string) => void
-  currentChurchId: string | null 
 }
 
-const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }: SidebarProps) => {
+const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['personal', 'management'])
-  const { user, setCurrentChurchId } = useAuthStore()
+  const { user, setCurrentChurchId, currentChurchId } = useAuthStore()
   const { churches, loadChurches } = useChurchStore()
   const navigate = useNavigate()
 
