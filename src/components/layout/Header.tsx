@@ -97,7 +97,7 @@ const Header = ({ currentChurchId }: HeaderProps) => {
         <div className="flex-1 max-w-xs md:max-w-md flex items-center gap-3">
           <Building className="w-5 h-5 text-gray-500" />
           <span className="font-semibold text-gray-800 truncate">{currentChurchName}</span>
-          {user.role !== 'super_admin' && (
+          {user?.role !== 'super_admin' && (
             <div className="relative flex-1 ml-4 hidden sm:block">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
@@ -131,13 +131,13 @@ const Header = ({ currentChurchId }: HeaderProps) => {
 
           <div className="flex items-center gap-2 md:gap-3 px-2 md:px-3 py-2 bg-gray-50 rounded-lg">
             <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-xs md:text-sm">
-              {user.name.charAt(0).toUpperCase()}
+              {user?.name.charAt(0).toUpperCase()}
             </div>
             <div className="text-right hidden sm:block">
-              <p className="text-xs md:text-sm font-medium text-gray-900 truncate max-w-20 md:max-w-none">{user.name}</p>
-              <Badge className={`text-xs ${getRoleColor(user.role)}`}>
-                {getRoleIcon(user.role)}
-                <span className="ml-1 hidden md:inline">{getRoleLabel(user.role)}</span>
+              <p className="text-xs md:text-sm font-medium text-gray-900 truncate max-w-20 md:max-w-none">{user?.name}</p>
+              <Badge className={`text-xs ${getRoleColor(user?.role)}`}>
+                {getRoleIcon(user?.role)}
+                <span className="ml-1 hidden md:inline">{getRoleLabel(user?.role)}</span>
               </Badge>
             </div>
           </div>

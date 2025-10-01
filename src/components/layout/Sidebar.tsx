@@ -359,27 +359,27 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-              {user.name.charAt(0).toUpperCase()}
+              {user?.name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 truncate">{user.name}</p>
-              <Badge className={cn("text-xs", getRoleColor(user.role))}>
-                {getRoleIcon(user.role)}
-                <span className="ml-1">{getRoleLabel(user.role)}</span>
+              <p className="font-medium text-gray-900 truncate">{user?.name}</p>
+              <Badge className={cn("text-xs", getRoleColor(user?.role))}>
+                {getRoleIcon(user?.role)}
+                <span className="ml-1">{getRoleLabel(user?.role)}</span>
               </Badge>
             </div>
           </div>
-          {user.churchName && user.role !== 'super_admin' && (
-            <p className="text-xs text-gray-500 mt-2 truncate">📍 {user.churchName}</p>
+          {user?.churchName && user?.role !== 'super_admin' && (
+            <p className="text-xs text-gray-500 mt-2 truncate">📍 {user?.churchName}</p>
           )}
-          {user.role === 'super_admin' && (
+          {user?.role === 'super_admin' && (
             <p className="text-xs text-gray-500 mt-2 truncate">👑 Painel Master</p>
           )}
         </div>
       )}
 
       {/* Church Selector for Non-Super Admin */}
-      {user.role !== 'super_admin' && !isCollapsed && (
+      {user?.role !== 'super_admin' && !isCollapsed && (
         <div className="p-4 border-b border-gray-100">
           <Label htmlFor="church-selector" className="text-xs font-medium text-gray-600 mb-1 block">
             Igreja Ativa
@@ -418,7 +418,7 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }
         </div>
 
         {/* Master Admin Link */}
-        {user.role === 'super_admin' && (
+        {user?.role === 'super_admin' && (
           <div className="px-4 mb-4">
             <Button
               variant={activeModule === 'master-admin' ? 'default' : 'ghost'}
