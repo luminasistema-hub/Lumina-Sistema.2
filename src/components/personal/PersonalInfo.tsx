@@ -35,33 +35,33 @@ import AddKidDialog from './AddKidDialog'; // Importar o novo componente
 interface PersonalInfoData {
   // Dados Pessoais
   nomeCompleto: string
-  dataNascimento: string
-  estadoCivil: string
-  profissao: string
-  telefone: string
+  dataNascimento: string | null
+  estadoCivil: string | null
+  profissao: string | null
+  telefone: string | null
   email: string
   
   // Endereço
-  endereco: string
+  endereco: string | null
   
   // Informações Familiares
   conjugeId: string | null // Alterado para ID do cônjuge
   conjugeNome?: string // Para exibição
-  dataCasamento: string // Novo campo
-  paisCristaos: string
+  dataCasamento: string | null // Novo campo
+  paisCristaos: string | null
   
   // Informações Ministeriais (mantidas no estado, mas não no formulário)
-  tempoIgreja: string
+  tempoIgreja: string | null
   batizado: boolean
-  dataBatismo: string
+  dataBatismo: string | null
   participaMinisterio: boolean
-  ministerioAtual: string
-  experienciaAnterior: string
-  dataConversao: string
+  ministerioAtual: string | null
+  experienciaAnterior: string | null
+  dataConversao: string | null
   
   // Disponibilidade (mantidas no estado, mas não no formulário)
   diasDisponiveis: string[]
-  horariosDisponiveis: string
+  horariosDisponiveis: string | null
 }
 
 interface VocationalTestResult {
@@ -94,24 +94,24 @@ const PersonalInfo = () => {
   const [isFirstAccess, setIsFirstAccess] = useState(true) 
   const [formData, setFormData] = useState<PersonalInfoData>({
     nomeCompleto: user?.name || '',
-    dataNascimento: '',
-    estadoCivil: '',
-    profissao: '',
-    telefone: '',
+    dataNascimento: null,
+    estadoCivil: null,
+    profissao: null,
+    telefone: null,
     email: user?.email || '',
-    endereco: '',
+    endereco: null,
     conjugeId: null,
-    dataCasamento: '', // Inicializa o novo campo
-    paisCristaos: '',
-    tempoIgreja: '',
+    dataCasamento: null, // Inicializa o novo campo
+    paisCristaos: null,
+    tempoIgreja: null,
     batizado: false,
-    dataBatismo: '',
+    dataBatismo: null,
     participaMinisterio: false,
-    ministerioAtual: '',
-    experienciaAnterior: '',
-    dataConversao: '',
+    ministerioAtual: null, 
+    experienciaAnterior: null,
+    dataConversao: null,
     diasDisponiveis: [],
-    horariosDisponiveis: ''
+    horariosDisponiveis: null
   })
   const [latestVocationalTest, setLatestVocationalTest] = useState<VocationalTestResult | null>(null);
   const [vocationalTestHistory, setVocationalTestHistory] = useState<VocationalTestResult[]>([]);
@@ -160,25 +160,25 @@ const PersonalInfo = () => {
 
       setFormData({
         nomeCompleto: user.name, 
-        dataNascimento: personalInfoRecord.data_nascimento || '',
-        estadoCivil: personalInfoRecord.estado_civil || '',
-        profissao: personalInfoRecord.profissao || '',
-        telefone: personalInfoRecord.telefone || '',
+        dataNascimento: personalInfoRecord.data_nascimento || null,
+        estadoCivil: personalInfoRecord.estado_civil || null,
+        profissao: personalInfoRecord.profissao || null,
+        telefone: personalInfoRecord.telefone || null,
         email: user.email, 
-        endereco: personalInfoRecord.endereco || '',
+        endereco: personalInfoRecord.endereco || null,
         conjugeId: personalInfoRecord.conjuge_id || null,
         conjugeNome: conjugeNome,
-        dataCasamento: personalInfoRecord.data_casamento || '',
-        paisCristaos: personalInfoRecord.pais_cristaos || '',
-        tempoIgreja: personalInfoRecord.tempo_igreja || '',
+        dataCasamento: personalInfoRecord.data_casamento || null,
+        paisCristaos: personalInfoRecord.pais_cristaos || null,
+        tempoIgreja: personalInfoRecord.tempo_igreja || null, 
         batizado: personalInfoRecord.batizado || false,
-        dataBatismo: personalInfoRecord.data_batismo || '',
+        dataBatismo: personalInfoRecord.data_batismo || null,
         participaMinisterio: personalInfoRecord.participa_ministerio || false,
-        ministerioAtual: personalInfoRecord.ministerio_anterior || '', 
-        experienciaAnterior: personalInfoRecord.experiencia_anterior || '',
-        dataConversao: personalInfoRecord.data_conversao || '',
+        ministerioAtual: personalInfoRecord.ministerio_anterior || null, 
+        experienciaAnterior: personalInfoRecord.experiencia_anterior || null,
+        dataConversao: personalInfoRecord.data_conversao || null,
         diasDisponiveis: personalInfoRecord.dias_disponiveis || [],
-        horariosDisponiveis: personalInfoRecord.horarios_disponiveis || ''
+        horariosDisponiveis: personalInfoRecord.horarios_disponiveis || null
       });
     } else {
       setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }));
@@ -366,21 +366,21 @@ const PersonalInfo = () => {
       membro_id: user.id, 
       telefone: formData.telefone,
       endereco: formData.endereco,
-      data_nascimento: formData.dataNascimento || null,
-      estado_civil: formData.estadoCivil || null,
-      profissao: formData.profissao || null,
-      conjuge_id: formData.conjugeId || null, // Salva o ID do cônjuge
-      data_casamento: formData.dataCasamento || null, // Salva o novo campo
-      pais_cristaos: formData.paisCristaos || null,
-      tempo_igreja: formData.tempoIgreja || null, 
+      data_nascimento: formData.dataNascimento,
+      estado_civil: formData.estadoCivil,
+      profissao: formData.profissao,
+      conjuge_id: formData.conjugeId, // Salva o ID do cônjuge
+      data_casamento: formData.dataCasamento, // Salva o novo campo
+      pais_cristaos: formData.paisCristaos,
+      tempo_igreja: formData.tempoIgreja, 
       batizado: formData.batizado,
-      data_batismo: formData.dataBatismo || null,
+      data_batismo: formData.dataBatismo,
       participa_ministerio: formData.participaMinisterio,
-      ministerio_anterior: formData.ministerioAtual || null, 
-      experiencia_anterior: formData.experienciaAnterior || null,
-      data_conversao: formData.dataConversao || null,
+      ministerio_anterior: formData.ministerioAtual, 
+      experiencia_anterior: formData.experienciaAnterior,
+      data_conversao: formData.dataConversao,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horariosDisponiveis: formData.horariosDisponiveis || null, 
+      horariosDisponiveis: formData.horariosDisponiveis, 
       updated_at: new Date().toISOString(),
     };
 
@@ -508,7 +508,7 @@ const PersonalInfo = () => {
                 <Label htmlFor="nomeCompleto">Nome Completo *</Label>
                 <Input
                   id="nomeCompleto"
-                  value={formData.nomeCompleto}
+                  value={formData.nomeCompleto || ''}
                   onChange={(e) => handleInputChange('nomeCompleto', e.target.value)}
                   placeholder="Seu nome completo"
                 />
@@ -518,13 +518,13 @@ const PersonalInfo = () => {
                 <Input
                   id="dataNascimento"
                   type="date"
-                  value={formData.dataNascimento}
+                  value={formData.dataNascimento || ''}
                   onChange={(e) => handleInputChange('dataNascimento', e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="estadoCivil">Estado Civil</Label>
-                <Select value={formData.estadoCivil} onValueChange={(value) => handleInputChange('estadoCivil', value)}>
+                <Select value={formData.estadoCivil || ''} onValueChange={(value) => handleInputChange('estadoCivil', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione seu estado civil" />
                   </SelectTrigger>
@@ -541,7 +541,7 @@ const PersonalInfo = () => {
                 <Label htmlFor="profissao">Profissão</Label>
                 <Input
                   id="profissao"
-                  value={formData.profissao}
+                  value={formData.profissao || ''}
                   onChange={(e) => handleInputChange('profissao', e.target.value)}
                   placeholder="Sua profissão"
                 />
@@ -550,7 +550,7 @@ const PersonalInfo = () => {
                 <Label htmlFor="telefone">Telefone *</Label>
                 <Input
                   id="telefone"
-                  value={formData.telefone}
+                  value={formData.telefone || ''}
                   onChange={handlePhoneChange}
                   placeholder="(00)9 0000-0000"
                   maxLength={15} 
@@ -561,7 +561,7 @@ const PersonalInfo = () => {
                 <Input
                   id="email"
                   type="email"
-                  value={formData.email}
+                  value={formData.email || ''}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="seu@email.com"
                 />
@@ -592,7 +592,7 @@ const PersonalInfo = () => {
                 <Label htmlFor="endereco">Endereço Completo *</Label>
                 <Input
                   id="endereco"
-                  value={formData.endereco}
+                  value={formData.endereco || ''}
                   onChange={(e) => handleInputChange('endereco', e.target.value)}
                   placeholder="Rua, número, bairro, cidade - UF"
                 />
@@ -642,7 +642,7 @@ const PersonalInfo = () => {
                     <Input
                       id="dataCasamento"
                       type="date"
-                      value={formData.dataCasamento}
+                      value={formData.dataCasamento || ''}
                       onChange={(e) => handleInputChange('dataCasamento', e.target.value)}
                     />
                   </div>
@@ -692,7 +692,7 @@ const PersonalInfo = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="paisCristaos">Seus pais são cristãos?</Label>
-                  <Select value={formData.paisCristaos} onValueChange={(value) => handleInputChange('paisCristaos', value)}>
+                  <Select value={formData.paisCristaos || ''} onValueChange={(value) => handleInputChange('paisCristaos', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
@@ -725,7 +725,7 @@ const PersonalInfo = () => {
                   <Input
                     id="dataConversao"
                     type="date"
-                    value={formData.dataConversao}
+                    value={formData.dataConversao || ''}
                     onChange={(e) => handleInputChange('dataConversao', e.target.value)}
                   />
                 </div>
@@ -734,7 +734,7 @@ const PersonalInfo = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="tempoIgreja">Há quanto tempo frequenta a igreja?</Label>
-                  <Select value={formData.tempoIgreja} onValueChange={(value) => handleInputChange('tempoIgreja', value)}>
+                  <Select value={formData.tempoIgreja || ''} onValueChange={(value) => handleInputChange('tempoIgreja', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
@@ -762,7 +762,7 @@ const PersonalInfo = () => {
                   {formData.batizado && (
                     <Input
                       type="date"
-                      value={formData.dataBatismo}
+                      value={formData.dataBatismo || ''}
                       onChange={(e) => handleInputChange('dataBatismo', e.target.value)}
                       placeholder="Data do batismo"
                     />
