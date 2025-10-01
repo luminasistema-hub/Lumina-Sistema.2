@@ -102,7 +102,14 @@ const SystemSettings = () => {
         } else {
           setChurchSettings(prev => ({
             ...prev,
-            nome: church.name, 
+            nome: church.name,
+            endereco: church.address || '',
+            telefone: church.contactPhone || '',
+            email: church.contactEmail || '',
+            cnpj: church.cnpj || '',
+            pastor_principal: church.nome_responsavel || '', // Assuming nome_responsavel is pastor_principal
+            site: church.site || '', // Assuming 'site' is a field in Church
+            descricao: church.descricao || '', // Assuming 'descricao' is a field in Church
           }));
           console.log(`SystemSettings: Initialized settings for ${church.name} with default/store name.`);
         }
@@ -131,7 +138,16 @@ const SystemSettings = () => {
     console.log('Salvando configurações da igreja:', churchSettings)
     localStorage.setItem(`churchSettings-${currentChurchId}`, JSON.stringify(churchSettings))
     
-    updateChurch(currentChurchId, { name: churchSettings.nome })
+    updateChurch(currentChurchId, { 
+      name: churchSettings.nome,
+      address: churchSettings.endereco,
+      contactPhone: churchSettings.telefone,
+      contactEmail: churchSettings.email,
+      cnpj: churchSettings.cnpj,
+      nome_responsavel: churchSettings.pastor_principal, // Mapping to nome_responsavel
+      site: churchSettings.site, // Assuming 'site' is a field in Church
+      descricao: churchSettings.descricao, // Assuming 'descricao' is a field in Church
+    })
     
     toast.success('Configurações da igreja salvas com sucesso!')
   }

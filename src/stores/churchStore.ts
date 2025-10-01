@@ -36,6 +36,11 @@ export interface Church {
   server_execution_timeout?: string;
   db_connection_pool?: string;
   db_query_cache_mb?: number;
+  // Campos adicionados para as configurações da igreja
+  cnpj?: string;
+  nome_responsavel?: string;
+  site?: string;
+  descricao?: string;
 }
 
 interface ChurchState {
@@ -95,6 +100,11 @@ export const useChurchStore = create<ChurchState>()(
           server_execution_timeout: c.server_execution_timeout,
           db_connection_pool: c.db_connection_pool,
           db_query_cache_mb: c.db_query_cache_mb,
+          // Campos adicionados para as configurações da igreja
+          cnpj: c.cnpj,
+          nome_responsavel: c.nome_responsavel,
+          site: c.site,
+          descricao: c.descricao,
         })) as Church[] });
       },
 
@@ -123,6 +133,11 @@ export const useChurchStore = create<ChurchState>()(
         if (updates.server_execution_timeout) updatePayload.server_execution_timeout = updates.server_execution_timeout;
         if (updates.db_connection_pool) updatePayload.db_connection_pool = updates.db_connection_pool;
         if (updates.db_query_cache_mb !== undefined) updatePayload.db_query_cache_mb = updates.db_query_cache_mb;
+        // Campos adicionados para as configurações da igreja
+        if (updates.cnpj) updatePayload.cnpj = updates.cnpj;
+        if (updates.nome_responsavel) updatePayload.nome_responsavel = updates.nome_responsavel;
+        if (updates.site) updatePayload.site = updates.site;
+        if (updates.descricao) updatePayload.descricao = updates.descricao;
 
 
         const { data, error } = await supabase
@@ -158,6 +173,11 @@ export const useChurchStore = create<ChurchState>()(
           server_execution_timeout: data.server_execution_timeout,
           db_connection_pool: data.db_connection_pool,
           db_query_cache_mb: data.db_query_cache_mb,
+          // Campos adicionados para as configurações da igreja
+          cnpj: data.cnpj,
+          nome_responsavel: data.nome_responsavel,
+          site: data.site,
+          descricao: data.descricao,
         };
 
         set((state) => ({
