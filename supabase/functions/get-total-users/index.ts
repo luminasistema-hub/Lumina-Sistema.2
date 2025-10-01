@@ -12,23 +12,19 @@ serve(async (req) => {
   }
 
   try {
-    // Crie um cliente Supabase com a chave de serviço para ter privilégios de administrador
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Use o cliente admin para contar os usuários na tabela auth.users
-    const { count, error } = await supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .schema('auth');
+    // Chama a função RPC para obter o número total de usuários de forma segura
+    const { data, error } = await supabaseAdmin.rpc('get_total_users_count');
 
     if (error) {
       throw error
     }
 
-    return new Response(JSON.stringify({ totalUsers: count }), {
+    return new Response(JSON.stringify({ totalUsers: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

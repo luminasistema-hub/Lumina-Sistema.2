@@ -22,6 +22,7 @@ import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSys
 import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
 import MasterAdminWebPerformanceInsights from '../components/master-admin/MasterAdminWebPerformanceInsights'; // Importação do novo componente
 import { supabase } from '../integrations/supabase/client' // Importar supabase
+import ManagePlansTab from '../components/master-admin/ManagePlansTab';
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
@@ -121,9 +122,10 @@ const MasterAdminPage = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="churches">Igrejas</TabsTrigger>
+            <TabsTrigger value="plans">Planos</TabsTrigger>
             <TabsTrigger value="database">Banco de Dados</TabsTrigger>
             <TabsTrigger value="tools">Ferramentas Admin</TabsTrigger>
             <TabsTrigger value="reports">Relatórios SaaS</TabsTrigger>
@@ -169,6 +171,10 @@ const MasterAdminPage = () => {
                 isLoading={isLoading}
               />
             </Card>
+          </TabsContent>
+
+          <TabsContent value="plans" className="space-y-6">
+            <ManagePlansTab />
           </TabsContent>
 
           <TabsContent value="database" className="space-y-6">

@@ -58,6 +58,9 @@ interface ChurchState {
   getChurchById: (churchId: string) => Church | undefined
   loadChurches: () => Promise<void>
   getPlanDetails: (planId: string) => SubscriptionPlanData | undefined
+  addSubscriptionPlan: (planData: Omit<SubscriptionPlanData, 'id'>) => Promise<SubscriptionPlanData | null>;
+  updateSubscriptionPlan: (planId: string, updates: Partial<Omit<SubscriptionPlanData, 'id' | 'limite_quizes_por_etapa' | 'limite_armazenamento_mb' | 'descricao'>>) => Promise<SubscriptionPlanData | null>;
+  deleteSubscriptionPlan: (planId: string) => Promise<boolean>;
 }
 
 export const useChurchStore = create<ChurchState>()(
@@ -213,6 +216,71 @@ export const useChurchStore = create<ChurchState>()(
 
       getChurchById: (churchId: string) => {
         return get().churches.find((c) => c.id === churchId);
+      },
+
+      addSubscriptionPlan: async (planData) => {
+        const { data, error } = await supabase
+          .from('planos_assinatura')
+          .insert({
+            nome: planData.nome,
+            preco_mensal: planData.preco_mensal,
+            limite_membros: planData.limite_membros,
+            // Valores padrão para outros campos obrigatórios
+            limite_quizes_por_etapa: 1,
+            limite_armazenamento_mb: 100,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('churchStore: Error adding subscription plan:', error);
+          return null;
+        }
+
+        const newPlan = data as SubscriptionPlanData;
+        set((state) => ({
+          subscriptionPlans: [...state.subscriptionPlans, newPlan],
+        }));
+        return newPlan;
+      },
+
+      updateSubscriptionPlan: async (planId, updates) => {
+        const { data, error } = await supabase
+          .from('planos_assinatura')
+          .update(updates)
+          .eq('id', planId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('churchStore: Error updating subscription plan:', error);
+          return null;
+        }
+        
+        const updatedPlan = data as SubscriptionPlanData;
+        set((state) => ({
+          subscriptionPlans: state.subscriptionPlans.map((p) =>
+            p.id === planId ? { ...p, ...updatedPlan } : p
+          ),
+        }));
+        return updatedPlan;
+      },
+
+      deleteSubscriptionPlan: async (planId) => {
+        const { error } = await supabase
+          .from('planos_assinatura')
+          .delete()
+          .eq('id', planId);
+
+        if (error) {
+          console.error('churchStore: Error deleting subscription plan:', error);
+          return false;
+        }
+
+        set((state) => ({
+          subscriptionPlans: state.subscriptionPlans.filter((p) => p.id !== planId),
+        }));
+        return true;
       },
     }),
     {
