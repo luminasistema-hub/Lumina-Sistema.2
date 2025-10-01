@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
+import { supabase } from '../../integrations/supabase/client'
 import { 
   Baby, 
   Plus, 
@@ -26,24 +27,24 @@ import {
   Filter,
   Calendar,
   Phone,
+  Mail,
   MapPin,
   Edit,
   Eye,
-  QrCode
+  QrCode,
+  Loader2,
+  Trash2
 } from 'lucide-react'
 
 interface Kid {
   id: string
-  churchId: string // Adicionado para multi-igrejas
+  id_igreja: string
   nome_crianca: string
   idade: number
   data_nascimento: string
-  responsavel: {
-    id: string
-    nome: string
-    telefone: string
-    email?: string
-  }
+  responsavel_id: string // ID do membro responsável
+  responsavel_nome?: string // Nome do responsável (para exibição, via join)
+  email_responsavel?: string // Email do responsável (para exibição, via join)
   informacoes_especiais?: string
   alergias?: string
   medicamentos?: string
@@ -56,39 +57,52 @@ interface Kid {
   status_checkin?: 'Presente' | 'Ausente'
   ultimo_checkin?: string
   codigo_seguranca?: string
+  created_at: string
+  updated_at: string
 }
 
 interface CheckinRecord {
   id: string
-  churchId: string // Adicionado para multi-igrejas
+  id_igreja: string
   crianca_id: string
   data_checkin: string
   data_checkout?: string
-  responsavel_checkin: string
-  responsavel_checkout?: string
+  responsavel_checkin_id: string
+  responsavel_checkin_nome?: string // Para exibição
+  responsavel_checkout_id?: string
+  responsavel_checkout_nome?: string // Para exibição
   codigo_seguranca: string
   observacoes?: string
+  created_at: string
+}
+
+interface MemberOption {
+  id: string
+  nome_completo: string
+  email: string
 }
 
 const KidsPage = () => {
-  const { user, currentChurchId } = useAuthStore() // Obter user e currentChurchId
+  const { user, currentChurchId } = useAuthStore()
   const [kids, setKids] = useState<Kid[]>([])
   const [checkinRecords, setCheckinRecords] = useState<CheckinRecord[]>([])
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false)
-  const [selectedKid, setSelectedKid] = useState<Kid | null>(null)
+  const [isEditKidDialogOpen, setIsEditKidDialogOpen] = useState(false)
+  const [kidToEdit, setKidToEdit] = useState<Kid | null>(null)
+  const [selectedKidDetails, setSelectedKidDetails] = useState<Kid | null>(null) // Para o modal de detalhes
   const [searchTerm, setSearchTerm] = useState('')
   const [filterAge, setFilterAge] = useState('all')
   const [viewMode, setViewMode] = useState<'kids' | 'checkin' | 'reports'>('kids')
+  const [loading, setLoading] = useState(true)
+  const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]) // Para o seletor de responsável
 
   const canManageKids = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
+  const canDeleteKids = user?.role === 'admin' || user?.role === 'pastor'
 
-  const [newKid, setNewKid] = useState({
+  const [newKidForm, setNewKidForm] = useState({
     nome_crianca: '',
-    idade: 0,
     data_nascimento: '',
-    responsavel_nome: '',
-    responsavel_telefone: '',
-    responsavel_email: '',
+    responsavel_id: user?.id || '', // Padrão para o próprio usuário
     informacoes_especiais: '',
     alergias: '',
     medicamentos: '',
@@ -98,220 +112,388 @@ const KidsPage = () => {
     contato_emergencia_parentesco: ''
   })
 
-  // Mock data
-  useEffect(() => {
-    if (currentChurchId) {
-      const storedKids = localStorage.getItem(`kids-${currentChurchId}`)
-      const storedCheckinRecords = localStorage.getItem(`checkinRecords-${currentChurchId}`)
-      if (storedKids) {
-        setKids(JSON.parse(storedKids))
-      } else {
-        const mockKids: Kid[] = [
-          {
-            id: '1',
-            churchId: currentChurchId,
-            nome_crianca: 'Ana Sofia',
-            idade: 7,
-            data_nascimento: '2018-05-15',
-            responsavel: {
-              id: '1',
-              nome: 'Maria Santos',
-              telefone: '(11) 99999-9999',
-              email: 'maria@email.com'
-            },
-            alergias: 'Alergia a amendoim',
-            informacoes_especiais: 'Criança muito tímida, precisa de atenção especial',
-            autorizacao_fotos: true,
-            status_checkin: 'Presente',
-            ultimo_checkin: '2025-09-11T09:00:00',
-            codigo_seguranca: 'AS123'
-          },
-          {
-            id: '2',
-            churchId: currentChurchId,
-            nome_crianca: 'Pedro Lucas',
-            idade: 5,
-            data_nascimento: '2020-03-20',
-            responsavel: {
-              id: '2',
-              nome: 'Carlos Silva',
-              telefone: '(11) 88888-8888'
-            },
-            medicamentos: 'Bronchodilator - usar em caso de crise asmática',
-            autorizacao_fotos: false,
-            status_checkin: 'Ausente'
-          }
-        ]
-        setKids(mockKids)
-        localStorage.setItem(`kids-${currentChurchId}`, JSON.stringify(mockKids))
-      }
-      if (storedCheckinRecords) {
-        setCheckinRecords(JSON.parse(storedCheckinRecords))
-      }
-    } else {
+  const [editKidForm, setEditKidForm] = useState({
+    nome_crianca: '',
+    data_nascimento: '',
+    responsavel_id: '',
+    informacoes_especiais: '',
+    alergias: '',
+    medicamentos: '',
+    autorizacao_fotos: true,
+    contato_emergencia_nome: '',
+    contato_emergencia_telefone: '',
+    contato_emergencia_parentesco: ''
+  })
+
+  const loadKidsData = useCallback(async () => {
+    if (!currentChurchId || !user?.id) {
       setKids([])
       setCheckinRecords([])
-    }
-  }, [currentChurchId, user])
-
-  const handleAddKid = () => {
-    if (!newKid.nome_crianca || !newKid.responsavel_nome || !newKid.responsavel_telefone) {
-      toast.error('Preencha os campos obrigatórios')
+      setLoading(false)
       return
+    }
+
+    setLoading(true)
+    try {
+      // Fetch children
+      let kidsQuery = supabase
+        .from('criancas')
+        .select(`
+          *,
+          membros!criancas_responsavel_id_fkey(nome_completo, email)
+        `)
+        .eq('id_igreja', currentChurchId)
+        .order('nome_crianca', { ascending: true });
+
+      // Membros só podem ver seus próprios filhos
+      if (!canManageKids) {
+        kidsQuery = kidsQuery.eq('responsavel_id', user.id);
+      }
+
+      const { data: kidsData, error: kidsError } = await kidsQuery;
+
+      if (kidsError) throw kidsError;
+
+      const formattedKids: Kid[] = kidsData.map(k => ({
+        ...k,
+        responsavel_nome: k.membros?.nome_completo || 'Desconhecido',
+        email_responsavel: k.membros?.email || '',
+        idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / (365.25 * 24 * 60 * 60 * 1000)),
+      }));
+      setKids(formattedKids);
+
+      // Fetch check-in records
+      let checkinQuery = supabase
+        .from('kids_checkin')
+        .select(`
+          *,
+          responsavel_checkin:membros!kids_checkin_responsavel_checkin_id_fkey(nome_completo),
+          responsavel_checkout:membros!kids_checkin_responsavel_checkout_id_fkey(nome_completo)
+        `)
+        .eq('id_igreja', currentChurchId)
+        .order('created_at', { ascending: false });
+
+      // Membros só podem ver check-ins de seus próprios filhos
+      if (!canManageKids) {
+        const userKidsIds = formattedKids.map(k => k.id);
+        checkinQuery = checkinQuery.in('crianca_id', userKidsIds);
+      }
+
+      const { data: checkinData, error: checkinError } = await checkinQuery;
+
+      if (checkinError) throw checkinError;
+
+      const formattedCheckinRecords: CheckinRecord[] = checkinData.map(c => ({
+        ...c,
+        responsavel_checkin_nome: c.responsavel_checkin?.nome_completo || 'Desconhecido',
+        responsavel_checkout_nome: c.responsavel_checkout?.nome_completo || 'Desconhecido',
+      }));
+      setCheckinRecords(formattedCheckinRecords);
+
+    } catch (error: any) {
+      console.error('Error loading Kids data:', error.message);
+      toast.error('Erro ao carregar dados do ministério Kids: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentChurchId, user?.id, canManageKids]);
+
+  const loadMemberOptions = useCallback(async () => {
+    if (!currentChurchId) {
+      setMemberOptions([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('membros')
+        .select('id, nome_completo, email')
+        .eq('id_igreja', currentChurchId)
+        .eq('status', 'ativo')
+        .order('nome_completo', { ascending: true });
+
+      if (error) throw error;
+      setMemberOptions(data as MemberOption[]);
+    } catch (error: any) {
+      console.error('Error loading member options:', error.message);
+      toast.error('Erro ao carregar opções de membros: ' + error.message);
+    }
+  }, [currentChurchId]);
+
+  useEffect(() => {
+    loadKidsData();
+    loadMemberOptions();
+  }, [loadKidsData, loadMemberOptions]);
+
+  const handleAddKid = async () => {
+    if (!newKidForm.nome_crianca || !newKidForm.data_nascimento || !newKidForm.responsavel_id || !currentChurchId) {
+      toast.error('Nome, data de nascimento e responsável são obrigatórios.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const responsibleMember = memberOptions.find(m => m.id === newKidForm.responsavel_id);
+      if (!responsibleMember) {
+        toast.error('Responsável não encontrado.');
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('criancas')
+        .insert({
+          id_igreja: currentChurchId,
+          nome_crianca: newKidForm.nome_crianca,
+          data_nascimento: newKidForm.data_nascimento,
+          responsavel_id: newKidForm.responsavel_id,
+          email_responsavel: responsibleMember.email,
+          informacoes_especiais: newKidForm.informacoes_especiais || null,
+          alergias: newKidForm.alergias || null,
+          medicamentos: newKidForm.medicamentos || null,
+          autorizacao_fotos: newKidForm.autorizacao_fotos,
+          contato_emergencia: newKidForm.contato_emergencia_nome ? {
+            nome: newKidForm.contato_emergencia_nome,
+            telefone: newKidForm.contato_emergencia_telefone,
+            parentesco: newKidForm.contato_emergencia_parentesco
+          } : null,
+          status_checkin: 'Ausente',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Criança cadastrada com sucesso!');
+      setIsAddKidDialogOpen(false);
+      setNewKidForm({
+        nome_crianca: '', data_nascimento: '', responsavel_id: user?.id || '',
+        informacoes_especiais: '', alergias: '', medicamentos: '', autorizacao_fotos: true,
+        contato_emergencia_nome: '', contato_emergencia_telefone: '', contato_emergencia_parentesco: ''
+      });
+      loadKidsData();
+    } catch (error: any) {
+      console.error('Error adding kid:', error.message);
+      toast.error('Erro ao cadastrar criança: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditKid = async () => {
+    if (!kidToEdit?.id || !editKidForm.nome_crianca || !editKidForm.data_nascimento || !editKidForm.responsavel_id || !currentChurchId) {
+      toast.error('Nome, data de nascimento e responsável são obrigatórios.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const responsibleMember = memberOptions.find(m => m.id === editKidForm.responsavel_id);
+      if (!responsibleMember) {
+        toast.error('Responsável não encontrado.');
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('criancas')
+        .update({
+          nome_crianca: editKidForm.nome_crianca,
+          data_nascimento: editKidForm.data_nascimento,
+          responsavel_id: editKidForm.responsavel_id,
+          email_responsavel: responsibleMember.email,
+          informacoes_especiais: editKidForm.informacoes_especiais || null,
+          alergias: editKidForm.alergias || null,
+          medicamentos: editKidForm.medicamentos || null,
+          autorizacao_fotos: editKidForm.autorizacao_fotos,
+          contato_emergencia: editKidForm.contato_emergencia_nome ? {
+            nome: editKidForm.contato_emergencia_nome,
+            telefone: editKidForm.contato_emergencia_telefone,
+            parentesco: editKidForm.contato_emergencia_parentesco
+          } : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', kidToEdit.id)
+        .eq('id_igreja', currentChurchId);
+
+      if (error) throw error;
+
+      toast.success('Informações da criança atualizadas com sucesso!');
+      setIsEditKidDialogOpen(false);
+      setKidToEdit(null);
+      loadKidsData();
+    } catch (error: any) {
+      console.error('Error updating kid:', error.message);
+      toast.error('Erro ao atualizar informações da criança: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteKid = async (kidId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta criança e todos os seus registros de check-in? Esta ação é irreversível.')) {
+      return;
     }
     if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
+      toast.error('Nenhuma igreja ativa selecionada.');
+      return;
     }
 
-    const kid: Kid = {
-      id: Date.now().toString(),
-      churchId: currentChurchId,
-      nome_crianca: newKid.nome_crianca,
-      idade: newKid.idade,
-      data_nascimento: newKid.data_nascimento,
-      responsavel: {
-        id: user?.id || '',
-        nome: newKid.responsavel_nome,
-        telefone: newKid.responsavel_telefone,
-        email: newKid.responsavel_email
-      },
-      informacoes_especiais: newKid.informacoes_especiais,
-      alergias: newKid.alergias,
-      medicamentos: newKid.medicamentos,
-      autorizacao_fotos: newKid.autorizacao_fotos,
-      contato_emergencia: newKid.contato_emergencia_nome ? {
-        nome: newKid.contato_emergencia_nome,
-        telefone: newKid.contato_emergencia_telefone,
-        parentesco: newKid.contato_emergencia_parentesco
-      } : undefined,
-      status_checkin: 'Ausente'
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('criancas')
+        .delete()
+        .eq('id', kidId)
+        .eq('id_igreja', currentChurchId);
+
+      if (error) throw error;
+
+      toast.success('Criança excluída com sucesso!');
+      loadKidsData();
+    } catch (error: any) {
+      console.error('Error deleting kid:', error.message);
+      toast.error('Erro ao excluir criança: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckin = async (kid: Kid) => {
+    if (!currentChurchId || !user?.id) {
+      toast.error('Nenhuma igreja ativa ou usuário selecionado.');
+      return;
     }
 
-    const updatedKids = [...kids, kid]
-    setKids(updatedKids)
-    localStorage.setItem(`kids-${currentChurchId}`, JSON.stringify(updatedKids))
+    setLoading(true);
+    try {
+      const codigo = Math.random().toString(36).substr(2, 4).toUpperCase(); // Código de 4 caracteres
 
-    setIsAddKidDialogOpen(false)
-    // Reset form
-    setNewKid({
-      nome_crianca: '',
-      idade: 0,
-      data_nascimento: '',
-      responsavel_nome: '',
-      responsavel_telefone: '',
-      responsavel_email: '',
-      informacoes_especiais: '',
-      alergias: '',
-      medicamentos: '',
-      autorizacao_fotos: true,
-      contato_emergencia_nome: '',
-      contato_emergencia_telefone: '',
-      contato_emergencia_parentesco: ''
-    })
-    toast.success('Criança cadastrada com sucesso!')
-  }
+      // Atualiza o status da criança
+      const { error: updateKidError } = await supabase
+        .from('criancas')
+        .update({
+          status_checkin: 'Presente',
+          ultimo_checkin: new Date().toISOString(),
+          codigo_seguranca: codigo,
+        })
+        .eq('id', kid.id)
+        .eq('id_igreja', currentChurchId);
 
-  const handleCheckin = (kidId: string) => {
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
+      if (updateKidError) throw updateKidError;
+
+      // Cria o registro de check-in
+      const { error: insertCheckinError } = await supabase
+        .from('kids_checkin')
+        .insert({
+          id_igreja: currentChurchId,
+          crianca_id: kid.id,
+          data_checkin: new Date().toISOString(),
+          responsavel_checkin_id: user.id,
+          codigo_seguranca: codigo,
+        });
+
+      if (insertCheckinError) throw insertCheckinError;
+
+      toast.success(`Check-in realizado! Código: ${codigo}`);
+      loadKidsData();
+    } catch (error: any) {
+      console.error('Error during check-in:', error.message);
+      toast.error('Erro ao realizar check-in: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    const codigo = Math.random().toString(36).substr(2, 6).toUpperCase()
-    
-    const updatedKids = kids.map(kid => 
-      kid.id === kidId 
-        ? { 
-            ...kid, 
-            status_checkin: 'Presente' as const,
-            ultimo_checkin: new Date().toISOString(),
-            codigo_seguranca: codigo
-          }
-        : kid
-    )
-    setKids(updatedKids)
-    localStorage.setItem(`kids-${currentChurchId}`, JSON.stringify(updatedKids))
+  };
 
-    const checkinRecord: CheckinRecord = {
-      id: Date.now().toString(),
-      churchId: currentChurchId,
-      crianca_id: kidId,
-      data_checkin: new Date().toISOString(),
-      responsavel_checkin: user?.name || '',
-      codigo_seguranca: codigo
+  const handleCheckout = async (kid: Kid) => {
+    if (!currentChurchId || !user?.id) {
+      toast.error('Nenhuma igreja ativa ou usuário selecionado.');
+      return;
     }
 
-    const updatedCheckinRecords = [...checkinRecords, checkinRecord]
-    setCheckinRecords(updatedCheckinRecords)
-    localStorage.setItem(`checkinRecords-${currentChurchId}`, JSON.stringify(updatedCheckinRecords))
+    setLoading(true);
+    try {
+      // Atualiza o status da criança
+      const { error: updateKidError } = await supabase
+        .from('criancas')
+        .update({
+          status_checkin: 'Ausente',
+          codigo_seguranca: null, // Limpa o código de segurança
+        })
+        .eq('id', kid.id)
+        .eq('id_igreja', currentChurchId);
 
-    toast.success(`Check-in realizado! Código: ${codigo}`)
-  }
+      if (updateKidError) throw updateKidError;
 
-  const handleCheckout = (kidId: string) => {
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
+      // Atualiza o registro de check-in mais recente que ainda não tem checkout
+      const { error: updateCheckinError } = await supabase
+        .from('kids_checkin')
+        .update({
+          data_checkout: new Date().toISOString(),
+          responsavel_checkout_id: user.id,
+        })
+        .eq('crianca_id', kid.id)
+        .is('data_checkout', null) // Apenas o check-in ativo
+        .eq('id_igreja', currentChurchId);
+
+      if (updateCheckinError) throw updateCheckinError;
+
+      toast.success('Check-out realizado com sucesso!');
+      loadKidsData();
+    } catch (error: any) {
+      console.error('Error during check-out:', error.message);
+      toast.error('Erro ao realizar check-out: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    const updatedKids = kids.map(kid => 
-      kid.id === kidId 
-        ? { ...kid, status_checkin: 'Ausente' as const }
-        : kid
-    )
-    setKids(updatedKids)
-    localStorage.setItem(`kids-${currentChurchId}`, JSON.stringify(updatedKids))
-
-    const updatedCheckinRecords = checkinRecords.map(record => 
-      record.crianca_id === kidId && !record.data_checkout
-        ? { 
-            ...record, 
-            data_checkout: new Date().toISOString(),
-            responsavel_checkout: user?.name || ''
-          }
-        : record
-    )
-    setCheckinRecords(updatedCheckinRecords)
-    localStorage.setItem(`checkinRecords-${currentChurchId}`, JSON.stringify(updatedCheckinRecords))
-
-    toast.success('Check-out realizado com sucesso!')
-  }
+  };
 
   const getAgeGroup = (idade: number) => {
-    if (idade <= 3) return 'Berçário'
-    if (idade <= 6) return 'Infantil'
-    if (idade <= 10) return 'Juniores'
-    return 'Pré-adolescentes'
-  }
+    if (idade <= 3) return 'Berçário';
+    if (idade <= 6) return 'Infantil';
+    if (idade <= 10) return 'Juniores';
+    return 'Pré-adolescentes';
+  };
 
   const getAgeGroupColor = (idade: number) => {
-    if (idade <= 3) return 'bg-pink-100 text-pink-800'
-    if (idade <= 6) return 'bg-blue-100 text-blue-800'
-    if (idade <= 10) return 'bg-green-100 text-green-800'
-    return 'bg-purple-100 text-purple-800'
-  }
+    if (idade <= 3) return 'bg-pink-100 text-pink-800';
+    if (idade <= 6) return 'bg-blue-100 text-blue-800';
+    if (idade <= 10) return 'bg-green-100 text-green-800';
+    return 'bg-purple-100 text-purple-800';
+  };
 
   const filteredKids = kids.filter(kid => {
     const matchesSearch = kid.nome_crianca.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         kid.responsavel.nome.toLowerCase().includes(searchTerm.toLowerCase())
+                         (kid.responsavel_nome && kid.responsavel_nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         (kid.email_responsavel && kid.email_responsavel.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesAge = filterAge === 'all' || 
                       (filterAge === 'bercario' && kid.idade <= 3) ||
                       (filterAge === 'infantil' && kid.idade > 3 && kid.idade <= 6) ||
                       (filterAge === 'juniores' && kid.idade > 6 && kid.idade <= 10) ||
-                      (filterAge === 'pre-adolescentes' && kid.idade > 10)
+                      (filterAge === 'pre-adolescentes' && kid.idade > 10);
 
-    return matchesSearch && matchesAge
-  })
+    return matchesSearch && matchesAge;
+  });
 
-  const presentKids = kids.filter(kid => kid.status_checkin === 'Presente')
-  const totalKids = kids.length
+  const presentKids = kids.filter(kid => kid.status_checkin === 'Presente');
+  const totalKids = kids.length;
+  const activeCheckins = checkinRecords.filter(r => !r.data_checkout).length;
 
   if (!currentChurchId) {
     return (
       <div className="p-6 text-center text-gray-600">
         Selecione uma igreja para gerenciar o ministério Kids.
       </div>
-    )
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
+        <p className="ml-4 text-lg text-gray-600">Carregando dados do ministério Kids...</p>
+      </div>
+    );
   }
 
   return (
@@ -359,7 +541,7 @@ const KidsPage = () => {
           <CardContent className="p-4">
             <div className="text-center">
               <div className="text-xl md:text-2xl font-bold text-blue-600">
-                {checkinRecords.filter(r => !r.data_checkout).length}
+                {activeCheckins}
               </div>
               <div className="text-sm text-gray-600">Check-ins Ativos</div>
             </div>
@@ -423,53 +605,47 @@ const KidsPage = () => {
                         <Label htmlFor="nome_crianca">Nome da Criança *</Label>
                         <Input
                           id="nome_crianca"
-                          value={newKid.nome_crianca}
-                          onChange={(e) => setNewKid({...newKid, nome_crianca: e.target.value})}
+                          value={newKidForm.nome_crianca}
+                          onChange={(e) => setNewKidForm({...newKidForm, nome_crianca: e.target.value})}
                           placeholder="Nome completo"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="data_nascimento">Data de Nascimento</Label>
+                        <Label htmlFor="data_nascimento">Data de Nascimento *</Label>
                         <Input
                           id="data_nascimento"
                           type="date"
-                          value={newKid.data_nascimento}
-                          onChange={(e) => {
-                            const birthDate = new Date(e.target.value)
-                            const age = Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-                            setNewKid({...newKid, data_nascimento: e.target.value, idade: age})
-                          }}
+                          value={newKidForm.data_nascimento}
+                          onChange={(e) => setNewKidForm({...newKidForm, data_nascimento: e.target.value})}
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="responsavel_nome">Nome do Responsável *</Label>
-                        <Input
-                          id="responsavel_nome"
-                          value={newKid.responsavel_nome}
-                          onChange={(e) => setNewKid({...newKid, responsavel_nome: e.target.value})}
-                          placeholder="Nome do pai/mãe"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="responsavel_telefone">Telefone *</Label>
-                        <Input
-                          id="responsavel_telefone"
-                          value={newKid.responsavel_telefone}
-                          onChange={(e) => setNewKid({...newKid, responsavel_telefone: e.target.value})}
-                          placeholder="(11) 99999-9999"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="responsavel_id">Responsável *</Label>
+                      <Select
+                        value={newKidForm.responsavel_id}
+                        onValueChange={(value) => setNewKidForm({...newKidForm, responsavel_id: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o responsável" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {memberOptions.map(member => (
+                            <SelectItem key={member.id} value={member.id}>
+                              {member.nome_completo} ({member.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="alergias">Alergias</Label>
                       <Textarea
                         id="alergias"
-                        value={newKid.alergias}
-                        onChange={(e) => setNewKid({...newKid, alergias: e.target.value})}
+                        value={newKidForm.alergias}
+                        onChange={(e) => setNewKidForm({...newKidForm, alergias: e.target.value})}
                         placeholder="Descreva alergias alimentares ou medicamentosas"
                         rows={2}
                       />
@@ -479,8 +655,8 @@ const KidsPage = () => {
                       <Label htmlFor="medicamentos">Medicamentos</Label>
                       <Textarea
                         id="medicamentos"
-                        value={newKid.medicamentos}
-                        onChange={(e) => setNewKid({...newKid, medicamentos: e.target.value})}
+                        value={newKidForm.medicamentos}
+                        onChange={(e) => setNewKidForm({...newKidForm, medicamentos: e.target.value})}
                         placeholder="Medicamentos de uso contínuo ou de emergência"
                         rows={2}
                       />
@@ -490,18 +666,37 @@ const KidsPage = () => {
                       <Label htmlFor="informacoes_especiais">Informações Especiais</Label>
                       <Textarea
                         id="informacoes_especiais"
-                        value={newKid.informacoes_especiais}
-                        onChange={(e) => setNewKid({...newKid, informacoes_especiais: e.target.value})}
+                        value={newKidForm.informacoes_especiais}
+                        onChange={(e) => setNewKidForm({...newKidForm, informacoes_especiais: e.target.value})}
                         placeholder="Comportamento, necessidades especiais, etc."
                         rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Contato de Emergência (Opcional)</Label>
+                      <Input
+                        placeholder="Nome do contato"
+                        value={newKidForm.contato_emergencia_nome}
+                        onChange={(e) => setNewKidForm({...newKidForm, contato_emergencia_nome: e.target.value})}
+                      />
+                      <Input
+                        placeholder="Telefone do contato"
+                        value={newKidForm.contato_emergencia_telefone}
+                        onChange={(e) => setNewKidForm({...newKidForm, contato_emergencia_telefone: e.target.value})}
+                      />
+                      <Input
+                        placeholder="Parentesco"
+                        value={newKidForm.contato_emergencia_parentesco}
+                        onChange={(e) => setNewKidForm({...newKidForm, contato_emergencia_parentesco: e.target.value})}
                       />
                     </div>
 
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="autorizacao_fotos"
-                        checked={newKid.autorizacao_fotos}
-                        onCheckedChange={(checked) => setNewKid({...newKid, autorizacao_fotos: checked as boolean})}
+                        checked={newKidForm.autorizacao_fotos}
+                        onCheckedChange={(checked) => setNewKidForm({...newKidForm, autorizacao_fotos: checked as boolean})}
                       />
                       <Label htmlFor="autorizacao_fotos">Autorizo fotos e vídeos para divulgação</Label>
                     </div>
@@ -552,11 +747,11 @@ const KidsPage = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 text-sm text-gray-600 mb-3">
                         <div className="flex items-center gap-2">
                           <Users className="w-4 h-4" />
-                          <span>{kid.responsavel.nome}</span>
+                          <span>{kid.responsavel_nome}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4" />
-                          <span>{kid.responsavel.telefone}</span>
+                          <Mail className="w-4 h-4" />
+                          <span>{kid.email_responsavel}</span>
                         </div>
                         {kid.ultimo_checkin && (
                           <div className="flex items-center gap-2">
@@ -604,7 +799,7 @@ const KidsPage = () => {
                         <Button 
                           size="sm" 
                           className="bg-green-500 hover:bg-green-600"
-                          onClick={() => handleCheckin(kid.id)}
+                          onClick={() => handleCheckin(kid)}
                         >
                           <UserCheck className="w-4 h-4 mr-1 sm:mr-2" />
                           <span className="hidden sm:inline">Check-in</span>
@@ -614,20 +809,36 @@ const KidsPage = () => {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleCheckout(kid.id)}
+                          onClick={() => handleCheckout(kid)}
                         >
                           <UserX className="w-4 h-4 mr-1 sm:mr-2" />
                           <span className="hidden sm:inline">Check-out</span>
                         </Button>
                       )}
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => setSelectedKidDetails(kid)}>
                         <Eye className="w-4 h-4 mr-1 sm:mr-2" />
                         <span className="hidden sm:inline">Ver</span>
                       </Button>
                       {canManageKids && (
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => { setKidToEdit(kid); setEditKidForm({
+                          nome_crianca: kid.nome_crianca,
+                          data_nascimento: kid.data_nascimento,
+                          responsavel_id: kid.responsavel_id,
+                          informacoes_especiais: kid.informacoes_especiais || '',
+                          alergias: kid.alergias || '',
+                          medicamentos: kid.medicamentos || '',
+                          autorizacao_fotos: kid.autorizacao_fotos,
+                          contato_emergencia_nome: kid.contato_emergencia?.nome || '',
+                          contato_emergencia_telefone: kid.contato_emergencia?.telefone || '',
+                          contato_emergencia_parentesco: kid.contato_emergencia?.parentesco || ''
+                        }); setIsEditKidDialogOpen(true); }}>
                           <Edit className="w-4 h-4 mr-1 sm:mr-2" />
                           <span className="hidden sm:inline">Editar</span>
+                        </Button>
+                      )}
+                      {canDeleteKids && (
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteKid(kid.id)}>
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
@@ -654,12 +865,46 @@ const KidsPage = () => {
         </TabsContent>
 
         <TabsContent value="checkin" className="space-y-4">
-          <div className="text-center py-8">
-            <QrCode className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Sistema de Check-in</h3>
-            <p className="text-gray-600">
-              Funcionalidade de check-in em desenvolvimento
-            </p>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Histórico de Check-ins</h2>
+          <div className="space-y-3">
+            {checkinRecords.length > 0 ? (
+              checkinRecords.map(record => {
+                const kid = kids.find(k => k.id === record.crianca_id);
+                return (
+                  <Card key={record.id} className="border-0 shadow-sm">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{kid?.nome_crianca || 'Criança Desconhecida'}</p>
+                        <p className="text-sm text-gray-600">
+                          Check-in por {record.responsavel_checkin_nome} em {new Date(record.data_checkin).toLocaleString('pt-BR')}
+                        </p>
+                        {record.data_checkout && (
+                          <p className="text-sm text-gray-600">
+                            Check-out por {record.responsavel_checkout_nome} em {new Date(record.data_checkout).toLocaleString('pt-BR')}
+                          </p>
+                        )}
+                        {record.codigo_seguranca && (
+                          <Badge variant="outline" className="mt-1">Código: {record.codigo_seguranca}</Badge>
+                        )}
+                      </div>
+                      {!record.data_checkout && (
+                        <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            ) : (
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-8 md:p-12 text-center">
+                  <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum registro de check-in</h3>
+                  <p className="text-gray-600">
+                    Realize o primeiro check-in de uma criança para ver o histórico.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 
@@ -675,8 +920,224 @@ const KidsPage = () => {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Kid Details Dialog */}
+      {selectedKidDetails && (
+        <Dialog open={!!selectedKidDetails} onOpenChange={() => setSelectedKidDetails(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <Baby className="w-6 h-6 text-pink-500" />
+                {selectedKidDetails.nome_crianca}
+              </DialogTitle>
+              <DialogDescription>
+                Detalhes completos da criança
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Idade</Label>
+                  <p className="text-gray-900">{selectedKidDetails.idade} anos</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Data de Nascimento</Label>
+                  <p className="text-gray-900">{new Date(selectedKidDetails.data_nascimento).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Responsável</Label>
+                  <p className="text-gray-900">{selectedKidDetails.responsavel_nome}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Email do Responsável</Label>
+                  <p className="text-gray-900">{selectedKidDetails.email_responsavel}</p>
+                </div>
+              </div>
+
+              {selectedKidDetails.alergias && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Alergias</Label>
+                  <p className="text-red-700 font-medium">{selectedKidDetails.alergias}</p>
+                </div>
+              )}
+              {selectedKidDetails.medicamentos && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Medicamentos</Label>
+                  <p className="text-yellow-700 font-medium">{selectedKidDetails.medicamentos}</p>
+                </div>
+              )}
+              {selectedKidDetails.informacoes_especiais && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Informações Especiais</Label>
+                  <p className="text-blue-700">{selectedKidDetails.informacoes_especiais}</p>
+                </div>
+              )}
+              {selectedKidDetails.contato_emergencia && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Contato de Emergência</Label>
+                  <p className="text-gray-900">
+                    {selectedKidDetails.contato_emergencia.nome} ({selectedKidDetails.contato_emergencia.parentesco}) - {selectedKidDetails.contato_emergencia.telefone}
+                  </p>
+                </div>
+              )}
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Autorização de Fotos</Label>
+                <p className="text-gray-900">{selectedKidDetails.autorizacao_fotos ? 'Sim' : 'Não'}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Status Check-in</Label>
+                <Badge className={selectedKidDetails.status_checkin === 'Presente' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                  {selectedKidDetails.status_checkin}
+                </Badge>
+              </div>
+              {selectedKidDetails.ultimo_checkin && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Último Check-in</Label>
+                  <p className="text-gray-900">{new Date(selectedKidDetails.ultimo_checkin).toLocaleString('pt-BR')}</p>
+                </div>
+              )}
+              {selectedKidDetails.codigo_seguranca && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Código de Segurança</Label>
+                  <p className="text-lg font-bold text-purple-600">{selectedKidDetails.codigo_seguranca}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end mt-4">
+              <Button variant="outline" onClick={() => setSelectedKidDetails(null)}>
+                Fechar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Kid Dialog */}
+      {kidToEdit && (
+        <Dialog open={isEditKidDialogOpen} onOpenChange={setIsEditKidDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Criança: {kidToEdit.nome_crianca}</DialogTitle>
+              <DialogDescription>
+                Atualize as informações da criança
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-nome_crianca">Nome da Criança *</Label>
+                  <Input
+                    id="edit-nome_crianca"
+                    value={editKidForm.nome_crianca}
+                    onChange={(e) => setEditKidForm({...editKidForm, nome_crianca: e.target.value})}
+                    placeholder="Nome completo"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-data_nascimento">Data de Nascimento *</Label>
+                  <Input
+                    id="edit-data_nascimento"
+                    type="date"
+                    value={editKidForm.data_nascimento}
+                    onChange={(e) => setEditKidForm({...editKidForm, data_nascimento: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-responsavel_id">Responsável *</Label>
+                <Select
+                  value={editKidForm.responsavel_id}
+                  onValueChange={(value) => setEditKidForm({...editKidForm, responsavel_id: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {memberOptions.map(member => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.nome_completo} ({member.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-alergias">Alergias</Label>
+                <Textarea
+                  id="edit-alergias"
+                  value={editKidForm.alergias}
+                  onChange={(e) => setEditKidForm({...editKidForm, alergias: e.target.value})}
+                  placeholder="Descreva alergias alimentares ou medicamentosas"
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-medicamentos">Medicamentos</Label>
+                <Textarea
+                  id="edit-medicamentos"
+                  value={editKidForm.medicamentos}
+                  onChange={(e) => setEditKidForm({...editKidForm, medicamentos: e.target.value})}
+                  placeholder="Medicamentos de uso contínuo ou de emergência"
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-informacoes_especiais">Informações Especiais</Label>
+                <Textarea
+                  id="edit-informacoes_especiais"
+                  value={editKidForm.informacoes_especiais}
+                  onChange={(e) => setEditKidForm({...editKidForm, informacoes_especiais: e.target.value})}
+                  placeholder="Comportamento, necessidades especiais, etc."
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Contato de Emergência (Opcional)</Label>
+                <Input
+                  placeholder="Nome do contato"
+                  value={editKidForm.contato_emergencia_nome}
+                  onChange={(e) => setEditKidForm({...editKidForm, contato_emergencia_nome: e.target.value})}
+                />
+                <Input
+                  placeholder="Telefone do contato"
+                  value={editKidForm.contato_emergencia_telefone}
+                  onChange={(e) => setEditKidForm({...editKidForm, contato_emergencia_telefone: e.target.value})}
+                />
+                <Input
+                  placeholder="Parentesco"
+                  value={editKidForm.contato_emergencia_parentesco}
+                  onChange={(e) => setEditKidForm({...editKidForm, contato_emergencia_parentesco: e.target.value})}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="edit-autorizacao_fotos"
+                  checked={editKidForm.autorizacao_fotos}
+                  onCheckedChange={(checked) => setEditKidForm({...editKidForm, autorizacao_fotos: checked as boolean})}
+                />
+                <Label htmlFor="edit-autorizacao_fotos">Autorizo fotos e vídeos para divulgação</Label>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditKidDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleEditKid}>
+                  Salvar Alterações
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
-  )
+  );
 }
 
 export default KidsPage
