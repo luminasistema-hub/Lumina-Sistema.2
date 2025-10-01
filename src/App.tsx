@@ -5,9 +5,10 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import MasterAdminPage from './pages/MasterAdminPage'
 import MasterAdminLoginPage from './pages/MasterAdminLoginPage'
-import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage' // Importar a nova página
+import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage'
+import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage' // Importar a nova página
 import { useEffect } from 'react'
-import { SpeedInsights } from "@vercel/speed-insights/react"; // Importação do SpeedInsights
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 function App() {
   const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore()
@@ -44,6 +45,10 @@ function App() {
         <Route 
           path="/register" 
           element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <RegisterPage />} 
+        />
+        <Route 
+          path="/cadastrar-igreja" 
+          element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <CadastrarIgrejaPage />} 
         />
         
         {/* Rotas de Login e Registro de Super Admin */}
