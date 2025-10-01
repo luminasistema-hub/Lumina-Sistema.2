@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../stores/authStore'
+import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -10,6 +11,7 @@ import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
+import { ReceiptDialog } from './ReceiptDialog'
 import { 
   DollarSign, 
   CreditCard, 
@@ -54,8 +56,10 @@ interface Contribution {
 
 const OfferingsPage = () => {
   const { user, currentChurchId } = useAuthStore()
+  const { getChurchById } = useChurchStore()
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
+  const [receiptData, setReceiptData] = useState<{ contribution: Contribution } | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedType, setSelectedType] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -70,6 +74,8 @@ const OfferingsPage = () => {
     observacoes: '',
     campanha: '' // Adicionado campo de campanha
   })
+
+  const currentChurch = currentChurchId ? getChurchById(currentChurchId) : null
 
   const loadContributions = async () => {
     if (!currentChurchId || !user?.id) {
@@ -170,9 +176,9 @@ const OfferingsPage = () => {
     }
   }
 
-  const generateReceipt = async (contributionId: string) => {
+  const markReceiptAsIssued = async (contributionId: string) => {
     if (!canManageFinancial) {
-      toast.error('Você não tem permissão para gerar recibos.')
+      toast.error('Você não tem permissão para emitir recibos.')
       return
     }
     setLoading(true)
@@ -183,18 +189,22 @@ const OfferingsPage = () => {
         .eq('id', contributionId)
 
       if (error) {
-        console.error('Error generating receipt:', error)
-        toast.error('Erro ao gerar recibo: ' + error.message)
+        console.error('Error marking receipt as issued:', error)
+        toast.error('Erro ao marcar recibo como emitido: ' + error.message)
         return
       }
       toast.success('Recibo marcado como emitido!')
       loadContributions()
     } catch (error) {
-      console.error('Unexpected error generating receipt:', error)
-      toast.error('Erro inesperado ao gerar recibo.')
+      console.error('Unexpected error marking receipt:', error)
+      toast.error('Erro inesperado ao marcar recibo.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleOpenReceipt = (contribution: Contribution) => {
+    setReceiptData({ contribution })
   }
 
   const getStatusColor = (status: Contribution['status']) => {
@@ -519,26 +529,15 @@ const OfferingsPage = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
-                    <Eye className="w-4 h-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Ver</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleOpenReceipt(contribution)}
+                  >
+                    <Receipt className="w-4 h-4 mr-1 sm:mr-2" />
+                    <span className="hidden sm:inline">Detalhes/Recibo</span>
+                    <span className="sm:hidden">Recibo</span>
                   </Button>
-                  {canManageFinancial && !contribution.recibo_emitido && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => generateReceipt(contribution.id)}
-                    >
-                      <Download className="w-4 h-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Gerar Recibo</span>
-                    </Button>
-                  )}
-                  {canManageFinancial && contribution.recibo_emitido && (
-                    <Button variant="outline" size="sm" disabled>
-                      <Download className="w-4 h-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Recibo Emitido</span>
-                    </Button>
-                  )}
                 </div>
               </div>
             </CardContent>
@@ -561,6 +560,14 @@ const OfferingsPage = () => {
           </CardContent>
         </Card>
       )}
+
+      <ReceiptDialog
+        isOpen={!!receiptData}
+        onOpenChange={(isOpen) => !isOpen && setReceiptData(null)}
+        contribution={receiptData?.contribution ?? null}
+        church={currentChurch}
+        onMarkAsIssued={markReceiptAsIssued}
+      />
     </div>
   )
 }
