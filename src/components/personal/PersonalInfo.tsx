@@ -369,7 +369,7 @@ const PersonalInfo = () => {
       experiencia_anterior: formData.experienciaAnterior || null,
       data_conversao: formData.dataConversao || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horarios_disponiveis: formData.horariosDisponiveis || null, 
+      horariosDisponiveis: formData.horariosDisponiveis || null, 
       updated_at: new Date().toISOString(),
     };
 
@@ -518,6 +518,7 @@ const PersonalInfo = () => {
                     <SelectValue placeholder="Selecione seu estado civil" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Não informado</SelectItem> {/* Adicionado */}
                     <SelectItem value="solteiro">Solteiro(a)</SelectItem>
                     <SelectItem value="casado">Casado(a)</SelectItem>
                     <SelectItem value="divorciado">Divorciado(a)</SelectItem>
@@ -616,7 +617,7 @@ const PersonalInfo = () => {
                           onChange={(e) => setConjugeSearchTerm(e.target.value)}
                           className="mb-2"
                         />
-                        <SelectItem value="">Nenhum</SelectItem>
+                        <SelectItem value="">Nenhum</SelectItem> 
                         {filteredConjugeOptions.map(member => (
                           <SelectItem key={member.id} value={member.id}>
                             {member.nome_completo} ({member.email})
@@ -685,6 +686,7 @@ const PersonalInfo = () => {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   <SelectContent>
+                      <SelectItem value="">Não informado</SelectItem> {/* Adicionado */}
                       <SelectItem value="sim">Sim, ambos</SelectItem>
                       <SelectItem value="um">Apenas um</SelectItem>
                       <SelectItem value="nao">Não</SelectItem>
@@ -726,6 +728,7 @@ const PersonalInfo = () => {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">Não informado</SelectItem> {/* Adicionado */}
                       <SelectItem value="primeiro-dia">É meu primeiro dia</SelectItem>
                       <SelectItem value="menos-1-mes">Menos de 1 mês</SelectItem>
                       <SelectItem value="1-3-meses">1 a 3 meses</SelectItem>
