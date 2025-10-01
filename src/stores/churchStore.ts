@@ -4,6 +4,16 @@ import { supabase } from '../integrations/supabase/client'
 
 export type SubscriptionPlan = '0-100 membros' | '101-300 membros' | '301-500 membros' | 'ilimitado'
 
+export interface PaymentRecord {
+  id: string;
+  data: string;
+  valor: number;
+  status: 'Pago' | 'Pendente' | 'Atrasado' | 'Cancelado';
+  metodo: string;
+  referencia?: string;
+  registrado_por: string;
+}
+
 export interface Church {
   id: string
   name: string
@@ -13,25 +23,41 @@ export interface Church {
   subscriptionPlan: SubscriptionPlan
   memberLimit: number
   currentMembers: number
-  status: 'active' | 'inactive' | 'pending' | 'trial'
+  status: 'active' | 'inactive' | 'pending' | 'trial' | 'blocked'
   created_at: string
   adminUserId: string | null 
   updated_at?: string 
+  valor_mensal_assinatura: number; // Novo campo
+  data_proximo_pagamento?: string; // Novo campo
+  ultimo_pagamento_status: 'Pago' | 'Pendente' | 'Atrasado' | 'N/A'; // Novo campo
+  historico_pagamentos: PaymentRecord[]; // Novo campo
 }
 
 interface ChurchState {
   churches: Church[]
-  addChurch: (church: Omit<Church, 'id' | 'created_at' | 'updated_at' | 'currentMembers'>) => Promise<Church | null>
+  addChurch: (church: Omit<Church, 'id' | 'created_at' | 'updated_at' | 'currentMembers' | 'valor_mensal_assinatura' | 'ultimo_pagamento_status' | 'historico_pagamentos'>) => Promise<Church | null>
   updateChurch: (churchId: string, updates: Partial<Church>) => Promise<Church | null>
   getChurchById: (churchId: string) => Church | undefined
   loadChurches: () => Promise<void>
-  getSubscriptionPlans: () => { label: string; value: SubscriptionPlan; memberLimit: number }[]
+  getSubscriptionPlans: () => { label: string; value: SubscriptionPlan; memberLimit: number; monthlyValue: number }[]
+  getPlanDetails: (planId: SubscriptionPlan) => { label: string; value: SubscriptionPlan; memberLimit: number; monthlyValue: number }
 }
 
 export const useChurchStore = create<ChurchState>()(
   persist(
     (set, get) => ({
       churches: [],
+
+      getSubscriptionPlans: () => [
+        { label: '0 a 100 Membros', value: '0-100 membros', memberLimit: 100, monthlyValue: 99.00 },
+        { label: '101 a 300 Membros', value: '101-300 membros', memberLimit: 300, monthlyValue: 199.00 },
+        { label: '301 a 500 Membros', value: '301-500 membros', memberLimit: 500, monthlyValue: 299.00 },
+        { label: 'Ilimitado', value: 'ilimitado', memberLimit: Infinity, monthlyValue: 499.00 },
+      ],
+
+      getPlanDetails: (planId: SubscriptionPlan) => {
+        return get().getSubscriptionPlans().find(p => p.value === planId) || { label: 'Desconhecido', value: planId, memberLimit: 0, monthlyValue: 0 };
+      },
 
       loadChurches: async () => {
         console.log('churchStore: Loading churches from Supabase...');
@@ -57,13 +83,18 @@ export const useChurchStore = create<ChurchState>()(
           created_at: c.criado_em,
           adminUserId: c.admin_user_id,
           updated_at: c.updated_at,
+          valor_mensal_assinatura: c.valor_mensal_assinatura || 0,
+          data_proximo_pagamento: c.data_proximo_pagamento,
+          ultimo_pagamento_status: c.ultimo_pagamento_status || 'N/A',
+          historico_pagamentos: c.historico_pagamentos || [],
         })) as Church[] });
       },
 
       addChurch: async (newChurchData) => {
         console.log('churchStore: Adding new church to Supabase:', newChurchData);
-        const selectedPlan = get().getSubscriptionPlans().find(p => p.value === newChurchData.subscriptionPlan);
-        const memberLimit = selectedPlan ? selectedPlan.memberLimit : 100; 
+        const planDetails = get().getPlanDetails(newChurchData.subscriptionPlan);
+        const memberLimit = planDetails.memberLimit;
+        const monthlyValue = planDetails.monthlyValue;
 
         const { data, error } = await supabase
           .from('igrejas')
@@ -74,6 +105,10 @@ export const useChurchStore = create<ChurchState>()(
             membros_atuais: 0,
             status: newChurchData.status,
             admin_user_id: newChurchData.adminUserId,
+            valor_mensal_assinatura: monthlyValue,
+            data_proximo_pagamento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+            ultimo_pagamento_status: 'Pendente',
+            historico_pagamentos: [],
           })
           .select()
           .single();
@@ -96,6 +131,10 @@ export const useChurchStore = create<ChurchState>()(
           contactEmail: data.contactEmail,
           contactPhone: data.contactPhone,
           updated_at: data.updated_at,
+          valor_mensal_assinatura: data.valor_mensal_assinatura,
+          data_proximo_pagamento: data.data_proximo_pagamento,
+          ultimo_pagamento_status: data.ultimo_pagamento_status,
+          historico_pagamentos: data.historico_pagamentos,
         };
 
         set((state) => ({
@@ -109,11 +148,10 @@ export const useChurchStore = create<ChurchState>()(
         const updatePayload: any = {};
 
         if (updates.subscriptionPlan) {
-          const selectedPlan = get().getSubscriptionPlans().find(p => p.value === updates.subscriptionPlan);
-          if (selectedPlan) {
-            updatePayload.plano_id = updates.subscriptionPlan;
-            updatePayload.limite_membros = selectedPlan.memberLimit;
-          }
+          const planDetails = get().getPlanDetails(updates.subscriptionPlan);
+          updatePayload.plano_id = updates.subscriptionPlan;
+          updatePayload.limite_membros = planDetails.memberLimit;
+          updatePayload.valor_mensal_assinatura = planDetails.monthlyValue;
         }
         if (updates.name) updatePayload.nome = updates.name;
         if (updates.currentMembers !== undefined) updatePayload.membros_atuais = updates.currentMembers;
@@ -122,6 +160,9 @@ export const useChurchStore = create<ChurchState>()(
         if (updates.address) updatePayload.address = updates.address;
         if (updates.contactEmail) updatePayload.contactEmail = updates.contactEmail;
         if (updates.contactPhone) updatePayload.contactPhone = updates.contactPhone;
+        if (updates.data_proximo_pagamento) updatePayload.data_proximo_pagamento = updates.data_proximo_pagamento;
+        if (updates.ultimo_pagamento_status) updatePayload.ultimo_pagamento_status = updates.ultimo_pagamento_status;
+        if (updates.historico_pagamentos) updatePayload.historico_pagamentos = updates.historico_pagamentos;
 
 
         const { data, error } = await supabase
@@ -149,6 +190,10 @@ export const useChurchStore = create<ChurchState>()(
           contactEmail: data.contactEmail,
           contactPhone: data.contactPhone,
           updated_at: data.updated_at,
+          valor_mensal_assinatura: data.valor_mensal_assinatura,
+          data_proximo_pagamento: data.data_proximo_pagamento,
+          ultimo_pagamento_status: data.ultimo_pagamento_status,
+          historico_pagamentos: data.historico_pagamentos,
         };
 
         set((state) => ({
@@ -162,13 +207,6 @@ export const useChurchStore = create<ChurchState>()(
       getChurchById: (churchId: string) => {
         return get().churches.find((c) => c.id === churchId);
       },
-
-      getSubscriptionPlans: () => [
-        { label: '0 a 100 Membros', value: '0-100 membros', memberLimit: 100 },
-        { label: '101 a 300 Membros', value: '101-300 membros', memberLimit: 300 },
-        { label: '301 a 500 Membros', value: '301-500 membros', memberLimit: 500 },
-        { label: 'Ilimitado', value: 'ilimitado', memberLimit: Infinity },
-      ],
     }),
     {
       name: 'connect-vida-churches',

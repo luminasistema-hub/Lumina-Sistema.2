@@ -1,23 +1,26 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { useChurchStore, Church, SubscriptionPlan } from '../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
-import { Badge } from '../components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Badge } from '../ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { toast } from 'sonner'
-import { Church as ChurchIcon, Plus, Edit, Trash2, Users, DollarSign, CheckCircle, XCircle, Clock, Globe } from 'lucide-react'
+import { Church as ChurchIcon, Plus, Edit, Trash2, Users, DollarSign, CheckCircle, XCircle, Clock, Globe, Loader2 } from 'lucide-react'
 import MainLayout from '../components/layout/MainLayout'
+import MasterAdminOverviewCards from '../components/master-admin/MasterAdminOverviewCards'
+import MasterAdminChurchTable from '../components/master-admin/MasterAdminChurchTable'
+import ManageChurchSubscriptionDialog from '../components/master-admin/ManageChurchSubscriptionDialog'
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
-  const { churches, loadChurches, addChurch, updateChurch, getSubscriptionPlans } = useChurchStore()
+  const { churches, loadChurches, addChurch, updateChurch, getSubscriptionPlans, getPlanDetails } = useChurchStore()
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null)
+  const [isLoading, setIsLoading] = useState(true);
 
   const [newChurch, setNewChurch] = useState({
     name: '',
@@ -26,11 +29,14 @@ const MasterAdminPage = () => {
     adminUserId: user?.id || null, 
   })
 
-  const [editChurchData, setEditChurchData] = useState<Partial<Church>>({})
-
   useEffect(() => {
-    loadChurches()
-  }, [loadChurches])
+    const fetchChurches = async () => {
+      setIsLoading(true);
+      await loadChurches();
+      setIsLoading(false);
+    };
+    fetchChurches();
+  }, [loadChurches]);
 
   if (user?.role !== 'super_admin') {
     return (
@@ -49,78 +55,48 @@ const MasterAdminPage = () => {
   const handleAddChurch = async () => {
     if (!newChurch.name || !newChurch.subscriptionPlan) {
       toast.error('Nome da igreja e plano de assinatura são obrigatórios.')
-      return
+      return;
     }
 
-    const selectedPlan = getSubscriptionPlans().find(p => p.value === newChurch.subscriptionPlan)
-    if (!selectedPlan) {
-      toast.error('Plano de assinatura inválido.')
-      return
+    setIsLoading(true);
+    try {
+      const added = await addChurch(newChurch);
+      if (added) {
+        setIsAddChurchDialogOpen(false);
+        setNewChurch({
+          name: '',
+          subscriptionPlan: '0-100 membros',
+          status: 'active',
+          adminUserId: user?.id || null,
+        });
+        toast.success(`Igreja ${added.name} adicionada com sucesso!`);
+      } else {
+        toast.error('Falha ao adicionar a igreja.');
+      }
+    } catch (error) {
+      console.error('Error adding church:', error);
+      toast.error('Erro ao adicionar a igreja.');
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    const churchToAdd = {
-      name: newChurch.name,
-      subscriptionPlan: newChurch.subscriptionPlan,
-      memberLimit: selectedPlan.memberLimit,
-      status: newChurch.status,
-      adminUserId: newChurch.adminUserId,
+  const handleUpdateChurch = useCallback(async (churchId: string, updates: Partial<Church>) => {
+    setIsLoading(true);
+    try {
+      const updated = await updateChurch(churchId, updates);
+      if (updated) {
+        toast.success(`Igreja ${updated.name} atualizada com sucesso!`);
+      } else {
+        toast.error('Falha ao atualizar a igreja.');
+      }
+    } catch (error) {
+      console.error('Error updating church:', error);
+      toast.error('Erro ao atualizar a igreja.');
+    } finally {
+      setIsLoading(false);
     }
-
-    const added = await addChurch(churchToAdd)
-
-    if (added) {
-      setIsAddChurchDialogOpen(false)
-      setNewChurch({
-        name: '',
-        subscriptionPlan: '0-100 membros',
-        status: 'active',
-        adminUserId: user?.id || null,
-      })
-      toast.success(`Igreja ${added.name} adicionada com sucesso!`)
-    } else {
-      toast.error('Falha ao adicionar a igreja.')
-    }
-  }
-
-  const handleUpdateChurch = async () => {
-    if (!selectedChurch || !editChurchData.subscriptionPlan) {
-      toast.error('Selecione uma igreja e um plano de assinatura válido.')
-      return
-    }
-
-    const selectedPlan = getSubscriptionPlans().find(p => p.value === editChurchData.subscriptionPlan)
-    if (!selectedPlan) {
-      toast.error('Plano de assinatura inválido.')
-      return
-    }
-
-    const updated = await updateChurch(selectedChurch.id, {
-      name: editChurchData.name,
-      subscriptionPlan: editChurchData.subscriptionPlan,
-      memberLimit: selectedPlan.memberLimit,
-      status: editChurchData.status,
-      adminUserId: editChurchData.adminUserId,
-    })
-
-    if (updated) {
-      setIsEditDialogOpen(false)
-      setSelectedChurch(null)
-      setEditChurchData({})
-      toast.success(`Igreja ${updated.name} atualizada com sucesso!`)
-    } else {
-      toast.error('Falha ao atualizar a igreja.')
-    }
-  }
-
-  const getStatusBadge = (status: Church['status']) => {
-    switch (status) {
-      case 'active': return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" /> Ativa</Badge>
-      case 'pending': return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" /> Pendente</Badge>
-      case 'inactive': return <Badge className="bg-red-100 text-red-800"><XCircle className="w-3 h-3 mr-1" /> Inativa</Badge>
-      case 'trial': return <Badge className="bg-blue-100 text-blue-800"><Globe className="w-3 h-3 mr-1" /> Teste</Badge>
-      default: return <Badge variant="outline">{status}</Badge>
-    }
-  }
+  }, [updateChurch]);
 
   return (
     <MainLayout>
@@ -131,6 +107,8 @@ const MasterAdminPage = () => {
             Gerencie todas as igrejas e suas assinaturas
           </p>
         </div>
+
+        <MasterAdminOverviewCards churches={churches} />
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -174,7 +152,7 @@ const MasterAdminPage = () => {
                       <SelectContent>
                         {getSubscriptionPlans().map(plan => (
                           <SelectItem key={plan.value} value={plan.value}>
-                            {plan.label}
+                            {plan.label} (R$ {plan.monthlyValue.toFixed(2)}/mês)
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -194,128 +172,35 @@ const MasterAdminPage = () => {
                         <SelectItem value="pending">Pendente</SelectItem>
                         <SelectItem value="inactive">Inativa</SelectItem>
                         <SelectItem value="trial">Teste</SelectItem>
+                        <SelectItem value="blocked">Bloqueada</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setIsAddChurchDialogOpen(false)}>
+                    <Button variant="outline" onClick={() => setIsAddChurchDialogOpen(false)} disabled={isLoading}>
                       Cancelar
                     </Button>
-                    <Button onClick={handleAddChurch}>
-                      Adicionar Igreja
+                    <Button onClick={handleAddChurch} disabled={isLoading}>
+                      {isLoading ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Adicionando...
+                        </div>
+                      ) : (
+                        'Adicionar Igreja'
+                      )}
                     </Button>
                   </div>
                 </div>
               </DialogContent>
             </Dialog>
           </CardHeader>
-          <CardContent>
-            {Array.isArray(churches) && churches.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                Nenhuma igreja cadastrada ainda.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {Array.isArray(churches) && churches.map((church) => (
-                  <Card key={church.id} className="border-0 shadow-sm">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold">{church.name}</h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Users className="w-4 h-4" />
-                          <span>{church.currentMembers} / {church.memberLimit === Infinity ? 'Ilimitado' : church.memberLimit} Membros</span>
-                          <DollarSign className="w-4 h-4 ml-4" />
-                          <span>Plano: {church.subscriptionPlan}</span>
-                        </div>
-                        <div className="mt-2">
-                          {getStatusBadge(church.status)}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedChurch(church)
-                            setEditChurchData(church)
-                            setIsEditDialogOpen(true)
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
+          <MasterAdminChurchTable 
+            churches={churches} 
+            onUpdateChurch={handleUpdateChurch} 
+            isLoading={isLoading}
+          />
         </Card>
-
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Editar Igreja: {selectedChurch?.name}</DialogTitle>
-              <DialogDescription>
-                Atualize os detalhes e o plano de assinatura da igreja.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="editChurchName">Nome da Igreja</Label>
-                <Input
-                  id="editChurchName"
-                  value={editChurchData.name || ''}
-                  onChange={(e) => setEditChurchData({...editChurchData, name: e.target.value})}
-                  placeholder="Nome da Igreja"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editSubscriptionPlan">Plano de Assinatura</Label>
-                <Select
-                  value={editChurchData.subscriptionPlan}
-                  onValueChange={(value) => setEditChurchData({...editChurchData, subscriptionPlan: value as SubscriptionPlan})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um plano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getSubscriptionPlans().map(plan => (
-                      <SelectItem key={plan.value} value={plan.value}>
-                        {plan.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editStatus">Status</Label>
-                <Select
-                  value={editChurchData.status}
-                  onValueChange={(value) => setEditChurchData({...editChurchData, status: value as Church['status']})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Ativa</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="inactive">Inativa</SelectItem>
-                    <SelectItem value="trial">Teste</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleUpdateChurch}>
-                  Salvar Alterações
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </MainLayout>
   )
