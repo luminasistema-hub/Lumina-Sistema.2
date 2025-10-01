@@ -131,10 +131,7 @@ const PersonalInfo = () => {
     // Buscar dados da tabela informacoes_pessoais
     const { data: personalInfoRecord, error: personalInfoError } = await supabase
       .from('informacoes_pessoais')
-      .select(`
-        *,
-        conjuge_profile:membros!informacoes_pessoais_conjuge_id_fkey(nome_completo, email)
-      `)
+      .select('*')
       .eq('membro_id', user.id)
       .maybeSingle();
 
@@ -147,6 +144,20 @@ const PersonalInfo = () => {
     console.log('Personal info data received:', personalInfoRecord);
 
     if (personalInfoRecord) {
+      // Buscar informações do cônjuge separadamente
+      let conjugeNome = '';
+      if (personalInfoRecord.conjuge_id) {
+        const { data: conjugeData, error: conjugeError } = await supabase
+          .from('membros')
+          .select('nome_completo, email')
+          .eq('id', personalInfoRecord.conjuge_id)
+          .single();
+        
+        if (!conjugeError && conjugeData) {
+          conjugeNome = conjugeData.nome_completo;
+        }
+      }
+
       setFormData({
         nomeCompleto: user.name, 
         dataNascimento: personalInfoRecord.data_nascimento || '',
@@ -156,8 +167,8 @@ const PersonalInfo = () => {
         email: user.email, 
         endereco: personalInfoRecord.endereco || '',
         conjugeId: personalInfoRecord.conjuge_id || null,
-        conjugeNome: personalInfoRecord.conjuge_profile?.nome_completo || '',
-        dataCasamento: personalInfoRecord.data_casamento || '', // Carrega o novo campo
+        conjugeNome: conjugeNome,
+        dataCasamento: personalInfoRecord.data_casamento || '',
         paisCristaos: personalInfoRecord.pais_cristaos || '',
         tempoIgreja: personalInfoRecord.tempo_igreja || '',
         batizado: personalInfoRecord.batizado || false,
@@ -518,7 +529,7 @@ const PersonalInfo = () => {
                     <SelectValue placeholder="Selecione seu estado civil" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Não informado</SelectItem> {/* Adicionado */}
+                    <SelectItem value="placeholder" disabled>Selecione seu estado civil</SelectItem>
                     <SelectItem value="solteiro">Solteiro(a)</SelectItem>
                     <SelectItem value="casado">Casado(a)</SelectItem>
                     <SelectItem value="divorciado">Divorciado(a)</SelectItem>
@@ -685,8 +696,8 @@ const PersonalInfo = () => {
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="">Não informado</SelectItem> {/* Adicionado */}
+                    <SelectContent>
+                      <SelectItem value="placeholder" disabled>Selecione</SelectItem>
                       <SelectItem value="sim">Sim, ambos</SelectItem>
                       <SelectItem value="um">Apenas um</SelectItem>
                       <SelectItem value="nao">Não</SelectItem>
@@ -728,7 +739,7 @@ const PersonalInfo = () => {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Não informado</SelectItem> {/* Adicionado */}
+                      <SelectItem value="placeholder" disabled>Selecione</SelectItem>
                       <SelectItem value="primeiro-dia">É meu primeiro dia</SelectItem>
                       <SelectItem value="menos-1-mes">Menos de 1 mês</SelectItem>
                       <SelectItem value="1-3-meses">1 a 3 meses</SelectItem>
@@ -848,7 +859,7 @@ const PersonalInfo = () => {
               <p className="font-medium">{formData.batizado ? 'Sim' : 'Não'}</p>
             </div>
             <div>
-              <p className className="text-sm text-gray-500">Participa de Ministério</p>
+              <p className="text-sm text-gray-500">Participa de Ministério</p>
               <p className="font-medium">{formData.participaMinisterio ? 'Sim' : 'Não'}</p>
             </div>
           </CardContent>
