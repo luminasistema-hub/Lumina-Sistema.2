@@ -40,11 +40,11 @@ const MasterAdminPage = () => {
       setIsLoading(true);
       await loadChurches();
 
-      // Fetch total users from Supabase Auth
+      // Fetch total users from Supabase Edge Function
       try {
-        const { data: usersData, error: usersError } = await supabase.auth.admin.listUsers();
-        if (usersError) throw usersError;
-        setTotalUsersCount(usersData.users.length);
+        const { data, error } = await supabase.functions.invoke('get-total-users');
+        if (error) throw error;
+        setTotalUsersCount(data.totalUsers);
       } catch (error: any) {
         console.error('Error fetching total users:', error.message);
         toast.error('Erro ao carregar total de usuários: ' + error.message);

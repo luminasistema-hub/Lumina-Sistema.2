@@ -31,6 +31,8 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
         data_proximo_pagamento: church.data_proximo_pagamento,
         ultimo_pagamento_status: church.ultimo_pagamento_status,
       });
+    } else {
+      setFormData({});
     }
   }, [church]);
 
@@ -81,7 +83,7 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
           <div className="space-y-2">
             <Label htmlFor="subscriptionPlan">Plano de Assinatura</Label>
             <Select
-              value={formData.subscriptionPlan}
+              value={formData.subscriptionPlan || ''}
               onValueChange={(value) => handleInputChange('subscriptionPlan', value as SubscriptionPlan)}
             >
               <SelectTrigger>
@@ -109,7 +111,7 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
           <div className="space-y-2">
             <Label htmlFor="status">Status da Igreja</Label>
             <Select
-              value={formData.status}
+              value={formData.status || ''}
               onValueChange={(value) => handleInputChange('status', value as Church['status'])}
             >
               <SelectTrigger>
@@ -136,7 +138,7 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
           <div className="space-y-2">
             <Label htmlFor="lastPaymentStatus">Status do Último Pagamento</Label>
             <Select
-              value={formData.ultimo_pagamento_status}
+              value={formData.ultimo_pagamento_status || ''}
               onValueChange={(value) => handleInputChange('ultimo_pagamento_status', value as Church['ultimo_pagamento_status'])}
             >
               <SelectTrigger>
