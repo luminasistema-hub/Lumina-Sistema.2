@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
-import { Building, Mail, Lock, Eye, EyeOff, User, Loader2 } from 'lucide-react';
+import { Building, Mail, Lock, Eye, EyeOff, User, Loader2, Phone, Home, FileText } from 'lucide-react'; // Adicionado Phone, Home, FileText
 import { supabase } from '../integrations/supabase/client';
 
 const FormularioCadastroIgreja = () => {
@@ -16,6 +16,10 @@ const FormularioCadastroIgreja = () => {
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('');
+  const [cnpj, setCnpj] = useState(''); // Novo estado
+  const [cpfResponsavel, setCpfResponsavel] = useState(''); // Novo estado
+  const [telefoneContato, setTelefoneContato] = useState(''); // Novo estado
+  const [endereco, setEndereco] = useState(''); // Novo estado
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -64,10 +68,14 @@ const FormularioCadastroIgreja = () => {
         password: adminPassword,
         options: {
           data: {
-            nome_igreja: churchName, // Ajustado para 'nome_igreja'
-            nome_completo_responsavel: adminName, // Ajustado para 'nome_completo_responsavel'
+            nome_igreja: churchName,
+            nome_completo_responsavel: adminName,
             plano_id: selectedPlan,
             initial_role: 'admin',
+            cnpj: cnpj, // Novo campo
+            cpf_responsavel: cpfResponsavel, // Novo campo
+            telefone_contato: telefoneContato, // Novo campo
+            endereco: endereco, // Novo campo
           },
         },
       });
@@ -162,6 +170,68 @@ const FormularioCadastroIgreja = () => {
           </button>
         </div>
       </div>
+
+      {/* Novos Campos */}
+      <div className="space-y-2">
+        <Label htmlFor="cnpj">CNPJ (Opcional)</Label>
+        <div className="relative">
+          <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Input
+            id="cnpj"
+            type="text"
+            placeholder="CNPJ da igreja"
+            value={cnpj}
+            onChange={(e) => setCnpj(e.target.value)}
+            className="pl-10 h-12"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="cpfResponsavel">CPF do Responsável (Opcional)</Label>
+        <div className="relative">
+          <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Input
+            id="cpfResponsavel"
+            type="text"
+            placeholder="CPF do responsável"
+            value={cpfResponsavel}
+            onChange={(e) => setCpfResponsavel(e.target.value)}
+            className="pl-10 h-12"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="telefoneContato">Telefone de Contato (Opcional)</Label>
+        <div className="relative">
+          <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Input
+            id="telefoneContato"
+            type="tel"
+            placeholder="Telefone para contato"
+            value={telefoneContato}
+            onChange={(e) => setTelefoneContato(e.target.value)}
+            className="pl-10 h-12"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="endereco">Endereço (Opcional)</Label>
+        <div className="relative">
+          <Home className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Input
+            id="endereco"
+            type="text"
+            placeholder="Endereço da igreja"
+            value={endereco}
+            onChange={(e) => setEndereco(e.target.value)}
+            className="pl-10 h-12"
+          />
+        </div>
+      </div>
+      {/* Fim dos Novos Campos */}
 
       <div className="space-y-2">
         <Label htmlFor="subscriptionPlan">Plano de Assinatura *</Label>
