@@ -291,12 +291,14 @@ const PersonalInfo = () => {
       data_batismo: formData.dataBatismo || null,
       participa_ministerio: formData.participaMinisterio,
       ministerio_anterior: formData.ministerioAnterior || null,
-      experiencia_anterior: formData.experienciaAnterior || null,
+      experienciaAnterior: formData.experienciaAnterior || null,
       data_conversao: formData.dataConversao || null,
       dias_disponiveis: formData.diasDisponiveis.length > 0 ? formData.diasDisponiveis : null,
-      horarios_disponiveis: formData.horariosDisponiveis || null,
+      horariosDisponiveis: formData.horariosDisponiveis || null,
       updated_at: new Date().toISOString(),
     };
+
+    console.log('Payload sendo enviado para informacoes_pessoais:', personalInfoPayload);
 
     const { error: upsertError } = await supabase
       .from('informacoes_pessoais')
@@ -304,6 +306,7 @@ const PersonalInfo = () => {
 
     if (upsertError) {
       toast.error('Erro ao salvar informações: ' + upsertError.message);
+      console.error('Erro no upsert do Supabase:', upsertError);
       return;
     }
 
@@ -638,9 +641,14 @@ const PersonalInfo = () => {
           {userKids.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {userKids.map((kid) => (
-                <div key={kid.id} className="p-3 bg-gray-50 rounded-lg">
-                  <p className="font-medium">{kid.nome_crianca}</p>
-                  <p className="text-sm text-gray-600">{kid.idade} anos</p>
+                <div key={kid.id} className="p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{kid.nome_crianca}</p>
+                    <p className="text-sm text-gray-600">{kid.idade} anos</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteKid(kid.id)}>
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -648,9 +656,11 @@ const PersonalInfo = () => {
             <div className="text-center py-4">
               <Baby className="w-10 h-10 text-gray-400 mx-auto mb-3" />
               <p className="text-gray-600 mb-3">Nenhuma criança cadastrada.</p>
-              <Button onClick={() => setIsAddKidDialogOpen(true)}><Plus className="w-4 h-4 mr-2" />Cadastrar Filho</Button>
             </div>
           )}
+          <div className="mt-4 text-center"> {/* Always show the add kid button */}
+            <Button onClick={() => setIsAddKidDialogOpen(true)}><Plus className="w-4 h-4 mr-2" />Adicionar Criança</Button>
+          </div>
         </CardContent>
       </Card>
 
