@@ -18,6 +18,8 @@ import DatabaseInfoTab from '../components/master-admin/DatabaseInfoTab' // Novo
 import AdminToolsTab from '../components/master-admin/AdminToolsTab' // Novo
 import SaaSReportsTab from '../components/master-admin/SaaSReportsTab' // Novo
 import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHistoryDialog' // Já existente, mas garantir import
+import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview'; // Importar novo componente
+import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus'; // Importar novo componente
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
@@ -124,7 +126,8 @@ const MasterAdminPage = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <MasterAdminOverviewCards churches={churches} />
-            {/* Adicionar mais gráficos ou resumos aqui se necessário */}
+            <MasterAdminSystemOverview /> {/* Novo componente */}
+            <MasterAdminServerStatus /> {/* Novo componente */}
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">
