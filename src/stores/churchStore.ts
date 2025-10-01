@@ -17,9 +17,9 @@ export interface PaymentRecord {
 export interface Church {
   id: string
   name: string
-  address?: string
-  contactEmail?: string
-  contactPhone?: string
+  address?: string // Mapeia para 'endereco' no DB
+  contactEmail?: string // Mapeia para 'email' no DB
+  contactPhone?: string // Mapeia para 'telefone_contato' no DB
   subscriptionPlan: SubscriptionPlan
   memberLimit: number
   currentMembers: number
@@ -82,9 +82,9 @@ export const useChurchStore = create<ChurchState>()(
         set({ churches: data.map(c => ({
           id: c.id,
           name: c.nome,
-          address: c.address,
-          contactEmail: c.contactEmail,
-          contactPhone: c.contactPhone,
+          address: c.endereco, // Corrigido: mapeia c.endereco para address
+          contactEmail: c.email, // Corrigido: mapeia c.email para contactEmail
+          contactPhone: c.telefone_contato, // Corrigido: mapeia c.telefone_contato para contactPhone
           subscriptionPlan: c.plano_id,
           memberLimit: c.limite_membros,
           currentMembers: c.membros_atuais,
@@ -122,9 +122,9 @@ export const useChurchStore = create<ChurchState>()(
         if (updates.currentMembers !== undefined) updatePayload.membros_atuais = updates.currentMembers;
         if (updates.status) updatePayload.status = updates.status;
         if (updates.adminUserId) updatePayload.admin_user_id = updates.adminUserId;
-        if (updates.address) updatePayload.address = updates.address;
-        if (updates.contactEmail) updatePayload.contactEmail = updates.contactEmail;
-        if (updates.contactPhone) updatePayload.contactPhone = updates.contactPhone;
+        if (updates.address) updatePayload.endereco = updates.address; // Corrigido: mapeia address para endereco
+        if (updates.contactEmail) updatePayload.email = updates.contactEmail; // Corrigido: mapeia contactEmail para email
+        if (updates.contactPhone) updatePayload.telefone_contato = updates.contactPhone; // Corrigido: mapeia contactPhone para telefone_contato
         if (updates.data_proximo_pagamento) updatePayload.data_proximo_pagamento = updates.data_proximo_pagamento;
         if (updates.ultimo_pagamento_status) updatePayload.ultimo_pagamento_status = updates.ultimo_pagamento_status;
         if (updates.historico_pagamentos) updatePayload.historico_pagamentos = updates.historico_pagamentos;
@@ -161,9 +161,9 @@ export const useChurchStore = create<ChurchState>()(
           status: data.status,
           created_at: data.criado_em,
           adminUserId: data.admin_user_id,
-          address: data.address,
-          contactEmail: data.contactEmail,
-          contactPhone: data.contactPhone,
+          address: data.endereco, // Corrigido: mapeia data.endereco para address
+          contactEmail: data.email, // Corrigido: mapeia data.email para contactEmail
+          contactPhone: data.telefone_contato, // Corrigido: mapeia data.telefone_contato para contactPhone
           updated_at: data.updated_at,
           valor_mensal_assinatura: data.valor_mensal_assinatura,
           data_proximo_pagamento: data.data_proximo_pagamento,
