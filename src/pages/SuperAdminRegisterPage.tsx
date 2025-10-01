@@ -35,121 +35,31 @@ const SuperAdminRegisterPage = () => {
     }
 
     try {
-      // 1. Garantir que a 'Super Admin Church' exista
-      let churchId = null;
-      const { data: existingChurch, error: fetchChurchError } = await supabase
-        .from('igrejas')
-        .select('id')
-        .eq('nome', 'Super Admin Church')
-        .single();
-
-      if (fetchChurchError && fetchChurchError.code !== 'PGRST116') {
-        console.error('Erro ao verificar a Igreja de Super Admin:', fetchChurchError);
-        toast.error('Erro ao verificar igreja de Super Admin.');
-        setIsLoading(false);
-        return;
-      }
-
-      if (existingChurch) {
-        churchId = existingChurch.id;
-        console.log('Igreja "Super Admin Church" encontrada com ID:', churchId);
-      } else {
-        console.log('Igreja "Super Admin Church" não encontrada, criando...');
-        const { data: newChurch, error: createChurchError } = await supabase
-          .from('igrejas')
-          .insert({
-            nome: 'Super Admin Church',
-            plano_id: 'ilimitado',
-            limite_membros: -1,
-            membros_atuais: 0,
-            status: 'active',
-            admin_user_id: null,
-          })
-          .select('id')
-          .single();
-
-        if (createChurchError) {
-          console.error('Erro ao criar a Igreja de Super Admin:', createChurchError);
-          toast.error('Erro ao criar igreja de Super Admin.');
-          setIsLoading(false);
-          return;
-        }
-        churchId = newChurch.id;
-        console.log('Igreja "Super Admin Church" criada com ID:', churchId);
-      }
-
-      // 2. Registrar o usuário na autenticação do Supabase
-      console.log('Tentando cadastrar Super Admin:', email);
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-            church_name: 'Super Admin Church',
-            initial_role: 'super_admin',
-            church_id: churchId,
-          },
+      // Call the Edge Function to handle Super Admin registration
+      const response = await fetch('https://abfkcncsvslfrfnjtmdb.supabase.co/functions/v1/create-super-admin-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, // Use anon key for Edge Function invocation
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`, // Also for Edge Function invocation
         },
+        body: JSON.stringify({ name, email, password }),
       });
 
-      if (signUpError) {
-        console.error('Erro no cadastro do Super Admin:', signUpError.message);
-        toast.error('Erro ao cadastrar Super Admin: ' + signUpError.message);
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Error from Edge Function:', data.error);
+        toast.error(data.error || 'Erro desconhecido ao cadastrar Super Admin.');
         setIsLoading(false);
         return;
       }
 
-      if (authData.user) {
-        console.log('Usuário Super Admin criado em auth.users:', authData.user.id);
+      toast.success(data.message || 'Super Admin cadastrado com sucesso! Você já pode fazer login.');
+      navigate('/master-admin-login');
 
-        // 3. Verificar e garantir que o perfil do membro foi criado na tabela 'membros'
-        const { data: memberProfile, error: fetchMemberError } = await supabase
-          .from('membros')
-          .select('id')
-          .eq('id', authData.user.id)
-          .single();
-
-        if (fetchMemberError && fetchMemberError.code !== 'PGRST116') {
-          console.error('Erro ao verificar perfil do membro:', fetchMemberError);
-          toast.error('Erro ao verificar perfil do membro.');
-          setIsLoading(false);
-          return;
-        }
-
-        if (!memberProfile) {
-          console.log('Perfil do membro não encontrado, inserindo manualmente...');
-          const { error: insertMemberError } = await supabase
-            .from('membros')
-            .insert({
-              id: authData.user.id,
-              id_igreja: churchId,
-              nome_completo: name,
-              email: email,
-              funcao: 'super_admin',
-              status: 'ativo',
-              perfil_completo: true,
-            });
-
-          if (insertMemberError) {
-            console.error('Erro ao inserir perfil do membro manualmente:', insertMemberError);
-            toast.error('Erro ao inserir perfil do membro manualmente: ' + insertMemberError.message);
-            setIsLoading(false);
-            return;
-          }
-          console.log('Perfil do membro inserido manualmente.');
-        } else {
-          console.log('Perfil do membro já existe.');
-        }
-
-        toast.success('Super Admin cadastrado com sucesso! Você já pode fazer login.');
-        navigate('/master-admin-login');
-      } else {
-        console.error('Erro desconhecido durante o registro do Super Admin.');
-        toast.error('Erro desconhecido no registro do Super Admin.');
-      }
     } catch (err) {
-      console.error('Erro inesperado em SuperAdminRegisterPage:', err);
+      console.error('Erro inesperado ao chamar a Edge Function:', err);
       toast.error('Ocorreu um erro inesperado ao cadastrar Super Admin.');
     } finally {
       setIsLoading(false);
