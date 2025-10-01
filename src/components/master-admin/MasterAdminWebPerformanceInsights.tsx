@@ -114,7 +114,7 @@ const MasterAdminWebPerformanceInsights: React.FC = () => {
             <div className="text-sm text-gray-600">Visualizações Totais de Página (30 dias)</div>
           </CardContent>
         </Card>
-      </Card>
+      </CardContent>
     </Card>
   );
 };
