@@ -7,6 +7,7 @@ import MasterAdminPage from './pages/MasterAdminPage'
 import MasterAdminLoginPage from './pages/MasterAdminLoginPage'
 import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage' // Importar a nova página
 import { useEffect } from 'react'
+import { SpeedInsights } from "@vercel/speed-insights/react"; // Importação do SpeedInsights
 
 function App() {
   const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore()
@@ -75,6 +76,7 @@ function App() {
           } 
         />
       </Routes>
+      <SpeedInsights />
     </div>
   )
 }

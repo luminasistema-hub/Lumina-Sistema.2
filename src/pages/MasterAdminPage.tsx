@@ -21,7 +21,7 @@ import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHist
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
 import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
 import { supabase } from '../integrations/supabase/client' // Importar supabase
-import { SpeedInsights } from "@vercel/speed-insights/react"; // Importação do SpeedInsights
+// import { SpeedInsights } from "@vercel/speed-insights/react"; // Importação do SpeedInsights
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
@@ -278,7 +278,7 @@ const MasterAdminPage = () => {
           </TabsContent>
         </Tabs>
       </div>
-      <SpeedInsights />
+      {/* <SpeedInsights /> */}
     </MainLayout>
   )
 }
