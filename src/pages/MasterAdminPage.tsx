@@ -227,7 +227,7 @@ const MasterAdminPage = () => {
           </TabsContent>
 
           <TabsContent value="tools" className="space-y-6">
-            <AdminToolsTab churches={churches} />
+            <AdminToolsTab churches={churches} onUpdateChurch={handleUpdateChurch} />
           </TabsContent>
 
           <TabsContent value="reports" className="space-y-6">

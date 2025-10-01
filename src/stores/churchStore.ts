@@ -31,11 +31,16 @@ export interface Church {
   data_proximo_pagamento?: string; // Novo campo
   ultimo_pagamento_status: 'Pago' | 'Pendente' | 'Atrasado' | 'N/A'; // Novo campo
   historico_pagamentos: PaymentRecord[]; // Novo campo
+  // Novas configurações avançadas
+  server_memory_limit?: string;
+  server_execution_timeout?: string;
+  db_connection_pool?: string;
+  db_query_cache_mb?: number;
 }
 
 interface ChurchState {
   churches: Church[]
-  addChurch: (church: Omit<Church, 'id' | 'created_at' | 'updated_at' | 'currentMembers' | 'valor_mensal_assinatura' | 'ultimo_pagamento_status' | 'historico_pagamentos'>) => Promise<Church | null>
+  addChurch: (church: Omit<Church, 'id' | 'created_at' | 'updated_at' | 'currentMembers' | 'valor_mensal_assinatura' | 'ultimo_pagamento_status' | 'historico_pagamentos' | 'server_memory_limit' | 'server_execution_timeout' | 'db_connection_pool' | 'db_query_cache_mb'>) => Promise<Church | null>
   updateChurch: (churchId: string, updates: Partial<Church>) => Promise<Church | null>
   getChurchById: (churchId: string) => Church | undefined
   loadChurches: () => Promise<void>
@@ -87,6 +92,10 @@ export const useChurchStore = create<ChurchState>()(
           data_proximo_pagamento: c.data_proximo_pagamento,
           ultimo_pagamento_status: c.ultimo_pagamento_status || 'N/A',
           historico_pagamentos: c.historico_pagamentos || [],
+          server_memory_limit: c.server_memory_limit,
+          server_execution_timeout: c.server_execution_timeout,
+          db_connection_pool: c.db_connection_pool,
+          db_query_cache_mb: c.db_query_cache_mb,
         })) as Church[] });
       },
 
@@ -135,6 +144,10 @@ export const useChurchStore = create<ChurchState>()(
           data_proximo_pagamento: data.data_proximo_pagamento,
           ultimo_pagamento_status: data.ultimo_pagamento_status,
           historico_pagamentos: data.historico_pagamentos,
+          server_memory_limit: data.server_memory_limit,
+          server_execution_timeout: data.server_execution_timeout,
+          db_connection_pool: data.db_connection_pool,
+          db_query_cache_mb: data.db_query_cache_mb,
         };
 
         set((state) => ({
@@ -163,6 +176,11 @@ export const useChurchStore = create<ChurchState>()(
         if (updates.data_proximo_pagamento) updatePayload.data_proximo_pagamento = updates.data_proximo_pagamento;
         if (updates.ultimo_pagamento_status) updatePayload.ultimo_pagamento_status = updates.ultimo_pagamento_status;
         if (updates.historico_pagamentos) updatePayload.historico_pagamentos = updates.historico_pagamentos;
+        // Novas configurações avançadas
+        if (updates.server_memory_limit) updatePayload.server_memory_limit = updates.server_memory_limit;
+        if (updates.server_execution_timeout) updatePayload.server_execution_timeout = updates.server_execution_timeout;
+        if (updates.db_connection_pool) updatePayload.db_connection_pool = updates.db_connection_pool;
+        if (updates.db_query_cache_mb !== undefined) updatePayload.db_query_cache_mb = updates.db_query_cache_mb;
 
 
         const { data, error } = await supabase
@@ -194,6 +212,10 @@ export const useChurchStore = create<ChurchState>()(
           data_proximo_pagamento: data.data_proximo_pagamento,
           ultimo_pagamento_status: data.ultimo_pagamento_status,
           historico_pagamentos: data.historico_pagamentos,
+          server_memory_limit: data.server_memory_limit,
+          server_execution_timeout: data.server_execution_timeout,
+          db_connection_pool: data.db_connection_pool,
+          db_query_cache_mb: data.db_query_cache_mb,
         };
 
         set((state) => ({

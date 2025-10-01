@@ -176,13 +176,12 @@ const SystemSettings = () => {
       </div>
 
       <Tabs defaultValue="church" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5"> {/* Ajustado para 5 abas */}
           <TabsTrigger value="church">Igreja</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
           <TabsTrigger value="security">Segurança</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
-          <TabsTrigger value="advanced">Avançado</TabsTrigger>
         </TabsList>
 
         <TabsContent value="church" className="space-y-6">
@@ -581,122 +580,6 @@ const SystemSettings = () => {
             </CardHeader>
             <CardContent>
               <UserManagement />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="advanced" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Cpu className="w-5 h-5 text-orange-500" />
-                Configurações Avançadas
-              </CardTitle>
-              <CardDescription>
-                Configurações técnicas para administradores experientes
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                  <span className="font-medium text-yellow-900">Atenção</span>
-                </div>
-                <p className="text-sm text-yellow-800">
-                  As configurações desta seção devem ser alteradas apenas por administradores experientes. 
-                  Mudanças incorretas podem afetar o funcionamento do sistema.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Configurações de Servidor</h4>
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label>Limite de Memória</Label>
-                      <Select defaultValue="512">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="256">256 MB</SelectItem>
-                          <SelectItem value="512">512 MB</SelectItem>
-                          <SelectItem value="1024">1 GB</SelectItem>
-                          <SelectItem value="2048">2 GB</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Timeout de Execução</Label>
-                      <Select defaultValue="30">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="30">30 segundos</SelectItem>
-                          <SelectItem value="60">60 segundos</SelectItem>
-                          <SelectItem value="120">2 minutos</SelectItem>
-                          <SelectItem value="300">5 minutos</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Configurações de Banco</h4>
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label>Pool de Conexões</Label>
-                      <Select defaultValue="10">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="5">5 conexões</SelectItem>
-                          <SelectItem value="10">10 conexões</SelectItem>
-                          <SelectItem value="20">20 conexões</SelectItem>
-                          <SelectItem value="50">50 conexões</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Cache de Query (MB)</Label>
-                      <Select defaultValue="128">
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="64">64 MB</SelectItem>
-                          <SelectItem value="128">128 MB</SelectItem>
-                          <SelectItem value="256">256 MB</SelectItem>
-                          <SelectItem value="512">512 MB</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t pt-6">
-                <h4 className="font-semibold mb-4">Ações Críticas</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button variant="outline" className="text-blue-600">
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Reiniciar Sistema
-                  </Button>
-                  <Button variant="outline" className="text-orange-600">
-                    <Database className="w-4 h-4 mr-2" />
-                    Otimizar Banco
-                  </Button>
-                  <Button variant="outline" className="text-red-600">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Limpar Cache
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -7,18 +7,52 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
 import { useChurchStore, Church } from '../../stores/churchStore';
-import { Key, Mail, RefreshCw, Loader2, Users, Shield, AlertTriangle } from 'lucide-react';
+import { Key, Mail, RefreshCw, Loader2, Users, Shield, AlertTriangle, Save, Server, Cpu, HardDrive, Wifi, Database, Trash2 } from 'lucide-react';
 
 interface AdminToolsTabProps {
   churches: Church[];
+  onUpdateChurch: (churchId: string, updates: Partial<Church>) => Promise<void>;
 }
 
-const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
+const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch }) => {
   const [selectedChurchId, setSelectedChurchId] = useState<string>('');
   const [churchAdmins, setChurchAdmins] = useState<Array<{ id: string; email: string; name: string }>>([]);
   const [selectedAdminEmail, setSelectedAdminEmail] = useState<string>('');
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const { getChurchById } = useChurchStore();
+
+  const [serverConfig, setServerConfig] = useState({
+    server_memory_limit: '512 MB',
+    server_execution_timeout: '30 segundos',
+  });
+
+  const [dbConfig, setDbConfig] = useState({
+    db_connection_pool: '10 conexões',
+    db_query_cache_mb: 128,
+  });
+
+  useEffect(() => {
+    if (selectedChurchId) {
+      fetchChurchAdmins(selectedChurchId);
+      const church = getChurchById(selectedChurchId);
+      if (church) {
+        setServerConfig({
+          server_memory_limit: church.server_memory_limit || '512 MB',
+          server_execution_timeout: church.server_execution_timeout || '30 segundos',
+        });
+        setDbConfig({
+          db_connection_pool: church.db_connection_pool || '10 conexões',
+          db_query_cache_mb: church.db_query_cache_mb || 128,
+        });
+      }
+    } else {
+      setChurchAdmins([]);
+      setSelectedAdminEmail('');
+      setServerConfig({ server_memory_limit: '512 MB', server_execution_timeout: '30 segundos' });
+      setDbConfig({ db_connection_pool: '10 conexões', db_query_cache_mb: 128 });
+    }
+  }, [selectedChurchId, churches, getChurchById]);
 
   const fetchChurchAdmins = async (churchId: string) => {
     setIsLoadingAdmins(true);
@@ -27,7 +61,7 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
         .from('membros')
         .select('id, email, nome_completo')
         .eq('id_igreja', churchId)
-        .in('funcao', ['admin', 'pastor']); // Admins e Pastores podem ser considerados administradores da igreja
+        .in('funcao', ['admin', 'pastor']);
 
       if (error) throw error;
 
@@ -36,7 +70,7 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
         email: m.email,
         name: m.nome_completo || m.email,
       })));
-      setSelectedAdminEmail(''); // Reset selected admin
+      setSelectedAdminEmail('');
     } catch (error: any) {
       console.error('Error fetching church admins:', error.message);
       toast.error('Erro ao carregar administradores da igreja: ' + error.message);
@@ -45,15 +79,6 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
       setIsLoadingAdmins(false);
     }
   };
-
-  useEffect(() => {
-    if (selectedChurchId) {
-      fetchChurchAdmins(selectedChurchId);
-    } else {
-      setChurchAdmins([]);
-      setSelectedAdminEmail(''); // Clear selected admin when church is unselected
-    }
-  }, [selectedChurchId]);
 
   const handleSendPasswordReset = async () => {
     if (!selectedAdminEmail) {
@@ -73,6 +98,26 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
       toast.error('Erro ao enviar link de redefinição de senha: ' + error.message);
     } finally {
       setIsSendingReset(false);
+    }
+  };
+
+  const handleSaveAdvancedSettings = async () => {
+    if (!selectedChurchId) {
+      toast.error('Selecione uma igreja para salvar as configurações avançadas.');
+      return;
+    }
+
+    try {
+      await onUpdateChurch(selectedChurchId, {
+        server_memory_limit: serverConfig.server_memory_limit,
+        server_execution_timeout: serverConfig.server_execution_timeout,
+        db_connection_pool: dbConfig.db_connection_pool,
+        db_query_cache_mb: dbConfig.db_query_cache_mb,
+      });
+      toast.success('Configurações avançadas salvas com sucesso!');
+    } catch (error) {
+      console.error('Error saving advanced settings:', error);
+      toast.error('Erro ao salvar configurações avançadas.');
     }
   };
 
@@ -166,6 +211,157 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches }) => {
               </>
             )}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-orange-500" />
+            Configurações Avançadas da Igreja
+          </CardTitle>
+          <CardDescription>
+            Ajuste configurações de servidor e banco de dados para a igreja selecionada.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="select-church-advanced">Selecione a Igreja</Label>
+            <Select value={selectedChurchId} onValueChange={setSelectedChurchId}>
+              <SelectTrigger id="select-church-advanced">
+                <SelectValue placeholder="Selecione uma igreja" />
+              </SelectTrigger>
+              <SelectContent>
+                {churches.map(church => (
+                  <SelectItem key={church.id} value={church.id}>
+                    {church.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedChurchId && (
+            <>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                  <span className="font-medium text-yellow-900">Atenção</span>
+                </div>
+                <p className="text-sm text-yellow-800">
+                  As configurações desta seção devem ser alteradas apenas por administradores experientes. 
+                  Mudanças incorretas podem afetar o funcionamento do sistema.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h4 className="font-semibold">Configurações de Servidor</h4>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Limite de Memória</Label>
+                      <Select 
+                        value={serverConfig.server_memory_limit} 
+                        onValueChange={(value) => setServerConfig({...serverConfig, server_memory_limit: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="256 MB">256 MB</SelectItem>
+                          <SelectItem value="512 MB">512 MB</SelectItem>
+                          <SelectItem value="1 GB">1 GB</SelectItem>
+                          <SelectItem value="2 GB">2 GB</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Timeout de Execução</Label>
+                      <Select 
+                        value={serverConfig.server_execution_timeout} 
+                        onValueChange={(value) => setServerConfig({...serverConfig, server_execution_timeout: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="30 segundos">30 segundos</SelectItem>
+                          <SelectItem value="60 segundos">60 segundos</SelectItem>
+                          <SelectItem value="2 minutos">2 minutos</SelectItem>
+                          <SelectItem value="5 minutos">5 minutos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="font-semibold">Configurações de Banco</h4>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Pool de Conexões</Label>
+                      <Select 
+                        value={dbConfig.db_connection_pool} 
+                        onValueChange={(value) => setDbConfig({...dbConfig, db_connection_pool: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5 conexões">5 conexões</SelectItem>
+                          <SelectItem value="10 conexões">10 conexões</SelectItem>
+                          <SelectItem value="20 conexões">20 conexões</SelectItem>
+                          <SelectItem value="50 conexões">50 conexões</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Cache de Query (MB)</Label>
+                      <Select 
+                        value={dbConfig.db_query_cache_mb?.toString()} 
+                        onValueChange={(value) => setDbConfig({...dbConfig, db_query_cache_mb: parseInt(value)})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="64">64 MB</SelectItem>
+                          <SelectItem value="128">128 MB</SelectItem>
+                          <SelectItem value="256">256 MB</SelectItem>
+                          <SelectItem value="512">512 MB</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h4 className="font-semibold mb-4">Ações Críticas</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button variant="outline" className="text-blue-600">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Reiniciar Sistema
+                  </Button>
+                  <Button variant="outline" className="text-orange-600">
+                    <Database className="w-4 h-4 mr-2" />
+                    Otimizar Banco
+                  </Button>
+                  <Button variant="outline" className="text-red-600">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Limpar Cache
+                  </Button>
+                </div>
+              </div>
+
+              <Button onClick={handleSaveAdvancedSettings} disabled={!selectedChurchId}>
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Configurações Avançadas
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
