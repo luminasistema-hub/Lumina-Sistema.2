@@ -148,8 +148,6 @@ const MasterAdminPage = () => {
               activeMembersCount={activeMembersCount} 
               totalTransactionsCount={totalTransactionsCount}
             />
-            <MasterAdminServerStatus />
-            <MasterAdminWebPerformanceInsights />
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">
