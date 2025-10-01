@@ -174,7 +174,8 @@ const FinancialPanel = () => {
     data_limite: '',
     categoria: '',
     descricao: '',
-    campanha_ativa: false
+    campanha_ativa: false,
+    status: 'Ativo' as FinancialGoal['status'] // Adicionado status para o newGoal
   })
 
   const [reportParams, setReportParams] = useState({
@@ -606,7 +607,7 @@ const FinancialPanel = () => {
       setIsAddGoalOpen(false)
       setNewGoal({
         nome: '', valor_meta: 0, data_limite: '', categoria: '',
-        descricao: '', campanha_ativa: false
+        descricao: '', campanha_ativa: false, status: 'Ativo'
       })
       loadFinancialData()
     } catch (error: any) {
@@ -650,7 +651,7 @@ const FinancialPanel = () => {
       setGoalToEdit(null)
       setNewGoal({
         nome: '', valor_meta: 0, data_limite: '', categoria: '',
-        descricao: '', campanha_ativa: false
+        descricao: '', campanha_ativa: false, status: 'Ativo'
       })
       loadFinancialData()
     } catch (error: any) {
@@ -813,7 +814,7 @@ const FinancialPanel = () => {
                     <Label>Tipo de Relatório</Label>
                     <Select value={reportParams.tipo} onValueChange={(value) => setReportParams({...reportParams, tipo: value as typeof reportParams.tipo})}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Selecione o tipo" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Mensal">Mensal</SelectItem>
@@ -1138,6 +1139,7 @@ const FinancialPanel = () => {
                             <SelectValue placeholder="Selecione a categoria" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                             {(newTransaction.tipo === 'Entrada' ? categoriesEntrada : categoriesSaida).map(cat => (
                               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                             ))}
@@ -1154,6 +1156,7 @@ const FinancialPanel = () => {
                             <SelectValue placeholder="Selecione a subcategoria" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                             {subcategorias[newTransaction.categoria as keyof typeof subcategorias]?.map(subcat => (
                               <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
                             ))}
@@ -1200,9 +1203,10 @@ const FinancialPanel = () => {
                         <Label htmlFor="metodo">Método de Pagamento</Label>
                         <Select value={newTransaction.metodo_pagamento} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value})}>
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder="Selecione o método" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                             {metodosPagamento.map(metodo => (
                               <SelectItem key={metodo} value={metodo}>{metodo}</SelectItem>
                             ))}
@@ -1422,6 +1426,7 @@ const FinancialPanel = () => {
                           <SelectValue placeholder="Selecione a categoria" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                           {categoriesSaida.map(cat => (
                             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                           ))}
@@ -1436,6 +1441,7 @@ const FinancialPanel = () => {
                             <SelectValue placeholder="Selecione a subcategoria" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                             {subcategorias[newBudget.categoria as keyof typeof subcategorias]?.map(subcat => (
                               <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
                             ))}
@@ -1639,6 +1645,7 @@ const FinancialPanel = () => {
                           <SelectValue placeholder="Selecione a categoria" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                           {categoriesEntrada.map(cat => (
                             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                           ))}
@@ -1871,6 +1878,7 @@ const FinancialPanel = () => {
                     <SelectValue placeholder="Selecione a categoria" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                     {(newTransaction.tipo === 'Entrada' ? categoriesEntrada : categoriesSaida).map(cat => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
@@ -1887,6 +1895,7 @@ const FinancialPanel = () => {
                     <SelectValue placeholder="Selecione a subcategoria" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                     {subcategorias[newTransaction.categoria as keyof typeof subcategorias]?.map(subcat => (
                       <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
                     ))}
@@ -1933,9 +1942,10 @@ const FinancialPanel = () => {
                 <Label htmlFor="edit-metodo">Método de Pagamento</Label>
                 <Select value={newTransaction.metodo_pagamento} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value})}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione o método" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                     {metodosPagamento.map(metodo => (
                       <SelectItem key={metodo} value={metodo}>{metodo}</SelectItem>
                     ))}
@@ -1993,6 +2003,7 @@ const FinancialPanel = () => {
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                   {categoriesSaida.map(cat => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
@@ -2007,6 +2018,7 @@ const FinancialPanel = () => {
                     <SelectValue placeholder="Selecione a subcategoria" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                     {subcategorias[newBudget.categoria as keyof typeof subcategorias]?.map(subcat => (
                       <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
                     ))}
@@ -2110,6 +2122,7 @@ const FinancialPanel = () => {
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
                   {categoriesEntrada.map(cat => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
