@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -8,7 +8,7 @@ import { Checkbox } from '../ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
 import { useChurchStore, Church } from '../../stores/churchStore';
-import { FileText, Download, BarChart3, RefreshCw, Loader2, Calendar, Users, DollarSign, TrendingUp } from 'lucide-react';
+import { FileText, Download, BarChart3, RefreshCw, Loader2, Calendar, Users, DollarSign, TrendingUp, Clock } from 'lucide-react';
 
 interface SaaSReportData {
   id: string;
@@ -40,15 +40,42 @@ const SaaSReportsTab: React.FC = () => {
     loadChurches(); // Ensure churches are loaded for reports
   }, [loadChurches]);
 
-  const generateSaaSReport = async () => {
+  const formatDisplayDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString; // Return original if invalid
+      return date.toLocaleDateString('pt-BR');
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDisplayDateTime = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString; // Return original if invalid
+      return date.toLocaleString('pt-BR');
+    } catch {
+      return dateString;
+    }
+  };
+
+  const generateSaaSReport = useCallback(async () => {
     setIsLoading(true);
     try {
       const startDate = new Date(reportParams.periodo_inicio);
       const endDate = new Date(reportParams.periodo_fim);
 
-      const filteredChurches = churches.filter(church => {
+      // Ensure churches is an array before filtering
+      const validChurches = Array.isArray(churches) ? churches : [];
+
+      const filteredChurches = validChurches.filter(church => {
+        // Add null/undefined check for created_at
+        if (!church.created_at) return false;
         const churchCreatedAt = new Date(church.created_at);
-        return churchCreatedAt >= startDate && churchCreatedAt <= endDate;
+        return !isNaN(churchCreatedAt.getTime()) && churchCreatedAt >= startDate && churchCreatedAt <= endDate;
       });
 
       const totalIgrejas = filteredChurches.length;
@@ -82,7 +109,7 @@ const SaaSReportsTab: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [churches, reportParams]);
 
   const handleDownloadReport = (report: SaaSReportData) => {
     const filename = `relatorio_saas_${report.tipo}_${report.periodo_inicio}_${report.periodo_fim}.json`;
@@ -196,8 +223,8 @@ const SaaSReportsTab: React.FC = () => {
                 <Card key={report.id} className="border-0 shadow-sm">
                   <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold">{report.tipo} - {report.periodo_inicio} a {report.periodo_fim}</h3>
-                      <p className="text-sm text-gray-600">Gerado em: {new Date(report.data_geracao).toLocaleString()}</p>
+                      <h3 className="text-lg font-semibold">{report.tipo} - {formatDisplayDate(report.periodo_inicio)} a {formatDisplayDate(report.periodo_fim)}</h3>
+                      <p className="text-sm text-gray-600">Gerado em: {formatDisplayDateTime(report.data_geracao)}</p>
                       <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-gray-700">
                         <p><Users className="inline-block w-4 h-4 mr-1 text-purple-500" /> Igrejas: {report.total_igrejas} ({report.igrejas_ativas} ativas)</p>
                         <p><DollarSign className="inline-block w-4 h-4 mr-1 text-green-500" /> Receita Estimada: R$ {report.total_receita_estimada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
