@@ -9,13 +9,13 @@ import EventsPage from '../components/spiritual/EventsPage'
 import CoursesPage from '../components/spiritual/CoursesPage'
 import DevotionalsPage from '../components/spiritual/DevotionalsPage'
 import OfferingsPage from '../components/contributions/OfferingsPage'
-import KidsPage from '../components/family/KidsPage'
+import KidsPage from '../components/family/KidsPage' // O componente KidsPage permanece no mesmo local
 import MemberManagementPage from '../components/management/MemberManagementPage'
 import MinistriesPage from '../components/management/MinistriesPage'
 import FinancialPanel from '../components/management/FinancialPanel'
 import SystemStatus from '../components/admin/SystemStatus'
 import SystemSettings from '../components/admin/SystemSettings'
-import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada' // Importar o novo componente
+import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada' 
 import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog' 
 import { useAuthStore } from '../stores/authStore' 
 
@@ -60,7 +60,7 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
         return <DevotionalsPage />
       case 'offerings':
         return <OfferingsPage />
-      case 'kids':
+      case 'kids-management': // NOVA ROTA PARA O MÓDULO KIDS
         return <KidsPage />
       case 'member-management':
         return <MemberManagementPage />
@@ -68,7 +68,7 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
         return <MinistriesPage />
       case 'financial-panel':
         return <FinancialPanel />
-      case 'journey-config': // NOVA ROTA
+      case 'journey-config': 
         return <ConfiguracaoJornada />
       case 'live-streaming':
         return (

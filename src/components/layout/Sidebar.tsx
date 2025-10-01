@@ -32,7 +32,7 @@ import {
   Clock,
   AlertCircle,
   Building,
-  ClipboardList // Importar o ícone ClipboardList
+  ClipboardList 
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useNavigate } from 'react-router-dom' 
@@ -126,20 +126,21 @@ const moduleCategories: ModuleCategory[] = [
       }
     ]
   },
-  {
-    id: 'family',
-    title: 'Família',
-    icon: <Baby className="w-5 h-5" />,
-    modules: [
-      {
-        id: 'kids',
-        title: 'Kids',
-        icon: <Baby className="w-4 h-4" />,
-        roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'voluntario', 'integra'],
-        status: 'complete'
-      }
-    ]
-  },
+  // Removido o módulo 'kids' da categoria 'family'
+  // {
+  //   id: 'family',
+  //   title: 'Família',
+  //   icon: <Baby className="w-5 h-5" />,
+  //   modules: [
+  //     {
+  //       id: 'kids',
+  //       title: 'Kids',
+  //       icon: <Baby className="w-4 h-4" />,
+  //       roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'voluntario', 'integra'],
+  //       status: 'complete'
+  //     }
+  //   ]
+  // },
   {
     id: 'management',
     title: 'Gestão',
@@ -166,11 +167,18 @@ const moduleCategories: ModuleCategory[] = [
         roles: ['pastor', 'admin', 'financeiro'],
         status: 'complete'
       },
-      { // NOVO ITEM DE MENU
+      { 
         id: 'journey-config',
         title: 'Configuração da Jornada',
         icon: <ClipboardList className="w-4 h-4" />,
-        roles: ['admin', 'pastor'], // Apenas administradores e pastores podem configurar
+        roles: ['admin', 'pastor'], 
+        status: 'complete'
+      },
+      { // NOVO MÓDULO KIDS EM GESTÃO
+        id: 'kids-management',
+        title: 'Gestão Kids',
+        icon: <Baby className="w-4 h-4" />,
+        roles: ['admin', 'pastor', 'lider_ministerio', 'membro'], // Membros podem ver seus próprios filhos
         status: 'complete'
       }
     ]
@@ -234,7 +242,7 @@ interface SidebarProps {
 
 const Sidebar = ({ activeModule = 'dashboard', onModuleSelect, currentChurchId }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['personal'])
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['personal', 'management']) // Expandir 'management' por padrão
   const { user, setCurrentChurchId } = useAuthStore()
   const { churches, loadChurches } = useChurchStore()
   const navigate = useNavigate()
