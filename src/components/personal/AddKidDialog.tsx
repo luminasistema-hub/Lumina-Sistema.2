@@ -9,6 +9,7 @@ import { Checkbox } from '../ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
 import { Baby, Plus, Loader2, Trash2, UserPlus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 
 interface KidFormData {
   nome_crianca: string;
