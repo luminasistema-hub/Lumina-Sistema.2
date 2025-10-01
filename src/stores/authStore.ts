@@ -180,33 +180,28 @@ export const useAuthStore = create<AuthState>()(
 
             console.log('AuthStore: Profile data successfully fetched. perfil_completo:', profile.perfil_completo);
 
-            const userRole = profile.funcao as UserRole;
-            const churchIdFromProfile = profile.id_igreja;
-            const churchName = profile.igrejas ? profile.igrejas.nome : undefined;
+            const churchIdForUser = profile.funcao === 'super_admin' ? null : profile.id_igreja;
 
-            const authenticatedUser: User = {
+            set({
+              user: {
+                id: session.user.id,
+                email: session.user.email!,
+                role: profile.funcao,
+                churchId: churchIdForUser,
+                churchName: profile.igrejas?.nome || 'N/A',
+                isProfileComplete: profile.perfil_completo,
+              },
+              isLoading: false,
+              currentChurchId: churchIdForUser,
+            });
+            console.log('AuthStore: User set:', {
               id: session.user.id,
-              name: profile.nome_completo || session.user.user_metadata.full_name || session.user.email || 'Usuário', 
               email: session.user.email!,
-              role: userRole,
-              churchId: churchIdFromProfile,
-              churchName: churchName,
-              status: profile.status as User['status'],
-              created_at: session.user.created_at,
-              perfil_completo: profile.perfil_completo,
-            };
-
-            let newCurrentChurchId: string | null;
-            if (userRole === 'super_admin') {
-                newCurrentChurchId = get().currentChurchId;
-                console.log('AuthStore: Super admin detected. Keeping currentCurrentChurchId from persisted state:', newCurrentChurchId);
-            } else {
-                newCurrentChurchId = churchIdFromProfile;
-                console.log('AuthStore: Non-super admin detected. Setting newCurrentChurchId to profile church ID:', newCurrentChurchId);
-            }
-
-            set({ user: authenticatedUser, isLoading: false, currentChurchId: newCurrentChurchId });
-            console.log('AuthStore: User authenticated and state updated. Final user:', authenticatedUser, 'Final currentChurchId:', newCurrentChurchId, 'isLoading set to false.');
+              role: profile.funcao,
+              churchId: churchIdForUser,
+              churchName: profile.igrejas?.nome || 'N/A',
+              isProfileComplete: profile.perfil_completo,
+            });
           } else {
             console.log('AuthStore: No authenticated user found in session. Setting isLoading to false.');
             set({ user: null, isLoading: false, currentChurchId: null });
