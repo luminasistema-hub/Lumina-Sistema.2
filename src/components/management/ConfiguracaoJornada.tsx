@@ -17,9 +17,10 @@ import { SortablePassoItem } from './SortablePassoItem';
 
 interface QuizPergunta {
   id?: string; // Opcional para novas perguntas
+  passo_id?: string;
   ordem: number;
-  pergunta_texto: string;
-  opcoes: string[];
+  pergunta: string;
+  opcoes_json: { opcoes: string[] };
   resposta_correta: number; // Índice da opção correta (0-based)
   pontuacao: number;
 }
@@ -41,8 +42,6 @@ interface EtapaTrilha {
   ordem: number;
   titulo: string;
   descricao: string;
-  tipo_conteudo: string;
-  conteudo: string;
   cor: string;
   created_at: string;
   passos: PassoEtapa[];
@@ -64,7 +63,7 @@ const ConfiguracaoJornada = () => {
 
   const [isPassoModalOpen, setIsPassoModalOpen] = useState(false);
   const [etapaAtualParaPasso, setEtapaAtualParaPasso] = useState<EtapaTrilha | null>(null);
-  const [formPassoData, setFormPassoData] = useState<Partial<PassoEtapa>>({
+  const [formPassoData, setFormPassoData] = useState<Partial<PassoEtapa & { pergunta_texto?: string }>>({
     titulo: '',
     tipo_passo: 'leitura',
     conteudo: '',
@@ -108,6 +107,7 @@ const ConfiguracaoJornada = () => {
         .select('id')
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
+        .limit(1)
         .single();
       
       if (trilhaError && trilhaError.code !== 'PGRST116') {
@@ -138,7 +138,7 @@ const ConfiguracaoJornada = () => {
         if (quizPassoIds.length > 0) {
           const { data: qData, error: qError } = await supabase
             .from('quiz_perguntas')
-            .select('*')
+            .select('id, passo_id, ordem, pergunta, opcoes_json, resposta_correta, pontuacao')
             .in('passo_id', quizPassoIds)
             .order('ordem', { ascending: true });
           if (qError) console.error('Erro ao carregar perguntas de quiz:', qError);
@@ -319,7 +319,7 @@ const ConfiguracaoJornada = () => {
     }
     if (formPassoData.tipo_passo === 'quiz') {
       for (const q of formPassoData.quiz_perguntas!) {
-        if (!q.pergunta_texto || q.opcoes.length < 2 || q.resposta_correta === undefined || q.resposta_correta < 0 || q.resposta_correta >= q.opcoes.length) {
+        if (!q.pergunta || (q.opcoes_json?.opcoes || []).length < 2 || q.resposta_correta === undefined || q.resposta_correta < 0 || q.resposta_correta >= (q.opcoes_json?.opcoes || []).length) {
           toast.error('Todas as perguntas do quiz devem ter texto, pelo menos 2 opções e uma resposta correta válida.');
           return;
         }
@@ -376,8 +376,8 @@ const ConfiguracaoJornada = () => {
         const perguntasToInsert = formPassoData.quiz_perguntas.map((q, index) => ({
           passo_id: passoId,
           ordem: index + 1,
-          pergunta_texto: q.pergunta_texto,
-          opcoes: q.opcoes,
+          pergunta: q.pergunta,
+          opcoes_json: q.opcoes_json,
           resposta_correta: q.resposta_correta,
           pontuacao: q.pontuacao,
         }));
@@ -507,8 +507,8 @@ const ConfiguracaoJornada = () => {
       ...prev,
       quiz_perguntas: [...(prev.quiz_perguntas || []), {
         ordem: (prev.quiz_perguntas?.length || 0) + 1,
-        pergunta_texto: '',
-        opcoes: ['', '', '', ''],
+        pergunta: '',
+        opcoes_json: { opcoes: ['', ''] },
         resposta_correta: 0,
         pontuacao: 1,
       }]
@@ -518,11 +518,7 @@ const ConfiguracaoJornada = () => {
   const updateQuizQuestion = (index: number, field: keyof QuizPergunta, value: any) => {
     setFormPassoData(prev => {
       const newQuestions = [...(prev.quiz_perguntas || [])];
-      if (field === 'opcoes') {
-        newQuestions[index] = { ...newQuestions[index], [field]: value };
-      } else {
-        newQuestions[index] = { ...newQuestions[index], [field]: value };
-      }
+      newQuestions[index] = { ...newQuestions[index], [field]: value };
       return { ...prev, quiz_perguntas: newQuestions };
     });
   };
@@ -530,9 +526,18 @@ const ConfiguracaoJornada = () => {
   const updateQuizOption = (qIndex: number, oIndex: number, value: string) => {
     setFormPassoData(prev => {
       const newQuestions = [...(prev.quiz_perguntas || [])];
-      const newOptions = [...newQuestions[qIndex].opcoes];
+      const newOptions = [...newQuestions[qIndex].opcoes_json.opcoes];
       newOptions[oIndex] = value;
-      newQuestions[qIndex] = { ...newQuestions[qIndex], opcoes: newOptions };
+      newQuestions[qIndex] = { ...newQuestions[qIndex], opcoes_json: { opcoes: newOptions } };
+      return { ...prev, quiz_perguntas: newQuestions };
+    });
+  };
+  
+  const addQuizOption = (qIndex: number) => {
+    setFormPassoData(prev => {
+      const newQuestions = [...(prev.quiz_perguntas || [])];
+      const newOptions = [...newQuestions[qIndex].opcoes_json.opcoes, ''];
+      newQuestions[qIndex] = { ...newQuestions[qIndex], opcoes_json: { opcoes: newOptions } };
       return { ...prev, quiz_perguntas: newQuestions };
     });
   };
@@ -769,7 +774,7 @@ const ConfiguracaoJornada = () => {
                   Perguntas do Quiz ({formPassoData.quiz_perguntas?.length || 0}/10)
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Cadastre até 10 perguntas de múltipla escolha. A nota final será de 0 a 10.
+                  Cadastre até 10 perguntas de múltipla escolha.
                 </p>
                 
                 {(formPassoData.quiz_perguntas || []).map((q, qIndex) => (
@@ -784,14 +789,14 @@ const ConfiguracaoJornada = () => {
                       <Label htmlFor={`pergunta-texto-${qIndex}`}>Texto da Pergunta *</Label>
                       <Input
                         id={`pergunta-texto-${qIndex}`}
-                        value={q.pergunta_texto}
-                        onChange={(e) => updateQuizQuestion(qIndex, 'pergunta_texto', e.target.value)}
+                        value={q.pergunta}
+                        onChange={(e) => updateQuizQuestion(qIndex, 'pergunta', e.target.value)}
                         placeholder="Qual é a capital do Brasil?"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Opções de Resposta * (Mínimo 2)</Label>
-                      {(q.opcoes || []).map((opcao, oIndex) => (
+                      {(q.opcoes_json?.opcoes || []).map((opcao, oIndex) => (
                         <div key={oIndex} className="flex items-center gap-2">
                           <Input
                             value={opcao}
@@ -808,11 +813,11 @@ const ConfiguracaoJornada = () => {
                           <Label>Correta</Label>
                         </div>
                       ))}
-                      {q.opcoes.length < 5 && (
+                      {(q.opcoes_json?.opcoes.length || 0) < 5 && (
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => updateQuizQuestion(qIndex, 'opcoes', [...q.opcoes, ''])}
+                          onClick={() => addQuizOption(qIndex)}
                         >
                           + Adicionar Opção
                         </Button>

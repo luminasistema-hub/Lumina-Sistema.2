@@ -126,15 +126,16 @@ const MemberJourney = () => {
     console.log('MemberJourney: Loading journey data for user:', user.id, 'church:', currentChurchId);
 
     try {
-      // 1. Buscar a trilha de crescimento da igreja
+      // 1. Buscar a trilha de crescimento da igreja (de forma mais segura)
       const { data: trilhaData, error: trilhaError } = await supabase
         .from('trilhas_crescimento')
         .select('id, titulo, descricao')
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
+        .limit(1) // Garante que pegamos apenas uma, mesmo que existam múltiplas
         .single();
 
-      if (trilhaError && trilhaError.code !== 'PGRST116') {
+      if (trilhaError && trilhaError.code !== 'PGRST116') { // PGRST116 = 0 rows
         console.error('MemberJourney: Error loading trilha_crescimento:', trilhaError);
         toast.error('Erro ao carregar a trilha de crescimento da igreja.');
         setLoading(false);
