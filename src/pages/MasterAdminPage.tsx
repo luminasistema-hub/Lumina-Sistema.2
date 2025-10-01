@@ -35,6 +35,7 @@ const MasterAdminPage = () => {
   // Novos estados para métricas globais
   const [totalUsersCount, setTotalUsersCount] = useState(0);
   const [activeMembersCount, setActiveMembersCount] = useState(0);
+  const [totalTransactionsCount, setTotalTransactionsCount] = useState(0);
 
   useEffect(() => {
     const fetchChurchesAndMetrics = async () => {
@@ -63,6 +64,18 @@ const MasterAdminPage = () => {
       } catch (error: any) {
         console.error('Error fetching active members:', error.message);
         toast.error('Erro ao carregar membros ativos: ' + error.message);
+      }
+
+      // Fetch total transactions
+      try {
+        const { count, error: transactionsError } = await supabase
+          .from('transacoes_financeiras')
+          .select('id', { count: 'exact' });
+        if (transactionsError) throw transactionsError;
+        setTotalTransactionsCount(count || 0);
+      } catch (error: any) {
+        console.error('Error fetching total transactions:', error.message);
+        toast.error('Erro ao carregar total de transações: ' + error.message);
       }
 
       setIsLoading(false);
@@ -136,6 +149,7 @@ const MasterAdminPage = () => {
             <MasterAdminSystemOverview 
               totalUsersCount={totalUsersCount} 
               activeMembersCount={activeMembersCount} 
+              totalTransactionsCount={totalTransactionsCount}
             />
             <MasterAdminServerStatus />
             <MasterAdminWebPerformanceInsights />
