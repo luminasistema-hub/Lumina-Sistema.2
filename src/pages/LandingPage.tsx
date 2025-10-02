@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Users, DollarSign, GraduationCap, Heart, Baby, BarChart3, Shield } from 'lucide-react';
 import { useSubscriptionPlans, SubscriptionPlan } from '@/hooks/useSubscriptionPlans';
 import { Skeleton } from '@/components/ui/skeleton';
