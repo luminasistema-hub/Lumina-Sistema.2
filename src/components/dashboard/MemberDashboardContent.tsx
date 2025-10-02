@@ -3,8 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { Calendar, BookOpen, Heart, TrendingUp, Clock, CheckCircle, ArrowRight, Play, Eye, Target } from 'lucide-react';
+import { useJourneyData } from '../../hooks/useJourneyData';
+import { Skeleton } from '../ui/skeleton';
+import { Link } from 'react-router-dom';
 
 const MemberDashboardContent = () => {
+  const { loading, overallProgress, completedSteps, totalSteps, etapas } = useJourneyData();
+
   // Cursos disponíveis
   const availableCourses = [
     {
@@ -74,18 +79,12 @@ const MemberDashboardContent = () => {
     },
   ];
 
-  // Status da jornada espiritual
-  const journeySteps = [
-    { title: 'Decisão por Cristo', completed: true },
-    { title: 'Batismo', completed: true },
-    { title: 'Curso de Discipulado', completed: false, current: true },
-    { title: 'Teste Vocacional', completed: false },
-    { title: 'Ministério Ativo', completed: false },
-    { title: 'Liderança', completed: false },
-  ];
-
-  const completedSteps = journeySteps.filter((step) => step.completed).length;
-  const journeyProgress = (completedSteps / journeySteps.length) * 100;
+  // Status da jornada espiritual - REMOVIDO O MOCK
+  const journeySteps = etapas.flatMap(etapa => etapa.passos).map((passo, index) => ({
+    title: passo.titulo,
+    completed: passo.completed,
+    current: !passo.completed && (etapas.flatMap(e => e.passos).findIndex(p => !p.completed) === index),
+  }));
 
   return (
     <>
@@ -152,51 +151,75 @@ const MemberDashboardContent = () => {
             <CardDescription>Acompanhe seu crescimento na fé</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600 mb-1">
-                {Math.round(journeyProgress)}%
-              </div>
-              <p className="text-sm text-gray-600">
-                {completedSteps} de {journeySteps.length} etapas concluídas
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {journeySteps.map((step, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      step.completed
-                        ? 'bg-green-500 text-white'
-                        : step.current
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-200 text-gray-400'
-                    }`}
-                  >
-                    {step.completed ? (
-                      <CheckCircle className="w-4 h-4" />
-                    ) : (
-                      <span className="text-xs font-bold">{index + 1}</span>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p
-                      className={`text-sm font-medium ${
-                        step.completed ? 'text-green-700' : step.current ? 'text-blue-700' : 'text-gray-500'
-                      }`}
-                    >
-                      {step.title}
-                    </p>
-                    {step.current && <p className="text-xs text-blue-600">Etapa atual</p>}
-                  </div>
+            {loading ? (
+              <div className="space-y-4">
+                <div className="flex justify-center items-center flex-col">
+                  <Skeleton className="h-8 w-24 mb-2" />
+                  <Skeleton className="h-4 w-48" />
                 </div>
-              ))}
-            </div>
+                <Skeleton className="h-4 w-full" />
+                <div className="space-y-3">
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-2/3" />
+                </div>
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : totalSteps > 0 ? (
+              <>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-600 mb-1">
+                    {Math.round(overallProgress)}%
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {completedSteps} de {totalSteps} passos concluídos
+                  </p>
+                </div>
 
-            <Button className="w-full bg-green-500 hover:bg-green-600">
-              <Target className="w-4 h-4 mr-2" />
-              Continuar Jornada
-            </Button>
+                <div className="space-y-3">
+                  {journeySteps.slice(0, 5).map((step, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          step.completed
+                            ? 'bg-green-500 text-white'
+                            : step.current
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 text-gray-400'
+                        }`}
+                      >
+                        {step.completed ? (
+                          <CheckCircle className="w-4 h-4" />
+                        ) : (
+                          <span className="text-xs font-bold">{index + 1}</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p
+                          className={`text-sm font-medium ${
+                            step.completed ? 'text-gray-500 line-through' : step.current ? 'text-blue-700' : 'text-gray-700'
+                          }`}
+                        >
+                          {step.title}
+                        </p>
+                        {step.current && <p className="text-xs text-blue-600">Próximo passo</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <Button asChild className="w-full bg-green-500 hover:bg-green-600">
+                  <Link to="/dashboard?tab=jornada">
+                    <Target className="w-4 h-4 mr-2" />
+                    Continuar Jornada
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-600">Sua jornada espiritual ainda não foi iniciada. Fale com a liderança da sua igreja.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
