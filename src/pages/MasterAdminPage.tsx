@@ -39,11 +39,11 @@ const MasterAdminPage = () => {
       setIsLoading(true);
       await loadChurches();
 
-      // Fetch total users from Supabase Auth
+      // Fetch total users from Supabase Auth using a secure RPC call
       try {
-        const { data: usersData, error: usersError } = await supabase.auth.admin.listUsers();
-        if (usersError) throw usersError;
-        setTotalUsersCount(usersData.users.length);
+        const { data: countData, error: countError } = await supabase.rpc('get_total_users_count');
+        if (countError) throw countError;
+        setTotalUsersCount(countData);
       } catch (error: any) {
         console.error('Error fetching total users:', error.message);
         toast.error('Erro ao carregar total de usuários: ' + error.message);

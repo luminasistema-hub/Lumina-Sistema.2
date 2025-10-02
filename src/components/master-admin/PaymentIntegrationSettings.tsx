@@ -19,16 +19,19 @@ const PaymentIntegrationSettings = () => {
         const { data, error } = await supabase
           .from('configuracoes_sistema')
           .select('valor')
-          .eq('chave', 'MERCADOPAGO_ACCESS_TOKEN')
-          .single();
+          .eq('chave', 'MERCADOPAGO_ACCESS_TOKEN');
 
-        if (error) throw error;
-        if (data) {
-          setAccessToken(data.valor || '');
+        if (error && error.code !== '42P01') throw error; // Ignore table not found error initially
+        if (data && data.length > 0) {
+          setAccessToken(data[0].valor || '');
+        } else {
+          setAccessToken(''); // Handle case where token is not yet set
         }
       } catch (error: any) {
         console.error('Error fetching payment token:', error);
-        toast.error('Erro ao carregar a chave da API de pagamento.');
+        if (error.code !== 'PGRST116') { // Don't show error if it's just '0 rows'
+          toast.error('Erro ao carregar a chave da API de pagamento.');
+        }
       } finally {
         setIsLoading(false);
       }
