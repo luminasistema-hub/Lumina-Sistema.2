@@ -164,10 +164,6 @@ const MasterAdminPage = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <MasterAdminOverviewCards churches={churches} />
-            <MasterAdminSystemOverview 
-              totalUsersCount={totalUsersCount} 
-              activeMembersCount={activeMembersCount} 
-            />
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">

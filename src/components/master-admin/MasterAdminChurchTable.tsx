@@ -32,9 +32,9 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
   const filteredChurches = churches.filter(church => {
     const matchesSearch = church.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           church.adminUserId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          church.subscriptionPlan.toLowerCase().includes(searchTerm.toLowerCase());
+                          church.subscriptionPlanName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || church.status === filterStatus;
-    const matchesPlan = filterPlan === 'all' || church.subscriptionPlan === filterPlan;
+    const matchesPlan = filterPlan === 'all' || church.subscriptionPlanName === filterPlan;
     return matchesSearch && matchesStatus && matchesPlan;
   });
 
@@ -173,7 +173,7 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <DollarSign className="w-4 h-4" />
-                      <span>Plano: {church.subscriptionPlan}</span>
+                      <span>Plano: {church.subscriptionPlanName}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <DollarSign className="w-4 h-4" />

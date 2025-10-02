@@ -5,8 +5,9 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
-import { Church, SubscriptionPlan, useChurchStore } from '../../stores/churchStore';
+import { Church, useChurchStore } from '../../stores/churchStore';
 import { Save, X, Loader2 } from 'lucide-react';
+import { useSubscriptionPlans } from '../../hooks/useSubscriptionPlans';
 
 interface ManageChurchSubscriptionDialogProps {
   isOpen: boolean;
@@ -16,15 +17,15 @@ interface ManageChurchSubscriptionDialogProps {
 }
 
 const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogProps> = ({ isOpen, onClose, church, onSave }) => {
-  const { getSubscriptionPlans, getPlanDetails } = useChurchStore();
-  const [formData, setFormData] = useState<Partial<Church>>({});
+  const { plans: subscriptionPlans, isLoading: isLoadingPlans } = useSubscriptionPlans();
+  const [formData, setFormData] = useState<Partial<Church> & { plano_id?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (church) {
       setFormData({
         name: church.name,
-        subscriptionPlan: church.subscriptionPlan,
+        plano_id: church.plano_id,
         status: church.status,
         adminUserId: church.adminUserId,
         valor_mensal_assinatura: church.valor_mensal_assinatura,
@@ -34,22 +35,26 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
     }
   }, [church]);
 
-  const handleInputChange = (field: keyof Church, value: any) => {
+  const handleInputChange = (field: keyof Church | 'plano_id', value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    if (field === 'subscriptionPlan') {
-      const planDetails = getPlanDetails(value as SubscriptionPlan);
-      setFormData(prev => ({ ...prev, valor_mensal_assinatura: planDetails.monthlyValue }));
+    if (field === 'plano_id') {
+      const planDetails = subscriptionPlans.find(p => p.id === value);
+      if (planDetails) {
+        setFormData(prev => ({ ...prev, valor_mensal_assinatura: planDetails.preco_mensal }));
+      }
     }
   };
 
   const handleSubmit = async () => {
-    if (!church?.id || !formData.name || !formData.subscriptionPlan || !formData.status) {
+    if (!church?.id || !formData.name || !formData.plano_id || !formData.status) {
       toast.error('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
     setIsLoading(true);
     try {
-      await onSave(church.id, formData);
+      // Prepara o payload para o onSave, garantindo que plano_id seja enviado
+      const updates: Partial<Church> = { ...formData };
+      await onSave(church.id, updates);
       onClose();
     } catch (error) {
       console.error('Failed to save church subscription:', error);
@@ -81,16 +86,17 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
           <div className="space-y-2">
             <Label htmlFor="subscriptionPlan">Plano de Assinatura</Label>
             <Select
-              value={formData.subscriptionPlan}
-              onValueChange={(value) => handleInputChange('subscriptionPlan', value as SubscriptionPlan)}
+              value={formData.plano_id}
+              onValueChange={(value) => handleInputChange('plano_id', value)}
+              disabled={isLoadingPlans}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione um plano" />
+                <SelectValue placeholder={isLoadingPlans ? "Carregando planos..." : "Selecione um plano"} />
               </SelectTrigger>
               <SelectContent>
-                {getSubscriptionPlans().map(plan => (
-                  <SelectItem key={plan.value} value={plan.value}>
-                    {plan.label} (R$ {plan.monthlyValue.toFixed(2)}/mês)
+                {subscriptionPlans.map(plan => (
+                  <SelectItem key={plan.id} value={plan.id}>
+                    {plan.nome} (R$ {plan.preco_mensal.toFixed(2)}/mês)
                   </SelectItem>
                 ))}
               </SelectContent>

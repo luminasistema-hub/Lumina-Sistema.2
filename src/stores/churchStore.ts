@@ -20,7 +20,8 @@ export interface Church {
   address?: string // Mapeia para 'endereco' no DB
   contactEmail?: string // Mapeia para 'email' no DB
   contactPhone?: string // Mapeia para 'telefone_contato' no DB
-  subscriptionPlan: SubscriptionPlan
+  subscriptionPlanName: string // Nome do plano para exibição
+  plano_id: string | null // ID do plano (UUID)
   memberLimit: number
   currentMembers: number
   status: 'active' | 'inactive' | 'pending' | 'trial' | 'blocked'
@@ -74,7 +75,7 @@ export const useChurchStore = create<ChurchState>()(
         console.log('churchStore: Loading churches from Supabase...');
         const { data, error } = await supabase
           .from('igrejas')
-          .select('*');
+          .select('*, plano:planos_assinatura(nome)');
 
         if (error) {
           console.error('churchStore: Error loading churches from Supabase:', error);
@@ -84,10 +85,11 @@ export const useChurchStore = create<ChurchState>()(
         set({ churches: data.map(c => ({
           id: c.id,
           name: c.nome,
-          address: c.endereco, // Corrigido: mapeia c.endereco para address
-          contactEmail: c.email, // Corrigido: mapeia c.email para contactEmail
-          contactPhone: c.telefone_contato, // Corrigido: mapeia c.telefone_contato para contactPhone
-          subscriptionPlan: c.plano_id,
+          address: c.endereco,
+          contactEmail: c.email,
+          contactPhone: c.telefone_contato,
+          subscriptionPlanName: Array.isArray(c.plano) ? c.plano[0]?.nome : c.plano?.nome || 'N/A',
+          plano_id: c.plano_id,
           memberLimit: c.limite_membros,
           currentMembers: c.membros_atuais,
           status: c.status,
@@ -104,7 +106,6 @@ export const useChurchStore = create<ChurchState>()(
           server_execution_timeout: c.server_execution_timeout,
           db_connection_pool: c.db_connection_pool,
           db_query_cache_mb: c.db_query_cache_mb,
-          // Campos adicionados para as configurações da igreja
           cnpj: c.cnpj,
           nome_responsavel: c.nome_responsavel,
           site: c.site,
@@ -116,30 +117,32 @@ export const useChurchStore = create<ChurchState>()(
         console.log('churchStore: Updating church in Supabase:', churchId, updates);
         const updatePayload: any = {};
 
-        if (updates.subscriptionPlan) {
-          const planDetails = get().getPlanDetails(updates.subscriptionPlan);
-          updatePayload.plano_id = updates.subscriptionPlan;
-          updatePayload.limite_membros = planDetails.memberLimit;
-          updatePayload.valor_mensal_assinatura = planDetails.monthlyValue;
+        // Mapeia os campos do formulário para os nomes das colunas do banco de dados
+        if (updates.plano_id) {
+          updatePayload.plano_id = updates.plano_id;
+          // Opcional: buscar detalhes do plano para atualizar outros campos se necessário
+          const { data: planDetails } = await supabase.from('planos_assinatura').select('limite_membros, preco_mensal').eq('id', updates.plano_id).single();
+          if (planDetails) {
+            updatePayload.limite_membros = planDetails.limite_membros;
+            updatePayload.valor_mensal_assinatura = planDetails.preco_mensal;
+          }
         }
         if (updates.name) updatePayload.nome = updates.name;
         if (updates.currentMembers !== undefined) updatePayload.membros_atuais = updates.currentMembers;
         if (updates.status) updatePayload.status = updates.status;
         if (updates.adminUserId) updatePayload.admin_user_id = updates.adminUserId;
-        if (updates.address) updatePayload.endereco = updates.address; // Corrigido: mapeia address para endereco
-        if (updates.contactEmail) updatePayload.email = updates.contactEmail; // Corrigido: mapeia contactEmail para email
-        if (updates.contactPhone) updatePayload.telefone_contato = updates.contactPhone; // Corrigido: mapeia contactPhone para telefone_contato
+        if (updates.address) updatePayload.endereco = updates.address;
+        if (updates.contactEmail) updatePayload.email = updates.contactEmail;
+        if (updates.contactPhone) updatePayload.telefone_contato = updates.contactPhone;
         if (updates.data_proximo_pagamento) updatePayload.data_proximo_pagamento = updates.data_proximo_pagamento;
         if (updates.ultimo_pagamento_status) updatePayload.ultimo_pagamento_status = updates.ultimo_pagamento_status;
         if (updates.historico_pagamentos) updatePayload.historico_pagamentos = updates.historico_pagamentos;
         if (updates.link_pagamento_assinatura) updatePayload.link_pagamento_assinatura = updates.link_pagamento_assinatura;
         if (updates.subscription_id_ext) updatePayload.subscription_id_ext = updates.subscription_id_ext;
-        // Novas configurações avançadas
         if (updates.server_memory_limit) updatePayload.server_memory_limit = updates.server_memory_limit;
         if (updates.server_execution_timeout) updatePayload.server_execution_timeout = updates.server_execution_timeout;
         if (updates.db_connection_pool) updatePayload.db_connection_pool = updates.db_connection_pool;
         if (updates.db_query_cache_mb !== undefined) updatePayload.db_query_cache_mb = updates.db_query_cache_mb;
-        // Campos adicionados para as configurações da igreja
         if (updates.cnpj) updatePayload.cnpj = updates.cnpj;
         if (updates.nome_responsavel) updatePayload.nome_responsavel = updates.nome_responsavel;
         if (updates.site) updatePayload.site = updates.site;
@@ -150,7 +153,7 @@ export const useChurchStore = create<ChurchState>()(
           .from('igrejas')
           .update(updatePayload)
           .eq('id', churchId)
-          .select()
+          .select('*, plano:planos_assinatura(nome)')
           .single();
 
         if (error) {
@@ -161,15 +164,16 @@ export const useChurchStore = create<ChurchState>()(
         const updatedChurch: Church = {
           id: data.id,
           name: data.nome,
-          subscriptionPlan: data.plano_id,
+          subscriptionPlanName: Array.isArray(data.plano) ? data.plano[0]?.nome : data.plano?.nome || 'N/A',
+          plano_id: data.plano_id,
           memberLimit: data.limite_membros,
           currentMembers: data.membros_atuais,
           status: data.status,
           created_at: data.criado_em,
           adminUserId: data.admin_user_id,
-          address: data.endereco, // Corrigido: mapeia data.endereco para address
-          contactEmail: data.email, // Corrigido: mapeia data.email para contactEmail
-          contactPhone: data.telefone_contato, // Corrigido: mapeia data.telefone_contato para contactPhone
+          address: data.endereco,
+          contactEmail: data.email,
+          contactPhone: data.telefone_contato,
           updated_at: data.updated_at,
           valor_mensal_assinatura: data.valor_mensal_assinatura,
           data_proximo_pagamento: data.data_proximo_pagamento,
@@ -181,7 +185,6 @@ export const useChurchStore = create<ChurchState>()(
           server_execution_timeout: data.server_execution_timeout,
           db_connection_pool: data.db_connection_pool,
           db_query_cache_mb: data.db_query_cache_mb,
-          // Campos adicionados para as configurações da igreja
           cnpj: data.cnpj,
           nome_responsavel: data.nome_responsavel,
           site: data.site,
