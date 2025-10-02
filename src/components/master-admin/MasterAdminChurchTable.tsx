@@ -6,9 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { Church, useChurchStore, PaymentRecord } from '../../stores/churchStore';
-import { Search, Filter, Edit, History, DollarSign, CheckCircle, XCircle, Clock, Shield, Users, Loader2, Calendar, AlertTriangle } from 'lucide-react';
+import { Search, Filter, Edit, History, DollarSign, CheckCircle, XCircle, Clock, Shield, Users, Loader2, Calendar, AlertTriangle, Link as LinkIcon } from 'lucide-react';
 import ManageChurchSubscriptionDialog from './ManageChurchSubscriptionDialog';
 import ViewPaymentHistoryDialog from './ViewPaymentHistoryDialog';
+import GeneratePaymentLinkDialog from './GeneratePaymentLinkDialog';
 import { useAuthStore } from '../../stores/authStore';
 import { v4 as uuidv4 } from 'uuid'; // Para gerar IDs únicos
 
@@ -25,6 +26,7 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
   const [filterPlan, setFilterPlan] = useState('all');
   const [isManageSubscriptionDialogOpen, setIsManageSubscriptionDialogOpen] = useState(false);
   const [isViewPaymentHistoryDialogOpen, setIsViewPaymentHistoryDialogOpen] = useState(false);
+  const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false);
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
 
   const filteredChurches = churches.filter(church => {
@@ -94,6 +96,10 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
       status: 'active' // Garante que a igreja esteja ativa se o pagamento for marcado como pago
     });
     toast.success('Pagamento marcado como PAGO e acesso restaurado!');
+  };
+
+  const handleLinkGenerated = (churchId: string, paymentLink: string) => {
+    onUpdateChurch(churchId, { link_pagamento_assinatura: paymentLink });
   };
 
   return (
@@ -201,6 +207,17 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
                       <History className="w-4 h-4 mr-2" />
                       Pagamentos
                     </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedChurch(church);
+                        setIsGenerateLinkDialogOpen(true);
+                      }}
+                    >
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      Link Assinatura
+                    </Button>
                     {church.status !== 'blocked' && (church.ultimo_pagamento_status === 'Pendente' || church.ultimo_pagamento_status === 'Atrasado') && (
                       <Button
                         variant="destructive"
@@ -252,6 +269,13 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
         church={selectedChurch}
         onUpdateChurch={onUpdateChurch}
         currentUserEmail={user?.email || 'Super Admin'}
+      />
+
+      <GeneratePaymentLinkDialog
+        isOpen={isGenerateLinkDialogOpen}
+        onClose={() => setIsGenerateLinkDialogOpen(false)}
+        church={selectedChurch}
+        onLinkGenerated={handleLinkGenerated}
       />
     </Card>
   );

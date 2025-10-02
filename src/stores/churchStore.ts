@@ -31,6 +31,8 @@ export interface Church {
   data_proximo_pagamento?: string; // Novo campo
   ultimo_pagamento_status: 'Pago' | 'Pendente' | 'Atrasado' | 'N/A'; // Novo campo
   historico_pagamentos: PaymentRecord[]; // Novo campo
+  link_pagamento_assinatura?: string; // Link de pagamento do MP
+  subscription_id_ext?: string; // ID da assinatura no MP
   // Novas configurações avançadas
   server_memory_limit?: string;
   server_execution_timeout?: string;
@@ -96,6 +98,8 @@ export const useChurchStore = create<ChurchState>()(
           data_proximo_pagamento: c.data_proximo_pagamento,
           ultimo_pagamento_status: c.ultimo_pagamento_status || 'N/A',
           historico_pagamentos: c.historico_pagamentos || [],
+          link_pagamento_assinatura: c.link_pagamento_assinatura,
+          subscription_id_ext: c.subscription_id_ext,
           server_memory_limit: c.server_memory_limit,
           server_execution_timeout: c.server_execution_timeout,
           db_connection_pool: c.db_connection_pool,
@@ -128,6 +132,8 @@ export const useChurchStore = create<ChurchState>()(
         if (updates.data_proximo_pagamento) updatePayload.data_proximo_pagamento = updates.data_proximo_pagamento;
         if (updates.ultimo_pagamento_status) updatePayload.ultimo_pagamento_status = updates.ultimo_pagamento_status;
         if (updates.historico_pagamentos) updatePayload.historico_pagamentos = updates.historico_pagamentos;
+        if (updates.link_pagamento_assinatura) updatePayload.link_pagamento_assinatura = updates.link_pagamento_assinatura;
+        if (updates.subscription_id_ext) updatePayload.subscription_id_ext = updates.subscription_id_ext;
         // Novas configurações avançadas
         if (updates.server_memory_limit) updatePayload.server_memory_limit = updates.server_memory_limit;
         if (updates.server_execution_timeout) updatePayload.server_execution_timeout = updates.server_execution_timeout;
@@ -169,6 +175,8 @@ export const useChurchStore = create<ChurchState>()(
           data_proximo_pagamento: data.data_proximo_pagamento,
           ultimo_pagamento_status: data.ultimo_pagamento_status,
           historico_pagamentos: data.historico_pagamentos,
+          link_pagamento_assinatura: data.link_pagamento_assinatura,
+          subscription_id_ext: data.subscription_id_ext,
           server_memory_limit: data.server_memory_limit,
           server_execution_timeout: data.server_execution_timeout,
           db_connection_pool: data.db_connection_pool,
