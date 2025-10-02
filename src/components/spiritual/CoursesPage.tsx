@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -19,42 +19,44 @@ import {
   Plus,
   Edit,
   Trash2,
-  Award,
-  Star,
-  CheckCircle,
-  Youtube,
   FileText,
-  Download,
-  Upload
+  Upload,
+  Youtube
 } from 'lucide-react'
+import { supabase } from '../../integrations/supabase/client'
+
+type StatusCurso = 'Rascunho' | 'Ativo' | 'Pausado' | 'Finalizado'
+type TipoCurso = 'Presencial' | 'Online' | 'Híbrido'
+type CategoriaCurso = 'Discipulado' | 'Liderança' | 'Teologia' | 'Ministério' | 'Evangelismo'
+type NivelCurso = 'Básico' | 'Intermediário' | 'Avançado'
 
 interface Course {
   id: string
   nome: string
   descricao: string
-  tipo: 'Presencial' | 'Online' | 'Híbrido'
-  categoria: 'Discipulado' | 'Liderança' | 'Teologia' | 'Ministério' | 'Evangelismo'
-  nivel: 'Básico' | 'Intermediário' | 'Avançado'
+  tipo: TipoCurso
+  categoria: CategoriaCurso
+  nivel: NivelCurso | null
   professor: {
-    id: string
-    nome: string
-    email: string
+    id: string | null
+    nome: string | null
+    email: string | null
   }
-  duracao_horas: number
-  status: 'Rascunho' | 'Ativo' | 'Pausado' | 'Finalizado'
-  data_inicio: string
-  data_fim: string
+  duracao_horas: number | null
+  status: StatusCurso
+  data_inicio: string | null
+  data_fim: string | null
+  certificado_disponivel: boolean
+  nota_minima_aprovacao: number | null
+  valor?: number | null
   modulos: CourseModule[]
   alunos_inscritos: Student[]
-  certificado_disponivel: boolean
-  nota_minima_aprovacao: number
-  valor?: number
 }
 
 interface CourseModule {
   id: string
   titulo: string
-  descricao: string
+  descricao: string | null
   ordem: number
   aulas: Lesson[]
   avaliacoes: Assessment[]
@@ -63,11 +65,11 @@ interface CourseModule {
 interface Lesson {
   id: string
   titulo: string
-  descricao: string
+  descricao: string | null
   tipo: 'Video' | 'Texto' | 'PDF' | 'Quiz'
-  conteudo: string // YouTube URL for videos, text content, etc.
-  duracao_minutos: number
-  obrigatoria: boolean
+  conteudo: string | null
+  duracao_minutos: number | null
+  obrigatoria: boolean | null
   ordem: number
 }
 
@@ -95,7 +97,6 @@ interface Student {
   email: string
   data_inscricao: string
   progresso: number
-  nota_final?: number
   certificado_emitido: boolean
   aulas_assistidas: string[]
   avaliacoes_respondidas: Array<{
@@ -106,7 +107,7 @@ interface Student {
 }
 
 const CoursesPage = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore()
   const [courses, setCourses] = useState<Course[]>([])
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -129,135 +130,149 @@ const CoursesPage = () => {
     nota_minima_aprovacao: 70
   })
 
-  // Mock data
   useEffect(() => {
-    console.log('CoursesPage: Loading courses data...')
-    const mockCourses: Course[] = [
-      {
-        id: '1',
-        nome: 'Fundamentos da Fé Cristã',
-        descricao: 'Curso básico sobre os pilares da fé cristã, ideal para novos convertidos e aqueles que desejam fortalecer seus fundamentos espirituais.',
-        tipo: 'Online',
-        categoria: 'Discipulado',
-        nivel: 'Básico',
-        professor: { id: '1', nome: 'Pastor João Silva', email: 'joao@igreja.com' },
-        duracao_horas: 20,
-        status: 'Ativo',
-        data_inicio: '2025-09-01',
-        data_fim: '2025-11-30',
-        certificado_disponivel: true,
-        nota_minima_aprovacao: 70,
-        valor: 0,
-        modulos: [
-          {
-            id: '1',
-            titulo: 'Introdução à Fé',
-            descricao: 'Conceitos básicos da fé cristã',
-            ordem: 1,
-            aulas: [
-              {
-                id: '1',
-                titulo: 'O que é ser cristão?',
-                descricao: 'Entendendo o significado de seguir a Cristo',
-                tipo: 'Video',
-                conteudo: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-                duracao_minutos: 45,
-                obrigatoria: true,
-                ordem: 1
-              },
-              {
-                id: '2',
-                titulo: 'A Bíblia como Palavra de Deus',
-                descricao: 'Compreendendo a autoridade das Escrituras',
-                tipo: 'Video',
-                conteudo: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-                duracao_minutos: 50,
-                obrigatoria: true,
-                ordem: 2
-              }
-            ],
-            avaliacoes: [
-              {
-                id: '1',
-                titulo: 'Avaliação Módulo 1',
-                tipo: 'Quiz',
-                nota_maxima: 100,
-                tentativas_permitidas: 3,
-                perguntas: [
-                  {
-                    id: '1',
-                    pergunta: 'Qual é o primeiro passo para ser cristão?',
-                    tipo: 'Múltipla Escolha',
-                    opcoes: ['Aceitar Jesus como Salvador', 'Ir à igreja', 'Ler a Bíblia', 'Fazer boas obras'],
-                    resposta_correta: 0,
-                    pontos: 25
-                  }
-                ]
-              }
-            ]
-          }
-        ],
-        alunos_inscritos: [
-          {
-            id: '1',
-            nome: 'Maria Santos',
-            email: 'maria@email.com',
-            data_inscricao: '2025-09-05',
-            progresso: 75,
-            aulas_assistidas: ['1'],
-            avaliacoes_respondidas: [],
-            certificado_emitido: false
-          }
-        ]
-      },
-      {
-        id: '2',
-        nome: 'Liderança Cristã Eficaz',
-        descricao: 'Desenvolvimento de habilidades de liderança baseadas em princípios bíblicos para líderes de ministério.',
-        tipo: 'Híbrido',
-        categoria: 'Liderança',
-        nivel: 'Intermediário',
-        professor: { id: '2', nome: 'Pastora Maria Oliveira', email: 'maria@igreja.com' },
-        duracao_horas: 40,
-        status: 'Ativo',
-        data_inicio: '2025-09-15',
-        data_fim: '2025-12-15',
-        certificado_disponivel: true,
-        nota_minima_aprovacao: 80,
-        valor: 150,
-        modulos: [],
-        alunos_inscritos: []
-      }
-    ]
-    setCourses(mockCourses)
-  }, [])
+    // Ajusta aba inicial conforme perfil
+    if (canManageCourses) {
+      setViewMode('admin')
+    } else if (canTeach) {
+      setViewMode('teacher')
+    } else {
+      setViewMode('student')
+    }
+  }, [canManageCourses, canTeach])
 
-  const handleCreateCourse = () => {
+  // Carregar cursos reais da igreja
+  useEffect(() => {
+    const loadCourses = async () => {
+      if (!user || !currentChurchId) return
+      const { data, error } = await supabase
+        .from('cursos')
+        .select(`
+          id, id_igreja, nome, descricao, tipo, categoria, nivel, professor_id, duracao_horas, status, data_inicio, data_fim, certificado_disponivel, nota_minima_aprovacao, valor
+        `)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) {
+        console.error('Erro ao carregar cursos:', error.message)
+        toast.error('Erro ao carregar cursos.')
+        return
+      }
+
+      // Carregar módulos e aulas para cada curso
+      const coursesWithChildren: Course[] = []
+      for (const c of data || []) {
+        const { data: modulos } = await supabase
+          .from('cursos_modulos')
+          .select(`id, id_curso, titulo, descricao, ordem`)
+          .eq('id_curso', c.id)
+          .order('ordem', { ascending: true })
+
+        const modules: CourseModule[] = []
+        for (const m of modulos || []) {
+          const { data: aulas } = await supabase
+            .from('cursos_aulas')
+            .select(`id, id_modulo, titulo, tipo, conteudo, duracao_minutos, obrigatoria, ordem, descricao`)
+            .eq('id_modulo', m.id)
+            .order('ordem', { ascending: true })
+
+          modules.push({
+            id: m.id,
+            titulo: m.titulo,
+            descricao: m.descricao,
+            ordem: m.ordem,
+            aulas: (aulas || []).map(a => ({
+              id: a.id,
+              titulo: a.titulo,
+              descricao: a.descricao || null,
+              tipo: (a.tipo === 'video' || a.tipo === 'Video') ? 'Video' : (a.tipo === 'Texto' ? 'Texto' : (a.tipo === 'PDF' ? 'PDF' : 'Quiz')),
+              conteudo: a.conteudo || null,
+              duracao_minutos: a.duracao_minutos ?? null,
+              obrigatoria: a.obrigatoria ?? null,
+              ordem: a.ordem
+            })),
+            avaliacoes: [] // manter vazio por agora
+          })
+        }
+
+        // Professor: pode vir nulo
+        const professor = { id: c.professor_id || null, nome: null, email: null }
+        // Opcional: buscar info do professor em 'membros'
+        if (c.professor_id) {
+          const { data: profData } = await supabase
+            .from('membros')
+            .select('id, nome_completo, email')
+            .eq('id', c.professor_id)
+            .maybeSingle()
+          if (profData) {
+            professor.nome = profData.nome_completo
+            professor.email = profData.email
+          }
+        }
+
+        coursesWithChildren.push({
+          id: c.id,
+          nome: c.nome,
+          descricao: c.descricao || '',
+          tipo: c.tipo as TipoCurso,
+          categoria: (c.categoria || 'Discipulado') as CategoriaCurso,
+          nivel: (c.nivel || 'Básico') as NivelCurso,
+          professor,
+          duracao_horas: c.duracao_horas ?? 0,
+          status: (c.status || 'Rascunho') as StatusCurso,
+          data_inicio: c.data_inicio || null,
+          data_fim: c.data_fim || null,
+          certificado_disponivel: !!c.certificado_disponivel,
+          nota_minima_aprovacao: c.nota_minima_aprovacao ?? 70,
+          valor: c.valor ?? 0,
+          modulos: modules,
+          alunos_inscritos: [] // manter vazio por agora
+        })
+      }
+
+      setCourses(coursesWithChildren)
+    }
+
+    loadCourses()
+  }, [user, currentChurchId])
+
+  const handleCreateCourse = async () => {
     if (!newCourse.nome || !newCourse.descricao) {
       toast.error('Preencha os campos obrigatórios')
       return
     }
-
-    const course: Course = {
-      id: Date.now().toString(),
-      nome: newCourse.nome!,
-      descricao: newCourse.descricao!,
-      tipo: newCourse.tipo as Course['tipo'] || 'Online',
-      categoria: newCourse.categoria as Course['categoria'] || 'Discipulado',
-      nivel: newCourse.nivel as Course['nivel'] || 'Básico',
-      professor: { id: user?.id || '', nome: user?.name || '', email: user?.email || '' },
-      duracao_horas: newCourse.duracao_horas || 0,
-      status: 'Rascunho',
-      data_inicio: newCourse.data_inicio || '',
-      data_fim: newCourse.data_fim || '',
-      modulos: [],
-      alunos_inscritos: [],
-      certificado_disponivel: newCourse.certificado_disponivel || false,
-      nota_minima_aprovacao: newCourse.nota_minima_aprovacao || 70,
-      valor: newCourse.valor
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
     }
 
-    setCourses([...courses, course])
+    const { data, error } = await supabase
+      .from('cursos')
+      .insert({
+        id_igreja: currentChurchId,
+        nome: newCourse.nome,
+        descricao: newCourse.descricao,
+        tipo: newCourse.tipo || 'Online',
+        categoria: newCourse.categoria || 'Discipulado',
+        nivel: newCourse.nivel || 'Básico',
+        professor_id: user?.id || null,
+        duracao_horas: newCourse.duracao_horas || 0,
+        status: 'Rascunho',
+        data_inicio: newCourse.data_inicio || null,
+        data_fim: newCourse.data_fim || null,
+        certificado_disponivel: newCourse.certificado_disponivel ?? true,
+        nota_minima_aprovacao: newCourse.nota_minima_aprovacao ?? 70,
+        valor: newCourse.valor ?? 0
+      })
+      .select('id')
+      .maybeSingle()
+
+    if (error) {
+      console.error('Erro ao criar curso:', error.message)
+      toast.error('Erro ao criar curso.')
+      return
+    }
+
+    toast.success('Curso criado com sucesso!')
     setIsCreateDialogOpen(false)
     setNewCourse({
       nome: '',
@@ -272,10 +287,44 @@ const CoursesPage = () => {
       certificado_disponivel: true,
       nota_minima_aprovacao: 70
     })
-    toast.success('Curso criado com sucesso!')
+    // Recarregar cursos
+    if (data?.id) {
+      const { data: c } = await supabase
+        .from('cursos')
+        .select(`
+          id, id_igreja, nome, descricao, tipo, categoria, nivel, professor_id, duracao_horas, status, data_inicio, data_fim, certificado_disponivel, nota_minima_aprovacao, valor
+        `)
+        .eq('id', data.id)
+        .maybeSingle()
+
+      if (c) {
+        setCourses(prev => [
+          ...prev,
+          {
+            id: c.id,
+            nome: c.nome,
+            descricao: c.descricao || '',
+            tipo: c.tipo as TipoCurso,
+            categoria: (c.categoria || 'Discipulado') as CategoriaCurso,
+            nivel: (c.nivel || 'Básico') as NivelCurso,
+            professor: { id: c.professor_id || null, nome: user?.name || null, email: user?.email || null },
+            duracao_horas: c.duracao_horas ?? 0,
+            status: (c.status || 'Rascunho') as StatusCurso,
+            data_inicio: c.data_inicio || null,
+            data_fim: c.data_fim || null,
+            certificado_disponivel: !!c.certificado_disponivel,
+            nota_minima_aprovacao: c.nota_minima_aprovacao ?? 70,
+            valor: c.valor ?? 0,
+            modulos: [],
+            alunos_inscritos: []
+          }
+        ])
+      }
+    }
   }
 
   const getYouTubeVideoId = (url: string) => {
+    if (!url) return null
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
     const match = url.match(regex)
     return match ? match[1] : null
@@ -300,7 +349,7 @@ const CoursesPage = () => {
     )
   }
 
-  const getStatusColor = (status: Course['status']) => {
+  const getStatusColor = (status: StatusCurso) => {
     switch (status) {
       case 'Rascunho': return 'bg-gray-100 text-gray-800'
       case 'Ativo': return 'bg-green-100 text-green-800'
@@ -310,7 +359,7 @@ const CoursesPage = () => {
     }
   }
 
-  const getCategoryColor = (categoria: Course['categoria']) => {
+  const getCategoryColor = (categoria: CategoriaCurso) => {
     switch (categoria) {
       case 'Discipulado': return 'bg-purple-100 text-purple-800'
       case 'Liderança': return 'bg-blue-100 text-blue-800'
@@ -320,6 +369,8 @@ const CoursesPage = () => {
       default: return 'bg-gray-100 text-gray-800'
     }
   }
+
+  const activeCourses = useMemo(() => courses.filter(c => c.status === 'Ativo'), [courses])
 
   return (
     <div className="p-6 space-y-6">
@@ -360,7 +411,7 @@ const CoursesPage = () => {
                     <Label htmlFor="nome">Nome do Curso *</Label>
                     <Input
                       id="nome"
-                      value={newCourse.nome}
+                      value={newCourse.nome || ''}
                       onChange={(e) => setNewCourse({...newCourse, nome: e.target.value})}
                       placeholder="Nome do curso"
                     />
@@ -370,7 +421,7 @@ const CoursesPage = () => {
                     <Label htmlFor="descricao">Descrição *</Label>
                     <Textarea
                       id="descricao"
-                      value={newCourse.descricao}
+                      value={newCourse.descricao || ''}
                       onChange={(e) => setNewCourse({...newCourse, descricao: e.target.value})}
                       placeholder="Descrição do curso"
                       rows={3}
@@ -380,7 +431,7 @@ const CoursesPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="tipo">Tipo</Label>
-                      <Select value={newCourse.tipo} onValueChange={(value) => setNewCourse({...newCourse, tipo: value as Course['tipo']})}>
+                      <Select value={newCourse.tipo || 'Online'} onValueChange={(value) => setNewCourse({...newCourse, tipo: value as TipoCurso})}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -394,7 +445,7 @@ const CoursesPage = () => {
 
                     <div className="space-y-2">
                       <Label htmlFor="categoria">Categoria</Label>
-                      <Select value={newCourse.categoria} onValueChange={(value) => setNewCourse({...newCourse, categoria: value as Course['categoria']})}>
+                      <Select value={newCourse.categoria || 'Discipulado'} onValueChange={(value) => setNewCourse({...newCourse, categoria: value as CategoriaCurso})}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -410,7 +461,7 @@ const CoursesPage = () => {
 
                     <div className="space-y-2">
                       <Label htmlFor="nivel">Nível</Label>
-                      <Select value={newCourse.nivel} onValueChange={(value) => setNewCourse({...newCourse, nivel: value as Course['nivel']})}>
+                      <Select value={newCourse.nivel || 'Básico'} onValueChange={(value) => setNewCourse({...newCourse, nivel: value as NivelCurso})}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -429,7 +480,7 @@ const CoursesPage = () => {
                       <Input
                         id="duracao"
                         type="number"
-                        value={newCourse.duracao_horas}
+                        value={newCourse.duracao_horas || 0}
                         onChange={(e) => setNewCourse({...newCourse, duracao_horas: parseInt(e.target.value) || 0})}
                         placeholder="0"
                       />
@@ -439,7 +490,7 @@ const CoursesPage = () => {
                       <Input
                         id="nota_minima"
                         type="number"
-                        value={newCourse.nota_minima_aprovacao}
+                        value={newCourse.nota_minima_aprovacao || 70}
                         onChange={(e) => setNewCourse({...newCourse, nota_minima_aprovacao: parseInt(e.target.value) || 70})}
                         placeholder="70"
                       />
@@ -462,7 +513,7 @@ const CoursesPage = () => {
 
         <TabsContent value="student" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.filter(course => course.status === 'Ativo').map((course) => (
+            {activeCourses.map((course) => (
               <Card key={course.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -472,7 +523,7 @@ const CoursesPage = () => {
                         <Badge className={getCategoryColor(course.categoria)}>
                           {course.categoria}
                         </Badge>
-                        <Badge variant="outline">{course.nivel}</Badge>
+                        <Badge variant="outline">{course.nivel || 'Básico'}</Badge>
                       </div>
                     </div>
                     <Badge className={getStatusColor(course.status)}>
@@ -488,7 +539,7 @@ const CoursesPage = () => {
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4 text-gray-400" />
-                          <span>{course.duracao_horas}h</span>
+                          <span>{course.duracao_horas || 0}h</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Users className="w-4 h-4 text-gray-400" />
@@ -497,14 +548,14 @@ const CoursesPage = () => {
                       </div>
                       {course.valor && course.valor > 0 && (
                         <div className="font-semibold text-green-600">
-                          R$ {course.valor.toFixed(2)}
+                          R$ {Number(course.valor).toFixed(2)}
                         </div>
                       )}
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs">
-                        <span>Professor: {course.professor.nome}</span>
+                        <span>Professor: {course.professor.nome || '—'}</span>
                         <span>75% concluído</span>
                       </div>
                       <Progress value={75} className="h-2" />
@@ -561,8 +612,8 @@ const CoursesPage = () => {
                         <div className="text-sm text-gray-600">Módulos</div>
                       </div>
                       <div className="text-center p-3 bg-orange-50 rounded-lg">
-                        <div className="text-2xl font-bold text-orange-600">{course.duracao_horas}h</div>
-                        <div className="text-sm text-gray-600">Duration</div>
+                        <div className="text-2xl font-bold text-orange-600">{course.duracao_horas || 0}h</div>
+                        <div className="text-sm text-gray-600">Duração</div>
                       </div>
                       <div className="text-center p-3 bg-purple-50 rounded-lg">
                         <div className="text-2xl font-bold text-purple-600">85%</div>
@@ -617,7 +668,7 @@ const CoursesPage = () => {
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-4 text-center">
                   <div className="text-2xl font-bold text-purple-600">
-                    {courses.reduce((acc, course) => acc + course.duracao_horas, 0)}h
+                    {courses.reduce((acc, course) => acc + (course.duracao_horas || 0), 0)}h
                   </div>
                   <div className="text-sm text-gray-600">Conteúdo Total</div>
                 </CardContent>
@@ -641,9 +692,9 @@ const CoursesPage = () => {
                         </div>
                         <p className="text-gray-600 text-sm mb-2">{course.descricao}</p>
                         <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span>Professor: {course.professor.nome}</span>
+                          <span>Professor: {course.professor.nome || '—'}</span>
                           <span>{course.alunos_inscritos.length} alunos</span>
-                          <span>{course.duracao_horas}h</span>
+                          <span>{course.duracao_horas || 0}h</span>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -673,7 +724,7 @@ const CoursesPage = () => {
             <DialogHeader>
               <DialogTitle>{selectedCourse.nome}</DialogTitle>
               <DialogDescription>
-                Professor: {selectedCourse.professor.nome}
+                Professor: {selectedCourse.professor.nome || '—'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
@@ -687,7 +738,7 @@ const CoursesPage = () => {
                           {aula.tipo === 'Video' && <Youtube className="w-5 h-5 text-red-500" />}
                           <div>
                             <div className="font-medium">{aula.titulo}</div>
-                            <div className="text-sm text-gray-600">{aula.duracao_minutos} min</div>
+                            <div className="text-sm text-gray-600">{aula.duracao_minutos || 0} min</div>
                           </div>
                         </div>
                         <Button size="sm">

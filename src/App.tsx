@@ -8,6 +8,7 @@ import MasterAdminLoginPage from './pages/MasterAdminLoginPage'
 import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage'
 import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
+import EADPortalPage from './pages/EADPortalPage'
 import { useEffect } from 'react'
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
@@ -76,6 +77,10 @@ function App() {
         <Route 
           path="/dashboard" 
           element={user && user.role !== 'super_admin' && currentChurchId ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/" replace />} 
+        />
+        <Route 
+          path="/ead" 
+          element={user && user.role !== 'super_admin' && currentChurchId ? <EADPortalPage /> : <Navigate to="/" replace />} 
         />
       </Routes>
       <SpeedInsights />
