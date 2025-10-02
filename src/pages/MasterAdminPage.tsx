@@ -19,8 +19,7 @@ import AdminToolsTab from '../components/master-admin/AdminToolsTab'
 import SaaSReportsTab from '../components/master-admin/SaaSReportsTab'
 import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHistoryDialog'
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
-import MasterAdminServerStatus from '../components/master-admin/MasterAdminServerStatus';
-import MasterAdminWebPerformanceInsights from '../components/master-admin/MasterAdminWebPerformanceInsights'; // Importação do novo componente
+import SubscriptionPlanManagement from '../components/master-admin/SubscriptionPlanManagement'; // Importação do novo componente
 import { supabase } from '../integrations/supabase/client' // Importar supabase
 
 const MasterAdminPage = () => {
@@ -154,9 +153,10 @@ const MasterAdminPage = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="churches">Igrejas</TabsTrigger>
+            <TabsTrigger value="plans">Planos</TabsTrigger>
             <TabsTrigger value="database">Banco de Dados</TabsTrigger>
             <TabsTrigger value="tools">Ferramentas Admin</TabsTrigger>
             <TabsTrigger value="reports">Relatórios SaaS</TabsTrigger>
@@ -168,8 +168,6 @@ const MasterAdminPage = () => {
               totalUsersCount={totalUsersCount} 
               activeMembersCount={activeMembersCount} 
             />
-            <MasterAdminServerStatus />
-            <MasterAdminWebPerformanceInsights />
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">
@@ -264,6 +262,10 @@ const MasterAdminPage = () => {
                 isLoading={isLoading}
               />
             </Card>
+          </TabsContent>
+
+          <TabsContent value="plans" className="space-y-6">
+            <SubscriptionPlanManagement />
           </TabsContent>
 
           <TabsContent value="database" className="space-y-6">

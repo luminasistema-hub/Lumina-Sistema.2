@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
 import { useChurchStore, Church } from '../../stores/churchStore';
 import { Key, Mail, RefreshCw, Loader2, Users, Shield, AlertTriangle, Save, Server, Cpu, HardDrive, Wifi, Database, Trash2 } from 'lucide-react';
+import PaymentIntegrationSettings from './PaymentIntegrationSettings';
 
 interface AdminToolsTabProps {
   churches: Church[];
@@ -365,7 +366,8 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch 
         </CardContent>
       </Card>
 
-      {/* Outras ferramentas de administração podem ser adicionadas aqui */}
+      <PaymentIntegrationSettings />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

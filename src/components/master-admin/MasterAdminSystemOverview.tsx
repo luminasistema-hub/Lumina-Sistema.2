@@ -1,31 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
-import { 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle, 
-  Users, 
-  BookOpen, 
-  Calendar, 
-  DollarSign,
-  Heart,
-  TestTube,
-  Baby,
-  Church,
-  Settings,
-  Mic,
-  Database,
-  Server,
-  Shield,
-  Activity,
-  Zap,
-  Globe,
-  HardDrive,
-  Cpu,
-  Wifi
-} from 'lucide-react';
+import { Users, DollarSign, Activity, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { supabase } from '../../integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface MasterAdminSystemOverviewProps {
   totalUsersCount: number;
@@ -33,147 +11,49 @@ interface MasterAdminSystemOverviewProps {
 }
 
 const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ totalUsersCount, activeMembersCount }) => {
+  const [totalTransactions, setTotalTransactions] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSystemMetrics = async () => {
+      setIsLoading(true);
+      try {
+        const { count, error } = await supabase
+          .from('transacoes_financeiras')
+          .select('*', { count: 'exact', head: true });
+
+        if (error) throw error;
+        setTotalTransactions(count || 0);
+      } catch (error: any) {
+        console.error('Error fetching system metrics:', error);
+        toast.error('Erro ao carregar métricas do sistema.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSystemMetrics();
+  }, []);
+
   const modules = [
-    {
-      name: 'Autenticação e Usuários',
-      icon: <Users className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '99.9%',
-      lastUpdate: '2025-09-24',
-      features: ['8 tipos de usuário', 'Sistema de permissões', 'Login seguro', 'Gestão de sessões']
-    },
-    {
-      name: 'Área Pessoal',
-      icon: <Heart className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '99.8%',
-      lastUpdate: '2025-09-24',
-      features: ['Informações pessoais', 'Jornada do membro', 'Perfil completo', 'Formulário eclesiástico']
-    },
-    {
-      name: 'Teste Vocacional',
-      icon: <TestTube className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '100%',
-      lastUpdate: '2025-09-24',
-      features: ['40 perguntas', '8 ministérios', 'Resultado automático', 'Histórico completo']
-    },
-    {
-      name: 'Crescimento Espiritual',
-      icon: <BookOpen className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '99.7%',
-      lastUpdate: '2025-09-24',
-      features: ['Eventos completos', 'Cursos EAD', 'Devocionais blog', 'Sistema de inscrições']
-    },
-    {
-      name: 'Sistema Financeiro',
-      icon: <DollarSign className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '99.9%',
-      lastUpdate: '2025-09-24',
-      features: ['Transações completas', 'Orçamentos', 'Relatórios', 'Metas financeiras', 'Recibos automáticos']
-    },
-    {
-      name: 'Gestão de Eventos',
-      icon: <Calendar className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '99.6%',
-      lastUpdate: '2025-09-24',
-      features: ['Criação de eventos', 'Inscrições online', 'Controle de presença', 'Gestão de capacidade']
-    },
-    {
-      name: 'Módulo Kids',
-      icon: <Baby className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '99.8%',
-      lastUpdate: '2025-09-24',
-      features: ['Cadastro completo', 'Check-in seguro', 'Informações médicas', 'Contatos de emergência']
-    },
-    {
-      name: 'Gestão de Membros',
-      icon: <Church className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '99.9%',
-      lastUpdate: '2025-09-24',
-      features: ['CRUD completo', 'Relatórios avançados', 'Histórico espiritual', 'Estatísticas detalhadas']
-    },
-    {
-      name: 'Gestão de Ministérios',
-      icon: <Users className="w-4 h-4" />,
-      progress: 100,
-      status: 'Completo',
-      color: 'green',
-      uptime: '99.7%',
-      lastUpdate: '2025-09-24',
-      features: ['Criação de ministérios', 'Escalas automáticas', 'Gestão de voluntários', 'Metas ministeriais']
-    },
-    {
-      name: 'Mídia e Transmissão',
-      icon: <Mic className="w-4 h-4" />,
-      progress: 85,
-      status: 'Em Desenvolvimento',
-      color: 'yellow',
-      uptime: '95.0%',
-      lastUpdate: '2025-09-20',
-      features: ['Estrutura base criada', 'Interface preparada', 'Integração com YouTube', 'Sistema de streaming']
-    },
-    {
-      name: 'Gestão de Site',
-      icon: <Globe className="w-4 h-4" />,
-      progress: 75,
-      status: 'Em Desenvolvimento',
-      color: 'blue',
-      uptime: '90.0%',
-      lastUpdate: '2025-09-18',
-      features: ['CMS básico', 'Editor de conteúdo', 'Gestão de páginas', 'SEO otimizado']
-    },
-    {
-      name: 'Configurações Avançadas',
-      icon: <Settings className="w-4 h-4" />,
-      progress: 80,
-      status: 'Básico',
-      color: 'blue',
-      uptime: '98.5%',
-      lastUpdate: '2025-09-24',
-      features: ['Configurações básicas', 'Backup automático', 'Logs do sistema', 'Monitoramento']
-    }
+    { name: 'Autenticação e Usuários', progress: 100, status: 'complete' },
+    { name: 'Área Pessoal', progress: 100, status: 'complete' },
+    { name: 'Teste Vocacional', progress: 100, status: 'complete' },
+    { name: 'Crescimento Espiritual', progress: 100, status: 'complete' },
+    { name: 'Sistema Financeiro', progress: 100, status: 'complete' },
+    { name: 'Gestão de Eventos', progress: 100, status: 'complete' },
+    { name: 'Módulo Kids', progress: 100, status: 'complete' },
+    { name: 'Gestão de Membros', progress: 100, status: 'complete' },
+    { name: 'Gestão de Ministérios', progress: 100, status: 'complete' },
+    { name: 'Mídia e Transmissão', progress: 85, status: 'development' },
+    { name: 'Gestão de Site', progress: 75, status: 'development' },
+    { name: 'Configurações Avançadas', progress: 80, status: 'basic' },
   ];
 
-  // Métricas que podem ser dinâmicas ou simuladas
-  const systemMetrics = {
-    totalUsers: totalUsersCount, // Agora dinâmico
-    activeUsers: activeMembersCount, // Agora dinâmico
-    totalTransactions: 1543, // Simulado - requer tabela de transações
-    systemUptime: '99.7%', // Hardcoded - métrica de infraestrutura
-    lastBackup: '2025-09-24 03:00:00', // Hardcoded - métrica de infraestrutura
-    databaseSize: '245 MB', // Hardcoded - métrica de infraestrutura
-    storageUsed: '1.2 GB', // Hardcoded - métrica de infraestrutura
-    apiCalls: '45,231', // Hardcoded - métrica de infraestrutura
-    errorRate: '0.03%' // Hardcoded - métrica de infraestrutura
-  };
-
   const overallProgress = Math.round(modules.reduce((sum, module) => sum + module.progress, 0) / modules.length);
+  const completedModules = modules.filter(m => m.status === 'complete').length;
 
   return (
     <>
-      {/* System Overview */}
       <Card className="border-2 border-green-200 bg-gradient-to-r from-green-50 to-blue-50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl">
@@ -181,7 +61,7 @@ const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ t
             Visão Geral do Sistema
           </CardTitle>
           <CardDescription className="text-lg">
-            Status atual do Sistema Connect Vida - Versão SaaS
+            Status atual do Sistema Lumina - Versão SaaS
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -192,7 +72,7 @@ const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ t
             </div>
             <div className="text-center p-4 bg-white rounded-lg border">
               <div className="text-2xl md:text-3xl font-bold text-blue-600">
-                {modules.filter(m => m.status === 'Completo').length}
+                {completedModules}
               </div>
               <div className="text-sm text-gray-600">Módulos Completos</div>
             </div>
@@ -201,7 +81,7 @@ const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ t
               <div className="text-sm text-gray-600">Tipos de Usuário</div>
             </div>
             <div className="text-center p-4 bg-white rounded-lg border">
-              <div className="text-2xl md:text-3xl font-bold text-orange-600">{systemMetrics.totalUsers}</div>
+              <div className="text-2xl md:text-3xl font-bold text-orange-600">{totalUsersCount}</div>
               <div className="text-sm text-gray-600">Usuários Totais</div>
             </div>
           </div>
@@ -213,34 +93,23 @@ const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ t
         </CardContent>
       </Card>
 
-      {/* System Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
             <Users className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-            <div className="text-xl font-bold">{systemMetrics.activeUsers}</div>
-            <div className="text-sm text-gray-600">Usuários Ativos (Membros)</div>
+            <div className="text-xl font-bold">{activeMembersCount}</div>
+            <div className="text-sm text-gray-600">Membros Ativos no Sistema</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <DollarSign className="w-8 h-8 text-green-500 mx-auto mb-2" />
-            <div className="text-xl font-bold">{systemMetrics.totalTransactions}</div>
-            <div className="text-sm text-gray-600">Transações (Simulado)</div> {/* Adicionado (Simulado) */}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Zap className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-            <div className="text-xl font-bold">{systemMetrics.systemUptime}</div>
-            <div className="text-sm text-gray-600">Uptime Geral (Hardcoded)</div> {/* Adicionado (Hardcoded) */}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Database className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-            <div className="text-xl font-bold">{systemMetrics.databaseSize}</div>
-            <div className="text-sm text-gray-600">Banco de Dados (Hardcoded)</div> {/* Adicionado (Hardcoded) */}
+            {isLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+            ) : (
+              <div className="text-xl font-bold">{totalTransactions}</div>
+            )}
+            <div className="text-sm text-gray-600">Transações Registradas</div>
           </CardContent>
         </Card>
       </div>
