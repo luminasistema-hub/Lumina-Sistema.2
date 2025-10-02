@@ -153,7 +153,7 @@ const FinancialPanel = () => {
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
   const [newTransaction, setNewTransaction] = useState({
-    tipo: 'Entrada' as const,
+    tipo: 'Entrada' as 'Entrada' | 'Saída',
     categoria: '',
     subcategoria: '',
     valor: 0,
@@ -366,7 +366,7 @@ const FinancialPanel = () => {
       toast.success('Transação adicionada com sucesso!')
       setIsAddTransactionOpen(false)
       setNewTransaction({
-        tipo: 'Entrada', categoria: undefined, subcategoria: undefined, valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
         descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
       })
       loadFinancialData()
@@ -415,7 +415,7 @@ const FinancialPanel = () => {
       setIsEditTransactionOpen(false)
       setTransactionToEdit(null)
       setNewTransaction({
-        tipo: 'Entrada', categoria: undefined, subcategoria: undefined, valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
         descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
       })
       loadFinancialData()

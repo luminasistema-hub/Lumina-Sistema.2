@@ -69,7 +69,7 @@ const OfferingsPage = () => {
 
   const [newContribution, setNewContribution] = useState({
     valor: 0,
-    tipo: 'Oferta' as Contribution['categoria'], // Usar categoria aqui
+    categoria: 'Ofertas' as Contribution['categoria'], // Usar categoria aqui
     metodo_pagamento: 'PIX' as Contribution['metodo_pagamento'],
     observacoes: '',
     campanha: '' // Adicionado campo de campanha
@@ -137,11 +137,11 @@ const OfferingsPage = () => {
         .insert({
           id_igreja: currentChurchId,
           tipo: 'Entrada',
-          categoria: newContribution.tipo,
+          categoria: newContribution.categoria,
           subcategoria: newContribution.campanha || null,
           valor: newContribution.valor,
           data_transacao: new Date().toISOString().split('T')[0],
-          descricao: `${newContribution.tipo} de ${user.name}`,
+          descricao: `${newContribution.categoria} de ${user.name}`,
           metodo_pagamento: newContribution.metodo_pagamento,
           responsavel: user.name,
           status: 'Pendente',
@@ -179,7 +179,7 @@ const OfferingsPage = () => {
               mensagem: `${user.name} realizou uma contribuição de R$ ${newContribution.valor.toFixed(2)} que aguarda aprovação.`,
               transaction_id: transactionData.id,
               valor: newContribution.valor,
-              categoria: newContribution.tipo,
+              categoria: newContribution.categoria,
               data: new Date().toISOString()
             }
           })
@@ -191,7 +191,7 @@ const OfferingsPage = () => {
       setIsContributeDialogOpen(false)
       setNewContribution({
         valor: 0,
-        tipo: 'Oferta',
+        categoria: 'Ofertas',
         metodo_pagamento: 'PIX',
         observacoes: '',
         campanha: ''
@@ -434,7 +434,7 @@ const OfferingsPage = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="tipo">Tipo de Contribuição</Label>
-                  <Select value={newContribution.tipo} onValueChange={(value) => setNewContribution({...newContribution, tipo: value})}>
+                  <Select value={newContribution.categoria} onValueChange={(value) => setNewContribution({...newContribution, categoria: value as Contribution['categoria']})}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
@@ -450,7 +450,7 @@ const OfferingsPage = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="metodo">Método de Pagamento</Label>
-                  <Select value={newContribution.metodo_pagamento} onValueChange={(value) => setNewContribution({...newContribution, metodo_pagamento: value})}>
+                  <Select value={newContribution.metodo_pagamento} onValueChange={(value) => setNewContribution({...newContribution, metodo_pagamento: value as Contribution['metodo_pagamento']})}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o método" />
                     </SelectTrigger>

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from 'sonner'
 import { User, UserRole, useAuthStore } from '../../stores/authStore' 
 import { useChurchStore } from '../../stores/churchStore' 
+import { supabase } from '../../integrations/supabase/client'
 import { 
   Users, 
   UserCheck, 

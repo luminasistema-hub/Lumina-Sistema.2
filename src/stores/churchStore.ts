@@ -30,7 +30,7 @@ export interface Church {
   updated_at?: string 
   valor_mensal_assinatura: number; // Novo campo
   data_proximo_pagamento?: string; // Novo campo
-  ultimo_pagamento_status: 'Pago' | 'Pendente' | 'Atrasado' | 'N/A'; // Novo campo
+  ultimo_pagamento_status: 'Pago' | 'Pendente' | 'Atrasado' | 'N/A' | 'Cancelado'; // Novo campo
   historico_pagamentos: PaymentRecord[]; // Novo campo
   link_pagamento_assinatura?: string; // Link de pagamento do MP
   subscription_id_ext?: string; // ID da assinatura no MP
@@ -51,6 +51,7 @@ interface ChurchState {
   updateChurch: (churchId: string, updates: Partial<Church>) => Promise<Church | null>
   getChurchById: (churchId: string) => Church | undefined
   loadChurches: () => Promise<void>
+  addChurch: (newChurch: { name: string; subscriptionPlan: SubscriptionPlan; status: Church['status']; adminUserId: string | null; }) => Promise<Church | null>;
   getSubscriptionPlans: () => { label: string; value: SubscriptionPlan; memberLimit: number; monthlyValue: number }[]
   getPlanDetails: (planId: SubscriptionPlan) => { label: string; value: SubscriptionPlan; memberLimit: number; monthlyValue: number }
 }
@@ -111,6 +112,45 @@ export const useChurchStore = create<ChurchState>()(
           site: c.site,
           descricao: c.descricao,
         })) as Church[] });
+      },
+
+      addChurch: async (newChurch) => {
+        const planDetails = get().getPlanDetails(newChurch.subscriptionPlan);
+        const { data, error } = await supabase
+          .from('igrejas')
+          .insert({
+            nome: newChurch.name,
+            limite_membros: planDetails.memberLimit,
+            status: newChurch.status,
+            admin_user_id: newChurch.adminUserId,
+            valor_mensal_assinatura: planDetails.monthlyValue,
+            ultimo_pagamento_status: 'Pendente',
+          })
+          .select('*, plano:planos_assinatura(nome)')
+          .single();
+
+        if (error) {
+          console.error('churchStore: Error adding church:', error);
+          return null;
+        }
+
+        const addedChurch: Church = {
+          id: data.id,
+          name: data.nome,
+          subscriptionPlanName: Array.isArray(data.plano) ? data.plano[0]?.nome : data.plano?.nome || 'N/A',
+          plano_id: data.plano_id,
+          memberLimit: data.limite_membros,
+          currentMembers: data.membros_atuais,
+          status: data.status,
+          created_at: data.criado_em,
+          adminUserId: data.admin_user_id,
+          valor_mensal_assinatura: data.valor_mensal_assinatura,
+          ultimo_pagamento_status: data.ultimo_pagamento_status,
+          historico_pagamentos: [],
+        };
+
+        set((state) => ({ churches: [...state.churches, addedChurch] }));
+        return addedChurch;
       },
 
       updateChurch: async (churchId, updates) => {
@@ -206,11 +246,6 @@ export const useChurchStore = create<ChurchState>()(
     {
       name: 'connect-vida-churches',
       partialize: (state) => ({}), 
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          get().loadChurches();
-        }
-      },
     }
   )
 )

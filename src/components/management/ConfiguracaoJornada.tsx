@@ -17,6 +17,7 @@ import { SortablePassoItem } from './SortablePassoItem';
 
 interface QuizPergunta {
   id?: string; // Opcional para novas perguntas
+  passo_id?: string;
   ordem: number;
   pergunta_texto: string;
   opcoes: string[];

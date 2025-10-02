@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 // Interfaces duplicadas de MemberJourney para uso no hook
 interface QuizPergunta {
   id?: string;
+  passo_id?: string;
   ordem: number;
   pergunta_texto: string;
   opcoes: string[];

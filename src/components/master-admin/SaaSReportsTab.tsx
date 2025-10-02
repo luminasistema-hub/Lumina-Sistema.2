@@ -8,7 +8,7 @@ import { Checkbox } from '../ui/checkbox';
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
 import { useChurchStore, Church } from '../../stores/churchStore';
-import { FileText, Download, BarChart3, RefreshCw, Loader2, Calendar, Users, DollarSign, TrendingUp, Clock } from 'lucide-react';
+import { FileText, Download, BarChart3, RefreshCw, Loader2, Calendar, Users, DollarSign, TrendingUp, Clock, History as HistoryIcon } from 'lucide-react';
 
 interface SaaSReportData {
   id: string;
@@ -205,7 +205,7 @@ const SaaSReportsTab: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <History className="w-5 h-5 text-blue-500" />
+            <HistoryIcon className="w-5 h-5 text-blue-500" />
             Histórico de Relatórios ({reports.length})
           </CardTitle>
           <CardDescription>

@@ -4,18 +4,20 @@ import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 import { Gauge, TrendingUp, Users, Clock, CheckCircle, AlertTriangle } from 'lucide-react'; // Removido Speedometer, mantido Gauge
 
+type MetricStatus = 'good' | 'average' | 'poor';
+
 const MasterAdminWebPerformanceInsights: React.FC = () => {
   // Dados fictícios para simular métricas de performance web
   const webMetrics = {
-    lcp: { value: 2.2, unit: 's', threshold: 2.5, status: 'good' }, // Largest Contentful Paint
-    fid: { value: 50, unit: 'ms', threshold: 100, status: 'good' }, // First Input Delay
-    cls: { value: 0.08, unit: '', threshold: 0.1, status: 'good' }, // Cumulative Layout Shift
-    pageLoadTime: { value: 3.5, unit: 's', threshold: 4.0, status: 'average' },
-    bounceRate: { value: 35, unit: '%', threshold: 40, status: 'good' },
-    totalPageViews: { value: '150k', status: 'good' },
+    lcp: { value: 2.2, unit: 's', threshold: 2.5, status: 'good' as MetricStatus }, // Largest Contentful Paint
+    fid: { value: 50, unit: 'ms', threshold: 100, status: 'good' as MetricStatus }, // First Input Delay
+    cls: { value: 0.08, unit: '', threshold: 0.1, status: 'good' as MetricStatus }, // Cumulative Layout Shift
+    pageLoadTime: { value: 3.5, unit: 's', threshold: 4.0, status: 'average' as MetricStatus },
+    bounceRate: { value: 35, unit: '%', threshold: 40, status: 'good' as MetricStatus },
+    totalPageViews: { value: '150k', status: 'good' as MetricStatus },
   };
 
-  const getStatusBadge = (status: 'good' | 'average' | 'poor') => {
+  const getStatusBadge = (status: MetricStatus) => {
     switch (status) {
       case 'good': return <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" /> Bom</Badge>;
       case 'average': return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" /> Médio</Badge>;
@@ -24,7 +26,7 @@ const MasterAdminWebPerformanceInsights: React.FC = () => {
     }
   };
 
-  const getProgressColor = (status: 'good' | 'average' | 'poor') => {
+  const getProgressColor = (status: MetricStatus) => {
     switch (status) {
       case 'good': return 'bg-green-500';
       case 'average': return 'bg-yellow-500';
@@ -84,7 +86,7 @@ const MasterAdminWebPerformanceInsights: React.FC = () => {
                 <Progress 
                   value={(webMetrics.pageLoadTime.threshold - webMetrics.pageLoadTime.value) / webMetrics.pageLoadTime.threshold * 100} 
                   className="w-1/2 h-2" 
-                  indicatorColor={getProgressColor(webMetrics.pageLoadTime.status)}
+                  indicatorClassName={getProgressColor(webMetrics.pageLoadTime.status)}
                 />
               </div>
             </CardContent>
@@ -100,7 +102,7 @@ const MasterAdminWebPerformanceInsights: React.FC = () => {
                 <Progress 
                   value={100 - webMetrics.bounceRate.value} 
                   className="w-1/2 h-2" 
-                  indicatorColor={getProgressColor(webMetrics.bounceRate.status)}
+                  indicatorClassName={getProgressColor(webMetrics.bounceRate.status)}
                 />
               </div>
             </CardContent>

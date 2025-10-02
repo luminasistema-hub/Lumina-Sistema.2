@@ -33,6 +33,7 @@ interface TrilhaCrescimento {
 
 interface QuizPergunta {
   id?: string;
+  passo_id?: string;
   ordem: number;
   pergunta_texto: string;
   opcoes: string[];

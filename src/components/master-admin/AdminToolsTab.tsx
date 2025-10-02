@@ -89,7 +89,7 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch 
 
     setIsSendingReset(true);
     try {
-      const { error } = await supabase.auth.admin.generatePasswordResetLink(selectedAdminEmail);
+      const { error } = await supabase.auth.resetPasswordForEmail(selectedAdminEmail);
 
       if (error) throw error;
 

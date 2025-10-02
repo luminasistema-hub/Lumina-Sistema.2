@@ -107,6 +107,7 @@ export const useAuthStore = create<AuthState>()(
               set({
                 user: {
                   id: session.user.id,
+                  name: superAdminProfile.nome_completo,
                   email: session.user.email!,
                   role: 'super_admin',
                   churchId: null,
@@ -154,6 +155,7 @@ export const useAuthStore = create<AuthState>()(
             set({
               user: {
                 id: session.user.id,
+                name: profile.nome_completo,
                 email: session.user.email!,
                 role: profile.funcao,
                 churchId: profile.id_igreja,
@@ -168,6 +170,7 @@ export const useAuthStore = create<AuthState>()(
             });
             console.log('AuthStore: User set:', {
               id: session.user.id,
+              name: profile.nome_completo,
               email: session.user.email!,
               role: profile.funcao,
               churchId: profile.id_igreja,
