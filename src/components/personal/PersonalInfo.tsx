@@ -521,7 +521,7 @@ const PersonalInfo = () => {
                     <SelectValue placeholder="Selecione seu estado civil" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="not_informed">Não informado</SelectItem>
+                    <SelectItem value="">Não informado</SelectItem>
                     <SelectItem value="solteiro">Solteiro(a)</SelectItem>
                     <SelectItem value="casado">Casado(a)</SelectItem>
                     <SelectItem value="divorciado">Divorciado(a)</SelectItem>
@@ -607,8 +607,8 @@ const PersonalInfo = () => {
                   <div className="space-y-2">
                     <Label htmlFor="conjugeId">Nome do Cônjuge</Label>
                     <Select
-                      value={formData.conjugeId || 'none_selected'} // Usar 'none_selected' como valor padrão para o Select
-                      onValueChange={(value) => handleInputChange('conjugeId', value === 'none_selected' ? null : value)}
+                      value={formData.conjugeId || ''} // Changed from 'none_selected' to ''
+                      onValueChange={(value) => handleInputChange('conjugeId', value === '' ? null : value)} // Changed from 'none_selected' to ''
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o cônjuge (membro da igreja)" />
@@ -620,7 +620,7 @@ const PersonalInfo = () => {
                           onChange={(e) => setConjugeSearchTerm(e.target.value)}
                           className="mb-2"
                         />
-                        <SelectItem value="none_selected">Nenhum</SelectItem> 
+                        <SelectItem value="">Nenhum</SelectItem> 
                         {filteredConjugeOptions.map(member => (
                           <SelectItem key={member.id} value={member.id}>
                             {member.nome_completo} ({member.email})
@@ -692,7 +692,7 @@ const PersonalInfo = () => {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="not_informed">Não informado</SelectItem>
+                      <SelectItem value="">Não informado</SelectItem>
                       <SelectItem value="sim">Sim, ambos</SelectItem>
                       <SelectItem value="um">Apenas um</SelectItem>
                       <SelectItem value="nao">Não</SelectItem>
@@ -737,7 +737,7 @@ const PersonalInfo = () => {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="not_informed">Não informado</SelectItem>
+                      <SelectItem value="">Não informado</SelectItem>
                       <SelectItem value="primeiro-dia">É meu primeiro dia</SelectItem>
                       <SelectItem value="menos-1-mes">Menos de 1 mês</SelectItem>
                       <SelectItem value="1-3-meses">1 a 3 meses</SelectItem>
@@ -857,7 +857,7 @@ const PersonalInfo = () => {
               <p className="font-medium">{formData.batizado ? 'Sim' : 'Não'}</p>
             </div>
             <div>
-              <p className className="text-sm text-gray-500">Participa de Ministério</p>
+              <p className="text-sm text-gray-500">Participa de Ministério</p>
               <p className="font-medium">{formData.participaMinisterio ? 'Sim' : 'Não'}</p>
             </div>
           </CardContent>
