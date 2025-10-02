@@ -33,7 +33,7 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white">
+    <div className="max-w-2xl mx-auto p-6 bg-white print-area">
       <Card className="border-2 border-gray-300">
         <CardHeader className="text-center pb-6">
           <div className="space-y-2">

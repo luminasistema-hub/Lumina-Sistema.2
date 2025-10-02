@@ -13,6 +13,8 @@ import { Progress } from '../ui/progress'
 import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
+import { UnifiedReceiptDialog } from '../financial/UnifiedReceiptDialog'
+import { useChurchStore } from '../../stores/churchStore'
 import { 
   DollarSign, 
   TrendingUp, 
@@ -125,6 +127,7 @@ interface FinancialReport {
 
 const FinancialPanel = () => {
   const { user, currentChurchId } = useAuthStore()
+  const { getChurchById } = useChurchStore()
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [goals, setGoals] = useState<FinancialGoal[]>([])
@@ -145,6 +148,7 @@ const FinancialPanel = () => {
   const [viewMode, setViewMode] = useState<'dashboard' | 'transactions' | 'budget' | 'goals' | 'reports'>('dashboard')
   const [loadingData, setLoadingData] = useState(true)
   const [pendingNotifications, setPendingNotifications] = useState<any[]>([])
+  const [receiptTransaction, setReceiptTransaction] = useState<FinancialTransaction | null>(null)
 
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
@@ -302,6 +306,33 @@ const FinancialPanel = () => {
   useEffect(() => {
     loadFinancialData()
   }, [loadFinancialData])
+
+  const markReceiptAsIssued = async (transactionId: string) => {
+    if (!canManageFinancial) {
+      toast.error('Você não tem permissão para emitir recibos.')
+      return
+    }
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({ recibo_emitido: true })
+        .eq('id', transactionId)
+
+      if (error) {
+        console.error('Error marking receipt as issued:', error)
+        toast.error('Erro ao marcar recibo como emitido: ' + error.message)
+        return
+      }
+      toast.success('Recibo marcado como emitido!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Unexpected error marking receipt:', error.message)
+      toast.error('Erro inesperado ao marcar recibo.')
+    } finally {
+      setLoadingData(false)
+    }
+  }
 
   const handleAddTransaction = async () => {
     if (!newTransaction.categoria || !newTransaction.valor || !newTransaction.descricao || !currentChurchId) {
@@ -509,30 +540,7 @@ const FinancialPanel = () => {
       toast.error('Recibos só podem ser gerados para entradas')
       return
     }
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
-    }
-
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .update({ recibo_emitido: true })
-        .eq('id', transaction.id)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) throw error
-      toast.success('Recibo marcado como emitido!')
-      // Aqui você pode adicionar a lógica para realmente gerar e baixar o PDF do recibo
-      // Por exemplo, chamar uma função de Edge Function ou um serviço externo.
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error generating receipt:', error.message)
-      toast.error('Erro ao gerar recibo: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    setReceiptTransaction(transaction)
   }
 
   const handleAddBudget = async () => {
@@ -1474,15 +1482,14 @@ const FinancialPanel = () => {
                           Aprovar
                         </Button>
                       )}
-                      {transaction.tipo === 'Entrada' && (
+                      {transaction.tipo === 'Entrada' && transaction.status === 'Confirmado' && (
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => generateReceipt(transaction)}
-                          disabled={transaction.recibo_emitido}
                         >
                           <Receipt className="w-4 h-4 mr-2" />
-                          {transaction.recibo_emitido ? 'Recibo Emitido' : 'Gerar Recibo'}
+                          {transaction.recibo_emitido ? 'Ver Recibo' : 'Emitir Recibo'}
                         </Button>
                       )}
                       <Button variant="outline" size="sm">
@@ -2207,102 +2214,15 @@ const FinancialPanel = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Goal Dialog */}
-      <Dialog open={isEditGoalOpen} onOpenChange={setIsEditGoalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Editar Meta Financeira</DialogTitle>
-            <DialogDescription>
-              Edite os detalhes da meta selecionada
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-goal-nome">Nome da Meta *</Label>
-              <Input
-                id="edit-goal-nome"
-                value={newGoal.nome}
-                onChange={(e) => setNewGoal({...newGoal, nome: e.target.value})}
-                placeholder="Ex: Reforma do Templo"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-goal-valor_meta">Valor da Meta (R$) *</Label>
-              <Input
-                id="edit-goal-valor_meta"
-                type="number"
-                step="0.01"
-                value={newGoal.valor_meta || ''}
-                onChange={(e) => setNewGoal({...newGoal, valor_meta: parseFloat(e.target.value) || 0})}
-                placeholder="0,00"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-goal-data_limite">Data Limite *</Label>
-              <Input
-                id="edit-goal-data_limite"
-                type="date"
-                value={newGoal.data_limite}
-                onChange={(e) => setNewGoal({...newGoal, data_limite: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-goal-categoria">Categoria</Label>
-              <Select value={newGoal.categoria || ''} onValueChange={(value) => setNewGoal({...newGoal, categoria: value === 'null' ? '' : value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">Nenhum</SelectItem>
-                  {categoriesEntrada.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-goal-descricao">Descrição</Label>
-              <Textarea
-                id="edit-goal-descricao"
-                value={newGoal.descricao}
-                onChange={(e) => setNewGoal({...newGoal, descricao: e.target.value})}
-                placeholder="Descrição da meta"
-                rows={2}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-goal-status">Status</Label>
-              <Select value={newGoal.status} onValueChange={(value) => setNewGoal({...newGoal, status: value as FinancialGoal['status']})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Concluído">Concluído</SelectItem>
-                  <SelectItem value="Pausado">Pausado</SelectItem>
-                  <SelectItem value="Cancelado">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="edit-goal-campanha"
-                checked={newGoal.campanha_ativa}
-                onCheckedChange={(checked) => setNewGoal({...newGoal, campanha_ativa: checked as boolean})}
-              />
-              <Label htmlFor="edit-goal-campanha">Criar campanha de arrecadação</Label>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsEditGoalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleEditGoal}>
-                Salvar Alterações
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Unified Receipt Dialog */}
+      <UnifiedReceiptDialog
+        isOpen={!!receiptTransaction}
+        onOpenChange={(isOpen) => !isOpen && setReceiptTransaction(null)}
+        transaction={receiptTransaction}
+        church={currentChurchId ? getChurchById(currentChurchId) : null}
+        onMarkAsIssued={markReceiptAsIssued}
+        canManage={canManageFinancial}
+      />
     </div>
   )
 }

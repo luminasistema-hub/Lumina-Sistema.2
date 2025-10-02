@@ -11,7 +11,7 @@ import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
-import { ReceiptDialog } from './ReceiptDialog'
+import { UnifiedReceiptDialog } from '../financial/UnifiedReceiptDialog'
 import { 
   DollarSign, 
   CreditCard, 
@@ -59,7 +59,7 @@ const OfferingsPage = () => {
   const { getChurchById } = useChurchStore()
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
-  const [receiptData, setReceiptData] = useState<{ contribution: Contribution } | null>(null)
+  const [receiptTransaction, setReceiptTransaction] = useState<Contribution | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedType, setSelectedType] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -233,7 +233,11 @@ const OfferingsPage = () => {
   }
 
   const handleOpenReceipt = (contribution: Contribution) => {
-    setReceiptData({ contribution })
+    if (contribution.status !== 'Confirmado') {
+      toast.info('O recibo só estará disponível após a confirmação da contribuição pelo financeiro.')
+      return
+    }
+    setReceiptTransaction(contribution)
   }
 
   const getStatusColor = (status: Contribution['status']) => {
@@ -562,9 +566,10 @@ const OfferingsPage = () => {
                     variant="outline" 
                     size="sm"
                     onClick={() => handleOpenReceipt(contribution)}
+                    disabled={contribution.status !== 'Confirmado'}
                   >
                     <Receipt className="w-4 h-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Detalhes/Recibo</span>
+                    <span className="hidden sm:inline">Recibo</span>
                     <span className="sm:hidden">Recibo</span>
                   </Button>
                 </div>
@@ -590,12 +595,13 @@ const OfferingsPage = () => {
         </Card>
       )}
 
-      <ReceiptDialog
-        isOpen={!!receiptData}
-        onOpenChange={(isOpen) => !isOpen && setReceiptData(null)}
-        contribution={receiptData?.contribution ?? null}
+      <UnifiedReceiptDialog
+        isOpen={!!receiptTransaction}
+        onOpenChange={(isOpen) => !isOpen && setReceiptTransaction(null)}
+        transaction={receiptTransaction}
         church={currentChurch}
         onMarkAsIssued={markReceiptAsIssued}
+        canManage={canManageFinancial}
       />
     </div>
   )
