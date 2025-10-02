@@ -145,7 +145,8 @@ const PersonalInfo = () => {
     console.log('Personal info data received:', personalInfoRecord);
 
     if (personalInfoRecord) {
-      setFormData({
+      setFormData(prev => ({
+        ...prev,
         nomeCompleto: user.name, 
         dataNascimento: personalInfoRecord.data_nascimento || '',
         estadoCivil: personalInfoRecord.estado_civil || '',
@@ -155,7 +156,7 @@ const PersonalInfo = () => {
         endereco: personalInfoRecord.endereco || '',
         conjugeId: personalInfoRecord.conjuge_id || null,
         conjugeNome: personalInfoRecord.conjuge_profile?.nome_completo || '',
-        dataCasamento: personalInfoRecord.data_casamento || '', // Carrega o novo campo
+        dataCasamento: personalInfoRecord.data_casamento || '',
         paisCristaos: personalInfoRecord.pais_cristaos || '',
         tempoIgreja: personalInfoRecord.tempo_igreja || '',
         batizado: personalInfoRecord.batizado || false,
@@ -166,7 +167,7 @@ const PersonalInfo = () => {
         dataConversao: personalInfoRecord.data_conversao || '',
         diasDisponiveis: personalInfoRecord.dias_disponiveis || [],
         horariosDisponiveis: personalInfoRecord.horarios_disponiveis || ''
-      });
+      }));
     } else {
       setFormData(prev => ({ ...prev, nomeCompleto: user.name, email: user.email }));
     }
