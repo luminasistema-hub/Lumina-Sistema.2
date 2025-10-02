@@ -302,8 +302,6 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
     )
   }
 
-  const currentChurch = currentChurchId ? churches.find(c => c.id === currentChurchId) : null
-
   return (
     <div className={cn(
       "h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300",

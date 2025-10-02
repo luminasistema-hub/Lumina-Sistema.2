@@ -110,7 +110,7 @@ const MasterAdminWebPerformanceInsights: React.FC = () => {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4 text-center">
             <Users className="w-8 h-8 text-teal-500 mx-auto mb-2" />
-            <div className="text-xl font-bold">{webMetrics.totalPageViews}</div>
+            <div className="text-xl font-bold">{webMetrics.totalPageViews.value}</div>
             <div className="text-sm text-gray-600">Visualizações Totais de Página (30 dias)</div>
           </CardContent>
         </Card>
