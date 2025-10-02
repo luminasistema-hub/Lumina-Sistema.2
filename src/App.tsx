@@ -30,7 +30,7 @@ function App() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-church-blue-50 to-church-purple-50">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-church-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-church-blue-600 font-medium">Carregando Sistema Connect Vida...</p>
+          <p className="text-church-blue-600 font-medium">Carregando Lumina...</p>
         </div>
       </div>
     )

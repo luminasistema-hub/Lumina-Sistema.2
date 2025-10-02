@@ -311,17 +311,10 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-              <Church className="w-5 h-5 text-white" />
-            </div>
+            <img src="/favicon.ico" alt="Lumina Logo" className="h-8 w-8" />
             <div>
-              <h1 className="font-bold text-gray-900">Connect Vida</h1>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-gray-500">Sistema Multi-Igrejas</p>
-                <Badge className="bg-green-100 text-green-800 text-xs px-2 py-0.5">
-                  SaaS
-                </Badge>
-              </div>
+              <h1 className="font-bold text-gray-900">Lumina</h1>
+              <p className="text-xs text-gray-500">Sistema de Gestão</p>
             </div>
           </div>
         )}
@@ -477,10 +470,10 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
         <div className="p-4 border-t border-gray-100">
           <div className="text-center">
             <p className="text-xs text-gray-500">
-              Connect Vida v2.0 SaaS
+              Lumina - Sistema de Gestão
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              © 2025 Igreja Connect
+              © {new Date().getFullYear()} Lumina
             </p>
             <div className="flex items-center justify-center gap-2 mt-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
