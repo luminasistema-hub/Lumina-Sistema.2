@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
 import UserManagement from './UserManagement'
 import { useAuthStore } from '../../stores/authStore'
-import { useChurchStore } from '../../stores/churchStore'
+import { supabase } from '../../integrations/supabase/client'
 import { 
   Settings, 
   Church, 
@@ -51,7 +51,6 @@ interface ChurchSettingsData {
 
 const SystemSettings = () => {
   const { currentChurchId, user } = useAuthStore()
-  const { getChurchById, updateChurch, loadChurches } = useChurchStore() 
 
   const [churchSettings, setChurchSettings] = useState<ChurchSettingsData>({
     nome: 'Igreja Connect Vida',
@@ -87,68 +86,99 @@ const SystemSettings = () => {
   const [showApiKey, setShowApiKey] = useState(false)
 
   useEffect(() => {
-    loadChurches(); 
-  }, [loadChurches]);
+    const loadChurchFromDB = async () => {
+      if (currentChurchId) {
+        // Buscar dados básicos da igreja
+        const { data: church, error } = await supabase
+          .from('igrejas')
+          .select('id, nome, nome_responsavel, endereco, telefone_contato, cnpj, admin_user_id')
+          .eq('id', currentChurchId)
+          .maybeSingle()
 
-  useEffect(() => {
-    console.log('SystemSettings: currentChurchId changed:', currentChurchId);
-    if (currentChurchId) {
-      const church = getChurchById(currentChurchId);
-      if (church) {
-        const storedSettings = localStorage.getItem(`churchSettings-${currentChurchId}`);
-        if (storedSettings) {
-          setChurchSettings(JSON.parse(storedSettings));
-          console.log(`SystemSettings: Loaded settings for ${church.name} from localStorage.`);
-        } else {
-          setChurchSettings(prev => ({
-            ...prev,
-            nome: church.name,
-            endereco: church.address || '',
-            telefone: church.contactPhone || '',
-            email: church.contactEmail || '',
-            cnpj: church.cnpj || '',
-            pastor_principal: church.nome_responsavel || '', // Assuming nome_responsavel is pastor_principal
-            site: church.site || '', // Assuming 'site' is a field in Church
-            descricao: church.descricao || '', // Assuming 'descricao' is a field in Church
-          }));
-          console.log(`SystemSettings: Initialized settings for ${church.name} with default/store name.`);
+        if (error) {
+          console.warn('SystemSettings: erro ao buscar igreja no Supabase:', error.message)
         }
-      } else {
-        console.warn(`SystemSettings: Church with ID ${currentChurchId} not found in store.`);
-        setChurchSettings({
-          nome: 'Igreja Desconhecida',
-          endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
-        });
-      }
-    } else if (user?.role === 'super_admin') {
-      setChurchSettings(prev => ({ ...prev, nome: 'Painel Master - Configurações' }));
-    } else {
-      setChurchSettings({
-        nome: 'Nenhuma Igreja Selecionada',
-        endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
-      });
-    }
-  }, [currentChurchId, user?.role, getChurchById]); 
 
-  const handleSaveChurchSettings = () => {
+        if (church) {
+          // Email: tentar obter pelo admin_user_id (se existir) na tabela membros
+          let adminEmail: string | '' = ''
+          if (church.admin_user_id) {
+            const { data: adminProfile } = await supabase
+              .from('membros')
+              .select('email')
+              .eq('id', church.admin_user_id)
+              .maybeSingle()
+            adminEmail = adminProfile?.email || ''
+          }
+
+          // Carregar site/descrição do localStorage (pois não existem na tabela)
+          const localKey = `churchSettings-${currentChurchId}`
+          const localStored = localStorage.getItem(localKey)
+          const localExtra = localStored ? JSON.parse(localStored) : {}
+
+          setChurchSettings({
+            nome: church.nome || 'Igreja Desconhecida',
+            endereco: church.endereco || '',
+            telefone: church.telefone_contato || '',
+            email: localExtra.email || adminEmail || '',
+            cnpj: church.cnpj || '',
+            pastor_principal: church.nome_responsavel || '',
+            site: localExtra.site || '',
+            descricao: localExtra.descricao || ''
+          })
+          console.log(`SystemSettings: Dados carregados da tabela igrejas para ID ${currentChurchId}.`)
+        } else {
+          console.warn(`SystemSettings: Igreja com ID ${currentChurchId} não encontrada no banco.`)
+          setChurchSettings({
+            nome: 'Igreja Desconhecida',
+            endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
+          })
+        }
+      } else if (user?.role === 'super_admin') {
+        setChurchSettings(prev => ({ ...prev, nome: 'Painel Master - Configurações' }))
+      } else {
+        setChurchSettings({
+          nome: 'Nenhuma Igreja Selecionada',
+          endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
+        })
+      }
+    }
+
+    loadChurchFromDB()
+  }, [currentChurchId, user?.role])
+
+  const handleSaveChurchSettings = async () => {
     if (!currentChurchId) {
       toast.error('Nenhuma igreja selecionada para salvar as configurações.')
       return
     }
     console.log('Salvando configurações da igreja:', churchSettings)
-    localStorage.setItem(`churchSettings-${currentChurchId}`, JSON.stringify(churchSettings))
-    
-    updateChurch(currentChurchId, { 
-      name: churchSettings.nome,
-      address: churchSettings.endereco,
-      contactPhone: churchSettings.telefone,
-      contactEmail: churchSettings.email,
-      cnpj: churchSettings.cnpj,
-      nome_responsavel: churchSettings.pastor_principal, // Mapping to nome_responsavel
-      site: churchSettings.site, // Assuming 'site' is a field in Church
-      descricao: churchSettings.descricao, // Assuming 'descricao' is a field in Church
-    })
-    
+
+    // Atualizar campos existentes na tabela 'igrejas'
+    const { error } = await supabase
+      .from('igrejas')
+      .update({
+        nome: churchSettings.nome,
+        nome_responsavel: churchSettings.pastor_principal,
+        endereco: churchSettings.endereco,
+        telefone_contato: churchSettings.telefone,
+        cnpj: churchSettings.cnpj,
+      })
+      .eq('id', currentChurchId)
+
+    if (error) {
+      console.error('SystemSettings: erro ao atualizar igreja:', error.message)
+      toast.error('Erro ao salvar configurações da igreja.')
+      return
+    }
+
+    // Persistir campos extras locais (email, site, descricao) para manter preenchimento na UI
+    localStorage.setItem(`churchSettings-${currentChurchId}`, JSON.stringify({
+      email: churchSettings.email,
+      site: churchSettings.site,
+      descricao: churchSettings.descricao
+    }))
+
     toast.success('Configurações da igreja salvas com sucesso!')
   }
 
