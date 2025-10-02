@@ -177,7 +177,7 @@ const moduleCategories: ModuleCategory[] = [
         id: 'live-streaming',
         title: 'Transmissão ao Vivo',
         icon: <Mic className="w-4 h-4" />,
-        roles: ['pastor', 'admin', 'midia_tecnologia'],
+        roles: [], // desabilitado: não aparece para nenhum perfil
         status: 'development'
       }
     ]
@@ -191,7 +191,7 @@ const moduleCategories: ModuleCategory[] = [
         id: 'site-management',
         title: 'Gestão de Site',
         icon: <Globe className="w-4 h-4" />,
-        roles: ['admin', 'midia_tecnologia'],
+        roles: [], // desabilitado: não aparece para nenhum perfil
         status: 'development'
       },
       {
