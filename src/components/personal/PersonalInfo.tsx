@@ -118,8 +118,6 @@ const PersonalInfo = () => {
   const [userKids, setUserKids] = useState<Kid[]>([]); // Estado para armazenar os filhos do usuário
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false); // Estado para controlar o diálogo de adicionar filho
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]); // Para o seletor de cônjuge
-  const [conjugeSearchTerm, setConjugeSearchTerm] = useState('');
-  const [filteredConjugeOptions, setFilteredConjugeOptions] = useState<MemberOption[]>([]);
 
 
   const loadProfileAndKidsData = useCallback(async () => {
@@ -248,7 +246,6 @@ const PersonalInfo = () => {
 
       if (error) throw error;
       setMemberOptions(data as MemberOption[]);
-      setFilteredConjugeOptions(data as MemberOption[]);
     } catch (error: any) {
       console.error('Error loading member options:', error.message);
       toast.error('Erro ao carregar opções de membros: ' + error.message);
@@ -259,19 +256,6 @@ const PersonalInfo = () => {
     loadProfileAndKidsData();
     loadMemberOptions();
   }, [loadProfileAndKidsData, loadMemberOptions]);
-
-  useEffect(() => {
-    if (conjugeSearchTerm) {
-      setFilteredConjugeOptions(
-        memberOptions.filter(member =>
-          member.nome_completo.toLowerCase().includes(conjugeSearchTerm.toLowerCase()) ||
-          member.email.toLowerCase().includes(conjugeSearchTerm.toLowerCase())
-        )
-      );
-    } else {
-      setFilteredConjugeOptions(memberOptions);
-    }
-  }, [conjugeSearchTerm, memberOptions]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -614,14 +598,8 @@ const PersonalInfo = () => {
                         <SelectValue placeholder="Selecione o cônjuge (membro da igreja)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <Input
-                          placeholder="Buscar membro..."
-                          value={conjugeSearchTerm}
-                          onChange={(e) => setConjugeSearchTerm(e.target.value)}
-                          className="mb-2"
-                        />
                         <SelectItem value="null">Nenhum</SelectItem> 
-                        {filteredConjugeOptions.map(member => (
+                        {memberOptions.map(member => (
                           <SelectItem key={member.id} value={member.id}>
                             {member.nome_completo} ({member.email})
                           </SelectItem>
