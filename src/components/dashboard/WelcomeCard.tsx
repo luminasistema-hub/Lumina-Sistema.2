@@ -1,24 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../../stores/authStore';
-import { useChurchStore } from '../../stores/churchStore';
 
 const WelcomeCard = () => {
-  const { user, currentChurchId } = useAuthStore();
-  const { getChurchById, loadChurches } = useChurchStore();
+  const { user } = useAuthStore();
   const [churchName, setChurchName] = useState('');
 
   useEffect(() => {
-    loadChurches();
-  }, [loadChurches]);
-
-  useEffect(() => {
-    if (currentChurchId) {
-      const church = getChurchById(currentChurchId);
-      setChurchName(church?.name || 'Sua Igreja');
-    } else {
-      setChurchName('Sua Igreja');
-    }
-  }, [currentChurchId, getChurchById]);
+    setChurchName(user?.churchName || '');
+  }, [user?.churchName]);
 
   if (!user) return null;
 

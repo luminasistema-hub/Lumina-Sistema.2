@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore, UserRole } from '../../stores/authStore'
-import { useChurchStore } from '../../stores/churchStore' 
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select' 
-import { Label } from '../ui/label' 
 import { 
   Users, 
   Calendar, 
@@ -31,7 +28,6 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Building,
   ClipboardList 
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
@@ -227,15 +223,8 @@ interface SidebarProps {
 const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['personal', 'management'])
-  const { user, setCurrentChurchId, currentChurchId } = useAuthStore()
-  const { churches, loadChurches } = useChurchStore()
+  const { user } = useAuthStore()
   const navigate = useNavigate()
-
-  useEffect(() => {
-    loadChurches()
-  }, [loadChurches])
-
-  if (!user) return null
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev => 
@@ -313,11 +302,6 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
     )
   }
 
-  const handleChurchSelect = (churchId: string) => {
-    setCurrentChurchId(churchId)
-    // No need to navigate to /dashboard here, as the App.tsx router handles it
-  }
-
   const currentChurch = currentChurchId ? churches.find(c => c.id === currentChurchId) : null
 
   return (
@@ -374,27 +358,6 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
           {user?.role === 'super_admin' && (
             <p className="text-xs text-gray-500 mt-2 truncate">👑 Painel Master</p>
           )}
-        </div>
-      )}
-
-      {/* Church Selector for Non-Super Admin */}
-      {user?.role !== 'super_admin' && !isCollapsed && (
-        <div className="p-4 border-b border-gray-100">
-          <Label htmlFor="church-selector" className="text-xs font-medium text-gray-600 mb-1 block">
-            Igreja Ativa
-          </Label>
-          <Select value={currentChurchId || ''} onValueChange={handleChurchSelect}>
-            <SelectTrigger id="church-selector" className="w-full">
-              <SelectValue placeholder="Selecione uma igreja" />
-            </SelectTrigger>
-            <SelectContent>
-              {churches.map(church => (
-                <SelectItem key={church.id} value={church.id}>
-                  {church.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       )}
 

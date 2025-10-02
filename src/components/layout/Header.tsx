@@ -1,5 +1,4 @@
 import { useAuthStore, UserRole } from '../../stores/authStore'
-import { useChurchStore } from '../../stores/churchStore' 
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { 
@@ -17,31 +16,13 @@ import {
   Users,
   Headphones,
   Heart,
-  Building
 } from 'lucide-react'
 import { Input } from '../ui/input'
 import { useState, useEffect } from 'react' 
 
 const Header = () => {
   const { user, logout } = useAuthStore()
-  const { getChurchById, loadChurches } = useChurchStore() 
   const [isDarkMode, setIsDarkMode] = useState(false)
-  const [currentChurchName, setCurrentChurchName] = useState('Nenhuma Igreja Selecionada')
-
-  useEffect(() => {
-    loadChurches() 
-  }, [loadChurches])
-
-  useEffect(() => {
-    if (user?.churchId) {
-      const church = getChurchById(user.churchId)
-      setCurrentChurchName(church?.name || 'Igreja Desconhecida')
-    } else if (user?.role === 'super_admin') {
-      setCurrentChurchName('Painel Master')
-    } else {
-      setCurrentChurchName('Nenhuma Igreja Selecionada')
-    }
-  }, [user?.churchId, user?.role, getChurchById])
 
   if (!user) return null
 
@@ -91,10 +72,8 @@ const Header = () => {
     <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex-1 max-w-xs md:max-w-md flex items-center gap-3">
-          <Building className="w-5 h-5 text-gray-500" />
-          <span className="font-semibold text-gray-800 truncate">{currentChurchName}</span>
           {user?.role !== 'super_admin' && (
-            <div className="relative flex-1 ml-4 hidden sm:block">
+            <div className="relative flex-1 hidden sm:block">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
                 placeholder="Pesquisar módulos, membros..."
