@@ -515,13 +515,13 @@ const PersonalInfo = () => {
                 <Label htmlFor="estadoCivil">Estado Civil</Label>
                 <Select 
                   value={formData.estadoCivil || ''} 
-                  onValueChange={(value) => handleInputChange('estadoCivil', value === 'not_informed' ? '' : value)}
+                  onValueChange={(value) => handleInputChange('estadoCivil', value === 'null' ? '' : value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione seu estado civil" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Não informado</SelectItem>
+                    <SelectItem value="null">Não informado</SelectItem>
                     <SelectItem value="solteiro">Solteiro(a)</SelectItem>
                     <SelectItem value="casado">Casado(a)</SelectItem>
                     <SelectItem value="divorciado">Divorciado(a)</SelectItem>
@@ -607,8 +607,8 @@ const PersonalInfo = () => {
                   <div className="space-y-2">
                     <Label htmlFor="conjugeId">Nome do Cônjuge</Label>
                     <Select
-                      value={formData.conjugeId || ''} // Changed from 'none_selected' to ''
-                      onValueChange={(value) => handleInputChange('conjugeId', value === '' ? null : value)} // Changed from 'none_selected' to ''
+                      value={formData.conjugeId || ''}
+                      onValueChange={(value) => handleInputChange('conjugeId', value === 'null' ? null : value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o cônjuge (membro da igreja)" />
@@ -620,7 +620,7 @@ const PersonalInfo = () => {
                           onChange={(e) => setConjugeSearchTerm(e.target.value)}
                           className="mb-2"
                         />
-                        <SelectItem value="">Nenhum</SelectItem> 
+                        <SelectItem value="null">Nenhum</SelectItem> 
                         {filteredConjugeOptions.map(member => (
                           <SelectItem key={member.id} value={member.id}>
                             {member.nome_completo} ({member.email})
@@ -686,13 +686,13 @@ const PersonalInfo = () => {
                   <Label htmlFor="paisCristaos">Seus pais são cristãos?</Label>
                   <Select 
                     value={formData.paisCristaos || ''} 
-                    onValueChange={(value) => handleInputChange('paisCristaos', value === 'not_informed' ? '' : value)}
+                    onValueChange={(value) => handleInputChange('paisCristaos', value === 'null' ? '' : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="">Não informado</SelectItem>
+                      <SelectItem value="null">Não informado</SelectItem>
                       <SelectItem value="sim">Sim, ambos</SelectItem>
                       <SelectItem value="um">Apenas um</SelectItem>
                       <SelectItem value="nao">Não</SelectItem>
@@ -731,13 +731,13 @@ const PersonalInfo = () => {
                   <Label htmlFor="tempoIgreja">Há quanto tempo frequenta a igreja?</Label>
                   <Select 
                     value={formData.tempoIgreja || ''} 
-                    onValueChange={(value) => handleInputChange('tempoIgreja', value === 'not_informed' ? '' : value)}
+                    onValueChange={(value) => handleInputChange('tempoIgreja', value === 'null' ? '' : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Não informado</SelectItem>
+                      <SelectItem value="null">Não informado</SelectItem>
                       <SelectItem value="primeiro-dia">É meu primeiro dia</SelectItem>
                       <SelectItem value="menos-1-mes">Menos de 1 mês</SelectItem>
                       <SelectItem value="1-3-meses">1 a 3 meses</SelectItem>

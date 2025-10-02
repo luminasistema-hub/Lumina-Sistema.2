@@ -443,13 +443,13 @@ const MinistriesPage = () => {
                     <Label htmlFor="lider_id">Líder do Ministério</Label>
                     <Select
                       value={newMinistry.lider_id || ''}
-                      onValueChange={(value) => setNewMinistry({...newMinistry, lider_id: value})}
+                      onValueChange={(value) => setNewMinistry({...newMinistry, lider_id: value === 'null' ? '' : value})}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um líder (opcional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Nenhum</SelectItem>
+                        <SelectItem value="null">Nenhum</SelectItem>
                         {memberOptions.map(member => (
                           <SelectItem key={member.id} value={member.id}>
                             {member.nome_completo} ({member.email})
@@ -733,13 +733,13 @@ const MinistriesPage = () => {
                 <Label htmlFor="edit-lider_id">Líder do Ministério</Label>
                 <Select
                   value={editMinistryData.lider_id || ''}
-                  onValueChange={(value) => setEditMinistryData({...editMinistryData, lider_id: value})}
+                  onValueChange={(value) => setEditMinistryData({...editMinistryData, lider_id: value === 'null' ? '' : value})}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um líder (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="null">Nenhum</SelectItem>
                     {memberOptions.map(member => (
                       <SelectItem key={member.id} value={member.id}>
                         {member.nome_completo} ({member.email})

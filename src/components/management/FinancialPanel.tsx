@@ -1201,12 +1201,12 @@ const FinancialPanel = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="categoria">Categoria *</Label>
-                        <Select value={newTransaction.categoria} onValueChange={(value) => setNewTransaction({...newTransaction, categoria: value, subcategoria: ''})}>
+                        <Select value={newTransaction.categoria || ''} onValueChange={(value) => setNewTransaction({...newTransaction, categoria: value === 'null' ? '' : value, subcategoria: ''})}>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione a categoria" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                            <SelectItem value="null">Nenhum</SelectItem>
                             {(newTransaction.tipo === 'Entrada' ? categoriesEntrada : categoriesSaida).map(cat => (
                               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                             ))}
@@ -1218,12 +1218,12 @@ const FinancialPanel = () => {
                     {newTransaction.categoria && subcategorias[newTransaction.categoria as keyof typeof subcategorias] && (
                       <div className="space-y-2">
                         <Label htmlFor="subcategoria">Subcategoria</Label>
-                        <Select value={newTransaction.subcategoria} onValueChange={(value) => setNewTransaction({...newTransaction, subcategoria: value})}>
+                        <Select value={newTransaction.subcategoria || ''} onValueChange={(value) => setNewTransaction({...newTransaction, subcategoria: value === 'null' ? '' : value})}>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione a subcategoria" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                            <SelectItem value="null">Nenhum</SelectItem>
                             {subcategorias[newTransaction.categoria as keyof typeof subcategorias]?.map(subcat => (
                               <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
                             ))}
@@ -1268,12 +1268,12 @@ const FinancialPanel = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="metodo">Método de Pagamento</Label>
-                        <Select value={newTransaction.metodo_pagamento} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value})}>
+                        <Select value={newTransaction.metodo_pagamento || ''} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value === 'null' ? '' : value})}>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione o método" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                            <SelectItem value="null">Nenhum</SelectItem>
                             {metodosPagamento.map(metodo => (
                               <SelectItem key={metodo} value={metodo}>{metodo}</SelectItem>
                             ))}
@@ -1552,12 +1552,12 @@ const FinancialPanel = () => {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="categoria">Categoria *</Label>
-                      <Select value={newBudget.categoria} onValueChange={(value) => setNewBudget({...newBudget, categoria: value, subcategoria: ''})}>
+                      <Select value={newBudget.categoria || ''} onValueChange={(value) => setNewBudget({...newBudget, categoria: value === 'null' ? '' : value, subcategoria: ''})}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a categoria" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                          <SelectItem value="null">Nenhum</SelectItem>
                           {categoriesSaida.map(cat => (
                             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                           ))}
@@ -1567,12 +1567,12 @@ const FinancialPanel = () => {
                     {newBudget.categoria && subcategorias[newBudget.categoria as keyof typeof subcategorias] && (
                       <div className="space-y-2">
                         <Label htmlFor="subcategoria">Subcategoria</Label>
-                        <Select value={newBudget.subcategoria} onValueChange={(value) => setNewBudget({...newBudget, subcategoria: value})}>
+                        <Select value={newBudget.subcategoria || ''} onValueChange={(value) => setNewBudget({...newBudget, subcategoria: value === 'null' ? '' : value})}>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione a subcategoria" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                            <SelectItem value="null">Nenhum</SelectItem>
                             {subcategorias[newBudget.categoria as keyof typeof subcategorias]?.map(subcat => (
                               <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
                             ))}
@@ -1771,12 +1771,12 @@ const FinancialPanel = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="categoria">Categoria</Label>
-                      <Select value={newGoal.categoria} onValueChange={(value) => setNewGoal({...newGoal, categoria: value})}>
+                      <Select value={newGoal.categoria || ''} onValueChange={(value) => setNewGoal({...newGoal, categoria: value === 'null' ? '' : value})}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione a categoria" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                          <SelectItem value="null">Nenhum</SelectItem>
                           {categoriesEntrada.map(cat => (
                             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                           ))}
@@ -2004,12 +2004,12 @@ const FinancialPanel = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-categoria">Categoria *</Label>
-                <Select value={newTransaction.categoria} onValueChange={(value) => setNewTransaction({...newTransaction, categoria: value, subcategoria: ''})}>
+                <Select value={newTransaction.categoria || ''} onValueChange={(value) => setNewTransaction({...newTransaction, categoria: value === 'null' ? '' : value, subcategoria: ''})}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                    <SelectItem value="null">Nenhum</SelectItem>
                     {(newTransaction.tipo === 'Entrada' ? categoriesEntrada : categoriesSaida).map(cat => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
@@ -2021,12 +2021,12 @@ const FinancialPanel = () => {
             {newTransaction.categoria && subcategorias[newTransaction.categoria as keyof typeof subcategorias] && (
               <div className="space-y-2">
                 <Label htmlFor="edit-subcategoria">Subcategoria</Label>
-                <Select value={newTransaction.subcategoria} onValueChange={(value) => setNewTransaction({...newTransaction, subcategoria: value})}>
+                <Select value={newTransaction.subcategoria || ''} onValueChange={(value) => setNewTransaction({...newTransaction, subcategoria: value === 'null' ? '' : value})}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a subcategoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                    <SelectItem value="null">Nenhum</SelectItem>
                     {subcategorias[newTransaction.categoria as keyof typeof subcategorias]?.map(subcat => (
                       <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
                     ))}
@@ -2071,12 +2071,12 @@ const FinancialPanel = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-metodo">Método de Pagamento</Label>
-                <Select value={newTransaction.metodo_pagamento} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value})}>
+                <Select value={newTransaction.metodo_pagamento || ''} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value === 'null' ? '' : value})}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o método" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                    <SelectItem value="null">Nenhum</SelectItem>
                     {metodosPagamento.map(metodo => (
                       <SelectItem key={metodo} value={metodo}>{metodo}</SelectItem>
                     ))}
@@ -2129,12 +2129,12 @@ const FinancialPanel = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-budget-categoria">Categoria *</Label>
-              <Select value={newBudget.categoria} onValueChange={(value) => setNewBudget({...newBudget, categoria: value, subcategoria: ''})}>
+              <Select value={newBudget.categoria || ''} onValueChange={(value) => setNewBudget({...newBudget, categoria: value === 'null' ? '' : value, subcategoria: ''})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                  <SelectItem value="null">Nenhum</SelectItem>
                   {categoriesSaida.map(cat => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
@@ -2144,12 +2144,12 @@ const FinancialPanel = () => {
             {newBudget.categoria && subcategorias[newBudget.categoria as keyof typeof subcategorias] && (
               <div className="space-y-2">
                 <Label htmlFor="edit-budget-subcategoria">Subcategoria</Label>
-                <Select value={newBudget.subcategoria} onValueChange={(value) => setNewBudget({...newBudget, subcategoria: value})}>
+                <Select value={newBudget.subcategoria || ''} onValueChange={(value) => setNewBudget({...newBudget, subcategoria: value === 'null' ? '' : value})}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a subcategoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem> {/* Adicionado */}
+                    <SelectItem value="null">Nenhum</SelectItem>
                     {subcategorias[newBudget.categoria as keyof typeof subcategorias]?.map(subcat => (
                       <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
                     ))}
@@ -2248,11 +2248,12 @@ const FinancialPanel = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-goal-categoria">Categoria</Label>
-              <Select value={newGoal.categoria} onValueChange={(value) => setNewGoal({...newGoal, categoria: value})}>
+              <Select value={newGoal.categoria || ''} onValueChange={(value) => setNewGoal({...newGoal, categoria: value === 'null' ? '' : value})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="null">Nenhum</SelectItem>
                   {categoriesEntrada.map(cat => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
