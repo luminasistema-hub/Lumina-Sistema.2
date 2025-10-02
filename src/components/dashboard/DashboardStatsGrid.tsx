@@ -2,37 +2,56 @@ import React from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardContent } from '../ui/card';
 import { Users, Calendar, BookOpen, DollarSign, Heart, TrendingUp } from 'lucide-react';
+import { useDashboardStats } from '../../hooks/useDashboardStats';
+import { Skeleton } from '../ui/skeleton';
 
 const DashboardStatsGrid = () => {
   const { user } = useAuthStore();
+  const { data: statsData, isLoading } = useDashboardStats();
 
   if (!user) return null;
 
   const isAdminOrPastor = user.role === 'admin' || user.role === 'pastor';
   const isFinancialRole = user.role === 'admin' || user.role === 'pastor' || user.role === 'financeiro';
 
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="border-0 shadow-sm">
+            <CardContent className="p-3 md:p-6">
+              <Skeleton className="h-6 w-3/4 mb-2" />
+              <Skeleton className="h-8 w-1/2 mb-2" />
+              <Skeleton className="h-4 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   const stats = isAdminOrPastor
     ? [
         {
           title: 'Membros Ativos',
-          value: '127',
-          change: '+5 novos membros',
+          value: statsData?.activeMembers?.toString() || '0',
+          change: 'membros na igreja',
           icon: <Users className="w-5 h-5" />,
           color: 'text-blue-600',
           bgColor: 'bg-blue-50',
         },
         {
           title: 'Eventos Próximos',
-          value: '3',
-          change: '+2 esta semana',
+          value: statsData?.upcomingEvents?.toString() || '0',
+          change: 'eventos agendados',
           icon: <Calendar className="w-5 h-5" />,
           color: 'text-green-600',
           bgColor: 'bg-green-50',
         },
         {
           title: 'Cursos em Andamento',
-          value: '2',
-          change: '1 finalizado',
+          value: statsData?.activeCourses?.toString() || '0',
+          change: 'inscrições ativas',
           icon: <BookOpen className="w-5 h-5" />,
           color: 'text-purple-600',
           bgColor: 'bg-purple-50',
@@ -41,8 +60,8 @@ const DashboardStatsGrid = () => {
           ? [
               {
                 title: 'Ofertas do Mês',
-                value: 'R$ 2.450',
-                change: '+15% vs mês anterior',
+                value: `R$ ${statsData?.totalMonthlyOfferings?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`,
+                change: 'confirmadas este mês',
                 icon: <DollarSign className="w-5 h-5" />,
                 color: 'text-orange-600',
                 bgColor: 'bg-orange-50',
@@ -51,7 +70,7 @@ const DashboardStatsGrid = () => {
           : [
               {
                 title: 'Ministérios Ativos',
-                value: '8',
+                value: '8', // Placeholder
                 change: 'Todos funcionando',
                 icon: <Heart className="w-5 h-5" />,
                 color: 'text-orange-600',
@@ -62,7 +81,7 @@ const DashboardStatsGrid = () => {
     : [
         {
           title: 'Cursos Disponíveis',
-          value: '12',
+          value: '12', // Placeholder
           change: '3 novos cursos',
           icon: <BookOpen className="w-5 h-5" />,
           color: 'text-blue-600',
@@ -70,7 +89,7 @@ const DashboardStatsGrid = () => {
         },
         {
           title: 'Próximos Eventos',
-          value: '4',
+          value: statsData?.upcomingEvents?.toString() || '0',
           change: 'Esta semana',
           icon: <Calendar className="w-5 h-5" />,
           color: 'text-green-600',
@@ -78,7 +97,7 @@ const DashboardStatsGrid = () => {
         },
         {
           title: 'Devocionais',
-          value: '25',
+          value: '25', // Placeholder
           change: 'Novos este mês',
           icon: <Heart className="w-5 h-5" />,
           color: 'text-purple-600',
@@ -86,7 +105,7 @@ const DashboardStatsGrid = () => {
         },
         {
           title: 'Jornada Espiritual',
-          value: '75%',
+          value: '75%', // Placeholder
           change: 'Progresso atual',
           icon: <TrendingUp className="w-5 h-5" />,
           color: 'text-orange-600',

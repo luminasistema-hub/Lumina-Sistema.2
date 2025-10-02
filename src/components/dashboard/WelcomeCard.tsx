@@ -24,7 +24,7 @@ const WelcomeCard = () => {
         {getGreeting()}, {user.name}! 👋
       </h1>
       <p className="text-blue-100 text-base md:text-lg">
-        Bem-vindo ao seu painel de controle do Connect Vida
+        Bem-vindo ao seu painel de controle da Lumina
       </p>
       {churchName && (
         <p className="text-blue-200 mt-2 text-sm md:text-base">
