@@ -276,7 +276,7 @@ const ConfiguracaoJornada = () => {
       tipo_passo: passo.tipo_passo,
       conteudo: passo.conteudo,
       ordem: passo.ordem,
-      quiz_perguntas: passo.tipo_passo === 'quiz' ? passo.quiz_perguntas : [],
+      quiz_perguntas: passo.tipo_passo === 'quiz' ? (passo.quiz_perguntas || []) : [],
     });
     setIsPassoModalOpen(true);
   };
@@ -290,32 +290,48 @@ const ConfiguracaoJornada = () => {
       toast.error('Título e tipo do passo são obrigatórios.');
       return;
     }
-    if (formPassoData.tipo_passo === 'quiz' && (!formPassoData.quiz_perguntas || formPassoData.quiz_perguntas.length === 0)) {
-      toast.error('Quizzes devem ter pelo menos uma pergunta.');
-      return;
-    }
-    if (formPassoData.tipo_passo === 'quiz') {
-      for (const q of formPassoData.quiz_perguntas!) {
-        if (!q.pergunta_texto || q.opcoes.length < 2 || q.resposta_correta === undefined || q.resposta_correta < 0 || q.resposta_correta >= q.opcoes.length) {
-          toast.error('Todas as perguntas do quiz devem ter texto, pelo menos 2 opções e uma resposta correta válida.');
+
+    let passoDataToSave = { ...formPassoData };
+
+    // Validação e limpeza de dados do Quiz
+    if (passoDataToSave.tipo_passo === 'quiz') {
+      const cleanedPerguntas = (passoDataToSave.quiz_perguntas || []).map(q => ({
+        ...q,
+        pergunta_texto: q.pergunta_texto.trim(),
+        opcoes: q.opcoes.map(opt => opt.trim()).filter(opt => opt !== ''),
+      })).filter(q => q.pergunta_texto);
+
+      if (cleanedPerguntas.length === 0) {
+        toast.error('Quizzes devem ter pelo menos uma pergunta com texto.');
+        return;
+      }
+
+      for (const q of cleanedPerguntas) {
+        if (q.opcoes.length < 2) {
+          toast.error(`A pergunta "${q.pergunta_texto}" deve ter pelo menos 2 opções válidas.`);
+          return;
+        }
+        if (q.resposta_correta === undefined || q.resposta_correta < 0 || q.resposta_correta >= q.opcoes.length) {
+          toast.error(`A pergunta "${q.pergunta_texto}" precisa de uma resposta correta selecionada.`);
           return;
         }
       }
+      passoDataToSave.quiz_perguntas = cleanedPerguntas;
     }
 
     setLoading(true);
     try {
       let passoId: string;
-      if (formPassoData.id) {
+      if (passoDataToSave.id) {
         // Atualizar passo existente
         const { data, error } = await supabase
           .from('passos_etapa')
           .update({
-            titulo: formPassoData.titulo,
-            tipo_passo: formPassoData.tipo_passo,
-            conteudo: formPassoData.conteudo,
+            titulo: passoDataToSave.titulo,
+            tipo_passo: passoDataToSave.tipo_passo,
+            conteudo: passoDataToSave.conteudo,
           })
-          .eq('id', formPassoData.id)
+          .eq('id', passoDataToSave.id)
           .select('id')
           .single();
         if (error) throw error;
@@ -329,9 +345,9 @@ const ConfiguracaoJornada = () => {
           .insert({
             id_etapa: etapaAtualParaPasso.id,
             ordem: novaOrdem,
-            titulo: formPassoData.titulo,
-            tipo_passo: formPassoData.tipo_passo,
-            conteudo: formPassoData.conteudo,
+            titulo: passoDataToSave.titulo,
+            tipo_passo: passoDataToSave.tipo_passo,
+            conteudo: passoDataToSave.conteudo,
           })
           .select('id')
           .single();
@@ -341,20 +357,20 @@ const ConfiguracaoJornada = () => {
       }
 
       // Lógica para salvar perguntas do quiz
-      if (formPassoData.tipo_passo === 'quiz' && formPassoData.quiz_perguntas) {
+      if (passoDataToSave.tipo_passo === 'quiz' && passoDataToSave.quiz_perguntas) {
         const { error: deleteError } = await supabase
           .from('quiz_perguntas')
           .delete()
           .eq('passo_id', passoId);
         if (deleteError) throw deleteError;
 
-        const perguntasToInsert = formPassoData.quiz_perguntas.map((q, index) => ({
+        const perguntasToInsert = passoDataToSave.quiz_perguntas.map((q, index) => ({
           passo_id: passoId,
           ordem: index + 1,
           pergunta_texto: q.pergunta_texto,
           opcoes: q.opcoes,
           resposta_correta: q.resposta_correta,
-          pontuacao: q.pontuacao,
+          pontuacao: q.pontuacao || 1,
         }));
 
         if (perguntasToInsert.length > 0) {
@@ -419,6 +435,7 @@ const ConfiguracaoJornada = () => {
           const { error } = await supabase.from('etapas_trilha').upsert(updates);
           if (error) throw error;
           toast.success('Ordem das etapas atualizada!');
+          await carregarJornadaCompleta();
         } catch (error: any) {
           console.error("Erro ao atualizar ordem das etapas:", error);
           toast.error('Erro ao salvar a nova ordem das etapas: ' + error.message);
@@ -450,6 +467,7 @@ const ConfiguracaoJornada = () => {
           const { error } = await supabase.from('passos_etapa').upsert(updates);
           if (error) throw error;
           toast.success('Ordem dos passos atualizada!');
+          await carregarJornadaCompleta();
         } catch (error: any) {
           console.error("Erro ao atualizar ordem dos passos:", error);
           toast.error('Erro ao salvar a nova ordem dos passos: ' + error.message);
@@ -471,7 +489,7 @@ const ConfiguracaoJornada = () => {
       quiz_perguntas: [...(prev.quiz_perguntas || []), {
         ordem: (prev.quiz_perguntas?.length || 0) + 1,
         pergunta_texto: '',
-        opcoes: ['', '', '', ''],
+        opcoes: ['', ''],
         resposta_correta: 0,
         pontuacao: 1,
       }]
@@ -503,6 +521,28 @@ const ConfiguracaoJornada = () => {
     }));
   };
 
+  const removeQuizOption = (qIndex: number, oIndex: number) => {
+    setFormPassoData(prev => {
+      const newQuestions = [...(prev.quiz_perguntas || [])];
+      const question = newQuestions[qIndex];
+      if (question.opcoes.length <= 2) {
+        toast.error('Uma pergunta deve ter no mínimo 2 opções.');
+        return prev;
+      }
+      const newOptions = question.opcoes.filter((_, i) => i !== oIndex);
+      
+      let newCorrectAnswer = question.resposta_correta;
+      if (oIndex < question.resposta_correta) {
+        newCorrectAnswer -= 1;
+      } else if (oIndex === question.resposta_correta) {
+        newCorrectAnswer = 0;
+      }
+
+      newQuestions[qIndex] = { ...question, opcoes: newOptions, resposta_correta: newCorrectAnswer };
+      return { ...prev, quiz_perguntas: newQuestions };
+    });
+  };
+
   if (!currentChurchId) {
     return (
       <div className="p-6 text-center text-gray-600">
@@ -511,7 +551,7 @@ const ConfiguracaoJornada = () => {
     );
   }
 
-  if (loading) {
+  if (loading && etapasAninhadas.length === 0) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
@@ -654,8 +694,8 @@ const ConfiguracaoJornada = () => {
             <Button variant="outline" onClick={() => setIsEtapaModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveEtapa}>
-              {etapaParaEditar ? 'Salvar Alterações' : 'Criar Etapa'}
+            <Button onClick={handleSaveEtapa} disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (etapaParaEditar ? 'Salvar Alterações' : 'Criar Etapa')}
             </Button>
           </div>
         </DialogContent>
@@ -688,8 +728,8 @@ const ConfiguracaoJornada = () => {
                   setFormPassoData(prev => ({
                     ...prev,
                     tipo_passo: value as PassoEtapa['tipo_passo'],
-                    conteudo: value === 'quiz' ? undefined : prev.conteudo,
-                    quiz_perguntas: value === 'quiz' ? (prev.quiz_perguntas || []) : undefined,
+                    conteudo: value === 'quiz' ? '' : prev.conteudo,
+                    quiz_perguntas: value === 'quiz' ? (prev.quiz_perguntas?.length ? prev.quiz_perguntas : []) : [],
                   }));
                 }}
               >
@@ -712,11 +752,12 @@ const ConfiguracaoJornada = () => {
             {formPassoData.tipo_passo !== 'quiz' && (
               <div className="space-y-2">
                 <Label htmlFor="passo-conteudo">Conteúdo (URL ou Texto)</Label>
-                <Input
+                <Textarea
                   id="passo-conteudo"
                   value={formPassoData.conteudo || ''}
                   onChange={(e) => setFormPassoData({...formPassoData, conteudo: e.target.value})}
-                  placeholder="Link para vídeo, PDF, ou texto adicional"
+                  placeholder="Link para vídeo, PDF, ou texto com instruções."
+                  rows={4}
                 />
               </div>
             )}
@@ -732,11 +773,11 @@ const ConfiguracaoJornada = () => {
                 </p>
                 
                 {(formPassoData.quiz_perguntas || []).map((q, qIndex) => (
-                  <Card key={qIndex} className="p-4 space-y-3 border-l-4 border-purple-200">
+                  <Card key={qIndex} className="p-4 space-y-3 border-l-4 border-purple-200 bg-white">
                     <div className="flex justify-between items-center">
                       <Label className="font-bold">Pergunta {qIndex + 1}</Label>
-                      <Button variant="destructive" size="sm" onClick={() => removeQuizQuestion(qIndex)}>
-                        <X className="w-4 h-4" />
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeQuizQuestion(qIndex)}>
+                        <X className="w-4 h-4 text-red-500" />
                       </Button>
                     </div>
                     <div className="space-y-2">
@@ -762,9 +803,12 @@ const ConfiguracaoJornada = () => {
                             name={`correct-option-${qIndex}`}
                             checked={q.resposta_correta === oIndex}
                             onChange={() => updateQuizQuestion(qIndex, 'resposta_correta', oIndex)}
-                            className="form-radio h-4 w-4 text-purple-600"
+                            className="form-radio h-4 w-4 text-purple-600 focus:ring-purple-500"
                           />
-                          <Label>Correta</Label>
+                          <Label htmlFor={`correct-option-${qIndex}`} className="text-xs">Correta</Label>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeQuizOption(qIndex, oIndex)}>
+                            <X className="w-3 h-3 text-gray-500" />
+                          </Button>
                         </div>
                       ))}
                       {q.opcoes.length < 5 && (
@@ -793,8 +837,8 @@ const ConfiguracaoJornada = () => {
             <Button variant="outline" onClick={() => setIsPassoModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSavePasso}>
-              {formPassoData.id ? 'Salvar Alterações' : 'Criar Passo'}
+            <Button onClick={handleSavePasso} disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (formPassoData.id ? 'Salvar Alterações' : 'Criar Passo')}
             </Button>
           </div>
         </DialogContent>
