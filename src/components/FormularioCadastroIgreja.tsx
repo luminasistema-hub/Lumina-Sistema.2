@@ -14,22 +14,14 @@ const validateCnpj = (cnpj: string) => {
   cnpj = cnpj.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
   if (cnpj.length !== 14) return false;
   // Validação básica de CNPJ (pode ser mais complexa)
-  return /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(cnpj) || /^\d{14}$/.test(cnpj);
-};
-
-const validateCpf = (cpf: string) => {
-  if (!cpf) return true; // Opcional, se for obrigatório, remover esta linha
-  cpf = cpf.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
-  if (cpf.length !== 11) return false;
-  // Validação básica de CPF (pode ser mais complexa)
-  return /^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(cpf) || /^\d{11}$/.test(cpf);
+  return true; // Simplificando para aceitar 14 dígitos
 };
 
 const validatePhone = (phone: string) => {
   if (!phone) return true; // Opcional, se for obrigatório, remover esta linha
   phone = phone.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
-  // Aceita 10 ou 11 dígitos (com ou sem DDD)
-  return /^\(\d{2}\)\s\d{4,5}-\d{4}$/.test(phone) || /^\d{10,11}$/.test(phone);
+  // Aceita 10 ou 11 dígitos
+  return phone.length >= 10 && phone.length <= 11;
 };
 
 const FormularioCadastroIgreja = () => {
@@ -42,25 +34,25 @@ const FormularioCadastroIgreja = () => {
   const [adminPassword, setAdminPassword] = useState('');
   const [selectedPlan, setSelectedPlan] = useState('');
   const [cnpj, setCnpj] = useState('');
-  const [cpfResponsavel, setCpfResponsavel] = useState('');
   const [telefoneContato, setTelefoneContato] = useState('');
   const [endereco, setEndereco] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const [subscriptionPlans, setSubscriptionPlans] = useState<{ value: string; label: string; monthlyValue: number }[]>([]);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<{ value: string; label: string; monthlyValue: number; memberLimit: number }[]>([]);
 
   useEffect(() => {
     const fetchPlans = async () => {
         const { data, error } = await supabase
             .from('planos_assinatura')
-            .select('id, nome, preco_mensal');
+            .select('id, nome, preco_mensal, limite_membros');
         
         if (data) {
             const formattedPlans = data.map(plan => ({
                 value: plan.id,
                 label: plan.nome,
-                monthlyValue: plan.preco_mensal
+                monthlyValue: plan.preco_mensal,
+                memberLimit: plan.limite_membros,
             }));
             setSubscriptionPlans(formattedPlans);
             
@@ -80,7 +72,7 @@ const FormularioCadastroIgreja = () => {
     setIsLoading(true);
 
     // Validações de campos obrigatórios
-    if (!churchName || !adminName || !adminEmail || !adminPassword || !selectedPlan || !cnpj || !cpfResponsavel || !telefoneContato || !endereco) {
+    if (!churchName || !adminName || !adminEmail || !adminPassword || !selectedPlan || !cnpj || !telefoneContato || !endereco) {
       toast.error('Por favor, preencha todos os campos obrigatórios.');
       setIsLoading(false);
       return;
@@ -93,12 +85,7 @@ const FormularioCadastroIgreja = () => {
 
     // Validações de formato
     if (!validateCnpj(cnpj)) {
-      toast.error('Por favor, insira um CNPJ válido.');
-      setIsLoading(false);
-      return;
-    }
-    if (!validateCpf(cpfResponsavel)) {
-      toast.error('Por favor, insira um CPF válido para o responsável.');
+      toast.error('Por favor, insira um CNPJ válido com 14 dígitos.');
       setIsLoading(false);
       return;
     }
@@ -108,29 +95,69 @@ const FormularioCadastroIgreja = () => {
       return;
     }
 
+    const planDetails = subscriptionPlans.find(p => p.value === selectedPlan);
+    if (!planDetails) {
+        toast.error('Plano de assinatura inválido. Por favor, recarregue a página.');
+        setIsLoading(false);
+        return;
+    }
+
+    let newChurchId: string | null = null;
+
     try {
-      const { data, error } = await supabase.auth.signUp({
+      // 1. Criar a igreja primeiro
+      const { data: churchData, error: churchError } = await supabase
+        .from('igrejas')
+        .insert({
+          nome: churchName,
+          cnpj: cnpj.replace(/[^\d]+/g, ''),
+          endereco: endereco,
+          telefone_contato: telefoneContato.replace(/[^\d]+/g, ''),
+          email: adminEmail,
+          nome_responsavel: adminName,
+          plano_id: selectedPlan,
+          status: 'pending',
+          valor_mensal_assinatura: planDetails.monthlyValue,
+          limite_membros: planDetails.memberLimit,
+          ultimo_pagamento_status: 'Pendente',
+        })
+        .select('id, nome')
+        .single();
+
+      if (churchError) {
+        if (churchError.message.includes('duplicate key value')) {
+          toast.error('Erro ao criar igreja: O CNPJ informado já está cadastrado.');
+        } else {
+          toast.error(`Erro ao criar igreja: ${churchError.message}`);
+        }
+        throw churchError;
+      }
+
+      newChurchId = churchData.id;
+
+      // 2. Criar o usuário administrador, que acionará o trigger handle_new_user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: adminEmail,
         password: adminPassword,
         options: {
           data: {
-            nome_igreja: churchName,
-            nome_completo_responsavel: adminName,
-            plano_id: selectedPlan,
+            full_name: adminName,
+            church_id: churchData.id,
+            church_name: churchData.nome,
             initial_role: 'admin',
-            cnpj: cnpj,
-            cpf_responsavel: cpfResponsavel,
-            telefone_contato: telefoneContato,
-            endereco: endereco,
           },
         },
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (authError) {
+        // Se o cadastro do usuário falhar, remove a igreja criada para evitar órfãos
+        if (newChurchId) {
+          await supabase.from('igrejas').delete().eq('id', newChurchId);
+        }
+        throw authError;
       }
 
-      toast.success('Igreja e conta de administrador criadas com sucesso! Verifique seu email para confirmar.');
+      toast.success('Igreja e conta de administrador criadas com sucesso! Verifique seu email para confirmar o cadastro.');
       navigate('/login');
 
     } catch (err: any) {
@@ -225,27 +252,12 @@ const FormularioCadastroIgreja = () => {
           <Input
             id="cnpj"
             type="text"
-            placeholder="XX.XXX.XXX/XXXX-XX"
+            placeholder="Apenas números"
             value={cnpj}
             onChange={(e) => setCnpj(e.target.value)}
             className="pl-10 h-12"
             required
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="cpfResponsavel">CPF do Responsável *</Label>
-        <div className="relative">
-          <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <Input
-            id="cpfResponsavel"
-            type="text"
-            placeholder="XXX.XXX.XXX-XX"
-            value={cpfResponsavel}
-            onChange={(e) => setCpfResponsavel(e.target.value)}
-            className="pl-10 h-12"
-            required
+            maxLength={14}
           />
         </div>
       </div>
