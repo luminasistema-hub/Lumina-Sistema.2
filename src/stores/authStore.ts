@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 // ESTA É A LINHA CORRIGIDA PARA O CAMINHO CERTO
 import { supabase } from '../lib/supabase'
 // ===================================================================
+import { supabase } from '@/integrations/supabase/client'
 
 // --- Interfaces (Tipos de Dados) ---
 export type UserRole =
