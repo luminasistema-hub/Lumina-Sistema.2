@@ -1,5 +1,5 @@
 // src/services/voluntariosService.ts
-import { supabase } from "@/lib/supabaseClient"
+import { supabase } from "@/integrations/supabase/client"
 
 // Buscar voluntários de um ministério
 export const fetchVoluntarios = async (idMinisterio: string) => {
