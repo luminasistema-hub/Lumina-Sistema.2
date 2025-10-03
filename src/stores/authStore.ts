@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { toast } from 'sonner'
 // ===================================================================
 // ESTA É A LINHA CORRIGIDA PARA O CAMINHO CERTO
-import { supabase } from '../lib/supabase'
+// (removido para evitar duplicidade)
 // ===================================================================
 import { supabase } from '@/integrations/supabase/client'
 
