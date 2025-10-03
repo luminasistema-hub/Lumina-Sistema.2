@@ -129,7 +129,7 @@ export const useAuthStore = create<AuthState>()(
           if (session?.user) {
             const { data: profile, error: profileError } = await supabase
               .from('membros')
-              .select(`*, igrejas(id, nome), informacoes_pessoais(*)`)
+              .select(`*, igrejas(id, nome)`)
               .eq('id', session.user.id)
               .maybeSingle()
 
@@ -137,9 +137,22 @@ export const useAuthStore = create<AuthState>()(
             if (!profile)
               throw new Error('Perfil de membro não encontrado para o ID da sessão.')
 
-            const info = Array.isArray(profile.informacoes_pessoais)
-              ? profile.informacoes_pessoais[0]
-              : profile.informacoes_pessoais
+            // Buscar informacoes_pessoais separadamente (evita relacionamento ambíguo)
+            const { data: personalRecord } = await supabase
+              .from('informacoes_pessoais')
+              .select('*')
+              .eq('membro_id', session.user.id)
+              .maybeSingle()
+
+            const personalInfo = personalRecord
+              ? {
+                  data_nascimento: personalRecord.data_nascimento ?? null,
+                  estado_civil: personalRecord.estado_civil ?? null,
+                  profissao: personalRecord.profissao ?? null,
+                  telefone: personalRecord.telefone ?? null,
+                  endereco: personalRecord.endereco ?? null,
+                }
+              : null
 
             set({
               user: {
@@ -153,7 +166,7 @@ export const useAuthStore = create<AuthState>()(
                 created_at: profile.created_at,
                 perfil_completo: profile.perfil_completo,
                 permissions: {},
-                personalInfo: info || null,
+                personalInfo,
               },
               currentChurchId: profile.id_igreja,
             })
