@@ -35,8 +35,6 @@ const FormularioCadastroIgreja = () => {
   const [cnpj, setCnpj] = useState('');
   const [telefoneContato, setTelefoneContato] = useState('');
   const [endereco, setEndereco] = useState('');
-  const [site, setSite] = useState('');
-  const [descricao, setDescricao] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -117,8 +115,6 @@ const FormularioCadastroIgreja = () => {
           valor_mensal_assinatura: planDetails.monthlyValue,
           limite_membros: planDetails.memberLimit,
           ultimo_pagamento_status: 'Pendente',
-          site: site,
-          descricao: descricao,
         })
         .select('id, nome')
         .single();
@@ -286,35 +282,6 @@ const FormularioCadastroIgreja = () => {
             onChange={(e) => setEndereco(e.target.value)}
             className="pl-10 h-12"
             required
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="site">Site da Igreja (Opcional)</Label>
-        <div className="relative">
-          <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <Input
-            id="site"
-            type="url"
-            placeholder="https://suaigreja.com"
-            value={site}
-            onChange={(e) => setSite(e.target.value)}
-            className="pl-10 h-12"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="descricao">Descrição da Igreja (Opcional)</Label>
-        <div className="relative">
-          <BookText className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-          <Textarea
-            id="descricao"
-            placeholder="Uma breve descrição sobre a visão e missão da sua igreja."
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            className="pl-10 pt-3"
           />
         </div>
       </div>
