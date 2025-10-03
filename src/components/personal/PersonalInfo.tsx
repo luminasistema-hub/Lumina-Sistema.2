@@ -65,19 +65,44 @@ const PersonalInfo = () => {
     if (!user || !currentChurchId) return;
 
     const { data: personalInfo, error: personalInfoError } = await supabase
-      .from('informacoes_pessoais').select(`*, conjuge:membros(nome_completo)`)
-      .eq('membro_id', user.id).maybeSingle();
+      .from('informacoes_pessoais')
+      .select('*')
+      .eq('membro_id', user.id)
+      .maybeSingle();
     if (personalInfoError) toast.error('Erro ao carregar informações pessoais.');
     if (personalInfo) {
       setFormData(prev => ({
-        ...prev, ...personalInfo, nomeCompleto: user.name, email: user.email,
-        dataNascimento: personalInfo.data_nascimento || '', estadoCivil: personalInfo.estado_civil || '',
-        conjugeId: personalInfo.conjuge_id || null, conjugeNome: personalInfo.conjuge?.nome_completo || '',
-        dataCasamento: personalInfo.data_casamento || '', paisCristaos: personalInfo.pais_cristaos || '',
-        tempoIgreja: personalInfo.tempo_igreja || '', dataBatismo: personalInfo.data_batismo || '',
-        ministerioAtual: personalInfo.ministerio_anterior || '', dataConversao: personalInfo.data_conversao || '',
-        diasDisponiveis: personalInfo.dias_disponiveis || [], horariosDisponiveis: personalInfo.horarios_disponiveis || ''
+        ...prev,
+        ...personalInfo,
+        nomeCompleto: user.name,
+        email: user.email,
+        dataNascimento: personalInfo.data_nascimento || '',
+        estadoCivil: personalInfo.estado_civil || '',
+        conjugeId: personalInfo.conjuge_id || null,
+        conjugeNome: '', // será preenchido abaixo, se aplicável
+        dataCasamento: personalInfo.data_casamento || '',
+        paisCristaos: personalInfo.pais_cristaos || '',
+        tempoIgreja: personalInfo.tempo_igreja || '',
+        batizado: personalInfo.batizado || false,
+        dataBatismo: personalInfo.data_batismo || '',
+        participaMinisterio: personalInfo.participa_ministerio || false,
+        ministerioAtual: personalInfo.ministerio_anterior || '',
+        dataConversao: personalInfo.data_conversao || '',
+        diasDisponiveis: personalInfo.dias_disponiveis || [],
+        horariosDisponiveis: personalInfo.horarios_disponiveis || '',
       }));
+
+      // Buscar nome do cônjuge separadamente se existir conjuge_id
+      if (personalInfo.conjuge_id) {
+        const { data: spouse, error: spouseError } = await supabase
+          .from('membros')
+          .select('nome_completo')
+          .eq('id', personalInfo.conjuge_id)
+          .maybeSingle();
+        if (!spouseError && spouse?.nome_completo) {
+          setFormData(prev => ({ ...prev, conjugeNome: spouse.nome_completo }));
+        }
+      }
     }
 
     const { data: kidsData, error: kidsError } = await supabase.from('criancas')
