@@ -1,124 +1,114 @@
-import React, { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Loader2, PlusCircle } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Users, Clock, Plus } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-interface Escala {
-  id: string;
-  data: string;
-  descricao: string;
-  culto_id: string;
-}
-
-interface Voluntario {
-  id: string;
-  membro_id: string;
-  funcao: string;
-  membros?: { nome: string };
-}
-
-interface Props {
+interface MinistrySchedulesProps {
   ministerioId: string;
 }
 
-export default function MinistrySchedules({ ministerioId }: Props) {
-  const [escalas, setEscalas] = useState<Escala[]>([]);
-  const [voluntarios, setVoluntarios] = useState<{ [key: string]: Voluntario[] }>({});
+const MinistrySchedules: React.FC<MinistrySchedulesProps> = ({ ministerioId }) => {
+  const { user, currentChurchId } = useAuthStore();
+  const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, [ministerioId]);
-
-  async function loadData() {
+  const loadSchedules = async () => {
+    if (!currentChurchId) return;
+    
     setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('escalas_servico')
+        .select(`
+          *,
+          evento:eventos(nome, data_hora),
+          voluntarios:escala_voluntarios!inner(*, membro:membros(nome_completo, email))
+        `)
+        .eq('ministerio_id', ministerioId)
+        .eq('id_igreja', currentChurchId)
+        .order('data_servico', { ascending: true });
 
-    // Buscar escalas do ministério
-    const { data: escalasData } = await supabase
-      .from("escalas_servico")
-      .select("id, data, descricao, culto_id")
-      .eq("ministerio_id", ministerioId)
-      .order("data", { ascending: true });
-
-    if (escalasData) {
-      setEscalas(escalasData);
-
-      // Buscar voluntários vinculados
-      let voluntariosObj: { [key: string]: Voluntario[] } = {};
-      for (const escala of escalasData) {
-        const { data: volData } = await supabase
-          .from("escala_voluntarios")
-          .select("id, membro_id, funcao, membros(nome)")
-          .eq("escala_id", escala.id);
-
-        voluntariosObj[escala.id] = volData || [];
-      }
-      setVoluntarios(voluntariosObj);
+      if (error) throw error;
+      setSchedules(data || []);
+    } catch (error: any) {
+      toast.error('Erro ao carregar escalas: ' + error.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setLoading(false);
-  }
-
-  async function addEscala() {
-    const { data, error } = await supabase
-      .from("escalas_servico")
-      .insert({
-        ministerio_id: ministerioId,
-        data: new Date().toISOString(),
-        descricao: "Nova Escala",
-      })
-      .select()
-      .single();
-
-    if (data) {
-      setEscalas((prev) => [...prev, data]);
-    }
-  }
+  useEffect(() => {
+    loadSchedules();
+  }, [ministerioId, currentChurchId]);
 
   if (loading) {
     return (
-      <div className="flex justify-center p-6">
-        <Loader2 className="animate-spin w-6 h-6" />
+      <div className="flex items-center justify-center h-32">
+        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Escalas de Voluntários</h2>
-        <Button onClick={addEscala}>
-          <PlusCircle className="w-4 h-4 mr-2" /> Nova Escala
-        </Button>
+        <h3 className="text-lg font-semibold">Escalas de Serviço</h3>
+        {(user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio') && (
+          <Button size="sm">
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Escala
+          </Button>
+        )}
       </div>
 
-      {escalas.map((escala) => (
-        <Card key={escala.id}>
-          <CardContent className="p-4">
-            <h3 className="font-medium">
-              {new Date(escala.data).toLocaleDateString()} - {escala.descricao}
-            </h3>
+      <div className="grid gap-3">
+        {schedules.map((schedule) => (
+          <Card key={schedule.id} className="hover:shadow-md transition-shadow">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-base">{schedule.evento?.nome}</CardTitle>
+                <Badge variant={schedule.status === 'Confirmado' ? 'default' : 'secondary'}>
+                  {schedule.status}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Calendar className="w-4 h-4" />
+                  {format(new Date(schedule.data_servico), 'PPP', { locale: ptBR })}
+                </div>
+                
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Users className="w-4 h-4" />
+                  {schedule.voluntarios?.length || 0} voluntários confirmados
+                </div>
 
-            <ul className="mt-3 space-y-1">
-              {voluntarios[escala.id]?.map((v) => (
-                <li key={v.id} className="text-sm">
-                  <strong>{v.membros?.nome}</strong> — {v.funcao}
-                </li>
-              ))}
-            </ul>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => alert("Abrir modal para adicionar voluntário")}
-            >
-              + Adicionar voluntário
-            </Button>
-          </CardContent>
-        </Card>
-      ))}
+                {schedule.observacoes && (
+                  <p className="text-sm text-gray-600 italic">{schedule.observacoes}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        
+        {schedules.length === 0 && (
+          <Card>
+            <CardContent className="p-6 text-center">
+              <Calendar className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">Nenhuma escala disponível</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default MinistrySchedules;
