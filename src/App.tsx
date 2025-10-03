@@ -126,9 +126,7 @@ function App() {
         <Route
           path="/cadastrar-igreja"
           element={
-            <ProtectedRoute>
-              <CadastrarIgrejaPage />
-            </ProtectedRoute>
+            <CadastrarIgrejaPage />
           }
         />
 
