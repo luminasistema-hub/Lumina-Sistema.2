@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { toast } from 'sonner'
 // ===================================================================
 // ESTA É A LINHA CORRIGIDA PARA O CAMINHO CERTO
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabase'
 // ===================================================================
 
 // --- Interfaces (Tipos de Dados) ---
@@ -111,7 +111,10 @@ export const useAuthStore = create<AuthState>()(
       checkAuth: async () => {
         if (isCheckingAuth) return
 
-        set({ isLoading: true })
+        // Apenas define o carregamento se não houver usuário (carregamento inicial)
+        if (!get().user) {
+          set({ isLoading: true })
+        }
         isCheckingAuth = true
 
         try {
@@ -154,14 +157,14 @@ export const useAuthStore = create<AuthState>()(
               currentChurchId: profile.id_igreja,
             })
           } else {
-            set({ user: null, currentChurchId: null, isLoading: false })
+            set({ user: null, currentChurchId: null })
           }
         } catch (error) {
           console.error('AuthStore: Erro no checkAuth:', error)
-          set({ user: null, currentChurchId: null, isLoading: false })
+          set({ user: null, currentChurchId: null })
         } finally {
           isCheckingAuth = false
-          set({ isLoading: false })
+          set({ isLoading: false }) // Sempre finaliza o carregamento
         }
       },
 
