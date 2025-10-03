@@ -344,6 +344,7 @@ const VocationalTest = () => {
       membro_id: user.id,
       data_teste: new Date().toISOString().split('T')[0],
       is_ultimo: true, 
+      id_igreja: currentChurchId,
     };
 
     questions.forEach(q => {
