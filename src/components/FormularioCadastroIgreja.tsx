@@ -4,8 +4,9 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { Building, Mail, Lock, Eye, EyeOff, User, Loader2, Phone, Home, FileText } from 'lucide-react';
+import { Building, Mail, Lock, Eye, EyeOff, User, Loader2, Phone, Home, FileText, Globe, BookText } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
 
 // Funções de validação para padrões brasileiros
@@ -13,14 +14,12 @@ const validateCnpj = (cnpj: string) => {
   if (!cnpj) return true; // Opcional, se for obrigatório, remover esta linha
   cnpj = cnpj.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
   if (cnpj.length !== 14) return false;
-  // Validação básica de CNPJ (pode ser mais complexa)
   return true; // Simplificando para aceitar 14 dígitos
 };
 
 const validatePhone = (phone: string) => {
   if (!phone) return true; // Opcional, se for obrigatório, remover esta linha
   phone = phone.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
-  // Aceita 10 ou 11 dígitos
   return phone.length >= 10 && phone.length <= 11;
 };
 
@@ -36,6 +35,8 @@ const FormularioCadastroIgreja = () => {
   const [cnpj, setCnpj] = useState('');
   const [telefoneContato, setTelefoneContato] = useState('');
   const [endereco, setEndereco] = useState('');
+  const [site, setSite] = useState('');
+  const [descricao, setDescricao] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -71,7 +72,6 @@ const FormularioCadastroIgreja = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Validações de campos obrigatórios
     if (!churchName || !adminName || !adminEmail || !adminPassword || !selectedPlan || !cnpj || !telefoneContato || !endereco) {
       toast.error('Por favor, preencha todos os campos obrigatórios.');
       setIsLoading(false);
@@ -82,8 +82,6 @@ const FormularioCadastroIgreja = () => {
       setIsLoading(false);
       return;
     }
-
-    // Validações de formato
     if (!validateCnpj(cnpj)) {
       toast.error('Por favor, insira um CNPJ válido com 14 dígitos.');
       setIsLoading(false);
@@ -105,7 +103,6 @@ const FormularioCadastroIgreja = () => {
     let newChurchId: string | null = null;
 
     try {
-      // 1. Criar a igreja primeiro
       const { data: churchData, error: churchError } = await supabase
         .from('igrejas')
         .insert({
@@ -120,6 +117,8 @@ const FormularioCadastroIgreja = () => {
           valor_mensal_assinatura: planDetails.monthlyValue,
           limite_membros: planDetails.memberLimit,
           ultimo_pagamento_status: 'Pendente',
+          site: site,
+          descricao: descricao,
         })
         .select('id, nome')
         .single();
@@ -135,7 +134,6 @@ const FormularioCadastroIgreja = () => {
 
       newChurchId = churchData.id;
 
-      // 2. Criar o usuário administrador, que acionará o trigger handle_new_user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: adminEmail,
         password: adminPassword,
@@ -150,7 +148,6 @@ const FormularioCadastroIgreja = () => {
       });
 
       if (authError) {
-        // Se o cadastro do usuário falhar, remove a igreja criada para evitar órfãos
         if (newChurchId) {
           await supabase.from('igrejas').delete().eq('id', newChurchId);
         }
@@ -244,7 +241,6 @@ const FormularioCadastroIgreja = () => {
         </div>
       </div>
 
-      {/* Novos Campos */}
       <div className="space-y-2">
         <Label htmlFor="cnpj">CNPJ *</Label>
         <div className="relative">
@@ -293,7 +289,35 @@ const FormularioCadastroIgreja = () => {
           />
         </div>
       </div>
-      {/* Fim dos Novos Campos */}
+
+      <div className="space-y-2">
+        <Label htmlFor="site">Site da Igreja (Opcional)</Label>
+        <div className="relative">
+          <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Input
+            id="site"
+            type="url"
+            placeholder="https://suaigreja.com"
+            value={site}
+            onChange={(e) => setSite(e.target.value)}
+            className="pl-10 h-12"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="descricao">Descrição da Igreja (Opcional)</Label>
+        <div className="relative">
+          <BookText className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+          <Textarea
+            id="descricao"
+            placeholder="Uma breve descrição sobre a visão e missão da sua igreja."
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            className="pl-10 pt-3"
+          />
+        </div>
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="subscriptionPlan">Plano de Assinatura *</Label>
