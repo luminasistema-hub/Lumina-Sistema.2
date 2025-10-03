@@ -1,10 +1,33 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { supabase } from '../integrations/supabase/client'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { toast } from 'sonner'
+// ===================================================================
+// ESTA É A LINHA CORRIGIDA PARA O CAMINHO CERTO
+import { supabase } from '../lib/supabaseClient'
+// ===================================================================
 
-export type UserRole = 'membro' | 'lider_ministerio' | 'pastor' | 'admin' | 'financeiro' | 'voluntario' | 'midia_tecnologia' | 'integra' | 'super_admin'
+// --- Interfaces (Tipos de Dados) ---
+export type UserRole =
+  | 'membro'
+  | 'lider_ministerio'
+  | 'pastor'
+  | 'admin'
+  | 'financeiro'
+  | 'voluntario'
+  | 'midia_tecnologia'
+  | 'integra'
+  | 'super_admin'
+
+export interface PersonalInfo {
+  data_nascimento?: string | null
+  estado_civil?: string | null
+  profissao?: string | null
+  telefone?: string | null
+  endereco?: string | null
+}
 
 interface User {
+  permissions: any
   id: string
   name: string
   email: string
@@ -14,7 +37,8 @@ interface User {
   ministry?: string
   status: 'ativo' | 'pendente' | 'inativo'
   created_at: string
-  perfil_completo: boolean;
+  perfil_completo: boolean
+  personalInfo?: PersonalInfo | null
 }
 
 export type { User }
@@ -23,14 +47,23 @@ interface AuthState {
   user: User | null
   isLoading: boolean
   currentChurchId: string | null
+
   login: (email: string, password: string) => Promise<boolean>
-  register: (name: string, email: string, password: string, churchName: string) => Promise<{ success: boolean; message: string }>
   logout: () => void
   checkAuth: () => void
   setCurrentChurchId: (churchId: string | null) => void
-  initializeAuthListener: () => void;
+  initializeAuthListener: () => void
+  updateUserProfile: (personalInfo: Partial<PersonalInfo>) => void
 }
 
+// ===================================================================
+// Controle de checagem para evitar chamadas duplicadas
+// ===================================================================
+let isCheckingAuth = false
+
+// ===================================================================
+// Store de Autenticação
+// ===================================================================
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -38,185 +71,156 @@ export const useAuthStore = create<AuthState>()(
       isLoading: true,
       currentChurchId: null,
 
-      login: async (email: string, password: string) => {
-        console.log('AuthStore: Attempting login (this method should ideally not be called directly for Supabase auth).');
-        set({ isLoading: true });
+      // ------------------------
+      // LOGIN
+      // ------------------------
+      login: async (email, password) => {
+        set({ isLoading: true })
         try {
-          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-          if (error) {
-            console.error('AuthStore: Supabase signInWithPassword error:', error.message);
-            set({ user: null, isLoading: false, currentChurchId: null });
-            return false;
-          }
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          })
+          if (error) throw error
+
           if (data.user) {
-            console.log('AuthStore: Supabase signInWithPassword successful, user:', data.user.id);
-            await get().checkAuth(); // Force checkAuth after successful login
-            return true;
+            await get().checkAuth()
+            return true
           }
         } catch (err) {
-          console.error('AuthStore: Unexpected error during login:', err);
+          console.error('AuthStore: Error during login:', err)
+          toast.error('Email ou senha inválidos.')
         } finally {
-          set({ isLoading: false });
+          set({ isLoading: false })
         }
-        return false;
+        return false
       },
 
-      register: async (name: string, email: string, password: string, churchName: string) => {
-        console.log('AuthStore: Register method called (should be handled in LoginPage).');
-        return { success: false, message: 'O registro é tratado diretamente pelo Supabase.' };
-      },
-
+      // ------------------------
+      // LOGOUT
+      // ------------------------
       logout: async () => {
-        console.log('AuthStore: Attempting logout.');
-        set({ isLoading: true });
-        const { error } = await supabase.auth.signOut();
-        if (!error) {
-          console.log('AuthStore: User logged out successfully.');
-          set({ user: null, currentChurchId: null, isLoading: false });
-        } else {
-          console.error('AuthStore: Error during logout:', error);
-          set({ isLoading: false });
-        }
+        set({ isLoading: true })
+        await supabase.auth.signOut()
+        set({ user: null, currentChurchId: null, isLoading: false })
       },
 
+      // ------------------------
+      // CHECK AUTH
+      // ------------------------
       checkAuth: async () => {
-        console.log('AuthStore: checkAuth initiated. Setting isLoading to true.');
-        set({ isLoading: true });
+        if (isCheckingAuth) return
+
+        set({ isLoading: true })
+        isCheckingAuth = true
+
         try {
-          const { data: { session }, error } = await supabase.auth.getSession();
-          console.log('AuthStore: getSession result - session:', session, 'error:', error);
+          const {
+            data: { session },
+            error,
+          } = await supabase.auth.getSession()
 
-          if (error) {
-            console.error('AuthStore: Error getting session:', error.message);
-            set({ user: null, isLoading: false, currentChurchId: null });
-            return;
-          }
+          if (error) throw error
 
-          if (session && session.user) {
-            console.log('AuthStore: Session found for user ID:', session.user.id);
-            
-            // Verificar se é um Super Admin
-            let { data: superAdminProfile, error: superAdminError } = await supabase
-              .from('super_admins')
-              .select('id, nome_completo, email')
+          if (session?.user) {
+            const { data: profile, error: profileError } = await supabase
+              .from('membros')
+              .select(`*, igrejas(id, nome), informacoes_pessoais(*)`)
               .eq('id', session.user.id)
-              .maybeSingle();
+              .maybeSingle()
 
-            if (superAdminProfile) {
-              console.log('AuthStore: User is a Super Admin.');
-              set({
-                user: {
-                  id: session.user.id,
-                  name: superAdminProfile.nome_completo,
-                  email: session.user.email!,
-                  role: 'super_admin',
-                  churchId: null,
-                  churchName: 'Painel Master',
-                  ministry: null,
-                  status: 'ativo',
-                  created_at: session.user.created_at,
-                  perfil_completo: true, // Super Admins não precisam completar perfil
-                },
-                isLoading: false,
-                currentChurchId: null,
-              });
-              return;
-            }
+            if (profileError) throw profileError
+            if (!profile)
+              throw new Error('Perfil de membro não encontrado para o ID da sessão.')
 
-            // Se não for Super Admin, buscar perfil normal
-            console.log('AuthStore: Attempting to fetch profile from "membros" table.');
-            let { data: profile, error: profileError } = await supabase
-              .from('membros') 
-              .select(`
-                id,
-                nome_completo,
-                email,
-                funcao,
-                id_igreja,
-                status,
-                created_at,
-                perfil_completo,
-                ministerio_recomendado,
-                igrejas(id, nome)
-              `)
-              .eq('id', session.user.id)
-              .maybeSingle(); 
-            
-            console.log('AuthStore: Profile fetch result - data:', profile, 'error:', profileError);
-
-            if (profileError || !profile) { 
-              console.error('AuthStore: Error fetching user profile or profile not found:', profileError?.message || 'Profile data is null/undefined.');
-              set({ user: null, isLoading: false, currentChurchId: null });
-              return;
-            }
-
-            console.log('AuthStore: Profile data successfully fetched. perfil_completo:', profile.perfil_completo);
+            const info = Array.isArray(profile.informacoes_pessoais)
+              ? profile.informacoes_pessoais[0]
+              : profile.informacoes_pessoais
 
             set({
               user: {
                 id: session.user.id,
                 name: profile.nome_completo,
                 email: session.user.email!,
-                role: profile.funcao,
+                role: profile.funcao as UserRole,
                 churchId: profile.id_igreja,
-                churchName: profile.igrejas?.nome || 'Igreja não encontrada',
-                ministry: profile.ministerio_recomendado,
-                status: profile.status,
+                churchName: profile.igrejas?.nome || 'Igreja',
+                status: profile.status as any,
                 created_at: profile.created_at,
                 perfil_completo: profile.perfil_completo,
+                permissions: {},
+                personalInfo: info || null,
               },
-              isLoading: false,
               currentChurchId: profile.id_igreja,
-            });
-            console.log('AuthStore: User set:', {
-              id: session.user.id,
-              name: profile.nome_completo,
-              email: session.user.email!,
-              role: profile.funcao,
-              churchId: profile.id_igreja,
-              churchName: profile.igrejas?.nome || 'Igreja não encontrada',
-              ministry: profile.ministerio_recomendado,
-              status: profile.status,
-              created_at: profile.created_at,
-              perfil_completo: profile.perfil_completo,
-            });
+            })
           } else {
-            console.log('AuthStore: No authenticated user found in session. Setting isLoading to false.');
-            set({ user: null, isLoading: false, currentChurchId: null });
+            set({ user: null, currentChurchId: null, isLoading: false })
           }
         } catch (error) {
-          console.error('AuthStore: Unexpected error during checkAuth:', error);
-          set({ user: null, isLoading: false, currentChurchId: null }); 
+          console.error('AuthStore: Erro no checkAuth:', error)
+          set({ user: null, currentChurchId: null, isLoading: false })
+        } finally {
+          isCheckingAuth = false
+          set({ isLoading: false })
         }
       },
 
+      // ------------------------
+      // SET CHURCH ID
+      // ------------------------
       setCurrentChurchId: (churchId: string | null) => {
-        set({ currentChurchId: churchId });
-        console.log('AuthStore: Current church ID set to:', churchId);
+        set({ currentChurchId: churchId })
       },
 
+      // ------------------------
+      // LISTENER
+      // ------------------------
       initializeAuthListener: () => {
-        if (!(get() as any)._authListenerInitialized) {
-          console.log('AuthStore: Initializing Supabase auth state listener.');
-          const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-              console.log('AuthStore: Supabase Auth State Change Event:', event, session);
-              if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-                console.log('AuthStore: Auth event detected, calling checkAuth().');
-                await (get() as any).checkAuth();
-              } else if (event === 'SIGNED_OUT') {
-                console.log('AuthStore: SIGNED_OUT event detected, clearing state.');
-                set({ user: null, currentChurchId: null, isLoading: false });
-              }
+        const { _authListenerInitialized } = get() as any
+        if (_authListenerInitialized) return
+
+        supabase.auth.onAuthStateChange(async (event) => {
+          if (
+            event === 'SIGNED_IN' ||
+            event === 'TOKEN_REFRESHED' ||
+            event === 'USER_UPDATED'
+          ) {
+            await get().checkAuth()
+          } else if (event === 'SIGNED_OUT') {
+            set({ user: null, currentChurchId: null, isLoading: false })
+          }
+        })
+
+        set({ _authListenerInitialized: true } as Partial<AuthState>)
+      },
+
+      // ------------------------
+      // UPDATE PROFILE (LOCAL)
+      // ------------------------
+      updateUserProfile: (personalInfo: Partial<PersonalInfo>) => {
+        set((state) => {
+          if (state.user) {
+            return {
+              user: {
+                ...state.user,
+                personalInfo: {
+                  ...state.user.personalInfo,
+                  ...personalInfo,
+                },
+                perfil_completo: true,
+              },
             }
-          );
-          (get() as any)._authListenerInitialized = true;
-        }
-      }
+          }
+          return state
+        })
+      },
     }),
     {
       name: 'connect-vida-auth',
-      partialize: (state) => ({ currentChurchId: state.currentChurchId }),
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        currentChurchId: state.currentChurchId,
+      }),
     }
   )
 )

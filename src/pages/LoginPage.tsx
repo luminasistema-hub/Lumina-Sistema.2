@@ -4,24 +4,20 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Label } from '../components/ui/label'
-import { Badge } from '../components/ui/badge'
 import { toast } from 'sonner'
-import { Church, Lock, Mail, Eye, EyeOff, ArrowRight } from 'lucide-react'
-import { Link, useSearchParams } from 'react-router-dom' // Importar Link e useSearchParams
+import { Lock, Mail, Eye, EyeOff } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
 
 const LoginPage = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const { login, isLoading } = useAuthStore()
-  const [searchParams] = useSearchParams() // Hook para ler parâmetros da URL
+  const [searchParams] = useSearchParams()
 
-  // Limpar parâmetros de registro se existirem na URL de login
   useEffect(() => {
     if (searchParams.get('churchId') || searchParams.get('churchName')) {
-      // Opcional: redirecionar para /login sem os parâmetros se não for desejado
-      // navigate('/login', { replace: true });
-      // Ou apenas ignorar os parâmetros aqui
+      // Opcional: redirecionar para /login sem os parâmetros
     }
   }, [searchParams]);
 
@@ -38,6 +34,7 @@ const LoginPage = () => {
     const success = await login(email, password);
     if (!success) {
       console.error('LoginPage: Login failed via useAuthStore.login().');
+      // A toast de erro já é tratada dentro do método login, se necessário
     } else {
       console.log('LoginPage: Login successful via useAuthStore.login().');
     }
@@ -57,9 +54,7 @@ const LoginPage = () => {
             <CardDescription className="text-base">
               Entre em sua conta
             </CardDescription>
-            <Badge className="bg-green-100 text-green-800 mx-auto">
-              Sistema em Produção
-            </Badge>
+            {/* O Badge "Sistema em Produção" foi removido daqui */}
           </CardHeader>
           
           <CardContent>
@@ -120,12 +115,12 @@ const LoginPage = () => {
             </form>
 
             <div className="mt-6 text-center">
+              {/* Link de cadastro foi substituído pelo de recuperar senha */}
               <Link
-                to="/register"
-                className="text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-2 mx-auto"
+                to="/recuperar-senha"
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
               >
-                Não tenho conta - Cadastrar-se
-                <ArrowRight className="w-4 h-4" />
+                Esqueceu sua senha?
               </Link>
             </div>
           </CardContent>
@@ -137,7 +132,7 @@ const LoginPage = () => {
             Lumina - Sistema de Gestão Eclesiástica
           </p>
           <p className="text-xs">
-            Todos os novos usuários iniciam como "Membro".
+            O cadastro de novos usuários é feito através de um link de convite.
           </p>
         </div>
       </div>
@@ -145,4 +140,4 @@ const LoginPage = () => {
   )
 }
 
-export default LoginPage
+export default LoginPage;

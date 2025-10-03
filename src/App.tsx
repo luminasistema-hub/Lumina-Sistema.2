@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+// src/App.tsx
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -10,20 +11,22 @@ import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
 import EADPortalPage from './pages/EADPortalPage'
 import { useEffect } from 'react'
-import { SpeedInsights } from "@vercel/speed-insights/react";
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
-function App() {
-  const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore()
-
-  useEffect(() => {
-    console.log('App mounted, initializing auth listener and checking authentication...')
-    initializeAuthListener();
-    checkAuth();
-  }, [checkAuth, initializeAuthListener])
-
-  useEffect(() => {
-    console.log('App Render: isLoading:', isLoading, 'user:', user?.email, 'userRole:', user?.role, 'currentChurchId:', currentChurchId);
-  }, [isLoading, user, currentChurchId]);
+// ----------------------------
+// ProtectedRoute genérico
+// ----------------------------
+function ProtectedRoute({
+  children,
+  requireTenant = false,
+  onlySuperAdmin = false,
+}: {
+  children: JSX.Element
+  requireTenant?: boolean
+  onlySuperAdmin?: boolean
+}) {
+  const { user, isLoading, currentChurchId } = useAuthStore()
+  const loc = useLocation()
 
   if (isLoading) {
     return (
@@ -36,53 +39,151 @@ function App() {
     )
   }
 
+  if (!user) {
+    return <Navigate to="/login" state={{ from: loc }} replace />
+  }
+
+  if (onlySuperAdmin && user.role !== 'super_admin') {
+    return <Navigate to="/" replace />
+  }
+
+  if (requireTenant && !currentChurchId) {
+    return <Navigate to="/cadastrar-igreja" replace />
+  }
+
+  return children
+}
+
+// ----------------------------
+// App principal
+// ----------------------------
+function App() {
+  const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore()
+
+  useEffect(() => {
+    console.log('🔄 App montado: inicializando auth listener e checkAuth...')
+    checkAuth()
+    const unsub = initializeAuthListener()
+    return () => {
+      if (typeof unsub === 'function') unsub()
+    }
+  }, [checkAuth, initializeAuthListener])
+
+  useEffect(() => {
+    console.log('👤 App Render:', {
+      isLoading,
+      user: user?.email,
+      role: user?.role,
+      currentChurchId,
+    })
+  }, [isLoading, user, currentChurchId])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-church-blue-50 to-church-purple-50">
       <Routes>
-        {/* Rota da Landing Page */}
-        <Route 
-          path="/" 
-          element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <LandingPage />} 
+        {/* Landing */}
+        <Route
+          path="/"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <LandingPage />
+            )
+          }
         />
 
-        {/* Rotas de Login e Registro Comum */}
-        <Route 
-          path="/login" 
-          element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <LoginPage />} 
+        {/* Login & Registro comuns */}
+        <Route
+          path="/login"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <LoginPage />
+            )
+          }
         />
-        <Route 
-          path="/register" 
-          element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <RegisterPage />} 
+        <Route
+          path="/register"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <RegisterPage />
+            )
+          }
         />
-        <Route 
-          path="/cadastrar-igreja" 
-          element={user ? <Navigate to={user.role === 'super_admin' ? "/master-admin" : "/dashboard"} replace /> : <CadastrarIgrejaPage />} 
-        />
-        
-        {/* Rotas de Login e Registro de Super Admin */}
-        <Route 
-          path="/master-admin-login" 
-          element={user?.role === 'super_admin' ? <Navigate to="/master-admin" replace /> : <MasterAdminLoginPage />} 
-        />
-        <Route 
-          path="/super-admin-register" 
-          element={user?.role === 'super_admin' ? <Navigate to="/master-admin" replace /> : <SuperAdminRegisterPage />} 
+        <Route
+          path="/cadastrar-igreja"
+          element={
+            <ProtectedRoute>
+              <CadastrarIgrejaPage />
+            </ProtectedRoute>
+          }
         />
 
-        {/* Rotas Protegidas */}
-        <Route 
-          path="/master-admin" 
-          element={user?.role === 'super_admin' ? <MasterAdminPage /> : <Navigate to="/master-admin-login" replace />} 
+        {/* Login & registro de super admin */}
+        <Route
+          path="/master-admin-login"
+          element={
+            user?.role === 'super_admin' ? (
+              <Navigate to="/master-admin" replace />
+            ) : (
+              <MasterAdminLoginPage />
+            )
+          }
         />
-        <Route 
-          path="/dashboard" 
-          element={user && user.role !== 'super_admin' && currentChurchId ? <DashboardPage currentChurchId={currentChurchId} /> : <Navigate to="/" replace />} 
+        <Route
+          path="/super-admin-register"
+          element={
+            user?.role === 'super_admin' ? (
+              <Navigate to="/master-admin" replace />
+            ) : (
+              <SuperAdminRegisterPage />
+            )
+          }
         />
-        <Route 
-          path="/ead" 
-          element={user && user.role !== 'super_admin' && currentChurchId ? <EADPortalPage /> : <Navigate to="/" replace />} 
+
+        {/* Rotas protegidas */}
+        <Route
+          path="/master-admin"
+          element={
+            <ProtectedRoute onlySuperAdmin>
+              <MasterAdminPage />
+            </ProtectedRoute>
+          }
         />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute requireTenant>
+              <DashboardPage currentChurchId={currentChurchId!} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ead"
+          element={
+            <ProtectedRoute requireTenant>
+              <EADPortalPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* catch all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
       <SpeedInsights />
     </div>
   )

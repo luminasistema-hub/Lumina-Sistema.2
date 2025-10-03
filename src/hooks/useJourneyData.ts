@@ -3,8 +3,8 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuthStore } from '../stores/authStore';
 import { toast } from 'sonner';
 
-// Interfaces duplicadas de MemberJourney para uso no hook
-interface QuizPergunta {
+// Interfaces para os dados da Jornada
+export interface QuizPergunta {
   id?: string;
   passo_id?: string;
   ordem: number;
@@ -14,7 +14,7 @@ interface QuizPergunta {
   pontuacao: number;
 }
 
-interface PassoEtapa {
+export interface PassoEtapa {
   id: string;
   id_etapa: string;
   ordem: number;
@@ -56,13 +56,12 @@ export interface JourneyEtapaDisplay extends EtapaTrilha {
 export const useJourneyData = () => {
   const { user, currentChurchId } = useAuthStore();
   const [etapas, setEtapas] = useState<JourneyEtapaDisplay[]>([]);
-  const [progresso, setProgresso] = useState<ProgressoMembro[]>([]);
   const [loading, setLoading] = useState(true);
   const [overallProgress, setOverallProgress] = useState(0);
   const [completedSteps, setCompletedSteps] = useState(0);
   const [totalSteps, setTotalSteps] = useState(0);
   const [currentLevel, setCurrentLevel] = useState(0);
-  const [trilhaInfo, setTrilhaInfo] = useState<{ titulo: string; descricao: string } | null>(null);
+  const [trilhaInfo, setTrilhaInfo] = useState<{ id: string; titulo: string; descricao: string } | null>(null);
 
   const loadJourneyData = useCallback(async () => {
     if (!user?.id || !currentChurchId) {
@@ -82,24 +81,24 @@ export const useJourneyData = () => {
       if (trilhaError && trilhaError.code !== 'PGRST116') throw trilhaError;
       if (!trilhaData) {
         setEtapas([]);
-        setProgresso([]);
         setTrilhaInfo(null);
+        setLoading(false);
         return;
       }
       
-      setTrilhaInfo({ titulo: trilhaData.titulo, descricao: trilhaData.descricao });
-      const trilhaId = trilhaData.id;
+      setTrilhaInfo({ id: trilhaData.id, titulo: trilhaData.titulo, descricao: trilhaData.descricao });
 
       const { data: etapasRawData, error: etapasDataError } = await supabase
         .from('etapas_trilha')
         .select('*')
-        .eq('id_trilha', trilhaId)
+        .eq('id_trilha', trilhaData.id)
         .order('ordem', { ascending: true });
       if (etapasDataError) throw etapasDataError;
 
       const etapaIds = (etapasRawData || []).map(etapa => etapa.id);
       if (etapaIds.length === 0) {
         setEtapas([]);
+        setLoading(false);
         return;
       }
 
@@ -117,7 +116,6 @@ export const useJourneyData = () => {
         .eq('id_membro', user.id)
         .in('id_passo', passoIds);
       if (progressoError) throw progressoError;
-      setProgresso(progressoData || []);
 
       const quizPassoIds = (passosRawData || []).filter(p => p.tipo_passo === 'quiz').map(p => p.id);
       let quizPerguntasData: QuizPergunta[] = [];
@@ -141,7 +139,7 @@ export const useJourneyData = () => {
               completed: passoProgresso?.status === 'concluido',
               completedDate: passoProgresso?.data_conclusao,
               quiz_perguntas: passo.tipo_passo === 'quiz' 
-                ? quizPerguntasData.filter(qp => qp.passo_id === passo.id) 
+                ? quizPerguntasData.filter(qp => qp.passo_id === passo.id).sort((a, b) => a.ordem - b.ordem)
                 : undefined
             };
           });
@@ -179,18 +177,70 @@ export const useJourneyData = () => {
       setTotalSteps(total);
       setOverallProgress(total > 0 ? (completed / total) * 100 : 0);
       setCurrentLevel(etapas.filter(etapa => etapa.allPassosCompleted).length);
+    } else if (!loading) {
+      setCompletedSteps(0);
+      setTotalSteps(0);
+      setOverallProgress(0);
+      setCurrentLevel(0);
     }
   }, [etapas, loading]);
+
+  const markPassoCompleted = async (passoId: string, quizDetails?: any) => {
+    if (!user?.id) {
+      toast.error('Erro: Usuário não identificado.');
+      return;
+    }
+
+    try {
+      const { data: existingProgress, error: fetchError } = await supabase
+        .from('progresso_membros')
+        .select('id')
+        .eq('id_membro', user.id)
+        .eq('id_passo', passoId)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+      const progressData = {
+        status: 'concluido',
+        data_conclusao: new Date().toISOString(),
+        respostas_quiz: quizDetails || null,
+      };
+
+      if (existingProgress) {
+        const { error } = await supabase
+          .from('progresso_membros')
+          .update(progressData)
+          .eq('id', existingProgress.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('progresso_membros')
+          .insert({
+            id_membro: user.id,
+            id_passo: passoId,
+            ...progressData,
+          });
+        if (error) throw error;
+      }
+
+      toast.success('Passo concluído com sucesso!');
+      await loadJourneyData();
+    } catch (error: any) {
+      console.error('useJourneyData: Error marking passo completed:', error);
+      toast.error('Ocorreu um erro ao marcar o passo como concluído.');
+    }
+  };
 
   return {
     loading,
     etapas,
-    progresso,
     overallProgress,
     completedSteps,
     totalSteps,
     currentLevel,
     trilhaInfo,
     loadJourneyData,
+    markPassoCompleted,
   };
 };

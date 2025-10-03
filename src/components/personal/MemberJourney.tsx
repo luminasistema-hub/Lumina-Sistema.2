@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Progress } from '../ui/progress'
 import { toast } from 'sonner' 
-import { supabase } from '../../integrations/supabase/client' 
 import { 
   Heart, 
   Droplets, 
@@ -20,82 +19,25 @@ import {
   Target
 } from 'lucide-react'
 import DescricaoFormatada from '../utils/DescricaoFormatada';
-import JourneyActionDialog from './JourneyActionDialog'; // Importar o novo componente de diálogo
-
-// Interfaces para os dados do Supabase
-interface TrilhaCrescimento {
-  id: string;
-  id_igreja: string;
-  titulo: string;
-  descricao: string;
-  is_ativa: boolean;
-}
-
-interface QuizPergunta {
-  id?: string;
-  passo_id?: string;
-  ordem: number;
-  pergunta_texto: string;
-  opcoes: string[];
-  resposta_correta: number;
-  pontuacao: number;
-}
-
-interface PassoEtapa {
-  id: string;
-  id_etapa: string;
-  ordem: number;
-  titulo: string;
-  tipo_passo: 'video' | 'quiz' | 'leitura' | 'acao' | 'link_externo';
-  conteudo?: string;
-  created_at: string;
-  quiz_perguntas?: QuizPergunta[];
-}
-
-interface EtapaTrilha {
-  id: string;
-  id_trilha: string;
-  ordem: number;
-  titulo: string;
-  descricao: string;
-  tipo_conteudo: string;
-  conteudo: string;
-  cor: string;
-  created_at: string;
-}
-
-// Progresso agora é por PASSO, não por ETAPA
-interface ProgressoMembro {
-  id: string;
-  id_membro: string;
-  id_passo: string; // Alterado para id_passo
-  status: 'pendente' | 'concluido';
-  data_conclusao?: string;
-}
-
-// A estrutura final que será usada para renderizar
-interface JourneyPassoDisplay extends PassoEtapa {
-  completed: boolean;
-  completedDate?: string;
-}
-
-interface JourneyEtapaDisplay extends EtapaTrilha {
-  passos: JourneyPassoDisplay[];
-  allPassosCompleted: boolean;
-}
+import JourneyActionDialog from './JourneyActionDialog';
+import { useJourneyData, PassoEtapa } from '../../hooks/useJourneyData';
 
 const MemberJourney = () => {
-  const { user, currentChurchId } = useAuthStore() 
-  const [etapas, setEtapas] = useState<JourneyEtapaDisplay[]>([])
-  const [progresso, setProgresso] = useState<ProgressoMembro[]>([])
-  const [loading, setLoading] = useState(true)
-  const [overallProgress, setOverallProgress] = useState(0)
-  const [currentLevel, setCurrentLevel] = useState(0)
+  const { user, currentChurchId } = useAuthStore();
+  const {
+    loading,
+    etapas,
+    overallProgress,
+    completedSteps,
+    totalSteps,
+    currentLevel,
+    trilhaInfo,
+    markPassoCompleted,
+  } = useJourneyData();
 
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
   const [currentActionPasso, setCurrentActionPasso] = useState<PassoEtapa | null>(null);
 
-  // Funções auxiliares para ícones e cores
   const getStepIcon = (title: string) => {
     const lowerTitle = title.toLowerCase();
     if (lowerTitle.includes('decisão') || lowerTitle.includes('fé')) return <Heart className="w-6 h-6" />;
@@ -116,194 +58,6 @@ const MemberJourney = () => {
     if (lowerTitle.includes('ministério') || lowerTitle.includes('serviço')) return { color: 'text-purple-600', bgColor: 'bg-purple-50 border-purple-200' };
     if (lowerTitle.includes('liderança')) return { color: 'text-amber-600', bgColor: 'bg-amber-50 border-amber-200' };
     return { color: 'text-gray-600', bgColor: 'bg-gray-50 border-gray-200' };
-  };
-
-  const loadJourneyData = async () => {
-    if (!user?.id || !currentChurchId) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    console.log('MemberJourney: Loading journey data for user:', user.id, 'church:', currentChurchId);
-
-    try {
-      // 1. Buscar a trilha de crescimento da igreja
-      const { data: trilhaData, error: trilhaError } = await supabase
-        .from('trilhas_crescimento')
-        .select('id, titulo, descricao')
-        .eq('id_igreja', currentChurchId)
-        .eq('is_ativa', true)
-        .single();
-
-      if (trilhaError && trilhaError.code !== 'PGRST116') {
-        console.error('MemberJourney: Error loading trilha_crescimento:', trilhaError);
-        toast.error('Erro ao carregar a trilha de crescimento da igreja.');
-        setLoading(false);
-        return;
-      }
-
-      if (!trilhaData) {
-        console.log('MemberJourney: No active journey found for this church.');
-        setEtapas([]);
-        setProgresso([]);
-        setLoading(false);
-        return;
-      }
-
-      const trilhaId = trilhaData.id;
-
-      // 2. Buscar as etapas da trilha
-      const { data: etapasRawData, error: etapasDataError } = await supabase
-        .from('etapas_trilha')
-        .select('*')
-        .eq('id_trilha', trilhaId)
-        .order('ordem', { ascending: true });
-
-      if (etapasDataError) {
-        console.error('MemberJourney: Error loading etapas_trilha:', etapasDataError);
-        toast.error('Erro ao carregar as etapas da trilha.');
-        setLoading(false);
-        return;
-      }
-
-      const etapaIds = (etapasRawData || []).map(etapa => etapa.id);
-
-      // 3. Buscar todos os passos de todas as etapas
-      const { data: passosRawData, error: passosError } = await supabase
-        .from('passos_etapa')
-        .select('*')
-        .in('id_etapa', etapaIds)
-        .order('ordem', { ascending: true });
-
-      if (passosError) {
-        console.error('MemberJourney: Error loading passos_etapa:', passosError);
-        toast.error('Erro ao carregar os passos da jornada.');
-        setLoading(false);
-        return;
-      }
-
-      const passoIds = (passosRawData || []).map(passo => passo.id);
-
-      // 4. Buscar o progresso do membro para esses passos
-      const { data: progressoData, error: progressoError } = await supabase
-        .from('progresso_membros')
-        .select('*')
-        .eq('id_membro', user.id)
-        .in('id_passo', passoIds); // Filtrar por id_passo
-
-      if (progressoError) {
-        console.error('MemberJourney: Error loading progresso_membros:', progressoError);
-        toast.error('Erro ao carregar seu progresso na jornada.');
-        setLoading(false);
-        return;
-      }
-      setProgresso(progressoData || []);
-
-      // 5. Carregar perguntas de quiz para os passos do tipo 'quiz'
-      const quizPassoIds = (passosRawData || []).filter(p => p.tipo_passo === 'quiz').map(p => p.id);
-      let quizPerguntasData: QuizPergunta[] = [];
-      if (quizPassoIds.length > 0) {
-        const { data: qData, error: qError } = await supabase
-          .from('quiz_perguntas')
-          .select('*')
-          .in('passo_id', quizPassoIds)
-          .order('ordem', { ascending: true });
-        if (qError) console.error('Erro ao carregar perguntas de quiz:', qError);
-        quizPerguntasData = qData || [];
-      }
-
-      // 6. Aninhar passos e progresso nas etapas
-      const etapasComPassos: JourneyEtapaDisplay[] = (etapasRawData || []).map(etapa => {
-        const passosDaEtapa: JourneyPassoDisplay[] = (passosRawData || [])
-          .filter(passo => passo.id_etapa === etapa.id)
-          .map(passo => {
-            const passoProgresso = (progressoData || []).find(p => p.id_passo === passo.id);
-            return {
-              ...passo,
-              completed: passoProgresso?.status === 'concluido',
-              completedDate: passoProgresso?.data_conclusao,
-              quiz_perguntas: passo.tipo_passo === 'quiz' 
-                ? quizPerguntasData.filter(qp => qp.passo_id === passo.id) 
-                : undefined
-            };
-          });
-        
-        const allPassosCompleted = passosDaEtapa.every(p => p.completed);
-
-        return {
-          ...etapa,
-          passos: passosDaEtapa,
-          allPassosCompleted: allPassosCompleted,
-        };
-      });
-      
-      setEtapas(etapasComPassos);
-
-    } catch (error) {
-      console.error('MemberJourney: Unexpected error during data loading:', error);
-      toast.error('Ocorreu um erro inesperado ao carregar a jornada.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadJourneyData();
-  }, [user?.id, currentChurchId]);
-
-  useEffect(() => {
-    if (!loading && etapas.length > 0) {
-      const totalPassos = etapas.reduce((sum, etapa) => sum + etapa.passos.length, 0);
-      const completedPassos = etapas.reduce((sum, etapa) => sum + etapa.passos.filter(passo => passo.completed).length, 0);
-      
-      const progressPercentage = totalPassos > 0 ? (completedPassos / totalPassos) * 100 : 0;
-      
-      setOverallProgress(progressPercentage);
-      setCurrentLevel(etapas.filter(etapa => etapa.allPassosCompleted).length);
-    } else if (!loading && etapas.length === 0) {
-      // Se não houver etapas, o estado de intro será mantido
-    }
-  }, [etapas, loading]);
-
-  const markPassoCompleted = async (passoId: string) => {
-    if (!user?.id || !currentChurchId) {
-      toast.error('Erro: Usuário ou igreja não identificados.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const existingProgress = progresso.find(p => p.id_passo === passoId && p.id_membro === user.id);
-
-      if (existingProgress) {
-        const { error } = await supabase
-          .from('progresso_membros')
-          .update({ status: 'concluido', data_conclusao: new Date().toISOString() })
-          .eq('id', existingProgress.id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('progresso_membros')
-          .insert({
-            id_membro: user.id,
-            id_passo: passoId,
-            status: 'concluido',
-            data_conclusao: new Date().toISOString(),
-          });
-
-        if (error) throw error;
-      }
-
-      toast.success('Passo marcado como concluído!');
-      loadJourneyData(); // Recarrega todos os dados para atualizar o progresso
-    } catch (error: any) {
-      console.error('MemberJourney: Unexpected error marking passo completed:', error);
-      toast.error('Ocorreu um erro inesperado ao marcar o passo.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const getProgressColor = () => {
@@ -346,6 +100,11 @@ const MemberJourney = () => {
     setIsActionDialogOpen(true);
   };
 
+  const handleCompleteAndClose = async (passoId: string, quizDetails?: any) => {
+    setIsActionDialogOpen(false);
+    await markPassoCompleted(passoId, quizDetails);
+  };
+
   if (!currentChurchId) {
     return (
       <div className="p-6 text-center text-gray-600">
@@ -363,7 +122,7 @@ const MemberJourney = () => {
     );
   }
 
-  if (etapas.length === 0) {
+  if (!trilhaInfo) {
     return (
       <div className="p-6 space-y-6">
         <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
@@ -380,7 +139,7 @@ const MemberJourney = () => {
               Comece Sua Jornada!
             </CardTitle>
             <CardDescription className="text-base">
-              Parece que sua igreja ainda não configurou uma trilha de crescimento, ou você ainda não iniciou a sua.
+              Parece que sua igreja ainda não configurou uma trilha de crescimento.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -399,7 +158,7 @@ const MemberJourney = () => {
             </div>
             <div className="text-center">
               <Button 
-                onClick={() => toast.info('Aguarde a configuração da trilha pela sua igreja ou inicie a sua!')}
+                onClick={() => toast.info('Aguarde a configuração da trilha pelo administrador da sua igreja.')}
                 className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-lg px-8 py-3"
               >
                 Entendi!
@@ -415,9 +174,9 @@ const MemberJourney = () => {
   return (
     <div className="p-6 space-y-6">
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">Jornada do Membro 🎯</h1>
+        <h1 className="text-3xl font-bold mb-2">{trilhaInfo.titulo} 🎯</h1>
         <p className="text-blue-100 text-lg">
-          Acompanhe seu crescimento espiritual e ministerial
+          {trilhaInfo.descricao}
         </p>
       </div>
 
@@ -444,7 +203,7 @@ const MemberJourney = () => {
             </div>
             <Progress value={overallProgress} className="h-3" />
             <p className="text-sm text-gray-600">
-              {etapas.reduce((sum, etapa) => sum + etapa.passos.filter(p => p.completed).length, 0)} de {etapas.reduce((sum, etapa) => sum + etapa.passos.length, 0)} passos concluídos
+              {completedSteps} de {totalSteps} passos concluídos
             </p>
           </div>
         </CardContent>
@@ -583,7 +342,7 @@ const MemberJourney = () => {
         isOpen={isActionDialogOpen}
         onClose={() => setIsActionDialogOpen(false)}
         passo={currentActionPasso}
-        onCompletePasso={markPassoCompleted}
+        onCompletePasso={handleCompleteAndClose}
       />
     </div>
   )

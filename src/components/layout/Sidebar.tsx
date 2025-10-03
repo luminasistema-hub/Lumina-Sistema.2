@@ -1,386 +1,191 @@
-import { useState, useEffect } from 'react'
-import { useAuthStore, UserRole } from '../../stores/authStore'
-import { Button } from '../ui/button'
-import { Badge } from '../ui/badge'
-import { 
-  Users, 
-  Calendar, 
-  DollarSign, 
-  Settings, 
-  Church, 
-  BookOpen, 
-  Heart,
-  Mic,
-  Baby,
-  GraduationCap,
-  User,
-  UserCheck,
-  Crown,
-  Shield,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  Home,
-  Globe,
-  Headphones,
-  Activity,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  ClipboardList 
-} from 'lucide-react'
-import { cn } from '../../lib/utils'
-import { useNavigate } from 'react-router-dom' 
+import { useState } from "react";
+import { useAuthStore, UserRole } from "../../stores/authStore";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import {
+  Users, Calendar, DollarSign, Settings, Church, BookOpen, Heart,
+  Baby, GraduationCap, User, Shield, ChevronLeft, ChevronRight,
+  ChevronDown, ChevronUp, Home, Activity, ClipboardList
+} from "lucide-react";
+import { cn } from "../../lib/utils";
+import { useNavigate } from "react-router-dom";
 
+// 🔹 Tipos de módulos
 interface ModuleItem {
-  id: string
-  title: string
-  icon: React.ReactNode
-  roles: UserRole[]
-  status: 'complete' | 'development' | 'basic'
-  active?: boolean
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  roles: UserRole[];
+  status: "complete" | "development" | "basic";
 }
 
 interface ModuleCategory {
-  id: string
-  title: string
-  icon: React.ReactNode
-  modules: ModuleItem[]
-  defaultOpen?: boolean
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  modules: ModuleItem[];
+  defaultOpen?: boolean;
 }
 
+// 🔹 Definição das categorias
 const moduleCategories: ModuleCategory[] = [
   {
-    id: 'personal',
-    title: 'Área Pessoal',
+    id: "personal",
+    title: "Área Pessoal",
     icon: <User className="w-5 h-5" />,
     defaultOpen: true,
     modules: [
-      {
-        id: 'personal-info',
-        title: 'Informações Pessoais',
-        icon: <User className="w-4 h-4" />,
-        roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'financeiro', 'voluntario', 'midia_tecnologia', 'integra'],
-        status: 'complete'
-      },
-      {
-        id: 'member-journey',
-        title: 'Jornada do Membro',
-        icon: <GraduationCap className="w-4 h-4" />,
-        roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'financeiro', 'voluntario', 'midia_tecnologia', 'integra'],
-        status: 'complete'
-      },
-      {
-        id: 'vocational-test',
-        title: 'Teste Vocacional',
-        icon: <Heart className="w-4 h-4" />,
-        roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'financeiro', 'voluntario', 'midia_tecnologia', 'integra'],
-        status: 'complete'
-      }
+      { id: "personal-info", title: "Informações Pessoais", icon: <User className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+      { id: "member-journey", title: "Jornada do Membro", icon: <GraduationCap className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+      { id: "vocational-test", title: "Teste Vocacional", icon: <Heart className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" }
     ]
   },
   {
-    id: 'spiritual',
-    title: 'Crescimento Espiritual',
+    id: "spiritual",
+    title: "Crescimento Espiritual",
     icon: <BookOpen className="w-5 h-5" />,
+    defaultOpen: true,
     modules: [
-      {
-        id: 'events',
-        title: 'Eventos',
-        icon: <Calendar className="w-4 h-4" />,
-        roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'financeiro', 'voluntario', 'midia_tecnologia', 'integra'],
-        status: 'complete'
-      },
-      {
-        id: 'courses',
-        title: 'Cursos EAD',
-        icon: <BookOpen className="w-4 h-4" />,
-        roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'financeiro', 'voluntario', 'midia_tecnologia', 'integra'],
-        status: 'complete'
-      },
-      {
-        id: 'devotionals',
-        title: 'Devocionais',
-        icon: <BookOpen className="w-4 h-4" />,
-        roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'financeiro', 'voluntario', 'midia_tecnologia', 'integra'],
-        status: 'complete'
-      }
+      { id: "events", title: "Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+      { id: "devotionals", title: "Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+      { id: "my-ministry", title: "Escalas & Voluntários", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","voluntario","pastor","admin"], status: "complete" }
     ]
   },
   {
-    id: 'contributions',
-    title: 'Contribuições',
+    id: "contributions",
+    title: "Contribuições",
     icon: <DollarSign className="w-5 h-5" />,
     modules: [
-      {
-        id: 'offerings',
-        title: 'Ofertas e Doações',
-        icon: <DollarSign className="w-4 h-4" />,
-        roles: ['membro', 'lider_ministerio', 'pastor', 'admin', 'financeiro', 'voluntario', 'midia_tecnologia', 'integra'],
-        status: 'complete'
-      }
+      { id: "offerings", title: "Ofertas e Doações", icon: <DollarSign className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" }
     ]
   },
   {
-    id: 'management',
-    title: 'Gestão',
+    id: "management",
+    title: "Gestão",
     icon: <Users className="w-5 h-5" />,
+    defaultOpen: true,
     modules: [
-      {
-        id: 'member-management',
-        title: 'Gestão de Membros',
-        icon: <Users className="w-4 h-4" />,
-        roles: ['lider_ministerio', 'pastor', 'admin', 'integra'],
-        status: 'complete'
-      },
-      {
-        id: 'ministries',
-        title: 'Ministérios',
-        icon: <Church className="w-4 h-4" />,
-        roles: ['lider_ministerio', 'pastor', 'admin'],
-        status: 'complete'
-      },
-      {
-        id: 'financial-panel',
-        title: 'Painel Financeiro',
-        icon: <DollarSign className="w-4 h-4" />,
-        roles: ['pastor', 'admin', 'financeiro'],
-        status: 'complete'
-      },
-      { 
-        id: 'journey-config',
-        title: 'Configuração da Jornada',
-        icon: <ClipboardList className="w-4 h-4" />,
-        roles: ['admin', 'pastor'], 
-        status: 'complete'
-      },
-      { 
-        id: 'kids-management',
-        title: 'Gestão Kids',
-        icon: <Baby className="w-4 h-4" />,
-        roles: ['admin', 'pastor', 'lider_ministerio', 'membro'], 
-        status: 'complete'
-      }
+      { id: "order-of-service", title: "Ordem de Culto", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin"], status: "complete" },
+      { id: "member-management", title: "Gestão de Membros", icon: <Users className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin","integra"], status: "complete" },
+      { id: "ministries", title: "Ministérios", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
+      { id: "financial-panel", title: "Painel Financeiro", icon: <DollarSign className="w-4 h-4" />, roles: ["pastor","admin","financeiro"], status: "complete" },
+      { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor"], status: "complete" },
+      { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","membro"], status: "complete" }
     ]
   },
   {
-    id: 'media',
-    title: 'Mídia e Transmissão',
-    icon: <Mic className="w-5 h-5" />,
-    modules: [
-      {
-        id: 'live-streaming',
-        title: 'Transmissão ao Vivo',
-        icon: <Mic className="w-4 h-4" />,
-        roles: [], // desabilitado: não aparece para nenhum perfil
-        status: 'development'
-      }
-    ]
-  },
-  {
-    id: 'administration',
-    title: 'Administração',
+    id: "administration",
+    title: "Administração",
     icon: <Settings className="w-5 h-5" />,
     modules: [
-      {
-        id: 'site-management',
-        title: 'Gestão de Site',
-        icon: <Globe className="w-4 h-4" />,
-        roles: [], // desabilitado: não aparece para nenhum perfil
-        status: 'development'
-      },
-      {
-        id: 'system-settings',
-        title: 'Configurações',
-        icon: <Settings className="w-4 h-4" />,
-        roles: ['admin'],
-        status: 'basic'
-      }
-    ]
-  },
-  {
-    id: 'system',
-    title: 'Sistema',
-    icon: <Activity className="w-5 h-5" />,
-    modules: [
-      {
-        id: 'system-status',
-        title: 'Status do Sistema',
-        icon: <Activity className="w-4 h-4" />,
-        roles: ['admin'],
-        status: 'complete'
-      }
+      { id: "system-settings", title: "Configurações", icon: <Settings className="w-4 h-4" />, roles: ["admin"], status: "basic" },
+      { id: "system-status", title: "Status do Sistema", icon: <Activity className="w-4 h-4" />, roles: ["admin"], status: "complete" }
     ]
   }
-]
+];
 
+// 🔹 Props da Sidebar
 interface SidebarProps {
-  activeModule?: string
-  onModuleSelect?: (moduleId: string) => void
+  activeModule?: string;
+  onModuleSelect?: (moduleId: string) => void;
 }
 
-const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) => {
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['personal', 'management'])
-  const { user } = useAuthStore()
-  const navigate = useNavigate()
+const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(["personal","management","spiritual"]);
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
 
   const toggleCategory = (categoryId: string) => {
-    setExpandedCategories(prev => 
-      prev.includes(categoryId) 
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    )
-  }
+    setExpandedCategories(prev =>
+      prev.includes(categoryId) ? prev.filter(id => id !== categoryId) : [...prev, categoryId]
+    );
+  };
 
+  // CORREÇÃO: Lógica de clique simplificada para notificar o DashboardPage
   const handleModuleClick = (moduleId: string) => {
-    if (moduleId === 'master-admin') {
-      navigate('/master-admin')
+    if (moduleId === "master-admin") {
+      navigate("/master-admin");
     } else {
-      onModuleSelect?.(moduleId)
+      onModuleSelect?.(moduleId);
     }
-  }
+  };
 
-  const getRoleIcon = (role: UserRole) => {
-    switch (role) {
-      case 'super_admin': return <Shield className="w-3 h-3" />
-      case 'admin': return <Shield className="w-3 h-3" />
-      case 'pastor': return <Crown className="w-3 h-3" />
-      case 'lider_ministerio': return <UserCheck className="w-3 h-3" />
-      case 'financeiro': return <DollarSign className="w-3 h-3" />
-      case 'voluntario': return <Users className="w-3 h-3" />
-      case 'midia_tecnologia': return <Headphones className="w-3 h-3" />
-      case 'integra': return <Heart className="w-3 h-3" />
-      case 'membro': return <User className="w-3 h-3" />
-    }
-  }
-
-  const getRoleColor = (role: UserRole) => {
-    switch (role) {
-      case 'super_admin': return 'bg-red-100 text-red-700 border-red-200'
-      case 'admin': return 'bg-red-100 text-red-700 border-red-200'
-      case 'pastor': return 'bg-purple-100 text-purple-700 border-purple-200'
-      case 'lider_ministerio': return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'financeiro': return 'bg-green-100 text-green-700 border-green-200'
-      case 'voluntario': return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-      case 'midia_tecnologia': return 'bg-indigo-100 text-indigo-700 border-indigo-200'
-      case 'integra': return 'bg-pink-100 text-pink-700 border-pink-200'
-      case 'membro': return 'bg-gray-100 text-gray-700 border-gray-200'
-    }
-  }
-
-  const getRoleLabel = (role: UserRole) => {
-    switch (role) {
-      case 'super_admin': return 'Super Admin'
-      case 'admin': return 'Admin'
-      case 'pastor': return 'Pastor'
-      case 'lider_ministerio': return 'Líder'
-      case 'financeiro': return 'Financeiro'
-      case 'voluntario': return 'Voluntário'
-      case 'midia_tecnologia': return 'Mídia'
-      case 'integra': return 'Integração'
-      case 'membro': return 'Membro'
-    }
-  }
-
-  const getStatusIcon = (status: ModuleItem['status']) => {
-    switch (status) {
-      case 'complete': return <CheckCircle className="w-3 h-3 text-green-500" />
-      case 'development': return <Clock className="w-3 h-3 text-yellow-500" />
-      case 'basic': return <AlertCircle className="w-3 h-3 text-blue-500" />
-    }
-  }
+  const getRoleLabel = (role: UserRole) => ({
+    "super_admin": "Super Admin", "admin": "Admin", "pastor": "Pastor", "lider_ministerio": "Líder",
+    "financeiro": "Financeiro", "voluntario": "Voluntário", "midia_tecnologia": "Mídia",
+    "integra": "Integração", "membro": "Membro"
+  }[role] || "");
 
   const getUserModules = (modules: ModuleItem[]) => {
-    return modules.filter(module => module.roles.includes(user.role))
-  }
+    if (!user) return [];
+    return modules.filter(module => module.roles.includes(user.role));
+  };
 
   const getUserCategories = () => {
-    return moduleCategories.filter(category => 
-      getUserModules(category.modules).length > 0
-    )
-  }
+    return moduleCategories.filter(category => getUserModules(category.modules).length > 0);
+  };
+
+  if (!user) return null;
 
   return (
     <div className={cn(
-      "h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300",
+      "h-screen bg-white border-r flex flex-col transition-all duration-300",
       isCollapsed ? "w-16" : "w-72"
     )}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between p-4 border-b">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
             <img src="/favicon.ico" alt="Lumina Logo" className="h-8 w-8" />
             <div>
-              <h1 className="font-bold text-gray-900">Lumina</h1>
+              <h1 className="font-bold">Lumina</h1>
               <p className="text-xs text-gray-500">Sistema de Gestão</p>
             </div>
           </div>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="h-8 w-8 p-0"
-        >
+        <Button variant="ghost" size="sm" onClick={() => setIsCollapsed(!isCollapsed)} className="h-8 w-8 p-0">
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </Button>
       </div>
 
-      {/* User Info */}
+      {/* Usuário logado */}
       {!isCollapsed && (
-        <div className="p-4 border-b border-gray-100">
+        <div className="p-4 border-b">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
+              {user?.name?.charAt(0).toUpperCase() || "U"}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 truncate">{user?.name || 'Usuário'}</p>
-              <Badge className={cn("text-xs", getRoleColor(user?.role))}>
-                {getRoleIcon(user?.role)}
-                <span className="ml-1">{getRoleLabel(user?.role)}</span>
-              </Badge>
+              <p className="font-medium truncate">{user?.name || "Usuário"}</p>
+              <Badge className="text-xs">{getRoleLabel(user?.role)}</Badge>
             </div>
           </div>
-          {user?.churchName && user?.role !== 'super_admin' && (
-            <p className="text-xs text-gray-500 mt-2 truncate">📍 {user?.churchName}</p>
-          )}
-          {user?.role === 'super_admin' && (
-            <p className="text-xs text-gray-500 mt-2 truncate">👑 Painel Master</p>
-          )}
+          <p className="text-xs text-gray-500 mt-2 truncate">📍 {user?.churchName || "Painel Master"}</p>
         </div>
       )}
 
-      {/* Navigation */}
+      {/* Conteúdo da Sidebar */}
       <div className="flex-1 overflow-y-auto py-4">
-        {/* Dashboard Home */}
+        {/* Dashboard */}
         <div className="px-4 mb-4">
           <Button
-            variant={activeModule === 'dashboard' ? 'default' : 'ghost'}
-            className={cn(
-              "w-full justify-start",
-              isCollapsed ? "px-2" : "px-3",
-              activeModule === 'dashboard' && "bg-blue-50 text-blue-700 hover:bg-blue-100"
-            )}
-            onClick={() => handleModuleClick('dashboard')}
+            variant={activeModule === "dashboard" ? "secondary" : "ghost"}
+            className="w-full justify-start"
+            onClick={() => handleModuleClick("dashboard")}
           >
             <Home className="w-4 h-4" />
             {!isCollapsed && <span className="ml-3">Dashboard</span>}
           </Button>
         </div>
 
-        {/* Master Admin Link */}
-        {user?.role === 'super_admin' && (
+        {/* Painel Master só para super_admin */}
+        {user?.role === "super_admin" && (
           <div className="px-4 mb-4">
             <Button
-              variant={activeModule === 'master-admin' ? 'default' : 'ghost'}
-              className={cn(
-                "w-full justify-start",
-                isCollapsed ? "px-2" : "px-3",
-                activeModule === 'master-admin' && "bg-red-50 text-red-700 hover:bg-red-100"
-              )}
-              onClick={() => handleModuleClick('master-admin')}
+              variant={activeModule === "master-admin" ? "secondary" : "ghost"}
+              className="w-full justify-start"
+              onClick={() => handleModuleClick("master-admin")}
             >
               <Shield className="w-4 h-4" />
               {!isCollapsed && <span className="ml-3">Painel Master</span>}
@@ -388,37 +193,19 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
           </div>
         )}
 
-        {/* Link para Registro de Super Admin (visível se não houver super admin logado) */}
-        {!user && (
-          <div className="px-4 mb-4">
-            <Button
-              variant="ghost"
-              className={cn(
-                "w-full justify-start",
-                isCollapsed ? "px-2" : "px-3",
-                "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
-              )}
-              onClick={() => navigate('/super-admin-register')}
-            >
-              <Shield className="w-4 h-4" />
-              {!isCollapsed && <span className="ml-3">Registrar Super Admin</span>}
-            </Button>
-          </div>
-        )}
-
-        {/* Module Categories */}
+        {/* Categorias + Módulos */}
         <div className="space-y-2">
           {getUserCategories().map((category) => {
-            const userModules = getUserModules(category.modules)
-            const isExpanded = expandedCategories.includes(category.id)
+            const userModules = getUserModules(category.modules);
+            if (userModules.length === 0) return null;
+            const isExpanded = expandedCategories.includes(category.id);
 
             return (
               <div key={category.id}>
-                {/* Category Header */}
                 {!isCollapsed && (
                   <Button
                     variant="ghost"
-                    className="w-full justify-between px-4 py-2 h-auto text-left font-medium text-gray-600 hover:text-gray-900"
+                    className="w-full justify-between px-4"
                     onClick={() => toggleCategory(category.id)}
                   >
                     <div className="flex items-center gap-3">
@@ -428,62 +215,31 @@ const Sidebar = ({ activeModule = 'dashboard', onModuleSelect }: SidebarProps) =
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
                 )}
-
-                {/* Category Modules */}
                 {(isCollapsed || isExpanded) && (
                   <div className={cn("space-y-1", isCollapsed ? "px-2" : "px-4 ml-4")}>
                     {userModules.map((module) => (
                       <Button
                         key={module.id}
-                        variant={activeModule === module.id ? 'default' : 'ghost'}
-                        className={cn(
-                          "w-full justify-start text-sm",
-                          isCollapsed ? "px-2 py-2" : "px-3 py-2",
-                          activeModule === module.id 
-                            ? "bg-blue-50 text-blue-700 hover:bg-blue-100 border-l-2 border-blue-500" 
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                        )}
+                        variant={activeModule === module.id ? "secondary" : "ghost"}
+                        className="w-full justify-start text-sm"
                         onClick={() => handleModuleClick(module.id)}
                         title={isCollapsed ? module.title : undefined}
                       >
                         <div className="flex items-center gap-2 w-full">
                           {module.icon}
-                          {!isCollapsed && (
-                            <>
-                              <span className="ml-1 flex-1">{module.title}</span>
-                              {getStatusIcon(module.status)}
-                            </>
-                          )}
+                          {!isCollapsed && <span className="ml-1 flex-1">{module.title}</span>}
                         </div>
                       </Button>
                     ))}
                   </div>
                 )}
               </div>
-            )
+            );
           })}
         </div>
       </div>
-
-      {/* Footer */}
-      {!isCollapsed && (
-        <div className="p-4 border-t border-gray-100">
-          <div className="text-center">
-            <p className="text-xs text-gray-500">
-              Lumina - Sistema de Gestão
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              © {new Date().getFullYear()} Lumina
-            </p>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs text-green-600">Sistema Online</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  )
-}
+  );
+};
 
-export default Sidebar
+export default Sidebar;

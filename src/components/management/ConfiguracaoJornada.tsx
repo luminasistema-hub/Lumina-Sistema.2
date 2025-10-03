@@ -16,12 +16,12 @@ import { SortableEtapaItem } from './SortableEtapaItem';
 import { SortablePassoItem } from './SortablePassoItem';
 
 interface QuizPergunta {
-  id?: string; // Opcional para novas perguntas
+  id?: string;
   passo_id?: string;
   ordem: number;
   pergunta_texto: string;
   opcoes: string[];
-  resposta_correta: number; // Índice da opção correta (0-based)
+  resposta_correta: number;
   pontuacao: number;
 }
 
@@ -33,7 +33,7 @@ interface PassoEtapa {
   tipo_passo: 'video' | 'quiz' | 'leitura' | 'acao' | 'link_externo';
   conteudo?: string;
   created_at: string;
-  quiz_perguntas?: QuizPergunta[]; // Adicionado para quizzes
+  quiz_perguntas?: QuizPergunta[];
 }
 
 interface EtapaTrilha {
@@ -42,8 +42,6 @@ interface EtapaTrilha {
   ordem: number;
   titulo: string;
   descricao: string;
-  tipo_conteudo: string;
-  conteudo: string;
   cor: string;
   created_at: string;
   passos: PassoEtapa[];
@@ -69,7 +67,7 @@ const ConfiguracaoJornada = () => {
     titulo: '',
     tipo_passo: 'leitura',
     conteudo: '',
-    quiz_perguntas: [], // Inicializa com array vazio para quizzes
+    quiz_perguntas: [],
   });
 
   const coresDisponiveis = [
@@ -104,65 +102,43 @@ const ConfiguracaoJornada = () => {
     }
     setLoading(true);
     try {
-      const { data: trilha, error: trilhaError } = await supabase
+      const { data: trilhaData, error } = await supabase
         .from('trilhas_crescimento')
-        .select('id')
+        .select(`
+          id,
+          etapas_trilha (
+            *,
+            passos_etapa (
+              *,
+              quiz_perguntas (*)
+            )
+          )
+        `)
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
         .single();
       
-      if (trilhaError && trilhaError.code !== 'PGRST116') {
-        console.error('Erro ao buscar trilha ativa:', trilhaError);
-        setEtapasAninhadas([]);
-        return;
-      }
+      if (error && error.code !== 'PGRST116') throw error;
 
-      if (trilha) {
-        const { data: etapasData, error: etapasDataError } = await supabase
-          .from('etapas_trilha')
-          .select('*')
-          .eq('id_trilha', trilha.id)
-          .order('ordem', { ascending: true });
-        if (etapasDataError) throw etapasDataError;
+      if (trilhaData && trilhaData.etapas_trilha) {
+        const etapasOrdenadas = (trilhaData.etapas_trilha as any[]).map(etapa => {
+          const passosOrdenados = etapa.passos_etapa 
+            ? [...etapa.passos_etapa].sort((a, b) => a.ordem - b.ordem)
+            : [];
+          
+          const passosComQuizCorreto = passosOrdenados.map(passo => ({
+            ...passo,
+            quiz_perguntas: passo.quiz_perguntas ? [...passo.quiz_perguntas].sort((a,b) => a.ordem - b.ordem) : []
+          }));
+          
+          return { ...etapa, passos: passosComQuizCorreto };
+        }).sort((a, b) => a.ordem - b.ordem);
 
-        const etapaIds = (etapasData || []).map(e => e.id);
-        const { data: passosData, error: passosError } = await supabase
-          .from('passos_etapa')
-          .select('*')
-          .in('id_etapa', etapaIds)
-          .order('ordem', { ascending: true });
-        if (passosError) throw passosError;
-
-        // Carregar perguntas de quiz para os passos do tipo 'quiz'
-        const quizPassoIds = (passosData || []).filter(p => p.tipo_passo === 'quiz').map(p => p.id);
-        let quizPerguntasData: QuizPergunta[] = [];
-        if (quizPassoIds.length > 0) {
-          const { data: qData, error: qError } = await supabase
-            .from('quiz_perguntas')
-            .select('*')
-            .in('passo_id', quizPassoIds)
-            .order('ordem', { ascending: true });
-          if (qError) console.error('Erro ao carregar perguntas de quiz:', qError);
-          quizPerguntasData = qData || [];
-        }
-
-        const etapasComPassos = (etapasData || []).map(etapa => ({
-          ...etapa,
-          passos: (passosData || [])
-            .filter(passo => passo.id_etapa === etapa.id)
-            .map(passo => ({
-              ...passo,
-              quiz_perguntas: passo.tipo_passo === 'quiz' 
-                ? quizPerguntasData.filter(qp => qp.passo_id === passo.id) 
-                : undefined
-            })) || []
-        }));
-        
-        setEtapasAninhadas(etapasComPassos);
+        setEtapasAninhadas(etapasOrdenadas);
       } else {
         setEtapasAninhadas([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao carregar a jornada completa:", error);
       toast.error("Erro ao carregar a jornada. Tente novamente.");
       setEtapasAninhadas([]);
@@ -366,14 +342,12 @@ const ConfiguracaoJornada = () => {
 
       // Lógica para salvar perguntas do quiz
       if (formPassoData.tipo_passo === 'quiz' && formPassoData.quiz_perguntas) {
-        // Primeiro, apagar todas as perguntas existentes para este passo
         const { error: deleteError } = await supabase
           .from('quiz_perguntas')
           .delete()
           .eq('passo_id', passoId);
         if (deleteError) throw deleteError;
 
-        // Em seguida, inserir as novas perguntas
         const perguntasToInsert = formPassoData.quiz_perguntas.map((q, index) => ({
           passo_id: passoId,
           ordem: index + 1,
@@ -383,11 +357,13 @@ const ConfiguracaoJornada = () => {
           pontuacao: q.pontuacao,
         }));
 
-        const { error: insertQuizError } = await supabase
-          .from('quiz_perguntas')
-          .insert(perguntasToInsert);
-        if (insertQuizError) throw insertQuizError;
-        toast.success('Perguntas do quiz salvas!');
+        if (perguntasToInsert.length > 0) {
+            const { error: insertQuizError } = await supabase
+                .from('quiz_perguntas')
+                .insert(perguntasToInsert);
+            if (insertQuizError) throw insertQuizError;
+            toast.success('Perguntas do quiz salvas!');
+        }
       }
       
       setIsPassoModalOpen(false);
@@ -406,7 +382,6 @@ const ConfiguracaoJornada = () => {
     }
     setLoading(true);
     try {
-      // O CASCADE DELETE na FK cuidará das perguntas do quiz
       const { error } = await supabase
         .from('passos_etapa')
         .delete()
@@ -425,9 +400,7 @@ const ConfiguracaoJornada = () => {
 
   const handleDragEnd = async (event: any) => {
     const { active, over } = event;
-
     if (!over || active.id === over.id) return;
-
     const isEtapaDrag = etapasAninhadas.some(etapa => etapa.id === active.id);
 
     if (isEtapaDrag) {
@@ -438,21 +411,18 @@ const ConfiguracaoJornada = () => {
         const newEtapas = Array.from(etapasAninhadas);
         const [movedEtapa] = newEtapas.splice(oldIndex, 1);
         newEtapas.splice(newIndex, 0, movedEtapa);
-
         setEtapasAninhadas(newEtapas);
 
         setLoading(true);
         try {
-          const updates = newEtapas.map((etapa, index) => ({
-            id: etapa.id,
-            ordem: index + 1,
-          }));
+          const updates = newEtapas.map((etapa, index) => ({ id: etapa.id, ordem: index + 1 }));
           const { error } = await supabase.from('etapas_trilha').upsert(updates);
           if (error) throw error;
           toast.success('Ordem das etapas atualizada!');
         } catch (error: any) {
           console.error("Erro ao atualizar ordem das etapas:", error);
           toast.error('Erro ao salvar a nova ordem das etapas: ' + error.message);
+          carregarJornadaCompleta(); // Reverter em caso de erro
         } finally {
           setLoading(false);
         }
@@ -460,7 +430,6 @@ const ConfiguracaoJornada = () => {
     } else {
       const etapaId = etapasAninhadas.find(etapa => etapa.passos.some(passo => passo.id === active.id))?.id;
       if (!etapaId) return;
-
       const etapaIndex = etapasAninhadas.findIndex(etapa => etapa.id === etapaId);
       if (etapaIndex === -1) return;
 
@@ -468,29 +437,23 @@ const ConfiguracaoJornada = () => {
       const newIndex = etapasAninhadas[etapaIndex].passos.findIndex(passo => passo.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        const newEtapasAninhadas = Array.from(etapasAninhadas);
-        const newPassos = Array.from(newEtapasAninhadas[etapaIndex].passos);
+        const newEtapasAninhadas = [...etapasAninhadas];
+        const newPassos = [...newEtapasAninhadas[etapaIndex].passos];
         const [movedPasso] = newPassos.splice(oldIndex, 1);
         newPassos.splice(newIndex, 0, movedPasso);
-
-        newEtapasAninhadas[etapaIndex] = {
-          ...newEtapasAninhadas[etapaIndex],
-          passos: newPassos,
-        };
+        newEtapasAninhadas[etapaIndex] = { ...newEtapasAninhadas[etapaIndex], passos: newPassos };
         setEtapasAninhadas(newEtapasAninhadas);
 
         setLoading(true);
         try {
-          const updates = newPassos.map((passo, index) => ({
-            id: passo.id,
-            ordem: index + 1,
-          }));
+          const updates = newPassos.map((passo, index) => ({ id: passo.id, ordem: index + 1 }));
           const { error } = await supabase.from('passos_etapa').upsert(updates);
           if (error) throw error;
           toast.success('Ordem dos passos atualizada!');
         } catch (error: any) {
           console.error("Erro ao atualizar ordem dos passos:", error);
           toast.error('Erro ao salvar a nova ordem dos passos: ' + error.message);
+          carregarJornadaCompleta(); // Reverter em caso de erro
         } finally {
           setLoading(false);
         }
@@ -498,7 +461,6 @@ const ConfiguracaoJornada = () => {
     }
   };
 
-  // Funções para gerenciar perguntas do quiz no formulário
   const addQuizQuestion = () => {
     if (formPassoData.quiz_perguntas && formPassoData.quiz_perguntas.length >= 10) {
       toast.error('Máximo de 10 perguntas por quiz.');
@@ -519,11 +481,7 @@ const ConfiguracaoJornada = () => {
   const updateQuizQuestion = (index: number, field: keyof QuizPergunta, value: any) => {
     setFormPassoData(prev => {
       const newQuestions = [...(prev.quiz_perguntas || [])];
-      if (field === 'opcoes') {
-        newQuestions[index] = { ...newQuestions[index], [field]: value };
-      } else {
-        newQuestions[index] = { ...newQuestions[index], [field]: value };
-      }
+      newQuestions[index] = { ...newQuestions[index], [field]: value };
       return { ...prev, quiz_perguntas: newQuestions };
     });
   };
@@ -565,8 +523,8 @@ const ConfiguracaoJornada = () => {
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 text-white mb-6 shadow-lg">
-         <h1 className="text-3xl font-bold">Configuração da Jornada 🗺️</h1>
-         <p className="opacity-90 mt-1">Gerencie as etapas e passos da trilha de crescimento da sua igreja.</p>
+          <h1 className="text-3xl font-bold">Configuração da Jornada 🗺️</h1>
+          <p className="opacity-90 mt-1">Gerencie as etapas e passos da trilha de crescimento da sua igreja.</p>
       </div>
 
       <Card className="bg-white p-6 rounded-xl shadow-lg">
@@ -730,8 +688,8 @@ const ConfiguracaoJornada = () => {
                   setFormPassoData(prev => ({
                     ...prev,
                     tipo_passo: value as PassoEtapa['tipo_passo'],
-                    conteudo: value === 'quiz' ? undefined : prev.conteudo, // Limpa conteúdo se for quiz
-                    quiz_perguntas: value === 'quiz' ? (prev.quiz_perguntas || []) : undefined, // Inicializa quiz_perguntas se for quiz
+                    conteudo: value === 'quiz' ? undefined : prev.conteudo,
+                    quiz_perguntas: value === 'quiz' ? (prev.quiz_perguntas || []) : undefined,
                   }));
                 }}
               >
