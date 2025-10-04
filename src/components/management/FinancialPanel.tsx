@@ -1094,22 +1094,28 @@ const FinancialPanel = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="w-full justify-start" variant="outline">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nova Transação
-                    </Button>
-                  </DialogTrigger>
-                </Dialog>
-                <Dialog open={isAddBudgetOpen} onOpenChange={setIsAddBudgetOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="w-full justify-start" variant="outline">
-                      <Target className="w-4 h-4 mr-2" />
-                      Novo Orçamento
-                    </Button>
-                  </DialogTrigger>
-                </Dialog>
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={() => {
+                    setViewMode('transactions')
+                    setIsAddTransactionOpen(true)
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nova Transação
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={() => {
+                    setViewMode('budget')
+                    setIsAddBudgetOpen(true)
+                  }}
+                >
+                  <Target className="w-4 h-4 mr-2" />
+                  Novo Orçamento
+                </Button>
               </CardContent>
             </Card>
 
@@ -1452,6 +1458,16 @@ const FinancialPanel = () => {
                         )}
                       </div>
                       <div className="flex gap-2">
+                        {transaction.tipo === 'Entrada' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => generateReceipt(transaction)}
+                          >
+                            <Receipt className="w-4 h-4 mr-2" />
+                            Recibo
+                          </Button>
+                        )}
                         <Button 
                           size="sm" 
                           className="bg-green-500 hover:bg-green-600"
@@ -1572,7 +1588,7 @@ const FinancialPanel = () => {
                           Aprovar
                         </Button>
                       )}
-                      {transaction.tipo === 'Entrada' && transaction.status === 'Confirmado' && (
+                      {transaction.tipo === 'Entrada' && (
                         <Button 
                           variant="outline" 
                           size="sm"
