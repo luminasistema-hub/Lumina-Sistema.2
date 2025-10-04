@@ -24,6 +24,7 @@ import {
   UserX,
   UserPlus
 } from 'lucide-react'
+import AddMinistryDialog from './AddMinistryDialog'
 
 // Interfaces
 interface Ministry {
@@ -31,27 +32,6 @@ interface Ministry {
   lider_nome?: string; created_at: string; id_igreja: string;
   volunteers_count?: number;
 }
-interface MemberOption { id: string; nome_completo: string; }
-interface Volunteer extends MemberOption { volunteer_id: string; }
-interface EventOption { id: string; nome: string; }
-interface Schedule {
-  id: string; data_servico: string; evento_id: string | null;
-  observacoes: string | null; evento_nome?: string;
-  voluntarios: { id: string; nome_completo: string }[];
-}
-
-const defaultMinistries = [
-    { nome: 'Louvor e Adoração', descricao: 'Responsáveis pela música e condução dos momentos de adoração.' },
-    { nome: 'Ministério Infantil', descricao: 'Cuida das crianças durante cultos e atividades.' },
-    { nome: 'Ministério de Jovens/Adolescentes', descricao: 'Voltado ao ensino e acompanhamento dessa faixa etária.' },
-    { nome: 'Ministério de Ensino/Bíblia', descricao: 'Escola Bíblica, discipulado, cursos de fundamentos da fé.' },
-    { nome: 'Ministério de Intercessão/Oração', descricao: 'Grupos de oração pela igreja, famílias e causas específicas.' },
-    { nome: 'Ministério de Evangelismo/Missões', descricao: 'Responsável por ações evangelísticas e missionárias.' },
-    { nome: 'Ministério de Ação Social', descricao: 'Voltado para assistência a necessitados (alimento, roupas, visitas etc.).' },
-    { nome: 'Ministério de Casais/Família', descricao: 'Fortalecimento dos lares, aconselhamento e eventos específicos.' },
-    { nome: 'Ministério de Comunicação/Mídia', descricao: 'Transmissão de cultos, redes sociais, projeção de letras e avisos.' },
-    { nome: 'Ministério de Recepção/Diaconato', descricao: 'Acolhimento de visitantes, organização do culto e apoio logístico.' },
-];
 
 const MinistriesPage = () => {
   const { user, currentChurchId } = useAuthStore()
@@ -64,6 +44,7 @@ const MinistriesPage = () => {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
+  const [openAddDialog, setOpenAddDialog] = useState(false);
 
   const canManage = user?.role === 'admin' || user?.role === 'pastor';
   const isLeaderOfSelected = selectedMinistry?.lider_id === user?.id;
@@ -77,19 +58,8 @@ const MinistriesPage = () => {
         .eq('id_igreja', currentChurchId).order('nome');
       if (ministriesError) throw ministriesError;
 
-      if (ministriesData && ministriesData.length === 0) {
-        const ministriesToInsert = defaultMinistries.map(m => ({ ...m, id_igreja: currentChurchId }));
-        const { error: insertError } = await supabase.from('ministerios').insert(ministriesToInsert)
-        if (insertError) throw insertError;
-        toast.success("Ministérios padrão criados para a sua igreja!");
-        
-        const { data: newData, error: newError } = await supabase.from('ministerios')
-            .select(`*, volunteers:ministerio_voluntarios!ministerio_voluntarios_ministerio_id_fkey(count)`)
-            .eq('id_igreja', currentChurchId).order('nome');
-        if (newError) throw newError;
-        ministriesData = newData || [];
-      }
-
+      // Removido: não criar ministérios automaticamente; admin fará manualmente.
+      
       const leaderIds = ministriesData.map(m => m.lider_id).filter(Boolean) as string[];
       const leadersMap = new Map<string, string>();
       if (leaderIds.length > 0) {
@@ -210,7 +180,19 @@ const MinistriesPage = () => {
         <p className="text-purple-100 mt-1">Crie ministérios, defina líderes e gerencie voluntários e escalas.</p>
       </div>
       
-      <Card><CardContent className="p-4 flex items-center"><div className="relative w-full"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><Input placeholder="Buscar ministério..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div></CardContent></Card>
+      <Card>
+        <CardContent className="p-4 flex items-center gap-3">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input placeholder="Buscar ministério..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+          </div>
+          {canManage && (
+            <Button onClick={() => setOpenAddDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Novo Ministério
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredMinistries.map((ministry) => (
@@ -232,7 +214,29 @@ const MinistriesPage = () => {
             </CardContent>
           </Card>
         ))}
+        {filteredMinistries.length === 0 && (
+          <Card className="col-span-full">
+            <CardContent className="p-6 text-center">
+              <p className="text-gray-600 mb-3">Nenhum ministério criado ainda.</p>
+              {canManage && (
+                <Button onClick={() => setOpenAddDialog(true)}>
+                  <Plus className="w-4 h-4 mr-2" /> Criar primeiro ministério
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Diálogo para criar novo ministério */}
+      {canManage && (
+        <AddMinistryDialog
+          open={openAddDialog}
+          onOpenChange={setOpenAddDialog}
+          churchId={currentChurchId}
+          onCreated={() => loadData()}
+        />
+      )}
       
       {/* DIÁLOGO DE DETALHES/GERENCIAMENTO */}
       <Dialog open={!!selectedMinistry} onOpenChange={() => setSelectedMinistry(null)}>
