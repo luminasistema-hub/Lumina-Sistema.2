@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Calendar, MapPin, Pencil, Plus, Search, Eye, Users, DollarSign } from "lucide-react";
+import { Calendar, MapPin, Pencil, Plus, Search, Eye, Users, DollarSign, ExternalLink } from "lucide-react";
 import { CreateEventDialog } from "./CreateEventDialog";
 import EditEventDialog, { EventItem } from "./EditEventDialog";
+import EventParticipantsDialog from "./EventParticipantsDialog";
 
 const EventsManagementPage = () => {
   const { currentChurchId, user } = useAuthStore();
@@ -20,6 +21,7 @@ const EventsManagementPage = () => {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<EventItem | null>(null);
+  const [participantsEvent, setParticipantsEvent] = useState<EventItem | null>(null);
 
   const canManage = user?.role === "admin" || user?.role === "pastor";
 
@@ -145,6 +147,18 @@ const EventsManagementPage = () => {
                     <h3 className="text-lg font-bold text-gray-900">{e.nome}</h3>
                     <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">{e.tipo}</span>
                     <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">{e.status}</span>
+                    {e.valor_inscricao && Number(e.valor_inscricao) > 0 && e.link_externo ? (
+                      <a
+                        href={e.link_externo}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs inline-flex items-center gap-1 text-blue-600 hover:underline"
+                        title="Abrir link externo de inscrição/pagamento"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Link externo
+                      </a>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 mb-3">
                     <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /><span>{new Date(e.data_hora).toLocaleString("pt-BR")}</span></div>
@@ -163,6 +177,9 @@ const EventsManagementPage = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 self-end md:self-center">
                   <Button variant="outline" onClick={() => setEditEvent(e)}><Pencil className="w-4 h-4 mr-2" />Editar</Button>
+                  <Button variant="outline" onClick={() => setParticipantsEvent(e)}>
+                    <Eye className="w-4 h-4 mr-2" /> Inscritos
+                  </Button>
                   <Button
                     variant={e.inscricoes_abertas ? "secondary" : "default"}
                     onClick={() => toggleInscricoes(e, !e.inscricoes_abertas)}
@@ -189,6 +206,16 @@ const EventsManagementPage = () => {
           open={!!editEvent}
           onClose={() => setEditEvent(null)}
           onUpdated={() => loadEvents()}
+        />
+      )}
+
+      {participantsEvent && (
+        <EventParticipantsDialog
+          eventId={participantsEvent.id}
+          churchId={participantsEvent.id_igreja || ""}
+          eventName={participantsEvent.nome}
+          open={!!participantsEvent}
+          onClose={() => setParticipantsEvent(null)}
         />
       )}
     </div>

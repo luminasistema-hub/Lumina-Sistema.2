@@ -19,6 +19,7 @@ export interface EventItem {
   inscricoes_abertas: boolean;
   valor_inscricao?: number | null;
   status: 'Planejado' | 'Confirmado' | 'Em Andamento' | 'Finalizado' | 'Cancelado';
+  link_externo?: string | null;
 }
 
 export function EditEventDialog({
@@ -40,6 +41,7 @@ export function EditEventDialog({
   const [status, setStatus] = useState<EventItem["status"]>(event.status);
   const [capacidadeMaxima, setCapacidadeMaxima] = useState<string>(event.capacidade_maxima ? String(event.capacidade_maxima) : "");
   const [valorInscricao, setValorInscricao] = useState<string>(event.valor_inscricao ? String(event.valor_inscricao) : "");
+  const [linkExterno, setLinkExterno] = useState<string>(event.link_externo || "");
   const [inscricoesAbertas, setInscricoesAbertas] = useState(event.inscricoes_abertas);
   const [saving, setSaving] = useState(false);
 
@@ -71,6 +73,7 @@ export function EditEventDialog({
       capacidade_maxima: capacidadeMaxima ? Number(capacidadeMaxima) : null,
       valor_inscricao: valorInscricao ? Number(valorInscricao) : 0,
       inscricoes_abertas: inscricoesAbertas,
+      link_externo: valorInscricao && Number(valorInscricao) > 0 ? (linkExterno || null) : null,
     };
 
     const { error } = await supabase.from("eventos").update(payload).eq("id", event.id);
@@ -164,6 +167,17 @@ export function EditEventDialog({
               </Select>
             </div>
           </div>
+
+          {Number(valorInscricao) > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="linkExterno">Link externo (pagamento/inscrição)</Label>
+              <Input
+                id="linkExterno"
+                value={linkExterno}
+                onChange={(e) => setLinkExterno(e.target.value)}
+              />
+            </div>
+          )}
 
           <Button onClick={handleUpdate} className="w-full" disabled={saving}>
             {saving ? "Salvando..." : "Salvar Alterações"}

@@ -26,6 +26,7 @@ export function CreateEventDialog({
   const [status, setStatus] = useState<"Planejado" | "Confirmado" | "Em Andamento" | "Finalizado" | "Cancelado">("Planejado");
   const [capacidadeMaxima, setCapacidadeMaxima] = useState<string>("");
   const [valorInscricao, setValorInscricao] = useState<string>("");
+  const [linkExterno, setLinkExterno] = useState<string>("");
   const [inscricoesAbertas, setInscricoesAbertas] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -46,6 +47,7 @@ export function CreateEventDialog({
       capacidade_maxima: capacidadeMaxima ? Number(capacidadeMaxima) : null,
       valor_inscricao: valorInscricao ? Number(valorInscricao) : 0,
       inscricoes_abertas: inscricoesAbertas,
+      link_externo: valorInscricao && Number(valorInscricao) > 0 ? (linkExterno || null) : null,
     };
 
     const { error } = await supabase.from("eventos").insert(payload);
@@ -68,6 +70,7 @@ export function CreateEventDialog({
     setCapacidadeMaxima("");
     setValorInscricao("");
     setInscricoesAbertas(true);
+    setLinkExterno("");
   };
 
   return (
@@ -148,6 +151,18 @@ export function CreateEventDialog({
               </Select>
             </div>
           </div>
+
+          {Number(valorInscricao) > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="linkExterno">Link externo (pagamento/inscrição)</Label>
+              <Input
+                id="linkExterno"
+                placeholder="https://exemplo.com/pagamento"
+                value={linkExterno}
+                onChange={(e) => setLinkExterno(e.target.value)}
+              />
+            </div>
+          )}
 
           <Button onClick={handleCreate} className="w-full" disabled={saving}>
             {saving ? "Salvando..." : "Salvar Evento"}
