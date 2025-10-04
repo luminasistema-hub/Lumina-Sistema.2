@@ -5,7 +5,7 @@ import { Badge } from "../ui/badge";
 import {
   Users, Calendar, DollarSign, Settings, Church, BookOpen, Heart,
   Baby, GraduationCap, User, Shield, ChevronLeft, ChevronRight,
-  ChevronDown, ChevronUp, Home, Activity, ClipboardList
+  ChevronDown, ChevronUp, Home, Activity, ClipboardList, Link2
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -81,7 +81,8 @@ const moduleCategories: ModuleCategory[] = [
     title: "Administração",
     icon: <Settings className="w-5 h-5" />,
     modules: [
-      { id: "system-settings", title: "Configurações", icon: <Settings className="w-4 h-4" />, roles: ["admin"], status: "basic" }
+      { id: "system-settings", title: "Configurações", icon: <Settings className="w-4 h-4" />, roles: ["admin"], status: "basic" },
+      { id: "whatsapp-integration", title: "Integração WhatsApp", icon: <Link2 className="w-4 h-4" />, roles: ["admin","pastor"], status: "basic" }
     ]
   }
 ];

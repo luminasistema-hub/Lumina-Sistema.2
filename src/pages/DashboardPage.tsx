@@ -20,6 +20,7 @@ import ProfileCompletionDialog from '../components/personal/ProfileCompletionDia
 import { useAuthStore } from '../stores/authStore'; 
 import OrderOfServiceEventsPage from '../components/management/OrderOfServiceEventsPage';
 import MyMinistryPage from '../components/management/MyMinistryPage';
+import WhatsappIntegration from '../components/admin/WhatsappIntegration';
 
 const DashboardPage = () => {
   const { user, isLoading } = useAuthStore(); 
@@ -59,6 +60,7 @@ const DashboardPage = () => {
       case 'order-of-service': return <OrderOfServiceEventsPage />;
       case 'my-ministry': 
         return <MyMinistryPage />;
+      case 'whatsapp-integration': return <WhatsappIntegration />;
       case 'system-settings': return <SystemSettings />;
       default: return <DashboardHome />;
     }

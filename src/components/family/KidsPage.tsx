@@ -336,6 +336,21 @@ const KidsPage = () => {
       if (insertCheckinError) throw insertCheckinError;
 
       toast.success(`Check-in realizado! Código: ${codigo}`);
+      // Enfileirar mensagem ao responsável
+      const { data: telRow } = await supabase
+        .from('informacoes_pessoais')
+        .select('telefone')
+        .eq('membro_id', kid.responsavel_id)
+        .maybeSingle();
+      const phone = telRow?.telefone || null;
+      if (phone && currentChurchId) {
+        await supabase.from('whatsapp_messages').insert({
+          church_id: currentChurchId,
+          recipient_phone: phone,
+          template_key: 'kids_checkin',
+          payload: { crianca_nome: kid.nome_crianca, codigo },
+        });
+      }
       loadKidsData();
     } catch (error: any) {
       console.error('Error during check-in:', error.message);
@@ -379,6 +394,21 @@ const KidsPage = () => {
       if (updateCheckinError) throw updateCheckinError;
 
       toast.success('Check-out realizado com sucesso!');
+      // Enfileirar mensagem ao responsável
+      const { data: telRow2 } = await supabase
+        .from('informacoes_pessoais')
+        .select('telefone')
+        .eq('membro_id', kid.responsavel_id)
+        .maybeSingle();
+      const phone2 = telRow2?.telefone || null;
+      if (phone2 && currentChurchId) {
+        await supabase.from('whatsapp_messages').insert({
+          church_id: currentChurchId,
+          recipient_phone: phone2,
+          template_key: 'kids_checkout',
+          payload: { crianca_nome: kid.nome_crianca, hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) },
+        });
+      }
       loadKidsData();
     } catch (error: any) {
       console.error('Error during check-out:', error.message);
