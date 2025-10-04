@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
-import { Shield, Lock, Mail, Eye, EyeOff, User, ArrowLeft, Building } from 'lucide-react';
+import { Shield, Lock, Mail, Eye, EyeOff, User, ArrowLeft } from 'lucide-react';
 
 const SuperAdminRegisterPage = () => {
   const navigate = useNavigate();
@@ -35,30 +35,21 @@ const SuperAdminRegisterPage = () => {
     }
 
     try {
-      // Call the Edge Function to handle Super Admin registration
-      const response = await fetch('https://abfkcncsvslfrfnjtmdb.supabase.co/functions/v1/create-super-admin-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, // Use anon key for Edge Function invocation
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`, // Also for Edge Function invocation
-        },
-        body: JSON.stringify({ name, email, password }),
+      // Chama a Edge Function do próprio projeto com o client (inclui headers automaticamente)
+      const { data, error } = await supabase.functions.invoke('create-super-admin-user', {
+        body: { name, email, password },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('Error from Edge Function:', data.error);
-        toast.error(data.error || 'Erro desconhecido ao cadastrar Super Admin.');
+      if (error) {
+        console.error('Erro da Edge Function:', error);
+        toast.error(error.message || 'Erro ao cadastrar Super Admin.');
         setIsLoading(false);
         return;
       }
 
-      toast.success(data.message || 'Super Admin cadastrado com sucesso! Você já pode fazer login.');
+      toast.success((data as any)?.message || 'Super Admin cadastrado com sucesso! Você já pode fazer login.');
       navigate('/master-admin-login');
-
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro inesperado ao chamar a Edge Function:', err);
       toast.error('Ocorreu um erro inesperado ao cadastrar Super Admin.');
     } finally {

@@ -1,10 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { toast } from 'sonner'
-// ===================================================================
-// ESTA É A LINHA CORRIGIDA PARA O CAMINHO CERTO
-// (removido para evitar duplicidade)
-// ===================================================================
 import { supabase } from '@/integrations/supabase/client'
 
 // --- Interfaces (Tipos de Dados) ---
@@ -57,14 +53,9 @@ interface AuthState {
   updateUserProfile: (personalInfo: Partial<PersonalInfo>) => void
 }
 
-// ===================================================================
-// Controle de checagem para evitar chamadas duplicadas
-// ===================================================================
+// Controle para evitar chamadas duplicadas
 let isCheckingAuth = false
 
-// ===================================================================
-// Store de Autenticação
-// ===================================================================
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -72,9 +63,6 @@ export const useAuthStore = create<AuthState>()(
       isLoading: true,
       currentChurchId: null,
 
-      // ------------------------
-      // LOGIN
-      // ------------------------
       login: async (email, password) => {
         set({ isLoading: true })
         try {
@@ -97,22 +85,14 @@ export const useAuthStore = create<AuthState>()(
         return false
       },
 
-      // ------------------------
-      // LOGOUT
-      // ------------------------
       logout: async () => {
         set({ isLoading: true })
         await supabase.auth.signOut()
         set({ user: null, currentChurchId: null, isLoading: false })
       },
 
-      // ------------------------
-      // CHECK AUTH
-      // ------------------------
       checkAuth: async () => {
         if (isCheckingAuth) return
-
-        // Apenas define o carregamento se não houver usuário (carregamento inicial)
         if (!get().user) {
           set({ isLoading: true })
         }
@@ -127,49 +107,85 @@ export const useAuthStore = create<AuthState>()(
           if (error) throw error
 
           if (session?.user) {
+            // 1) Tenta carregar perfil de membro (fluxo normal)
             const { data: profile, error: profileError } = await supabase
               .from('membros')
               .select(`*, igrejas(id, nome)`)
               .eq('id', session.user.id)
               .maybeSingle()
 
-            if (profileError) throw profileError
-            if (!profile)
-              throw new Error('Perfil de membro não encontrado para o ID da sessão.')
+            if (profileError) {
+              console.warn('AuthStore: erro ao buscar perfil em membros:', profileError.message)
+            }
 
-            // Buscar informacoes_pessoais separadamente (evita relacionamento ambíguo)
-            const { data: personalRecord } = await supabase
-              .from('informacoes_pessoais')
-              .select('*')
-              .eq('membro_id', session.user.id)
-              .maybeSingle()
+            if (profile) {
+              // Buscar informacoes_pessoais separadamente
+              const { data: personalRecord } = await supabase
+                .from('informacoes_pessoais')
+                .select('*')
+                .eq('membro_id', session.user.id)
+                .maybeSingle()
 
-            const personalInfo = personalRecord
-              ? {
-                  data_nascimento: personalRecord.data_nascimento ?? null,
-                  estado_civil: personalRecord.estado_civil ?? null,
-                  profissao: personalRecord.profissao ?? null,
-                  telefone: personalRecord.telefone ?? null,
-                  endereco: personalRecord.endereco ?? null,
-                }
-              : null
+              const personalInfo = personalRecord
+                ? {
+                    data_nascimento: personalRecord.data_nascimento ?? null,
+                    estado_civil: personalRecord.estado_civil ?? null,
+                    profissao: personalRecord.profissao ?? null,
+                    telefone: personalRecord.telefone ?? null,
+                    endereco: personalRecord.endereco ?? null,
+                  }
+                : null
 
-            set({
-              user: {
-                id: session.user.id,
-                name: profile.nome_completo,
-                email: session.user.email!,
-                role: profile.funcao as UserRole,
-                churchId: profile.id_igreja,
-                churchName: profile.igrejas?.nome || 'Igreja',
-                status: profile.status as any,
-                created_at: profile.created_at,
-                perfil_completo: profile.perfil_completo,
-                permissions: {},
-                personalInfo,
-              },
-              currentChurchId: profile.id_igreja,
-            })
+              set({
+                user: {
+                  id: session.user.id,
+                  name: profile.nome_completo,
+                  email: session.user.email!,
+                  role: profile.funcao as UserRole,
+                  churchId: profile.id_igreja,
+                  churchName: profile.igrejas?.nome || 'Igreja',
+                  status: profile.status as any,
+                  created_at: profile.created_at,
+                  perfil_completo: profile.perfil_completo,
+                  permissions: {},
+                  personalInfo,
+                },
+                currentChurchId: profile.id_igreja,
+              })
+            } else {
+              // 2) Fallback: verifica se é Super Admin
+              const { data: sa, error: saError } = await supabase
+                .from('super_admins')
+                .select('id, nome_completo, email, created_at')
+                .eq('id', session.user.id)
+                .maybeSingle()
+
+              if (saError) {
+                console.warn('AuthStore: erro ao buscar super_admins:', saError.message)
+              }
+
+              if (sa) {
+                set({
+                  user: {
+                    id: sa.id,
+                    name: sa.nome_completo || session.user.email || 'Super Admin',
+                    email: sa.email || session.user.email!,
+                    role: 'super_admin',
+                    churchId: null,
+                    churchName: 'Painel Master',
+                    status: 'ativo',
+                    created_at: sa.created_at || new Date().toISOString(),
+                    perfil_completo: true,
+                    permissions: {},
+                    personalInfo: null,
+                  },
+                  currentChurchId: null,
+                })
+              } else {
+                // Não é membro nem super_admin
+                set({ user: null, currentChurchId: null })
+              }
+            }
           } else {
             set({ user: null, currentChurchId: null })
           }
@@ -178,20 +194,14 @@ export const useAuthStore = create<AuthState>()(
           set({ user: null, currentChurchId: null })
         } finally {
           isCheckingAuth = false
-          set({ isLoading: false }) // Sempre finaliza o carregamento
+          set({ isLoading: false })
         }
       },
 
-      // ------------------------
-      // SET CHURCH ID
-      // ------------------------
       setCurrentChurchId: (churchId: string | null) => {
         set({ currentChurchId: churchId })
       },
 
-      // ------------------------
-      // LISTENER
-      // ------------------------
       initializeAuthListener: () => {
         const { _authListenerInitialized } = get() as any
         if (_authListenerInitialized) return
@@ -211,9 +221,6 @@ export const useAuthStore = create<AuthState>()(
         set({ _authListenerInitialized: true } as Partial<AuthState>)
       },
 
-      // ------------------------
-      // UPDATE PROFILE (LOCAL)
-      // ------------------------
       updateUserProfile: (personalInfo: Partial<PersonalInfo>) => {
         set((state) => {
           if (state.user) {

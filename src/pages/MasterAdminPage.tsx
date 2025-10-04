@@ -9,28 +9,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { toast } from 'sonner'
-import { Church as ChurchIcon, Plus, Edit, Trash2, Users, DollarSign, CheckCircle, XCircle, Clock, Globe, Loader2, Database, Key, BarChart3 } from 'lucide-react'
+import { Church as ChurchIcon, Plus, Loader2 } from 'lucide-react'
 import MainLayout from '../components/layout/MainLayout'
 import MasterAdminOverviewCards from '../components/master-admin/MasterAdminOverviewCards'
 import MasterAdminChurchTable from '../components/master-admin/MasterAdminChurchTable'
-import ManageChurchSubscriptionDialog from '../components/master-admin/ManageChurchSubscriptionDialog'
 import DatabaseInfoTab from '../components/master-admin/DatabaseInfoTab'
 import AdminToolsTab from '../components/master-admin/AdminToolsTab'
 import SaaSReportsTab from '../components/master-admin/SaaSReportsTab'
-import ViewPaymentHistoryDialog from '../components/master-admin/ViewPaymentHistoryDialog'
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
-import SubscriptionPlanManagement from '../components/master-admin/SubscriptionPlanManagement'; // Importação do novo componente
-import { supabase } from '../integrations/supabase/client' // Importar supabase
+import SubscriptionPlanManagement from '../components/master-admin/SubscriptionPlanManagement'
+import { supabase } from '../integrations/supabase/client'
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
-  const { churches, loadChurches, updateChurch, getSubscriptionPlans, getPlanDetails } = useChurchStore()
+  const { churches, loadChurches, updateChurch, getSubscriptionPlans } = useChurchStore()
   const [isAddChurchDialogOpen, setIsAddChurchDialogOpen] = useState(false)
-  const [selectedChurch, setSelectedChurch] = useState<Church | null>(null)
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Novos estados para métricas globais
+  // Métricas
   const [totalUsersCount, setTotalUsersCount] = useState(0);
   const [activeMembersCount, setActiveMembersCount] = useState(0);
 
@@ -39,26 +36,32 @@ const MasterAdminPage = () => {
       setIsLoading(true);
       await loadChurches();
 
-      // Fetch total users from Supabase Auth using a secure RPC call
+      // Total de usuários: soma membros + super_admins
       try {
-        const { data: countData, error: countError } = await supabase.rpc('get_total_users_count');
-        if (countError) throw countError;
-        setTotalUsersCount(countData);
+        const [{ count: memberCount, error: mErr }, { count: saCount, error: saErr }] = await Promise.all([
+          supabase.from('membros').select('id', { count: 'exact', head: true }),
+          supabase.from('super_admins').select('id', { count: 'exact', head: true }),
+        ])
+
+        if (mErr) throw mErr
+        if (saErr) throw saErr
+
+        setTotalUsersCount((memberCount || 0) + (saCount || 0))
       } catch (error: any) {
-        console.error('Error fetching total users:', error.message);
-        toast.error('Erro ao carregar total de usuários: ' + error.message);
+        console.error('Erro ao calcular total de usuários:', error.message)
+        setTotalUsersCount(0)
       }
 
-      // Fetch active members from public.membros
+      // Membros ativos
       try {
         const { count, error: membersError } = await supabase
           .from('membros')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('status', 'ativo');
         if (membersError) throw membersError;
         setActiveMembersCount(count || 0);
       } catch (error: any) {
-        console.error('Error fetching active members:', error.message);
+        console.error('Erro ao carregar membros ativos:', error.message);
         toast.error('Erro ao carregar membros ativos: ' + error.message);
       }
 
@@ -81,53 +84,12 @@ const MasterAdminPage = () => {
     )
   }
 
-  const handleAddChurch = async () => {
-    if (!newChurch.name || !newChurch.subscriptionPlan) {
-      toast.error('Nome da igreja e plano de assinatura são obrigatórios.')
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // A função addChurch não existe no store, esta lógica precisa ser implementada ou removida.
-      // Por enquanto, vou comentar para remover o erro, mas isso precisa de uma implementação real.
-      // const added = await addChurch(newChurch);
-      toast.info('Funcionalidade de adicionar igreja em desenvolvimento.');
-      setIsAddChurchDialogOpen(false);
-      /*
-      if (added) {
-        setIsAddChurchDialogOpen(false);
-        setNewChurch({
-          name: '',
-          subscriptionPlan: '0-100 membros',
-          status: 'active',
-          adminUserId: user?.id || null,
-        });
-        toast.success(`Igreja ${added.name} adicionada com sucesso!`);
-        // Recarregar métricas após adicionar igreja
-        const { data: usersData } = await supabase.auth.admin.listUsers();
-        setTotalUsersCount(usersData?.users.length || 0);
-        const { count } = await supabase.from('membros').select('id', { count: 'exact' }).eq('status', 'ativo');
-        setActiveMembersCount(count || 0);
-      } else {
-        toast.error('Falha ao adicionar a igreja.');
-      }
-      */
-    } catch (error) {
-      console.error('Error adding church:', error);
-      toast.error('Erro ao adicionar a igreja.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleUpdateChurch = useCallback(async (churchId: string, updates: Partial<Church>) => {
     setIsLoading(true);
     try {
       const updated = await updateChurch(churchId, updates);
       if (updated) {
         toast.success(`Igreja ${updated.name} atualizada com sucesso!`);
-        // Recarregar métricas se o status de um membro for alterado (indiretamente)
         const { count } = await supabase.from('membros').select('id', { count: 'exact' }).eq('status', 'ativo');
         setActiveMembersCount(count || 0);
       } else {
@@ -143,10 +105,15 @@ const MasterAdminPage = () => {
 
   const [newChurch, setNewChurch] = useState({
     name: '',
-    subscriptionPlan: '0-100 membros' as SubscriptionPlan,
+    subscriptionPlan: getSubscriptionPlans()[0]?.value || '0-100 membros',
     status: 'active' as Church['status'],
     adminUserId: user?.id || null,
   });
+
+  const handleAddChurch = async () => {
+    toast.info('Funcionalidade de adicionar igreja em desenvolvimento.');
+    setIsAddChurchDialogOpen(false);
+  };
 
   return (
     <MainLayout>
@@ -170,6 +137,7 @@ const MasterAdminPage = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <MasterAdminOverviewCards churches={churches} />
+            <MasterAdminSystemOverview totalUsersCount={totalUsersCount} activeMembersCount={activeMembersCount} />
           </TabsContent>
 
           <TabsContent value="churches" className="space-y-6">
@@ -218,24 +186,6 @@ const MasterAdminPage = () => {
                                 {plan.label} (R$ {plan.monthlyValue.toFixed(2)}/mês)
                               </SelectItem>
                             ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
-                        <Select
-                          value={newChurch.status}
-                          onValueChange={(value) => setNewChurch({...newChurch, status: value as Church['status']})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">Ativa</SelectItem>
-                            <SelectItem value="pending">Pendente</SelectItem>
-                            <SelectItem value="inactive">Inativa</SelectItem>
-                            <SelectItem value="trial">Teste</SelectItem>
-                            <SelectItem value="blocked">Bloqueada</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
