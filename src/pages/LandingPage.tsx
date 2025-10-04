@@ -179,7 +179,7 @@ const LandingPage = () => {
       <section className="border-t bg-muted/30">
         <div className="container mx-auto px-4 py-10 md:py-16">
           <div className="grid md:grid-cols-3 gap-6">
-            <Card className="bg-background/70 backdrop-blur">
+            <Card className="bg-background/70">
               <CardContent className="p-6">
                 <Badge variant="secondary">1</Badge>
                 <h3 className="mt-3 font-semibold">Configure sua igreja</h3>
@@ -188,7 +188,7 @@ const LandingPage = () => {
                 </p>
               </CardContent>
             </Card>
-            <Card className="bg-background/70 backdrop-blur">
+            <Card className="bg-background/70">
               <CardContent className="p-6">
                 <Badge variant="secondary">2</Badge>
                 <h3 className="mt-3 font-semibold">Convide membros</h3>
@@ -197,7 +197,7 @@ const LandingPage = () => {
                 </p>
               </CardContent>
             </Card>
-            <Card className="bg-background/70 backdrop-blur">
+            <Card className="bg-background/70">
               <CardContent className="p-6">
                 <Badge variant="secondary">3</Badge>
                 <h3 className="mt-3 font-semibold">Automatize notificações</h3>
@@ -234,7 +234,7 @@ const LandingPage = () => {
             </p>
           </div>
           <div className="mt-6">
-            <Card className="bg-background/70 backdrop-blur">
+            <Card className="bg-background/70">
               <CardContent className="p-6">
                 <form className="grid md:grid-cols-2 gap-4" onSubmit={handleContatoWhatsApp}>
                   <div className="space-y-2">
@@ -270,7 +270,7 @@ const LandingPage = () => {
         <div className="container mx-auto px-4 py-10 md:py-16">
           <div className="max-w-3xl">
             <blockquote className="text-lg md:text-xl leading-relaxed">
-              “Conseguimos reduzir a bagunça em escalas e comunicação com voluntários. O check-in das crianças ficou muito mais seguro e prático.”
+              "Conseguimos reduzir a bagunça em escalas e comunicação com voluntários. O check-in das crianças ficou muito mais seguro e prático."
             </blockquote>
             <p className="mt-3 text-sm text-muted-foreground">— Equipe de liderança</p>
           </div>

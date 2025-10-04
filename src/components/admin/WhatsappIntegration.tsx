@@ -264,17 +264,18 @@ const WhatsappIntegration = () => {
             {session?.status === 'awaiting_qr' && session?.qr_code ? (
               <div className="mt-3 flex flex-col items-center gap-2">
                 <div className="bg-white p-2 rounded">
+                  {console.log("Rendering QR Code with value:", session.qr_code)}
                   <QRCode value={session.qr_code} size={192} />
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 text-center">
                   No celular: WhatsApp → Dispositivos conectados → Conectar aparelho. Escaneie o QR acima.
                 </p>
               </div>
             ) : (
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-gray-500 mt-1 text-center">
                 {session?.status === 'connected'
                   ? 'Dispositivo conectado ao WhatsApp.'
-                  : 'Aguardando QR do serviço de sessão.'}
+                  : 'Aguardando QR do serviço de sessão. Clique em "Iniciar Vinculação" para gerar um novo QR.'}
               </p>
             )}
           </div>
