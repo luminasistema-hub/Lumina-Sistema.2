@@ -63,10 +63,10 @@ interface MemberProfile {
   data_casamento?: string;
   estado_civil?: string;
   profissao?: string;
-  conjuge?: string;
-  filhos?: Array<{nome: string, idade: string}>; 
+  conjuge_id?: string | null;
+  conjuge_nome?: string; 
+  filhos?: Array<{nome: string, idade: number}>; 
   pais_cristaos?: string;
-  familiar_na_igreja?: string; 
   tempo_igreja?: string; 
   batizado?: boolean;
   data_batismo?: string;
@@ -241,7 +241,7 @@ const MemberManagementPage = () => {
 
     console.log('Loaded raw member data:', data);
 
-    const membersData: Member[] = data.map((member: any) => ({
+    let membersData: Member[] = data.map((member: any) => ({
       id: member.id,
       id_igreja: member.id_igreja,
       funcao: member.funcao,
@@ -258,6 +258,7 @@ const MemberManagementPage = () => {
       data_casamento: member.informacoes_pessoais?.data_casamento,
       estado_civil: member.informacoes_pessoais?.estado_civil,
       profissao: member.informacoes_pessoais?.profissao,
+      conjuge_id: member.informacoes_pessoais?.conjuge_id ?? null,
       pais_cristaos: member.informacoes_pessoais?.pais_cristaos,
       tempo_igreja: member.informacoes_pessoais?.tempo_igreja,
       batizado: member.informacoes_pessoais?.batizado,
@@ -271,6 +272,37 @@ const MemberManagementPage = () => {
       // Map membros fields
       ultimo_teste_data: member.ultimo_teste_data, 
       ministerio_recomendado: member.ministerio_recomendado, 
+    }));
+
+    // Enriquecer com nome do cônjuge e filhos (tabelas corretas)
+    const memberIds = membersData.map(m => m.id);
+    // Cônjuges
+    const spouseIds = Array.from(new Set(membersData.map(m => m.conjuge_id).filter(Boolean))) as string[];
+    let spouseMap: Record<string, string> = {};
+    if (spouseIds.length > 0) {
+      const { data: spouses } = await supabase
+        .from('membros')
+        .select('id, nome_completo')
+        .in('id', spouseIds);
+      spouseMap = Object.fromEntries((spouses || []).map(s => [s.id, s.nome_completo]));
+    }
+    // Filhos
+    const { data: kids } = await supabase
+      .from('criancas')
+      .select('responsavel_id, nome_crianca, data_nascimento')
+      .in('responsavel_id', memberIds)
+      .eq('id_igreja', churchId);
+    const kidsByResponsible: Record<string, Array<{nome: string, idade: number}>> = {};
+    (kids || []).forEach(k => {
+      const idade = Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000);
+      const entry = { nome: k.nome_crianca, idade };
+      if (!kidsByResponsible[k.responsavel_id]) kidsByResponsible[k.responsavel_id] = [];
+      kidsByResponsible[k.responsavel_id].push(entry);
+    });
+    membersData = membersData.map(m => ({
+      ...m,
+      conjuge_nome: m.conjuge_id ? spouseMap[m.conjuge_id] : undefined,
+      filhos: kidsByResponsible[m.id] || []
     }));
 
     setMembers(membersData);
@@ -432,10 +464,7 @@ const MemberManagementPage = () => {
       data_casamento: member.data_casamento,
       estado_civil: member.estado_civil,
       profissao: member.profissao,
-      conjuge: member.conjuge,
-      filhos: member.filhos,
       pais_cristaos: member.pais_cristaos,
-      familiar_na_igreja: member.familiar_na_igreja, 
       tempo_igreja: member.tempo_igreja, 
       batizado: member.batizado,
       data_batismo: member.data_batismo,
@@ -1202,10 +1231,10 @@ const MemberManagementPage = () => {
                       <p className="text-gray-900">{selectedMember.profissao}</p>
                     </div>
                   )}
-                  {selectedMember.conjuge && (
+                  {selectedMember.conjuge_nome && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Cônjuge</Label>
-                      <p className="text-gray-900">{selectedMember.conjuge}</p>
+                      <p className="text-gray-900">{selectedMember.conjuge_nome}</p>
                     </div>
                   )}
                   {selectedMember.filhos && selectedMember.filhos.length > 0 && (
@@ -1222,12 +1251,6 @@ const MemberManagementPage = () => {
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Pais Cristãos</Label>
                       <p className="text-gray-900">{selectedMember.pais_cristaos}</p>
-                    </div>
-                  )}
-                  {selectedMember.familiar_na_igreja && (
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Familiar na Igreja</Label>
-                      <p className="text-gray-900">{selectedMember.familiar_na_igreja}</p>
                     </div>
                   )}
                 </div>
@@ -1480,33 +1503,6 @@ const MemberManagementPage = () => {
                     id="edit-profissao"
                     value={editMemberData.profissao || ''}
                     onChange={(e) => setEditMemberData({...editMemberData, profissao: e.target.value})}
-                  />
-                </div>
-                {editMemberData.estado_civil === 'casado' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-conjuge">Cônjuge</Label>
-                    <Input
-                      id="edit-conjuge"
-                      value={editMemberData.conjuge || ''}
-                      onChange={(e) => setEditMemberData({...editMemberData, conjuge: e.target.value})}
-                    />
-                  </div>
-                )}
-                {/* Filhos - simplified for now, full implementation would need dynamic fields */}
-                <div className="space-y-2">
-                  <Label htmlFor="edit-filhos">Filhos (JSON)</Label>
-                  <Textarea
-                    id="edit-filhos"
-                    value={JSON.stringify(editMemberData.filhos || [], null, 2)}
-                    onChange={(e) => {
-                      try {
-                        setEditMemberData({...editMemberData, filhos: JSON.parse(e.target.value)});
-                      } catch (err) {
-                        console.error("Invalid JSON for filhos", err);
-                        toast.error("Formato JSON inválido para filhos.");
-                      }
-                    }}
-                    rows={3}
                   />
                 </div>
                 {editMemberData.estado_civil === 'casado' && (
