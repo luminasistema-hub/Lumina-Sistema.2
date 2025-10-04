@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
 import { UnifiedReceiptDialog } from '../financial/UnifiedReceiptDialog'
+import ReportViewerDialog from '../financial/ReportViewerDialog'
 import { 
   DollarSign, 
   CreditCard, 
@@ -60,6 +61,36 @@ const OfferingsPage = () => {
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
   const [receiptTransaction, setReceiptTransaction] = useState<Contribution | null>(null)
+  const [reportViewerOpen, setReportViewerOpen] = useState(false)
+  const [selectedReport, setSelectedReport] = useState<{
+    id: string
+    tipo: 'Mensal' | 'Trimestral' | 'Anual' | 'Personalizado'
+    periodo_inicio: string
+    periodo_fim: string
+    gerado_por: string
+    data_geracao: string
+    dados: {
+      total_entradas: number
+      total_saidas: number
+      saldo_periodo: number
+      categorias_entrada: Array<{categoria: string, valor: number}>
+      categorias_saida: Array<{categoria: string, valor: number}>
+      maior_entrada: {
+        id: string
+        tipo: 'Entrada' | 'Saída'
+        categoria: string
+        subcategoria?: string
+        valor: number
+        data_transacao: string
+        descricao: string
+        metodo_pagamento: string
+        responsavel: string
+        status: 'Pendente' | 'Confirmado' | 'Cancelado'
+        numero_documento?: string
+      } | null
+      maior_saida: null
+    }
+  } | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedType, setSelectedType] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -284,6 +315,94 @@ const OfferingsPage = () => {
     })
     .reduce((sum, c) => sum + c.valor, 0)
 
+  const getPeriodRange = () => {
+    const now = new Date()
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    let start = new Date(end)
+    if (selectedPeriod === 'month') {
+      start = new Date(end.getFullYear(), end.getMonth(), 1)
+    } else if (selectedPeriod === 'quarter') {
+      const qStartMonth = Math.floor(end.getMonth() / 3) * 3
+      start = new Date(end.getFullYear(), qStartMonth, 1)
+    } else if (selectedPeriod === 'year') {
+      start = new Date(end.getFullYear(), 0, 1)
+    } else {
+      // 'all' → usa a primeira contribuição confirmada
+      const confirmed = contributions.filter(c => c.status === 'Confirmado')
+      if (confirmed.length > 0) {
+        const minDate = confirmed.reduce((min, c) => {
+          const d = new Date(c.data_transacao)
+          return d < min ? d : min
+        }, new Date(confirmed[0].data_transacao))
+        start = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate())
+      } else {
+        start = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+      }
+    }
+    const fmt = (d: Date) => d.toISOString().split('T')[0]
+    return { startStr: fmt(start), endStr: fmt(end), start, end }
+  }
+
+  const openOfferingsReport = () => {
+    const { startStr, endStr, start, end } = getPeriodRange()
+    const confirmed = contributions
+      .filter(c => c.status === 'Confirmado')
+      .filter(c => {
+        const d = new Date(c.data_transacao)
+        return d >= start && d <= end
+      })
+
+    if (confirmed.length === 0) {
+      toast.info('Não há contribuições confirmadas no período selecionado.')
+      return
+    }
+
+    const total_entradas = confirmed.reduce((sum, c) => sum + c.valor, 0)
+    const categoriasMap = new Map<string, number>()
+    confirmed.forEach(c => {
+      categoriasMap.set(c.categoria, (categoriasMap.get(c.categoria) || 0) + c.valor)
+    })
+    const categorias_entrada = Array.from(categoriasMap.entries()).map(([categoria, valor]) => ({ categoria, valor }))
+
+    const maior = confirmed.slice().sort((a, b) => b.valor - a.valor)[0] || null
+    const maior_entrada = maior
+      ? {
+          id: maior.id,
+          tipo: 'Entrada' as const,
+          categoria: maior.categoria,
+          subcategoria: maior.subcategoria,
+          valor: maior.valor,
+          data_transacao: maior.data_transacao,
+          descricao: maior.descricao,
+          metodo_pagamento: maior.metodo_pagamento,
+          responsavel: maior.responsavel || (maior.membro_nome || ''),
+          status: maior.status,
+          numero_documento: maior.numero_documento
+        }
+      : null
+
+    const report = {
+      id: Date.now().toString(),
+      tipo: selectedPeriod === 'month' ? 'Mensal' : selectedPeriod === 'quarter' ? 'Trimestral' : selectedPeriod === 'year' ? 'Anual' : 'Personalizado',
+      periodo_inicio: startStr,
+      periodo_fim: endStr,
+      gerado_por: user?.name || 'Usuário',
+      data_geracao: new Date().toISOString(),
+      dados: {
+        total_entradas,
+        total_saidas: 0,
+        saldo_periodo: total_entradas,
+        categorias_entrada,
+        categorias_saida: [],
+        maior_entrada,
+        maior_saida: null
+      }
+    }
+
+    setSelectedReport(report)
+    setReportViewerOpen(true)
+  }
+
   if (!currentChurchId) {
     return (
       <div className="p-6 text-center text-gray-600">
@@ -500,7 +619,7 @@ const OfferingsPage = () => {
             </DialogContent>
           </Dialog>
 
-          <Button variant="outline" className="hidden sm:flex">
+          <Button variant="outline" className="hidden sm:flex" onClick={openOfferingsReport}>
             <Download className="w-4 h-4 mr-2" />
             Relatório
           </Button>
@@ -606,6 +725,13 @@ const OfferingsPage = () => {
         church={currentChurch}
         onMarkAsIssued={markReceiptAsIssued}
         canManage={canManageFinancial}
+      />
+
+      {/* Report Viewer Dialog (Ofertas & Doações) */}
+      <ReportViewerDialog
+        isOpen={reportViewerOpen}
+        onOpenChange={setReportViewerOpen}
+        report={selectedReport}
       />
     </div>
   )
