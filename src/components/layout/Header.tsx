@@ -16,11 +16,16 @@ import {
   Users,
   Headphones,
   Heart,
+  Menu,
 } from 'lucide-react'
 import { Input } from '../ui/input'
 import { useState, useEffect } from 'react' 
 
-const Header = () => {
+type HeaderProps = {
+  onOpenMobileMenu?: () => void;
+}
+
+const Header = ({ onOpenMobileMenu }: HeaderProps) => {
   const { user, logout } = useAuthStore()
   const [isDarkMode, setIsDarkMode] = useState(false)
 
@@ -72,6 +77,17 @@ const Header = () => {
     <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex-1 max-w-xs md:max-w-md flex items-center gap-3">
+          {/* Botão menu (mobile) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="sm:hidden"
+            onClick={onOpenMobileMenu}
+            aria-label="Abrir menu"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+          
           {user?.role !== 'super_admin' && (
             <div className="relative flex-1 hidden sm:block">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />

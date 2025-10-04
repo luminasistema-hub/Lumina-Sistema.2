@@ -2,7 +2,6 @@ import React, { useEffect } from 'react'; // Importar useEffect
 import { useAuthStore } from '../../stores/authStore';
 import WelcomeCard from './WelcomeCard';
 import DashboardStatsGrid from './DashboardStatsGrid';
-import DashboardQuickActions from './DashboardQuickActions';
 import MemberDashboardContent from './MemberDashboardContent';
 import AdminPastorDashboardContent from './AdminPastorDashboardContent';
 import { trackEvent } from '../../lib/analytics'; // Importar trackEvent
@@ -30,7 +29,6 @@ const DashboardHome = () => {
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <WelcomeCard />
       <DashboardStatsGrid />
-      <DashboardQuickActions />
 
       {isAdminOrPastor ? <AdminPastorDashboardContent /> : <MemberDashboardContent />}
     </div>
