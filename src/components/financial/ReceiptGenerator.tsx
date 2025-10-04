@@ -128,12 +128,19 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
       </Card>
 
       <style>{`
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+        
         @media print {
           body * {
             visibility: hidden;
           }
           .print-area, .print-area * {
             visibility: visible;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .print-area {
             position: absolute;
