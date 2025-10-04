@@ -35,19 +35,14 @@ const SuperAdminRegisterPage = () => {
     }
 
     try {
-      // Invoca a Edge Function usando a URL completa do projeto (recomendado)
-      const { data, error } = await supabase.functions.invoke(
-        'https://zcowqahrhuzrxdzdrref.supabase.co/functions/v1/create-super-admin-user',
-        { body: { name, email, password }, headers: { 'Content-Type': 'application/json' } }
-      );
+      // Invoca a Edge Function usando APENAS o nome (o client já sabe o SUPABASE_URL)
+      const { data, error } = await supabase.functions.invoke('create-super-admin-user', {
+        body: { name, email, password },
+      });
 
       if (error) {
         console.error('Erro da Edge Function:', error);
-        const msg =
-          (error as any)?.message === 'Failed to send a request to the Edge Function'
-            ? 'Não foi possível contatar a função no Supabase. Verifique se a função está publicada e tente novamente.'
-            : (error as any)?.message || 'Erro ao cadastrar Super Admin.';
-        toast.error(msg);
+        toast.error((error as any)?.message || 'Erro ao cadastrar Super Admin.');
         setIsLoading(false);
         return;
       }
