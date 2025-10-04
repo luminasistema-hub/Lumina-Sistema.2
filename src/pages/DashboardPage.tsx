@@ -19,8 +19,7 @@ import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada';
 import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog'; 
 import { useAuthStore } from '../stores/authStore'; 
 import OrderOfServicePage from '../components/management/OrderOfServicePage';
-import MinistryLeadershipPage from '../components/management/MinistryLeadershipPage';
-import DemandsPage from '../components/management/DemandsPage';
+import MyMinistryPage from '../components/management/MyMinistryPage';
 
 const DashboardPage = () => {
   const { user, isLoading } = useAuthStore(); 
@@ -57,15 +56,8 @@ const DashboardPage = () => {
       case 'financial-panel': return <FinancialPanel />;
       case 'journey-config': return <ConfiguracaoJornada />;
       case 'order-of-service': return <OrderOfServicePage />;
-      
-      // ROTEAMENTO INTELIGENTE PARA "ESCALAS & VOLUNTÁRIOS"
-      case 'my-ministry':
-        if (user?.role === 'admin' || user?.role === 'pastor') {
-          return <DemandsPage />; // Admins/Pastores veem todas as demandas
-        }
-        // Líderes e Voluntários veem sua página específica
-        return <MinistryLeadershipPage />;
-        
+      case 'my-ministry': 
+        return <MyMinistryPage />;
       case 'system-settings': return <SystemSettings />;
       case 'system-status': return <SystemStatus />;
       default: return <DashboardHome />;

@@ -206,8 +206,8 @@ const MinistriesPage = () => {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-6 md:p-8 text-white shadow-lg">
-        <h1 className="text-3xl font-bold">Gerenciamento de Ministérios</h1>
-        <p className="text-purple-100 mt-1">Coordene as equipes, voluntários e escalas de serviço.</p>
+        <h1 className="text-3xl font-bold">Gestão de Ministério</h1>
+        <p className="text-purple-100 mt-1">Crie ministérios, defina líderes e gerencie voluntários e escalas.</p>
       </div>
       
       <Card><CardContent className="p-4 flex items-center"><div className="relative w-full"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><Input placeholder="Buscar ministério..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div></CardContent></Card>
@@ -244,6 +244,39 @@ const MinistriesPage = () => {
               <TabsTrigger value="schedules">Escalas de Serviço</TabsTrigger>
             </TabsList>
             <TabsContent value="volunteers" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
+              {(canManage) && (
+                <Card className="mb-4">
+                  <CardContent className="p-4 grid gap-3 md:grid-cols-3">
+                    <div className="md:col-span-2">
+                      <Label className="text-sm">Definir Líder do Ministério</Label>
+                      <Select
+                        value={selectedMinistry?.lider_id || ''}
+                        onValueChange={async (memberId) => {
+                          if (!selectedMinistry) return;
+                          const { error } = await supabase
+                            .from('ministerios')
+                            .update({ lider_id: memberId === 'null' ? null : memberId })
+                            .eq('id', selectedMinistry.id);
+                          if (error) { toast.error('Falha ao definir líder: ' + error.message); return; }
+                          toast.success('Líder definido!');
+                          // recarregar detalhes
+                          await loadData();
+                          await loadMinistryDetails(selectedMinistry.id);
+                        }}
+                      >
+                        <SelectTrigger className="w-full"><SelectValue placeholder="Selecione um líder" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="null">Sem líder</SelectItem>
+                          {memberOptions.map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="text-sm text-gray-600 flex items-end">Líder atual: <span className="ml-1 font-medium">{selectedMinistry?.lider_nome || '—'}</span></div>
+                  </CardContent>
+                </Card>
+              )}
               {(canManage || isLeaderOfSelected) && (
                   <Card className="mb-4"><CardContent className="p-4 flex items-center gap-4">
                       <Select onValueChange={setSelectedVolunteerToAdd}>
@@ -295,4 +328,3 @@ const MinistriesPage = () => {
 }
 
 export default MinistriesPage
-

@@ -48,7 +48,7 @@ const moduleCategories: ModuleCategory[] = [
     modules: [
       { id: "events", title: "Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
       { id: "devotionals", title: "Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
-      { id: "my-ministry", title: "Escalas & Voluntários", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","voluntario","pastor","admin"], status: "complete" }
+      { id: "my-ministry", title: "Meu Ministério", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","voluntario"], status: "complete" }
     ]
   },
   {
@@ -67,7 +67,7 @@ const moduleCategories: ModuleCategory[] = [
     modules: [
       { id: "order-of-service", title: "Ordem de Culto", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin"], status: "complete" },
       { id: "member-management", title: "Gestão de Membros", icon: <Users className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin","integra"], status: "complete" },
-      { id: "ministries", title: "Ministérios", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
+      { id: "ministries", title: "Gestão de Ministério", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
       { id: "financial-panel", title: "Painel Financeiro", icon: <DollarSign className="w-4 h-4" />, roles: ["pastor","admin","financeiro"], status: "complete" },
       { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor"], status: "complete" },
       { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","membro"], status: "complete" },
