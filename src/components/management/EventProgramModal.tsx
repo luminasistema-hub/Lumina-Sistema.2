@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { PlusCircle, Trash2, Printer, Clock, User as UserIcon, MapPin, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type ProgramItem = {
   titulo: string;
@@ -246,69 +247,73 @@ const EventProgramModal = ({ isOpen, onClose, event }: EventProgramModalProps) =
             <div className="flex items-center gap-2"><UserIcon className="w-4 h-4" /> {church?.nome || "Igreja"}</div>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Programação do Evento</h3>
-              <Button variant="outline" size="sm" onClick={addItem}>
-                <PlusCircle className="w-4 h-4 mr-1" /> Adicionar Item
-              </Button>
-            </div>
+          <ScrollArea className="h-[60vh]">
+            <div className="space-y-4 pr-2">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Programação do Evento</h3>
+                <Button variant="outline" size="sm" onClick={addItem}>
+                  <PlusCircle className="w-4 h-4 mr-1" /> Adicionar Item
+                </Button>
+              </div>
 
-            <div className="space-y-2">
-              {items.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nenhum item. Clique em “Adicionar Item”.</p>
-              )}
+              <div className="space-y-2">
+                {items.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Nenhum item. Clique em "Adicionar Item".</p>
+                )}
 
-              {items.map((it, idx) => (
-                <div key={idx} className="rounded-md border p-3 space-y-2">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <Input
-                      placeholder="Título (ex: Oração Inicial, Adoração, Mensagem)"
-                      value={it.titulo}
-                      onChange={(e) => updateItem(idx, { titulo: e.target.value })}
-                    />
-                    <div className="flex items-center gap-2">
+                {items.map((it, idx) => (
+                  <div key={idx} className="rounded-md border p-3 space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       <Input
-                        type="number"
-                        min={0}
-                        placeholder="Tempo (min)"
-                        value={it.tempo_minutos}
-                        onChange={(e) => updateItem(idx, { tempo_minutos: Number(e.target.value) })}
-                        className="w-32"
+                        placeholder="Título (ex: Oração Inicial, Adoração, Mensagem)"
+                        value={it.titulo}
+                        onChange={(e) => updateItem(idx, { titulo: e.target.value })}
                       />
-                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder="Tempo (min)"
+                          value={it.tempo_minutos}
+                          onChange={(e) => updateItem(idx, { tempo_minutos: Number(e.target.value) })}
+                          className="w-32"
+                        />
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                    <Textarea
+                      placeholder="Descrição / Músicas / Observações desse item"
+                      value={it.descricao}
+                      onChange={(e) => updateItem(idx, { descricao: e.target.value })}
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <Input
+                      placeholder="Responsável (nome)"
+                      value={it.responsavel}
+                      onChange={(e) => updateItem(idx, { responsavel: e.target.value })}
+                    />
+                    <div className="flex justify-end">
+                      <Button variant="ghost" size="sm" className="text-red-600" onClick={() => removeItem(idx)}>
+                        <Trash2 className="w-4 h-4 mr-1" /> Remover
+                      </Button>
                     </div>
                   </div>
-                  <Textarea
-                    placeholder="Descrição / Músicas / Observações desse item"
-                    value={it.descricao}
-                    onChange={(e) => updateItem(idx, { descricao: e.target.value })}
-                    rows={3}
-                  />
-                  <Input
-                    placeholder="Responsável (nome)"
-                    value={it.responsavel}
-                    onChange={(e) => updateItem(idx, { responsavel: e.target.value })}
-                  />
-                  <div className="flex justify-end">
-                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => removeItem(idx)}>
-                      <Trash2 className="w-4 h-4 mr-1" /> Remover
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
 
-          <div className="space-y-2">
-            <h3 className="font-semibold">Avisos e Observações</h3>
-            <Textarea
-              placeholder="Ex: Anúncios, comunicados e observações gerais do culto/evento"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-            />
-          </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold">Avisos e Observações</h3>
+                <Textarea
+                  placeholder="Ex: Anúncios, comunicados e observações gerais do culto/evento"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+              </div>
+            </div>
+          </ScrollArea>
 
           <div className="flex justify-between pt-2">
             <Button variant="outline" onClick={onClose}>Fechar</Button>
