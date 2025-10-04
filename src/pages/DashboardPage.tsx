@@ -19,7 +19,7 @@ import SystemSettings from '../components/admin/SystemSettings';
 import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada'; 
 import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog'; 
 import { useAuthStore } from '../stores/authStore'; 
-import OrderOfServicePage from '../components/management/OrderOfServicePage';
+import OrderOfServiceEventsPage from '../components/management/OrderOfServiceEventsPage';
 import MyMinistryPage from '../components/management/MyMinistryPage';
 
 const DashboardPage = () => {
@@ -57,7 +57,7 @@ const DashboardPage = () => {
       case 'ministries': return <MinistriesPage />;
       case 'financial-panel': return <FinancialPanel />;
       case 'journey-config': return <ConfiguracaoJornada />;
-      case 'order-of-service': return <OrderOfServicePage />;
+      case 'order-of-service': return <OrderOfServiceEventsPage />;
       case 'my-ministry': 
         return <MyMinistryPage />;
       case 'system-settings': return <SystemSettings />;
