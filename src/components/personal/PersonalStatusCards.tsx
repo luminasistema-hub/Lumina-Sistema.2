@@ -95,6 +95,49 @@ const PersonalStatusCards: React.FC = () => {
     load();
   }, [user?.id, currentChurchId]);
 
+  // Realtime: atualizar quando o usuário inscrever/cancelar
+  useEffect(() => {
+    if (!user?.id || !currentChurchId) return;
+    const channel = supabase
+      .channel(`my-event-registrations-${user.id}-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'evento_participantes', filter: `membro_id=eq.${user.id}` },
+        () => {
+          // Recarregar apenas a parte de eventos
+          (async () => {
+            try {
+              const { data: parts } = await supabase
+                .from('evento_participantes')
+                .select('id, evento_id')
+                .eq('membro_id', user.id)
+                .eq('id_igreja', currentChurchId);
+              const participacoes: ParticipacaoEvento[] = parts || [];
+              setEventsTotal(participacoes.length);
+              const eventoIds = participacoes.map(p => p.evento_id).filter(Boolean) as string[];
+              if (eventoIds.length > 0) {
+                const nowIso = new Date().toISOString();
+                const { data: eventos } = await supabase
+                  .from('eventos')
+                  .select('id, data_hora')
+                  .in('id', eventoIds)
+                  .gt('data_hora', nowIso);
+                setEventsUpcoming((eventos || []).length);
+              } else {
+                setEventsUpcoming(0);
+              }
+            } catch {
+              // silencioso; manter UX suave
+            }
+          })();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, currentChurchId]);
+
   const ministryCount = ministries.length;
   const leaderActive = isGlobalLeader || isLeaderSomeMinistry;
 

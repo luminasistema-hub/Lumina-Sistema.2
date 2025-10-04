@@ -12,7 +12,8 @@ import EditEventDialog, { EventItem } from "./EditEventDialog";
 
 const EventsManagementPage = () => {
   const { currentChurchId, user } = useAuthStore();
-  const [events, setEvents] = useState<EventItem[]>([]);
+  type ManagedEvent = EventItem & { participantes_count?: number };
+  const [events, setEvents] = useState<ManagedEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterTipo, setFilterTipo] = useState<string>("all");
@@ -30,7 +31,7 @@ const EventsManagementPage = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("eventos")
-      .select("*")
+      .select("*, participantes:evento_participantes(count)")
       .eq("id_igreja", currentChurchId)
       .order("data_hora", { ascending: true });
     setLoading(false);
@@ -39,7 +40,11 @@ const EventsManagementPage = () => {
       toast.error("Erro ao carregar eventos: " + error.message);
       return;
     }
-    setEvents((data || []) as EventItem[]);
+    const mapped = (data || []).map((e: any) => ({
+      ...e,
+      participantes_count: e.participantes?.[0]?.count || 0,
+    })) as ManagedEvent[];
+    setEvents(mapped);
   };
 
   useEffect(() => { loadEvents(); }, [currentChurchId]);
@@ -146,7 +151,13 @@ const EventsManagementPage = () => {
                     <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /><span>{e.local}</span></div>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-700">
-                    <div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>Capacidade {e.capacidade_maxima ?? "-"}</span></div>
+                    <div className="flex items-center gap-1.5">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        Inscritos {e.participantes_count ?? 0}
+                        {typeof e.capacidade_maxima === "number" ? ` / ${e.capacidade_maxima}` : " / -"}
+                      </span>
+                    </div>
                     {e.valor_inscricao ? <div className="flex items-center gap-1.5 font-semibold text-green-600"><DollarSign className="w-4 h-4" /><span>{Number(e.valor_inscricao).toFixed(2)}</span></div> : null}
                   </div>
                 </div>
