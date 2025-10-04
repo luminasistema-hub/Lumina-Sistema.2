@@ -53,6 +53,8 @@ import {
   Loader2,
   X
 } from 'lucide-react'
+import TransactionDetailsDialog from '../financial/TransactionDetailsDialog'
+import ReportViewerDialog from '../financial/ReportViewerDialog'
 
 interface FinancialTransaction {
   id: string

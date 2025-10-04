@@ -1,7 +1,7 @@
 import React from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
+import { Button } from '../ui/button'
+import { Separator } from '../ui/separator'
 import { Calendar, CreditCard, Building, FileText, ArrowUpRight, ArrowDownRight, CheckCircle, Clock } from 'lucide-react'
 
 interface FinancialTransaction {
