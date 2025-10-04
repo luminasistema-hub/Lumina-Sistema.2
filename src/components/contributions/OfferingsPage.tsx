@@ -61,36 +61,6 @@ const OfferingsPage = () => {
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
   const [receiptTransaction, setReceiptTransaction] = useState<Contribution | null>(null)
-  const [reportViewerOpen, setReportViewerOpen] = useState(false)
-  const [selectedReport, setSelectedReport] = useState<{
-    id: string
-    tipo: 'Mensal' | 'Trimestral' | 'Anual' | 'Personalizado'
-    periodo_inicio: string
-    periodo_fim: string
-    gerado_por: string
-    data_geracao: string
-    dados: {
-      total_entradas: number
-      total_saidas: number
-      saldo_periodo: number
-      categorias_entrada: Array<{categoria: string, valor: number}>
-      categorias_saida: Array<{categoria: string, valor: number}>
-      maior_entrada: {
-        id: string
-        tipo: 'Entrada' | 'Saída'
-        categoria: string
-        subcategoria?: string
-        valor: number
-        data_transacao: string
-        descricao: string
-        metodo_pagamento: string
-        responsavel: string
-        status: 'Pendente' | 'Confirmado' | 'Cancelado'
-        numero_documento?: string
-      } | null
-      maior_saida: null
-    }
-  } | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedType, setSelectedType] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -117,16 +87,12 @@ const OfferingsPage = () => {
 
     setLoading(true)
     try {
-      let query = supabase
+      const query = supabase
         .from('transacoes_financeiras')
         .select('*')
         .eq('id_igreja', currentChurchId)
-        .eq('tipo', 'Entrada') // Apenas entradas são contribuições
-
-      // Membros só podem ver suas próprias contribuições
-      if (!canViewFinancial) {
-        query = query.eq('membro_id', user.id)
-      }
+        .eq('tipo', 'Entrada')
+        .eq('membro_id', user.id) // Sempre filtra pelo membro logado
 
       const { data, error } = await query.order('data_transacao', { ascending: false })
 
@@ -268,10 +234,7 @@ const OfferingsPage = () => {
   }
 
   const handleOpenReceipt = (contribution: Contribution) => {
-    if (contribution.status !== 'Confirmado') {
-      toast.info('O recibo só estará disponível após a confirmação da contribuição pelo financeiro.')
-      return
-    }
+    // Abre sempre o recibo para visualização/impressão
     setReceiptTransaction(contribution)
   }
 
@@ -618,11 +581,6 @@ const OfferingsPage = () => {
               </div>
             </DialogContent>
           </Dialog>
-
-          <Button variant="outline" className="hidden sm:flex" onClick={openOfferingsReport}>
-            <Download className="w-4 h-4 mr-2" />
-            Relatório
-          </Button>
         </div>
       </div>
 
@@ -689,7 +647,6 @@ const OfferingsPage = () => {
                     variant="outline" 
                     size="sm"
                     onClick={() => handleOpenReceipt(contribution)}
-                    disabled={contribution.status !== 'Confirmado'}
                   >
                     <Receipt className="w-4 h-4 mr-1 sm:mr-2" />
                     <span className="hidden sm:inline">Recibo</span>
