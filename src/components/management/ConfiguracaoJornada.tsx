@@ -15,6 +15,7 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { SortableEtapaItem } from './SortableEtapaItem';
 import { SortablePassoItem } from './SortablePassoItem';
 import CreateTrilhaDialog from './CreateTrilhaDialog';
+import MembersManagementCard from './MembersManagementCard';
 
 interface QuizPergunta {
   id?: string;
@@ -335,9 +336,9 @@ const ConfiguracaoJornada = () => {
           })
           .eq('id', passoDataToSave.id)
           .select('id')
-          .single();
+          .maybeSingle();
         if (error) throw error;
-        passoId = data.id;
+        passoId = data!.id;
         toast.success('Passo atualizado com sucesso!');
       } else {
         // Criar novo passo
@@ -352,9 +353,9 @@ const ConfiguracaoJornada = () => {
             conteudo: passoDataToSave.conteudo,
           })
           .select('id')
-          .single();
+          .maybeSingle();
         if (error) throw error;
-        passoId = data.id;
+        passoId = data!.id;
         toast.success('Novo passo criado com sucesso!');
       }
 
