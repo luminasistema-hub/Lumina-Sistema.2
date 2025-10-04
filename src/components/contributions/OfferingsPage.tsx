@@ -614,15 +614,17 @@ const OfferingsPage = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleOpenReceipt(contribution)}
-                  >
-                    <Receipt className="w-4 h-4 mr-1 sm:mr-2" />
-                    <span className="hidden sm:inline">Recibo</span>
-                    <span className="sm:hidden">Recibo</span>
-                  </Button>
+                  {contribution.status === 'Confirmado' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleOpenReceipt(contribution)}
+                    >
+                      <Receipt className="w-4 h-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Recibo</span>
+                      <span className="sm:hidden">Recibo</span>
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>

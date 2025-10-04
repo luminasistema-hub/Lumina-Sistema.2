@@ -53,6 +53,7 @@ import {
   Loader2,
   X
 } from 'lucide-react'
+import { ScrollArea } from '../ui/scroll-area'
 import TransactionDetailsDialog from '../financial/TransactionDetailsDialog'
 import ReportViewerDialog from '../financial/ReportViewerDialog'
 
@@ -1126,27 +1127,31 @@ const FinancialPanel = () => {
                   Alertas Financeiros
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {budgets.filter(b => b.status === 'Excedido').map(budget => (
-                  <div key={budget.id} className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border-l-4 border-red-400">
-                    <AlertTriangle className="w-4 h-4 text-red-500" />
-                    <div className="text-sm">
-                      <p className="font-medium text-red-800">Orçamento Excedido</p>
-                      <p className="text-red-600">{budget.categoria}</p>
-                    </div>
+              <CardContent>
+                <ScrollArea className="max-h-64 pr-2">
+                  <div className="space-y-3">
+                    {budgets.filter(b => b.status === 'Excedido').map(budget => (
+                      <div key={budget.id} className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border-l-4 border-red-400">
+                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        <div className="text-sm">
+                          <p className="font-medium text-red-800">Orçamento Excedido</p>
+                          <p className="text-red-600">{budget.categoria}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {pendingNotifications.map((n) => (
+                      <div key={n.id} className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
+                        <Clock className="w-4 h-4 text-yellow-500" />
+                        <div className="text-sm">
+                          <p className="font-medium text-yellow-800">Nova transação pendente</p>
+                          <p className="text-yellow-600">
+                            {n.event_details?.mensagem || `Valor R$ ${Number(n.event_details?.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                {pendingNotifications.map((n) => (
-                  <div key={n.id} className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
-                    <Clock className="w-4 h-4 text-yellow-500" />
-                    <div className="text-sm">
-                      <p className="font-medium text-yellow-800">Nova transação pendente</p>
-                      <p className="text-yellow-600">
-                        {n.event_details?.mensagem || `Valor R$ ${Number(n.event_details?.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                </ScrollArea>
               </CardContent>
             </Card>
 
@@ -1157,18 +1162,22 @@ const FinancialPanel = () => {
                   Transações Recentes
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {transactions.slice(0, 5).map(t => (
-                  <div key={t.id} className="flex items-center justify-between text-sm">
-                    <span className="truncate">
-                      {t.tipo === 'Entrada' ? '➕' : '➖'} {t.categoria} • R$ {t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-gray-500">{new Date(t.data_transacao).toLocaleDateString('pt-BR')}</span>
+              <CardContent>
+                <ScrollArea className="max-h-64 pr-2">
+                  <div className="space-y-3">
+                    {transactions.slice(0, 5).map(t => (
+                      <div key={t.id} className="flex items-center justify-between text-sm">
+                        <span className="truncate">
+                          {t.tipo === 'Entrada' ? '➕' : '➖'} {t.categoria} • R$ {t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-gray-500">{new Date(t.data_transacao).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    ))}
+                    {transactions.length === 0 && (
+                      <p className="text-sm text-gray-500">Nenhuma transação registrada.</p>
+                    )}
                   </div>
-                ))}
-                {transactions.length === 0 && (
-                  <p className="text-sm text-gray-500">Nenhuma transação registrada.</p>
-                )}
+                </ScrollArea>
               </CardContent>
             </Card>
           </div>
