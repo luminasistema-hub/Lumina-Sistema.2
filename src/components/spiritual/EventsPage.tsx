@@ -45,7 +45,7 @@ const EventsPage = () => {
     setLoading(true)
     try {
       const { data, error } = await supabase.from('eventos')
-        .select(`*, participantes:evento_participantes!evento_participantes_evento_id_fkey(count)`)
+        .select(`*, participantes:evento_participantes(count)`)
         .eq('id_igreja', currentChurchId)
         .order('data_hora', { ascending: true })
 
@@ -74,6 +74,21 @@ const EventsPage = () => {
   }, [currentChurchId, user?.id])
 
   useEffect(() => { loadEvents() }, [loadEvents])
+  // Atualização automática via Supabase Realtime ao criar/editar/remover eventos da igreja atual
+  useEffect(() => {
+    if (!currentChurchId) return;
+    const channel = supabase
+      .channel(`events-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
+        () => { loadEvents(); }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentChurchId, loadEvents])
 
   useEffect(() => {
     let filtered = events.filter(event => 
