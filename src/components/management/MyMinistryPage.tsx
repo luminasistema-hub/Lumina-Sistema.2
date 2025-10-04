@@ -53,18 +53,47 @@ const MyMinistryPage = () => {
       .select('ministerio:ministerios(id, nome, descricao, lider_id)')
       .eq('membro_id', user.id)
       .eq('id_igreja', currentChurchId);
-    const list = (mv || []).map((row: any) => ({
+    const volunteerList = (mv || []).map((row: any) => ({
       id: row.ministerio.id,
       nome: row.ministerio.nome,
       descricao: row.ministerio.descricao,
       lider_id: row.ministerio.lider_id,
       isLeader: row.ministerio.lider_id === user.id
     })) as Ministry[];
-    // Pode haver duplicatas pelo join; remover duplicadas
-    const unique = Array.from(new Map(list.map(m => [m.id, m])).values());
+
+    // Carrega também os ministérios onde o usuário é LÍDER (mesmo que não esteja na tabela de voluntários)
+    const { data: leaderRows } = await supabase
+      .from('ministerios')
+      .select('id, nome, descricao, lider_id')
+      .eq('id_igreja', currentChurchId)
+      .eq('lider_id', user.id);
+
+    const leaderList = (leaderRows || []).map((m: any) => ({
+      id: m.id,
+      nome: m.nome,
+      descricao: m.descricao,
+      lider_id: m.lider_id,
+      isLeader: true
+    })) as Ministry[];
+
+    // Mescla e remove duplicados, priorizando a entrada onde isLeader = true
+    const merged = [...volunteerList, ...leaderList];
+    const uniqueMap = new Map<string, Ministry>();
+    for (const item of merged) {
+      if (!uniqueMap.has(item.id)) {
+        uniqueMap.set(item.id, item);
+      } else {
+        const existing = uniqueMap.get(item.id)!;
+        uniqueMap.set(item.id, { ...existing, ...item, isLeader: existing.isLeader || item.isLeader });
+      }
+    }
+    const unique = Array.from(uniqueMap.values());
     setMyMinistries(unique);
+
+    // Se nada selecionado ainda, prioriza um ministério onde o usuário é líder
     if (unique.length > 0 && !selectedMinistryId) {
-      setSelectedMinistryId(unique[0].id);
+      const leaderFirst = unique.find(m => m.isLeader) || unique[0];
+      setSelectedMinistryId(leaderFirst.id);
     }
   }, [user?.id, currentChurchId, selectedMinistryId]);
 
