@@ -1,8 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Progress } from '../ui/progress';
-import { Calendar, BookOpen, Heart, Clock, CheckCircle, ArrowRight, Play, Eye, Target } from 'lucide-react';
+import { Calendar, Heart, CheckCircle, ArrowRight, Eye, Target } from 'lucide-react';
 import { useJourneyData } from '../../hooks/useJourneyData';
 import { Skeleton } from '../ui/skeleton';
 import { Link } from 'react-router-dom';
@@ -16,32 +15,7 @@ const MemberDashboardContent = () => {
   const { data: recentEvents, isLoading: loadingEvents } = useRecentEvents();
   const { data: recentDevotionals, isLoading: loadingDevotionals } = useRecentDevotionals();
 
-  // Cursos disponíveis
-  const availableCourses = [
-    {
-      title: 'Fundamentos da Fé',
-      description: 'Curso básico para novos convertidos',
-      duration: '4 semanas',
-      students: 25,
-      progress: 0,
-    },
-    {
-      title: 'Liderança Cristã',
-      description: 'Desenvolvimento de líderes',
-      duration: '8 semanas',
-      students: 15,
-      progress: 60,
-    },
-    {
-      title: 'Evangelismo Pessoal',
-      description: 'Como compartilhar sua fé',
-      duration: '6 semanas',
-      students: 30,
-      progress: 0,
-    },
-  ];
-
-  // Status da jornada espiritual - REMOVIDO O MOCK
+  // Status da jornada espiritual - dados reais
   const journeySteps = etapas.flatMap(etapa => etapa.passos).map((passo, index) => ({
     title: passo.titulo,
     completed: passo.completed,
@@ -50,59 +24,7 @@ const MemberDashboardContent = () => {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Cursos Disponíveis */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-500" />
-              Cursos Disponíveis
-            </CardTitle>
-            <CardDescription>Continue seu crescimento espiritual</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {availableCourses.map((course, index) => (
-              <div key={index} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <BookOpen className="w-6 h-6 text-blue-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium truncate">{course.title}</h3>
-                  <p className="text-sm text-gray-600 truncate">{course.description}</p>
-                  <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
-                    <span>{course.duration}</span>
-                    <span>{course.students} alunos</span>
-                  </div>
-                  {course.progress > 0 && (
-                    <div className="mt-2">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Progresso</span>
-                        <span>{course.progress}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1">
-                        <div
-                          className="bg-blue-500 h-1 rounded-full"
-                          style={{ width: `${course.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <Button size="sm" className="shrink-0">
-                  {course.progress > 0 ? (
-                    <>
-                      <Play className="w-3 h-3 mr-1" />
-                      Continuar
-                    </>
-                  ) : (
-                    'Iniciar'
-                  )}
-                </Button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 gap-6">
         {/* Status da Jornada */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
@@ -187,7 +109,7 @@ const MemberDashboardContent = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Próximos Eventos */}
+        {/* Últimos Eventos */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -220,7 +142,7 @@ const MemberDashboardContent = () => {
                         <p className="text-xs text-gray-600">{event.tipo || 'Evento'}</p>
                       </div>
                     </div>
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" aria-label="Ver evento">
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                   </div>
@@ -266,7 +188,7 @@ const MemberDashboardContent = () => {
                         <span>{readStr}</span>
                       </div>
                     </div>
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" aria-label="Ver devocional">
                       <Eye className="w-4 h-4" />
                     </Button>
                   </div>

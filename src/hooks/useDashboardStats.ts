@@ -26,7 +26,7 @@ const fetchDashboardStats = async (churchId: string | null) => {
   const { count: activeCourses, error: coursesError } = await supabase
     .from('cursos_inscricoes')
     .select('id_curso', { count: 'exact', head: true })
-    .eq('status', 'ativo')
+    .eq('status', 'Ativo')
     .in('id_curso', (await supabase.from('cursos').select('id').eq('id_igreja', churchId)).data?.map(c => c.id) || []);
   if (coursesError) throw new Error(`Cursos: ${coursesError.message}`);
 
@@ -45,7 +45,7 @@ const fetchDashboardStats = async (churchId: string | null) => {
     .lte('data_transacao', end);
   if (offeringsError) throw new Error(`Ofertas: ${offeringsError.message}`);
   
-  const totalMonthlyOfferings = monthlyOfferings?.reduce((sum, item) => sum + item.valor, 0) || 0;
+  const totalMonthlyOfferings = (monthlyOfferings || []).reduce((sum: number, item: any) => sum + Number(item.valor ?? 0), 0);
 
   return {
     activeMembers,

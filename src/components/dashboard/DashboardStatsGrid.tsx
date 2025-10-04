@@ -4,6 +4,7 @@ import { Card, CardContent } from '../ui/card';
 import { Users, Calendar, BookOpen, DollarSign, Heart, TrendingUp } from 'lucide-react';
 import { useDashboardStats } from '../../hooks/useDashboardStats';
 import { Skeleton } from '../ui/skeleton';
+import { useJourneyData } from '../../hooks/useJourneyData';
 
 const DashboardStatsGrid = () => {
   const { user } = useAuthStore();
@@ -16,7 +17,7 @@ const DashboardStatsGrid = () => {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         {[...Array(4)].map((_, i) => (
           <Card key={i} className="border-0 shadow-sm">
             <CardContent className="p-3 md:p-6">
@@ -29,6 +30,8 @@ const DashboardStatsGrid = () => {
       </div>
     );
   }
+
+  const { overallProgress, totalSteps } = useJourneyData();
 
   const stats = isAdminOrPastor
     ? [
@@ -67,54 +70,41 @@ const DashboardStatsGrid = () => {
                 bgColor: 'bg-orange-50',
               },
             ]
-          : [
-              {
-                title: 'Ministérios Ativos',
-                value: '8', // Placeholder
-                change: 'Todos funcionando',
-                icon: <Heart className="w-5 h-5" />,
-                color: 'text-orange-600',
-                bgColor: 'bg-orange-50',
-              },
-            ]),
+          : []),
       ]
     : [
         {
-          title: 'Cursos Disponíveis',
-          value: '12', // Placeholder
-          change: '3 novos cursos',
-          icon: <BookOpen className="w-5 h-5" />,
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-50',
-        },
-        {
           title: 'Próximos Eventos',
           value: statsData?.upcomingEvents?.toString() || '0',
-          change: 'Esta semana',
+          change: 'esta semana',
           icon: <Calendar className="w-5 h-5" />,
           color: 'text-green-600',
           bgColor: 'bg-green-50',
         },
         {
-          title: 'Devocionais',
-          value: '25', // Placeholder
-          change: 'Novos este mês',
-          icon: <Heart className="w-5 h-5" />,
+          title: 'Cursos em Andamento',
+          value: statsData?.activeCourses?.toString() || '0',
+          change: 'inscrições ativas',
+          icon: <BookOpen className="w-5 h-5" />,
           color: 'text-purple-600',
           bgColor: 'bg-purple-50',
         },
-        {
-          title: 'Jornada Espiritual',
-          value: '75%', // Placeholder
-          change: 'Progresso atual',
-          icon: <TrendingUp className="w-5 h-5" />,
-          color: 'text-orange-600',
-          bgColor: 'bg-orange-50',
-        },
+        ...(totalSteps > 0
+          ? [
+              {
+                title: 'Jornada Espiritual',
+                value: `${Math.round(overallProgress || 0)}%`,
+                change: `${Math.round(overallProgress || 0)} de progresso`,
+                icon: <TrendingUp className="w-5 h-5" />,
+                color: 'text-orange-600',
+                bgColor: 'bg-orange-50',
+              },
+            ]
+          : []),
       ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
       {stats.map((stat, index) => (
         <Card key={index} className="border-0 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-3 md:p-6">

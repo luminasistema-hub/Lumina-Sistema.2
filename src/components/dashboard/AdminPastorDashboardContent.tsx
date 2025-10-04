@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Calendar, Clock, ArrowRight } from 'lucide-react';
+import { Calendar, ArrowRight } from 'lucide-react';
 import { useRecentEvents } from '../../hooks/useRecentEvents';
 import { useRecentDevotionals } from '../../hooks/useRecentDevotionals';
 import { Skeleton } from '../ui/skeleton';
@@ -14,28 +14,8 @@ const AdminPastorDashboardContent = () => {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activities */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-blue-500" />
-              Atividades Recentes
-            </CardTitle>
-            <CardDescription>Últimas atualizações do sistema</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
-              <div className="flex-1">
-                <p className="font-medium text-sm">Eventos e devocionais são mostrados abaixo com dados reais.</p>
-                <p className="text-xs text-gray-600">Blocos estáticos foram removidos para refletir o sistema.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Events */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Últimos Eventos */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -76,78 +56,50 @@ const AdminPastorDashboardContent = () => {
           </CardContent>
         </Card>
 
-        {/* Progress */}
+        {/* Últimos Devocionais */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>Progresso Mensal</CardTitle>
-            <CardDescription>Metas e objetivos da igreja</CardDescription>
+            <CardTitle>Últimos Devocionais</CardTitle>
+            <CardDescription>Três mais recentes publicados</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Membros Ativos</span>
-                  <span>85%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '85%' }} />
-                </div>
+            {loadingDevotionals ? (
+              <div className="space-y-3">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
               </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Meta Financeira</span>
-                  <span>72%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{ width: '72%' }} />
-                </div>
+            ) : (
+              <div className="space-y-3">
+                {(recentDevotionals || []).map((devotional) => {
+                  const dt = devotional.data_publicacao ? new Date(devotional.data_publicacao) : null;
+                  const dateStr = dt ? format(dt, "dd MMM", { locale: ptBR }) : '';
+                  const readStr = devotional.tempo_leitura ? `${devotional.tempo_leitura} min` : '—';
+                  return (
+                    <div key={devotional.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm truncate">{devotional.titulo}</h3>
+                        <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                          <span>Por {devotional.membros?.nome_completo || 'Autor'}</span>
+                          <span>•</span>
+                          <span>{dateStr}</span>
+                          <span>•</span>
+                          <span>{readStr}</span>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="ghost" aria-label="Ver devocional">
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Devocionais Recentes */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle>Últimos Devocionais</CardTitle>
-          <CardDescription>Três mais recentes publicados</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loadingDevotionals ? (
-            <div className="space-y-3">
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {(recentDevotionals || []).map((devotional) => {
-                const dt = devotional.data_publicacao ? new Date(devotional.data_publicacao) : null;
-                const dateStr = dt ? format(dt, "dd MMM", { locale: ptBR }) : '';
-                const readStr = devotional.tempo_leitura ? `${devotional.tempo_leitura} min` : '—';
-                return (
-                  <div key={devotional.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm truncate">{devotional.titulo}</h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
-                        <span>Por {devotional.membros?.nome_completo || 'Autor'}</span>
-                        <span>•</span>
-                        <span>{dateStr}</span>
-                        <span>•</span>
-                        <span>{readStr}</span>
-                      </div>
-                    </div>
-                    <Button size="sm" variant="ghost">
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Espaço reservado para futuras métricas reais (sem estáticos) */}
     </>
   );
 };
