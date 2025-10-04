@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuthStore, UserRole } from "../../stores/authStore";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 // 🔹 Tipos de módulos
 interface ModuleItem {
@@ -94,8 +95,37 @@ interface SidebarProps {
 const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["personal","management","spiritual"]);
-  const { user } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
+  const [hasMyMinistryAccess, setHasMyMinistryAccess] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let mounted = true;
+    const checkAccess = async () => {
+      if (!user || !currentChurchId) {
+        if (mounted) setHasMyMinistryAccess(false);
+        return;
+      }
+      // Se a role já for líder/voluntário, libera diretamente
+      const byRole = user.role === "lider_ministerio" || user.role === "voluntario";
+      // Verifica se é líder de algum ministério na igreja
+      const { count: leaderCount } = await supabase
+        .from("ministerios")
+        .select("id", { count: "exact", head: true })
+        .eq("id_igreja", currentChurchId)
+        .eq("lider_id", user.id);
+      // Verifica se é voluntário em algum ministério na igreja
+      const { count: volunteerCount } = await supabase
+        .from("ministerio_voluntarios")
+        .select("id", { count: "exact", head: true })
+        .eq("id_igreja", currentChurchId)
+        .eq("membro_id", user.id);
+      const hasAccess = byRole || (leaderCount || 0) > 0 || (volunteerCount || 0) > 0;
+      if (mounted) setHasMyMinistryAccess(hasAccess);
+    };
+    checkAccess();
+    return () => { mounted = false; };
+  }, [user, currentChurchId]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev =>
@@ -120,7 +150,13 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
 
   const getUserModules = (modules: ModuleItem[]) => {
     if (!user) return [];
-    return modules.filter(module => module.roles.includes(user.role));
+    return modules.filter(module => {
+      if (module.id === "my-ministry") {
+        // Mostrar apenas se tiver acesso por role ou vínculo (líder/voluntário) com algum ministério
+        return hasMyMinistryAccess;
+      }
+      return module.roles.includes(user.role);
+    });
   };
 
   const getUserCategories = () => {
