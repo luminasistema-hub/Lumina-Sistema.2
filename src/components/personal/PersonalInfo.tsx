@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom' 
 import AddKidDialog from './AddKidDialog';
+import PersonalStatusCards from './PersonalStatusCards';
 
 // Interfaces para tipagem dos dados
 interface PersonalInfoData {
@@ -196,6 +197,8 @@ const PersonalInfo = () => {
             <p className="text-blue-100 text-lg">Para começarmos, preencha suas informações pessoais.</p>
           </div>
         )}
+        {/* Status do Membro */}
+        <PersonalStatusCards />
         <form className="space-y-8">
           <Card>
             <CardHeader>
@@ -356,6 +359,8 @@ const PersonalInfo = () => {
         <div><h1 className="text-3xl font-bold text-gray-800">Meu Perfil</h1><p className="text-gray-500 mt-1">Seus dados pessoais, familiares e ministeriais.</p></div>
         <Button variant="outline" onClick={() => setIsEditing(true)}><Edit className="w-4 h-4 mr-2" />Editar Perfil</Button>
       </div>
+      {/* Status do Membro */}
+      <PersonalStatusCards />
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Coluna 1: Dados Pessoais e Família */}
         <div className="xl:col-span-2 space-y-6">
