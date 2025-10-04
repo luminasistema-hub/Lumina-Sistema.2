@@ -7,6 +7,7 @@ import MemberJourney from '../components/personal/MemberJourney';
 import VocationalTest from '../components/personal/VocationalTest';
 import EventsPage from '../components/spiritual/EventsPage';
 import EventsManagementPage from '../components/management/EventsManagementPage';
+import DevotionalsManagementPage from '../components/management/DevotionalsManagementPage';
 import DevotionalsPage from '../components/spiritual/DevotionalsPage';
 import OfferingsPage from '../components/contributions/OfferingsPage';
 import KidsPage from '../components/family/KidsPage';
@@ -49,6 +50,7 @@ const DashboardPage = () => {
       case 'events': return <EventsPage />;
       case 'events-management': return <EventsManagementPage />;
       case 'devotionals': return <DevotionalsPage />;
+      case 'devotionals-management': return <DevotionalsManagementPage />;
       case 'offerings': return <OfferingsPage />;
       case 'kids-management': return <KidsPage />;
       case 'member-management': return <MemberManagementPage />;
