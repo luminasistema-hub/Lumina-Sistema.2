@@ -1,293 +1,115 @@
-import { Link } from "react-router-dom";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { toast } from "@/components/ui/sonner";
-import {
-  LayoutDashboard,
-  Users,
-  CalendarCheck2,
-  Baby,
-  BookOpen,
-  HandCoins,
-  MessageSquare,
-  ShieldCheck,
-  Zap,
-  ArrowRight,
-  Sparkles,
-  PhoneCall,
-} from "lucide-react";
+import { Button } from "@/components/ui/button"
+import { Church, Users, BookOpen, MessageCircle, ShieldCheck, Smartphone } from "lucide-react"
 
-const Feature = ({
-  icon: Icon,
-  title,
-  desc,
-}: {
-  icon: any;
-  title: string;
-  desc: string;
-}) => (
-  <Card className="h-full transition-transform hover:translate-y-[-2px] hover:shadow-lg">
-    <CardContent className="p-6">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="inline-flex items-center justify-center rounded-md bg-primary/10 text-primary p-2">
-          <Icon className="h-5 w-5" />
-        </div>
-        <h3 className="font-semibold">{title}</h3>
-      </div>
-      <p className="text-sm text-muted-foreground">{desc}</p>
-    </CardContent>
-  </Card>
-);
-
-const Stat = ({ value, label }: { value: string; label: string }) => (
-  <div className="text-center">
-    <div className="text-2xl md:text-3xl font-bold">{value}</div>
-    <div className="text-xs md:text-sm text-muted-foreground">{label}</div>
-  </div>
-);
-
-const LandingPage = () => {
-  const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
-  const [mensagem, setMensagem] = useState("");
-
-  const handleContatoWhatsApp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nome.trim() || !email.trim() || !mensagem.trim()) {
-      toast.error("Preencha nome, e-mail e mensagem.");
-      return;
-    }
-    const texto = `Olá! Sou ${nome} (${email}).%0A%0A${mensagem}%0A%0AEnviado pelo site.`;
-    const telefone = "5563984861923";
-    const url = `https://wa.me/${telefone}?text=${encodeURIComponent(texto)}`;
-    window.open(url, "_blank");
-    toast.success("Abrindo WhatsApp...");
-  };
-
+export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Background decor */}
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute left-1/2 top-[-10%] h-[400px] w-[600px] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
-        <div className="absolute right-[-10%] bottom-[-10%] h-[300px] w-[300px] rounded-full bg-emerald-300/20 blur-3xl" />
-      </div>
+    <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen flex flex-col">
 
-      {/* Hero */}
-      <header className="relative overflow-hidden">
-        <div className="container mx-auto px-4 pt-14 md:pt-20">
-          <div className="mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground bg-background/60 backdrop-blur">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              <span>Novo • Integração WhatsApp com fila por igreja</span>
-            </div>
-
-            <h1 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight">
-              Organize sua igreja em um só lugar
-            </h1>
-            <p className="mt-4 text-muted-foreground text-base md:text-lg">
-              Ministérios, escalas, Kids check-in/out, devocionais, cursos EAD, doações com recibo e WhatsApp — tudo com segurança e RLS por igreja.
-            </p>
-
-            <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild size="lg" className="shadow-md hover:shadow-lg">
-                <Link to="/login">
-                  Entrar
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="backdrop-blur">
-                <Link to="/register">Criar conta</Link>
-              </Button>
-              <Button asChild variant="ghost" size="lg" className="sm:ml-2" >
-                <a href="#contato">
-                  Contato
-                  <PhoneCall className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
-            </div>
-
-            <div className="mt-8 grid grid-cols-3 max-w-xl mx-auto gap-4">
-              <Stat value="100%" label="RLS por igreja" />
-              <Stat value="60s" label="Fila WhatsApp" />
-              <Stat value="24/7" label="Online" />
-            </div>
+      {/* Navbar */}
+      <header className="w-full fixed top-0 bg-white/70 backdrop-blur-lg z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-indigo-600">Lumina</h1>
+          <nav className="hidden md:flex gap-8 text-gray-700 font-medium">
+            <a href="#features" className="hover:text-indigo-600">Recursos</a>
+            <a href="#churches" className="hover:text-indigo-600">Igrejas</a>
+            <a href="#contact" className="hover:text-indigo-600">Contato</a>
+          </nav>
+          <div className="flex gap-4">
+            <Button variant="ghost" asChild>
+              <a href="/login">Entrar</a>
+            </Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl" asChild>
+              <a href="/register">Criar conta grátis</a>
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Features */}
-      <section className="container mx-auto px-4 py-10 md:py-16">
-        <div className="max-w-2xl">
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
-            Tudo o que sua igreja precisa
-          </h2>
-          <p className="mt-2 text-muted-foreground">
-            Funcionalidades pensadas para líderes, voluntários e membros — simples, seguras e integradas.
+      {/* Hero Section */}
+      <section className="flex-1 flex items-center pt-32 pb-20 max-w-7xl mx-auto px-6 lg:px-12 grid lg:grid-cols-2 gap-12">
+        {/* Texto */}
+        <div className="space-y-6">
+          <h1 className="text-5xl font-extrabold leading-tight text-gray-900">
+            Organize sua <span className="text-indigo-600">igreja</span> em um só lugar
+          </h1>
+          <p className="text-lg text-gray-600 max-w-lg">
+            Ministérios, escalas, check-in de crianças, devocionais, cursos EAD, doações e WhatsApp — tudo em uma única plataforma segura.
           </p>
+          <div className="flex gap-4">
+            <a href="/register" className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl shadow hover:bg-indigo-700 transition">
+              Criar conta grátis
+            </a>
+            <a href="/login" className="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-100 transition">
+              Entrar
+            </a>
+          </div>
         </div>
 
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <Feature
-            icon={Users}
-            title="Gestão de Ministérios"
-            desc="Cadastre ministérios, líderes e voluntários; gerencie funções e demandas."
+        {/* Imagem */}
+        <div className="relative">
+          <img 
+            src="/hero-igreja.png" 
+            alt="Dashboard Lumina" 
+            className="rounded-3xl shadow-2xl"
           />
-          <Feature
-            icon={CalendarCheck2}
-            title="Escalas de Serviço"
-            desc="Crie escalas por evento e ministério; confirme presença e visualize atribuições."
-          />
-          <Feature
-            icon={Baby}
-            title="Kids Check-in/Out"
-            desc="Check-in com código de segurança e histórico de presença por criança."
-          />
-          <Feature
-            icon={BookOpen}
-            title="Devocionais e Cursos"
-            desc="Publique devocionais e organize trilhas/cursos com módulos e aulas."
-          />
-          <Feature
-            icon={HandCoins}
-            title="Doações e Recibos"
-            desc="Registre ofertas e emita recibos; acompanhe transações e relatórios."
-          />
-          <Feature
-            icon={MessageSquare}
-            title="WhatsApp Integrado"
-            desc="Templates por igreja e fila automática para escala, kids e recibos."
-          />
-          <Feature
-            icon={LayoutDashboard}
-            title="Dashboard por Função"
-            desc="Painéis para admin/pastor e membros com métricas e atalhos."
-          />
-          <Feature
-            icon={ShieldCheck}
-            title="Segurança por Igreja"
-            desc="Supabase Auth + RLS: cada igreja vê apenas seus dados."
-          />
+          <div className="absolute -top-6 -left-6 w-24 h-24 bg-indigo-200 rounded-full blur-2xl opacity-50"></div>
+          <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-purple-200 rounded-full blur-2xl opacity-50"></div>
         </div>
       </section>
 
-      {/* Como funciona */}
-      <section className="border-t bg-muted/30">
-        <div className="container mx-auto px-4 py-10 md:py-16">
-          <div className="grid md:grid-cols-3 gap-6">
-            <Card className="bg-background/70">
-              <CardContent className="p-6">
-                <Badge variant="secondary">1</Badge>
-                <h3 className="mt-3 font-semibold">Configure sua igreja</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Cadastre ministérios, eventos e preferências. Defina líderes e papéis.
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-background/70">
-              <CardContent className="p-6">
-                <Badge variant="secondary">2</Badge>
-                <h3 className="mt-3 font-semibold">Convide membros</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Voluntários ajustam dados pessoais e recebem atribuições pelas escalas.
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-background/70">
-              <CardContent className="p-6">
-                <Badge variant="secondary">3</Badge>
-                <h3 className="mt-3 font-semibold">Automatize notificações</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Fila de envio a cada 60s para escala, kids e recibos — com templates por igreja.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="mt-8 flex flex-col sm:flex-row gap-3">
-            <Button asChild>
-              <Link to="/login">
-                Acessar painel
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link to="/register">Criar conta</Link>
-            </Button>
+      {/* Igrejas parceiras */}
+      <section id="churches" className="py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-6 text-center">
+          <h2 className="text-xl font-semibold text-gray-700 mb-8">Igrejas que confiam na Lumina</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6 opacity-70">
+            <img src="/logo1.png" alt="Igreja 1" className="h-10 mx-auto" />
+            <img src="/logo2.png" alt="Igreja 2" className="h-10 mx-auto" />
+            <img src="/logo3.png" alt="Igreja 3" className="h-10 mx-auto" />
+            <img src="/logo4.png" alt="Igreja 4" className="h-10 mx-auto" />
+            <img src="/logo5.png" alt="Igreja 5" className="h-10 mx-auto" />
+            <img src="/logo6.png" alt="Igreja 6" className="h-10 mx-auto" />
           </div>
         </div>
       </section>
 
-      {/* Contato */}
-      <section id="contato" className="border-t">
-        <div className="container mx-auto px-4 py-12 md:py-16">
-          <div className="max-w-3xl">
-            <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
-              Fale conosco
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              Envie sua mensagem e fale direto no nosso WhatsApp. Responderemos o quanto antes.
-            </p>
-          </div>
-          <div className="mt-6">
-            <Card className="bg-background/70">
-              <CardContent className="p-6">
-                <form className="grid md:grid-cols-2 gap-4" onSubmit={handleContatoWhatsApp}>
-                  <div className="space-y-2">
-                    <Label htmlFor="nome">Nome</Label>
-                    <Input id="nome" placeholder="Seu nome" value={nome} onChange={(e) => setNome(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">E-mail</Label>
-                    <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="mensagem">Mensagem</Label>
-                    <Textarea id="mensagem" placeholder="Como podemos ajudar?" value={mensagem} onChange={(e) => setMensagem(e.target.value)} className="min-h-[120px]" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Button type="submit" className="w-full md:w-auto">
-                      Falar no WhatsApp
-                      <MessageSquare className="ml-2 h-4 w-4" />
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Enviaremos sua mensagem para o WhatsApp +55 63 98486-1923 automaticamente.
-                    </p>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
+      {/* Funcionalidades */}
+      <section id="features" className="py-20 bg-gradient-to-b from-white to-indigo-50">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-12">Tudo o que sua igreja precisa</h2>
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <FeatureCard icon={<Church />} title="Gestão de Ministérios" desc="Cadastre ministérios, líderes e voluntários; gerencie funções e demandas." />
+            <FeatureCard icon={<Users />} title="Escalas de Serviço" desc="Crie escalas por evento ou ministério; confirme presença e atribuições." />
+            <FeatureCard icon={<BookOpen />} title="Cursos e Devocionais" desc="Organize cursos EAD e publique devocionais para membros." />
+            <FeatureCard icon={<MessageCircle />} title="WhatsApp Integrado" desc="Fila automática de mensagens por igreja para escalas, kids e recibos." />
+            <FeatureCard icon={<Smartphone />} title="Dashboard por Função" desc="Painéis para admin, pastor e membros com métricas e atalhos." />
+            <FeatureCard icon={<ShieldCheck />} title="Segurança por Igreja" desc="Supabase Auth + RLS: cada igreja vê apenas seus dados." />
           </div>
         </div>
       </section>
 
-      {/* Depoimento breve */}
-      <section className="border-t">
-        <div className="container mx-auto px-4 py-10 md:py-16">
-          <div className="max-w-3xl">
-            <blockquote className="text-lg md:text-xl leading-relaxed">
-              "Conseguimos reduzir a bagunça em escalas e comunicação com voluntários. O check-in das crianças ficou muito mais seguro e prático."
-            </blockquote>
-            <p className="mt-3 text-sm text-muted-foreground">— Equipe de liderança</p>
-          </div>
-        </div>
+      {/* CTA Final */}
+      <section className="py-20 bg-indigo-600 text-white text-center">
+        <h2 className="text-4xl font-bold mb-6">Pronto para organizar sua igreja?</h2>
+        <p className="mb-8 text-lg">Comece grátis agora mesmo e leve a gestão da sua igreja para o próximo nível.</p>
+        <a href="/register" className="px-8 py-4 bg-white text-indigo-700 font-semibold rounded-xl shadow hover:bg-gray-100 transition">
+          Criar conta grátis
+        </a>
       </section>
 
-      <footer className="border-t">
-        <div className="container mx-auto px-4 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Connect Vida. Todos os direitos reservados.</p>
-          <div className="flex items-center gap-4 text-sm">
-            <Link to="/login" className="text-primary hover:underline">Entrar</Link>
-            <Link to="/register" className="text-primary hover:underline">Criar conta</Link>
-          </div>
-        </div>
+      {/* Rodapé */}
+      <footer className="py-6 bg-gray-900 text-gray-400 text-center text-sm">
+        © {new Date().getFullYear()} Lumina. Todos os direitos reservados.
       </footer>
     </div>
-  );
-};
+  )
+}
 
-export default LandingPage;
+function FeatureCard({ icon, title, desc }: { icon: JSX.Element, title: string, desc: string }) {
+  return (
+    <div className="bg-white rounded-2xl shadow-md p-8 hover:shadow-lg transition">
+      <div className="text-indigo-600 mb-4">{icon}</div>
+      <h3 className="text-xl font-semibold text-gray-900 mb-2">{title}</h3>
+      <p className="text-gray-600">{desc}</p>
+    </div>
+  )
+}
