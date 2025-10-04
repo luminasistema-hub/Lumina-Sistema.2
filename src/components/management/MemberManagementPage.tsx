@@ -60,6 +60,7 @@ interface MemberProfile {
   telefone?: string;
   endereco?: string;
   data_nascimento?: string;
+  data_casamento?: string;
   estado_civil?: string;
   profissao?: string;
   conjuge?: string;
@@ -100,6 +101,8 @@ const MemberManagementPage = () => {
   const [filterRole, setFilterRole] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMinistry, setFilterMinistry] = useState('all')
+  const [filterBirthday, setFilterBirthday] = useState('all') // all | mes_atual
+  const [filterWedding, setFilterWedding] = useState('all') // all | mes_atual
   const [churchesLoaded, setChurchesLoaded] = useState(false); 
 
   const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
@@ -172,8 +175,23 @@ const MemberManagementPage = () => {
       )
     }
 
+    if (filterBirthday === 'mes_atual') {
+      filtered = filtered.filter(member => isSameMonth(member.data_nascimento))
+    }
+
+    if (filterWedding === 'mes_atual') {
+      filtered = filtered.filter(member => isSameMonth(member.data_casamento))
+    }
+
     setFilteredMembers(filtered)
-  }, [members, searchTerm, filterRole, filterStatus, filterMinistry])
+  }, [members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding])
+
+  const isSameMonth = (dateStr?: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(`${dateStr}T00:00:00`);
+    const now = new Date();
+    return d.getMonth() === now.getMonth();
+  };
 
   const loadMembers = async (churchId: string) => {
     console.log('MemberManagementPage: Loading members for churchId:', churchId);
@@ -237,6 +255,7 @@ const MemberManagementPage = () => {
       telefone: member.informacoes_pessoais?.telefone,
       endereco: member.informacoes_pessoais?.endereco,
       data_nascimento: member.informacoes_pessoais?.data_nascimento,
+      data_casamento: member.informacoes_pessoais?.data_casamento,
       estado_civil: member.informacoes_pessoais?.estado_civil,
       profissao: member.informacoes_pessoais?.profissao,
       pais_cristaos: member.informacoes_pessoais?.pais_cristaos,
@@ -410,6 +429,7 @@ const MemberManagementPage = () => {
       telefone: member.telefone,
       endereco: member.endereco,
       data_nascimento: member.data_nascimento,
+      data_casamento: member.data_casamento,
       estado_civil: member.estado_civil,
       profissao: member.profissao,
       conjuge: member.conjuge,
@@ -464,6 +484,7 @@ const MemberManagementPage = () => {
         telefone: editMemberData.telefone,
         endereco: editMemberData.endereco,
         data_nascimento: editMemberData.data_nascimento,
+        data_casamento: editMemberData.data_casamento,
         estado_civil: editMemberData.estado_civil,
         profissao: editMemberData.profissao,
         pais_cristaos: editMemberData.pais_cristaos,
@@ -703,6 +724,30 @@ const MemberManagementPage = () => {
         </Card>
       </div>
 
+      {/* Stats - Aniversários */}
+      <div className="grid grid-cols-2 gap-4 md:gap-6">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-xl md:text-2xl font-bold text-pink-600">
+                {members.filter(m => isSameMonth(m.data_nascimento)).length}
+              </div>
+              <div className="text-sm text-gray-600">Aniversariantes do mês</div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="text-center">
+              <div className="text-xl md:text-2xl font-bold text-rose-600">
+                {members.filter(m => isSameMonth(m.data_casamento)).length}
+              </div>
+              <div className="text-sm text-gray-600">Aniversário de casamento do mês</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters and Actions */}
       <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 w-full lg:flex-1">
@@ -716,7 +761,7 @@ const MemberManagementPage = () => {
             />
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
             <Select value={filterRole} onValueChange={setFilterRole}>
               <SelectTrigger>
                 <Filter className="w-4 h-4 mr-2" />
@@ -762,6 +807,28 @@ const MemberManagementPage = () => {
                 <SelectItem value="Kids">Kids</SelectItem>
                 <SelectItem value="Organização e Administração">Organização e Administração</SelectItem>
                 <SelectItem value="Ação Social">Ação Social</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Filtro Aniversário (nascimento) */}
+            <Select value={filterBirthday} onValueChange={setFilterBirthday}>
+              <SelectTrigger>
+                <SelectValue placeholder="Aniversariantes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="mes_atual">Aniversariantes do mês</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Filtro Aniversário de casamento */}
+            <Select value={filterWedding} onValueChange={setFilterWedding}>
+              <SelectTrigger>
+                <SelectValue placeholder="Casamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="mes_atual">Casamento no mês</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1442,6 +1509,17 @@ const MemberManagementPage = () => {
                     rows={3}
                   />
                 </div>
+                {editMemberData.estado_civil === 'casado' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-data_casamento">Data de Casamento</Label>
+                    <Input
+                      id="edit-data_casamento"
+                      type="date"
+                      value={editMemberData.data_casamento || ''}
+                      onChange={(e) => setEditMemberData({...editMemberData, data_casamento: e.target.value})}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Spiritual Info Fields */}
