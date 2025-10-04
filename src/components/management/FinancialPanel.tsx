@@ -477,7 +477,7 @@ const FinancialPanel = () => {
       const { error: notificationError } = await supabase
         .from('eventos_aplicacao')
         .delete()
-        .eq('event_details->transaction_id', transactionId)
+        .eq('event_details->>transaction_id', transactionId)
         .eq('event_name', 'nova_contribuicao_pendente')
 
       if (notificationError) {
@@ -518,7 +518,7 @@ const FinancialPanel = () => {
       const { error: notificationError } = await supabase
         .from('eventos_aplicacao')
         .delete()
-        .eq('event_details->transaction_id', transactionId)
+        .eq('event_details->>transaction_id', transactionId)
         .eq('event_name', 'nova_contribuicao_pendente')
 
       if (notificationError) {

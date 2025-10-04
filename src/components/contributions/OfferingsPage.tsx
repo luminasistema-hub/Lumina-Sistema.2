@@ -69,7 +69,7 @@ const OfferingsPage = () => {
 
   const [newContribution, setNewContribution] = useState({
     valor: 0,
-    categoria: 'Ofertas' as Contribution['categoria'], // Usar categoria aqui
+    categoria: 'Ofertas' as Contribution['categoria'], // Keep plural to match Financial Panel
     metodo_pagamento: 'PIX' as Contribution['metodo_pagamento'],
     observacoes: '',
     campanha: '' // Adicionado campo de campanha
@@ -131,6 +131,9 @@ const OfferingsPage = () => {
 
     setLoading(true)
     try {
+      // Generate a simple receipt/document number for tracking in the panel
+      const numeroDocumento = `ENT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(Math.random() * 900 + 100)}`;
+      
       // Criar transação financeira pendente
       const { data: transactionData, error: transactionError } = await supabase
         .from('transacoes_financeiras')
@@ -149,6 +152,7 @@ const OfferingsPage = () => {
           membro_id: user.id,
           membro_nome: user.name,
           recibo_emitido: false,
+          numero_documento: numeroDocumento,
         })
         .select()
         .single()
@@ -439,9 +443,9 @@ const OfferingsPage = () => {
                       <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Oferta">Oferta</SelectItem>
-                      <SelectItem value="Dízimo">Dízimo</SelectItem>
-                      <SelectItem value="Doação Especial">Doação Especial</SelectItem>
+                      <SelectItem value="Ofertas">Ofertas</SelectItem>
+                      <SelectItem value="Dízimos">Dízimos</SelectItem>
+                      <SelectItem value="Doações Especiais">Doações Especiais</SelectItem>
                       <SelectItem value="Missões">Missões</SelectItem>
                       <SelectItem value="Obras">Obras</SelectItem>
                     </SelectContent>
