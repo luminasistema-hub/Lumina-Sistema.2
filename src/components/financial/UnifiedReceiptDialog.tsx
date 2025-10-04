@@ -40,7 +40,7 @@ export const UnifiedReceiptDialog = ({
   onMarkAsIssued,
   canManage,
 }: UnifiedReceiptDialogProps) => {
-  if (!transaction || !church) return null
+  if (!transaction) return null
 
   const handleDownloadPdf = () => {
     // Usa a impressora do navegador; o usuário pode escolher "Salvar como PDF"
@@ -55,10 +55,10 @@ export const UnifiedReceiptDialog = ({
     categoria: transaction.categoria,
     metodo_pagamento: transaction.metodo_pagamento,
     igreja: {
-      nome: church.name,
-      endereco: church.address || 'Endereço não informado',
-      cnpj: church.cnpj || 'CNPJ não informado',
-      telefone: church.contactPhone || 'Telefone não informado',
+      nome: church?.name ?? 'Igreja não identificada',
+      endereco: church?.address ?? 'Endereço não informado',
+      cnpj: church?.cnpj ?? 'CNPJ não informado',
+      telefone: church?.contactPhone ?? 'Telefone não informado',
     },
     doador: transaction.membro_nome || 'Doador não identificado',
   }
