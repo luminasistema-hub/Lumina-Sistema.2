@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Phone, QrCode, Link2, CheckCircle, Clock } from 'lucide-react';
+import { Copy, RefreshCcw } from 'lucide-react';
+import QRCode from 'react-qr-code';
 
 type SessionRow = {
   id: string;
@@ -55,6 +57,28 @@ const WhatsappIntegration = () => {
       setSelectedTemplateContent(initial?.content || '');
     };
     load();
+  }, [currentChurchId]);
+
+  // Realtime: atualiza sessão quando QR/status mudar
+  useEffect(() => {
+    if (!currentChurchId) return;
+    const channel = supabase
+      .channel(`whatsapp_sessions_${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'whatsapp_sessions', filter: `church_id=eq.${currentChurchId}` },
+        (payload) => {
+          const row = (payload.new || payload.old) as SessionRow | null;
+          if (row) {
+            setSession(row);
+            if (row.status === 'connected') {
+              toast.success('WhatsApp conectado com sucesso!');
+            }
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [currentChurchId]);
 
   useEffect(() => {
@@ -124,6 +148,25 @@ const WhatsappIntegration = () => {
     toast.success('Fila processada!');
   };
 
+  const refreshSession = async () => {
+    if (!currentChurchId) return;
+    const { data: sessRows, error } = await supabase
+      .from('whatsapp_sessions')
+      .select('*')
+      .eq('church_id', currentChurchId)
+      .limit(1);
+    if (!error) {
+      setSession((sessRows || [])[0] || null);
+      toast.success('Sessão atualizada.');
+    }
+  };
+
+  const copyQr = async () => {
+    if (!session?.qr_code) return;
+    await navigator.clipboard.writeText(session.qr_code);
+    toast.success('Chave do QR copiada!');
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-6 text-white shadow">
@@ -165,13 +208,36 @@ const WhatsappIntegration = () => {
           )}
 
           <div className="p-3 border rounded-lg">
-            <div className="flex items-center gap-2 text-gray-600">
-              <QrCode className="w-4 h-4" />
-              <span>QR Code</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-gray-600">
+                <QrCode className="w-4 h-4" />
+                <span>QR Code</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={refreshSession}>
+                  <RefreshCcw className="w-4 h-4 mr-1" /> Atualizar
+                </Button>
+                <Button variant="ghost" size="sm" onClick={copyQr} disabled={!session?.qr_code}>
+                  <Copy className="w-4 h-4 mr-1" /> Copiar
+                </Button>
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
-              {session?.qr_code || 'QR será fornecido pelo serviço de sessão.'}
-            </p>
+            {session?.status === 'awaiting_qr' && session?.qr_code ? (
+              <div className="mt-3 flex flex-col items-center gap-2">
+                <div className="bg-white p-2 rounded">
+                  <QRCode value={session.qr_code} size={192} />
+                </div>
+                <p className="text-xs text-gray-500">
+                  No celular: WhatsApp → Dispositivos conectados → Conectar aparelho. Escaneie o QR acima.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 mt-1">
+                {session?.status === 'connected'
+                  ? 'Dispositivo conectado ao WhatsApp.'
+                  : 'Aguardando QR do serviço de sessão.'}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
