@@ -9,11 +9,9 @@ import { useJourneyData } from '../../hooks/useJourneyData';
 const DashboardStatsGrid = () => {
   const { user } = useAuthStore();
   const { data: statsData, isLoading } = useDashboardStats();
+  const { overallProgress, totalSteps } = useJourneyData();
 
   if (!user) return null;
-
-  const isAdminOrPastor = user.role === 'admin' || user.role === 'pastor';
-  const isFinancialRole = user.role === 'admin' || user.role === 'pastor' || user.role === 'financeiro';
 
   if (isLoading) {
     return (
@@ -31,7 +29,8 @@ const DashboardStatsGrid = () => {
     );
   }
 
-  const { overallProgress, totalSteps } = useJourneyData();
+  const isAdminOrPastor = user.role === 'admin' || user.role === 'pastor';
+  const isFinancialRole = user.role === 'admin' || user.role === 'pastor' || user.role === 'financeiro';
 
   const stats = isAdminOrPastor
     ? [
