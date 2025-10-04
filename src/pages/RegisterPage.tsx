@@ -23,6 +23,7 @@ const RegisterPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [churchName, setChurchName] = useState(churchNameFromUrl || ''); 
+  const [isChurchNameLoading, setIsChurchNameLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -31,6 +32,27 @@ const RegisterPage = () => {
       setChurchName(churchNameFromUrl);
     }
   }, [churchNameFromUrl]);
+
+  // Buscar nome da igreja quando vier apenas o churchId
+  useEffect(() => {
+    if (churchIdFromUrl && !churchNameFromUrl) {
+      setIsChurchNameLoading(true);
+      supabase
+        .from('igrejas')
+        .select('nome')
+        .eq('id', churchIdFromUrl)
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('RegisterPage: Erro ao carregar nome da igreja:', error.message);
+            toast.error('Não foi possível carregar o nome da igreja. Tente novamente.');
+          } else {
+            setChurchName(data?.nome || '');
+          }
+        })
+        .finally(() => setIsChurchNameLoading(false));
+    }
+  }, [churchIdFromUrl, churchNameFromUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,14 +141,19 @@ const RegisterPage = () => {
                   <Input
                     id="churchName"
                     type="text"
-                    placeholder="Nome da sua igreja"
+                    placeholder={churchIdFromUrl ? 'Nome da igreja (preenchido automaticamente)' : 'Nome da sua igreja'}
                     value={churchName}
                     onChange={(e) => setChurchName(e.target.value)}
                     className="pl-10 h-12"
-                    disabled={!!churchIdFromUrl} 
+                    disabled={!!churchIdFromUrl}
                     required
                   />
                 </div>
+                {churchIdFromUrl && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Vinculada automaticamente à sua igreja.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -171,12 +198,17 @@ const RegisterPage = () => {
               <Button 
                 type="submit" 
                 className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 transition-opacity"
-                disabled={isLoading}
+                disabled={isLoading || isChurchNameLoading}
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Cadastrando...
+                  </div>
+                ) : isChurchNameLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Carregando igreja...
                   </div>
                 ) : (
                   'Criar Conta'
