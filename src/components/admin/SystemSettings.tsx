@@ -1,206 +1,169 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { Badge } from '../ui/badge'
-import { Switch } from '../ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Badge } from '../ui/badge'
 import { toast } from 'sonner'
+import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/integrations/supabase/client'
 import UserManagement from './UserManagement'
-import { useAuthStore } from '../../stores/authStore'
-import { supabase } from '../../integrations/supabase/client'
-import { 
-  Settings, 
-  Church, 
-  Shield, 
-  Bell, 
-  Mail, 
-  Database,
-  Globe,
+import UpgradePlanDialog from './UpgradePlanDialog'
+import {
+  Church,
   Users,
-  Lock,
   Save,
-  RefreshCw,
-  Download,
-  Upload,
-  Trash2,
-  AlertTriangle,
-  CheckCircle,
-  Eye,
-  EyeOff,
-  Key,
-  Server,
-  Cpu,
-  HardDrive,
-  Wifi
+  ArrowUpRight,
+  Wallet,
+  CalendarDays,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react'
 
-interface ChurchSettingsData {
+type ChurchSettingsData = {
   nome: string
   endereco: string
   telefone: string
   email: string
   cnpj: string
-  pastor_principal: string
+  nome_responsavel: string
   site: string
   descricao: string
+}
+
+type PlanState = {
+  plano_id: string | null
+  plan_name: string
+  limite_membros: number | null
+  membros_atuais_db: number | null
+  membros_count: number
+  valor_mensal_assinatura: number | null
+  data_proximo_pagamento: string | null
+  ultimo_pagamento_status: string | null
+  link_pagamento_assinatura?: string | null
 }
 
 const SystemSettings = () => {
   const { currentChurchId, user } = useAuthStore()
 
   const [churchSettings, setChurchSettings] = useState<ChurchSettingsData>({
-    nome: 'Igreja Connect Vida',
-    endereco: 'Rua da Igreja, 123 - Centro - São Paulo/SP',
-    telefone: '(11) 99999-9999',
-    email: 'contato@conectvida.com',
-    cnpj: '12.345.678/0001-90',
-    pastor_principal: 'Pastor João Silva',
-    site: 'https://www.conectvida.com',
-    descricao: 'Uma igreja comprometida com o crescimento espiritual e a comunhão cristã.'
+    nome: '',
+    endereco: '',
+    telefone: '',
+    email: '',
+    cnpj: '',
+    nome_responsavel: '',
+    site: '',
+    descricao: ''
   })
 
-  const [systemConfig, setSystemConfig] = useState({
-    backup_automatico: true,
-    notificacoes_email: true,
-    logs_detalhados: true,
-    manutencao_programada: false,
-    ssl_habilitado: true,
-    cache_habilitado: true,
-    compressao_dados: true,
-    monitoramento_ativo: true
+  const [plan, setPlan] = useState<PlanState>({
+    plano_id: null,
+    plan_name: 'N/A',
+    limite_membros: null,
+    membros_atuais_db: null,
+    membros_count: 0,
+    valor_mensal_assinatura: null,
+    data_proximo_pagamento: null,
+    ultimo_pagamento_status: 'N/A',
+    link_pagamento_assinatura: null
   })
 
-  const [securitySettings, setSecuritySettings] = useState({
-    autenticacao_dois_fatores: false,
-    senha_forte_obrigatoria: true,
-    sessao_timeout: '60',
-    tentativas_login: '5',
-    bloqueio_temporario: '15',
-    log_acessos: true
-  })
+  const [loading, setLoading] = useState(false)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
-  const [showApiKey, setShowApiKey] = useState(false)
+  const canManage = useMemo(() => {
+    return user?.role === 'admin' || user?.role === 'super_admin'
+  }, [user?.role])
 
   useEffect(() => {
-    const loadChurchFromDB = async () => {
-      if (currentChurchId) {
-        // Buscar dados básicos da igreja
-        const { data: church, error } = await supabase
-          .from('igrejas')
-          .select('id, nome, nome_responsavel, endereco, telefone_contato, cnpj, admin_user_id')
-          .eq('id', currentChurchId)
-          .maybeSingle()
+    const load = async () => {
+      if (!currentChurchId) return
 
-        if (error) {
-          console.warn('SystemSettings: erro ao buscar igreja no Supabase:', error.message)
-        }
+      // Carrega dados da igreja com informações do plano
+      const { data: church, error } = await supabase
+        .from('igrejas')
+        .select(`
+          id, nome, endereco, telefone_contato, email, cnpj,
+          nome_responsavel, site, descricao,
+          plano_id, limite_membros, membros_atuais,
+          valor_mensal_assinatura, data_proximo_pagamento,
+          ultimo_pagamento_status, link_pagamento_assinatura,
+          plano:planos_assinatura ( id, nome, limite_membros, preco_mensal )
+        `)
+        .eq('id', currentChurchId)
+        .maybeSingle()
 
-        if (church) {
-          // Email: tentar obter pelo admin_user_id (se existir) na tabela membros
-          let adminEmail: string | '' = ''
-          if (church.admin_user_id) {
-            const { data: adminProfile } = await supabase
-              .from('membros')
-              .select('email')
-              .eq('id', church.admin_user_id)
-              .maybeSingle()
-            adminEmail = adminProfile?.email || ''
-          }
+      if (error) {
+        console.warn('SystemSettings: erro ao buscar igreja:', error.message)
+        return
+      }
 
-          // Carregar site/descrição do localStorage (pois não existem na tabela)
-          const localKey = `churchSettings-${currentChurchId}`
-          const localStored = localStorage.getItem(localKey)
-          const localExtra = localStored ? JSON.parse(localStored) : {}
-
-          setChurchSettings({
-            nome: church.nome || 'Igreja Desconhecida',
-            endereco: church.endereco || '',
-            telefone: church.telefone_contato || '',
-            email: localExtra.email || adminEmail || '',
-            cnpj: church.cnpj || '',
-            pastor_principal: church.nome_responsavel || '',
-            site: localExtra.site || '',
-            descricao: localExtra.descricao || ''
-          })
-          console.log(`SystemSettings: Dados carregados da tabela igrejas para ID ${currentChurchId}.`)
-        } else {
-          console.warn(`SystemSettings: Igreja com ID ${currentChurchId} não encontrada no banco.`)
-          setChurchSettings({
-            nome: 'Igreja Desconhecida',
-            endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
-          })
-        }
-      } else if (user?.role === 'super_admin') {
-        setChurchSettings(prev => ({ ...prev, nome: 'Painel Master - Configurações' }))
-      } else {
+      if (church) {
         setChurchSettings({
-          nome: 'Nenhuma Igreja Selecionada',
-          endereco: '', telefone: '', email: '', cnpj: '', pastor_principal: '', site: '', descricao: ''
+          nome: church.nome || '',
+          endereco: church.endereco || '',
+          telefone: church.telefone_contato || '',
+          email: church.email || '',
+          cnpj: church.cnpj || '',
+          nome_responsavel: church.nome_responsavel || '',
+          site: church.site || '',
+          descricao: church.descricao || ''
+        })
+
+        // Conta real de membros
+        const { count } = await supabase
+          .from('membros')
+          .select('id', { count: 'exact', head: true })
+          .eq('id_igreja', currentChurchId)
+
+        setPlan({
+          plano_id: church.plano_id || null,
+          plan_name: (Array.isArray(church.plano) ? church.plano[0]?.nome : church.plano?.nome) || 'N/A',
+          limite_membros: church.limite_membros ?? (Array.isArray(church.plano) ? church.plano[0]?.limite_membros : church.plano?.limite_membros) ?? null,
+          membros_atuais_db: church.membros_atuais ?? null,
+          membros_count: count ?? 0,
+          valor_mensal_assinatura: church.valor_mensal_assinatura ?? (Array.isArray(church.plano) ? church.plano[0]?.preco_mensal : church.plano?.preco_mensal) ?? null,
+          data_proximo_pagamento: church.data_proximo_pagamento ?? null,
+          ultimo_pagamento_status: church.ultimo_pagamento_status ?? 'N/A',
+          link_pagamento_assinatura: church.link_pagamento_assinatura ?? null
         })
       }
     }
 
-    loadChurchFromDB()
-  }, [currentChurchId, user?.role])
+    load()
+  }, [currentChurchId])
 
   const handleSaveChurchSettings = async () => {
     if (!currentChurchId) {
-      toast.error('Nenhuma igreja selecionada para salvar as configurações.')
+      toast.error('Nenhuma igreja selecionada.')
       return
     }
-    console.log('Salvando configurações da igreja:', churchSettings)
-
-    // Atualizar campos existentes na tabela 'igrejas'
+    setLoading(true)
     const { error } = await supabase
       .from('igrejas')
       .update({
         nome: churchSettings.nome,
-        nome_responsavel: churchSettings.pastor_principal,
+        nome_responsavel: churchSettings.nome_responsavel,
         endereco: churchSettings.endereco,
         telefone_contato: churchSettings.telefone,
         cnpj: churchSettings.cnpj,
+        email: churchSettings.email,
+        site: churchSettings.site,
+        descricao: churchSettings.descricao
       })
       .eq('id', currentChurchId)
 
+    setLoading(false)
+
     if (error) {
-      console.error('SystemSettings: erro ao atualizar igreja:', error.message)
-      toast.error('Erro ao salvar configurações da igreja.')
+      console.error('SystemSettings: erro ao salvar:', error.message)
+      toast.error('Erro ao salvar configurações.')
       return
     }
-
-    // Persistir campos extras locais (email, site, descricao) para manter preenchimento na UI
-    localStorage.setItem(`churchSettings-${currentChurchId}`, JSON.stringify({
-      email: churchSettings.email,
-      site: churchSettings.site,
-      descricao: churchSettings.descricao
-    }))
-
-    toast.success('Configurações da igreja salvas com sucesso!')
-  }
-
-  const handleSaveSystemConfig = () => {
-    console.log('Salvando configurações do sistema:', systemConfig)
-    toast.success('Configurações do sistema atualizadas!')
-  }
-
-  const handleSaveSecurity = () => {
-    console.log('Salvando configurações de segurança:', securitySettings)
-    toast.success('Configurações de segurança atualizadas!')
-  }
-
-  const handleBackup = () => {
-    toast.info('Iniciando backup do sistema...')
-    setTimeout(() => {
-      toast.success('Backup concluído com sucesso!')
-    }, 3000)
-  }
-
-  const handleRestore = () => {
-    toast.warning('Função de restauração será implementada na versão final')
+    toast.success('Configurações salvas com sucesso!')
   }
 
   if (!currentChurchId && user?.role !== 'super_admin') {
@@ -213,20 +176,17 @@ const SystemSettings = () => {
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
-      {/* Header */}
       <div className="bg-gradient-to-r from-gray-600 to-slate-700 rounded-xl md:rounded-2xl p-4 md:p-6 text-white">
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Configurações do Sistema ⚙️</h1>
         <p className="text-gray-100 text-base md:text-lg">
-          Configurações avançadas e administração do Connect Vida
+          Gerencie os dados da igreja e o status do plano
         </p>
       </div>
 
       <Tabs defaultValue="church" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5"> {/* Ajustado para 5 abas */}
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="church">Igreja</TabsTrigger>
-          <TabsTrigger value="system">Sistema</TabsTrigger>
-          <TabsTrigger value="security">Segurança</TabsTrigger>
-          <TabsTrigger value="backup">Backup</TabsTrigger>
+          <TabsTrigger value="plan">Plano</TabsTrigger>
           <TabsTrigger value="users">Usuários</TabsTrigger>
         </TabsList>
 
@@ -237,9 +197,7 @@ const SystemSettings = () => {
                 <Church className="w-5 h-5 text-purple-500" />
                 Informações da Igreja
               </CardTitle>
-              <CardDescription>
-                Configure as informações básicas da sua igreja
-              </CardDescription>
+              <CardDescription>Campos sincronizados com a tabela igrejas</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -248,25 +206,25 @@ const SystemSettings = () => {
                   <Input
                     id="nome"
                     value={churchSettings.nome}
-                    onChange={(e) => setChurchSettings({...churchSettings, nome: e.target.value})}
+                    onChange={(e) => setChurchSettings({ ...churchSettings, nome: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pastor">Pastor Principal</Label>
+                  <Label htmlFor="responsavel">Responsável (Pastor)</Label>
                   <Input
-                    id="pastor"
-                    value={churchSettings.pastor_principal}
-                    onChange={(e) => setChurchSettings({...churchSettings, pastor_principal: e.target.value})}
+                    id="responsavel"
+                    value={churchSettings.nome_responsavel}
+                    onChange={(e) => setChurchSettings({ ...churchSettings, nome_responsavel: e.target.value })}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endereco">Endereço Completo</Label>
+                <Label htmlFor="endereco">Endereço</Label>
                 <Input
                   id="endereco"
                   value={churchSettings.endereco}
-                  onChange={(e) => setChurchSettings({...churchSettings, endereco: e.target.value})}
+                  onChange={(e) => setChurchSettings({ ...churchSettings, endereco: e.target.value })}
                 />
               </div>
 
@@ -276,7 +234,7 @@ const SystemSettings = () => {
                   <Input
                     id="telefone"
                     value={churchSettings.telefone}
-                    onChange={(e) => setChurchSettings({...churchSettings, telefone: e.target.value})}
+                    onChange={(e) => setChurchSettings({ ...churchSettings, telefone: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -285,7 +243,7 @@ const SystemSettings = () => {
                     id="email"
                     type="email"
                     value={churchSettings.email}
-                    onChange={(e) => setChurchSettings({...churchSettings, email: e.target.value})}
+                    onChange={(e) => setChurchSettings({ ...churchSettings, email: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -293,17 +251,17 @@ const SystemSettings = () => {
                   <Input
                     id="cnpj"
                     value={churchSettings.cnpj}
-                    onChange={(e) => setChurchSettings({...churchSettings, cnpj: e.target.value})}
+                    onChange={(e) => setChurchSettings({ ...churchSettings, cnpj: e.target.value })}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="site">Site da Igreja</Label>
+                <Label htmlFor="site">Site</Label>
                 <Input
                   id="site"
                   value={churchSettings.site}
-                  onChange={(e) => setChurchSettings({...churchSettings, site: e.target.value})}
+                  onChange={(e) => setChurchSettings({ ...churchSettings, site: e.target.value })}
                 />
               </div>
 
@@ -312,12 +270,12 @@ const SystemSettings = () => {
                 <Textarea
                   id="descricao"
                   value={churchSettings.descricao}
-                  onChange={(e) => setChurchSettings({...churchSettings, descricao: e.target.value})}
+                  onChange={(e) => setChurchSettings({ ...churchSettings, descricao: e.target.value })}
                   rows={3}
                 />
               </div>
 
-              <Button onClick={handleSaveChurchSettings} className="bg-purple-500 hover:bg-purple-600">
+              <Button onClick={handleSaveChurchSettings} disabled={!canManage || loading} className="bg-purple-500 hover:bg-purple-600">
                 <Save className="w-4 h-4 mr-2" />
                 Salvar Configurações da Igreja
               </Button>
@@ -325,292 +283,126 @@ const SystemSettings = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="system" className="space-y-6">
+        <TabsContent value="plan" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Server className="w-5 h-5 text-blue-500" />
-                Configurações do Sistema
+                <Wallet className="w-5 h-5 text-blue-500" />
+                Status do Plano
               </CardTitle>
-              <CardDescription>
-                Configurações técnicas e funcionais do sistema
-              </CardDescription>
+              <CardDescription>Detalhes da assinatura e limites contratados</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Funcionalidades</h4>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Backup Automático</Label>
-                      <p className="text-sm text-gray-600">Backup diário às 3:00</p>
-                    </div>
-                    <Switch
-                      checked={systemConfig.backup_automatico}
-                      onCheckedChange={(checked) => setSystemConfig({...systemConfig, backup_automatico: checked})}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Notificações por Email</Label>
-                      <p className="text-sm text-gray-600">Alertas do sistema</p>
-                    </div>
-                    <Switch
-                      checked={systemConfig.notificacoes_email}
-                      onCheckedChange={(checked) => setSystemConfig({...systemConfig, notificacoes_email: checked})}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Logs Detalhados</Label>
-                      <p className="text-sm text-gray-600">Registro completo de ações</p>
-                    </div>
-                    <Switch
-                      checked={systemConfig.logs_detalhados}
-                      onCheckedChange={(checked) => setSystemConfig({...systemConfig, logs_detalhados: checked})}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Modo Manutenção</Label>
-                      <p className="text-sm text-gray-600">Sistema temporariamente offline</p>
-                    </div>
-                    <Switch
-                      checked={systemConfig.manutencao_programada}
-                      onCheckedChange={(checked) => setSystemConfig({...systemConfig, manutencao_programada: checked})}
-                    />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-lg border p-4">
+                  <div className="text-sm text-muted-foreground">Plano atual</div>
+                  <div className="mt-1 text-lg font-semibold">{plan.plan_name}</div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <div className="text-sm text-muted-foreground">Limite de membros (contratado)</div>
+                  <div className="mt-1 text-lg font-semibold">
+                    {plan.limite_membros ?? '—'}
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Performance</h4>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>SSL Habilitado</Label>
-                      <p className="text-sm text-gray-600">Conexão segura HTTPS</p>
-                    </div>
-                    <Switch
-                      checked={systemConfig.ssl_habilitado}
-                      onCheckedChange={(checked) => setSystemConfig({...systemConfig, ssl_habilitado: checked})}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Cache Habilitado</Label>
-                      <p className="text-sm text-gray-600">Melhora performance</p>
-                    </div>
-                    <Switch
-                      checked={systemConfig.cache_habilitado}
-                      onCheckedChange={(checked) => setSystemConfig({...systemConfig, cache_habilitado: checked})}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Compressão de Dados</Label>
-                      <p className="text-sm text-gray-600">Reduz tráfego de rede</p>
-                    </div>
-                    <Switch
-                      checked={systemConfig.compressao_dados}
-                      onCheckedChange={(checked) => setSystemConfig({...systemConfig, compressao_dados: checked})}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Monitoramento Ativo</Label>
-                      <p className="text-sm text-gray-600">Acompanhamento em tempo real</p>
-                    </div>
-                    <Switch
-                      checked={systemConfig.monitoramento_ativo}
-                      onCheckedChange={(checked) => setSystemConfig({...systemConfig, monitoramento_ativo: checked})}
-                    />
-                  </div>
+                <div className="rounded-lg border p-4">
+                  <div className="text-sm text-muted-foreground">Uso atual (membros)</div>
+                  <div className="mt-1 text-lg font-semibold">{plan.membros_count}</div>
                 </div>
               </div>
 
-              <Button onClick={handleSaveSystemConfig} className="bg-blue-500 hover:bg-blue-600">
-                <Save className="w-4 h-4 mr-2" />
-                Salvar Configurações do Sistema
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-red-500" />
-                Configurações de Segurança
-              </CardTitle>
-              <CardDescription>
-                Configurações de segurança e controle de acesso
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Autenticação</h4>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Autenticação Dois Fatores</Label>
-                      <p className="text-sm text-gray-600">Segurança adicional</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.autenticacao_dois_fatores}
-                      onCheckedChange={(checked) => setSecuritySettings({...securitySettings, autenticacao_dois_fatores: checked})}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Senha Forte Obrigatória</Label>
-                      <p className="text-sm text-gray-600">Mínimo 8 caracteres</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.senha_forte_obrigatoria}
-                      onCheckedChange={(checked) => setSecuritySettings({...securitySettings, senha_forte_obrigatoria: checked})}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Timeout de Sessão (minutos)</Label>
-                    <Select value={securitySettings.sessao_timeout} onValueChange={(value) => setSecuritySettings({...securitySettings, sessao_timeout: value})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="30">30 minutos</SelectItem>
-                        <SelectItem value="60">1 hora</SelectItem>
-                        <SelectItem value="120">2 horas</SelectItem>
-                        <SelectItem value="240">4 horas</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-lg border p-4">
+                  <div className="text-sm text-muted-foreground">Valor mensal</div>
+                  <div className="mt-1 text-lg font-semibold">
+                    {plan.valor_mensal_assinatura != null
+                      ? `R$ ${plan.valor_mensal_assinatura.toFixed(2)}`
+                      : '—'}
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Controle de Acesso</h4>
-                  
-                  <div className="space-y-2">
-                    <Label>Tentativas de Login</Label>
-                    <Select value={securitySettings.tentativas_login} onValueChange={(value) => setSecuritySettings({...securitySettings, tentativas_login: value})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3 tentativas</SelectItem>
-                        <SelectItem value="5">5 tentativas</SelectItem>
-                        <SelectItem value="10">10 tentativas</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Bloqueio Temporário (minutos)</Label>
-                    <Select value={securitySettings.bloqueio_temporario} onValueChange={(value) => setSecuritySettings({...securitySettings, bloqueio_temporario: value})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="5">5 minutos</SelectItem>
-                        <SelectItem value="15">15 minutos</SelectItem>
-                        <SelectItem value="30">30 minutos</SelectItem>
-                        <SelectItem value="60">1 hora</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Log de Acessos</Label>
-                      <p className="text-sm text-gray-600">Registrar tentativas de login</p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.log_acessos}
-                      onCheckedChange={(checked) => setSecuritySettings({...securitySettings, log_acessos: checked})}
-                    />
+                <div className="rounded-lg border p-4">
+                  <div className="text-sm text-muted-foreground">Próximo pagamento</div>
+                  <div className="mt-1 flex items-center gap-2 text-lg font-semibold">
+                    <CalendarDays className="w-4 h-4" />
+                    {plan.data_proximo_pagamento
+                      ? new Date(plan.data_proximo_pagamento).toLocaleDateString('pt-BR')
+                      : '—'}
                   </div>
                 </div>
-              </div>
-
-              <Button onClick={handleSaveSecurity} className="bg-red-500 hover:bg-red-600">
-                <Save className="w-4 h-4 mr-2" />
-                Salvar Configurações de Segurança
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="backup" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="w-5 h-5 text-green-500" />
-                Backup e Restauração
-              </CardTitle>
-              <CardDescription>
-                Gerencie backups do sistema e restauração de dados
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Backup Automático</h4>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <span className="font-medium text-green-900">Status: Ativo</span>
-                    </div>
-                    <p className="text-sm text-green-800 mb-3">
-                      Último backup: 24/09/2025 às 03:00:00
-                    </p>
-                    <div className="space-y-2">
-                      <div className="text-xs text-green-700">
-                        • Backup diário automático às 03:00
-                      </div>
-                      <div className="text-xs text-green-700">
-                        • Retenção de 30 dias
-                      </div>
-                      <div className="text-xs text-green-700">
-                        • Compressão automática
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="font-semibold">Backup Manual</h4>
-                  <div className="space-y-3">
-                    <Button onClick={handleBackup} className="w-full bg-green-500 hover:bg-green-600">
-                      <Download className="w-4 h-4 mr-2" />
-                      Criar Backup Agora
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      <Upload className="w-4 h-4 mr-2" />
-                      Enviar Backup
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full text-blue-600 hover:text-blue-700"
-                      onClick={handleRestore}
+                <div className="rounded-lg border p-4">
+                  <div className="text-sm text-muted-foreground">Status do último pagamento</div>
+                  <div className="mt-1">
+                    <Badge
+                      variant={
+                        plan.ultimo_pagamento_status === 'Pago'
+                          ? 'secondary'
+                          : plan.ultimo_pagamento_status === 'Atrasado'
+                          ? 'destructive'
+                          : 'outline'
+                      }
                     >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Restaurar Sistema
-                    </Button>
+                      {plan.ultimo_pagamento_status || 'N/A'}
+                    </Badge>
                   </div>
                 </div>
               </div>
+
+              <div className="flex flex-wrap gap-2">
+                {canManage && (
+                  <Button onClick={() => setUpgradeOpen(true)}>
+                    <ArrowUpRight className="w-4 h-4 mr-2" />
+                    Upgrade de Plano
+                  </Button>
+                )}
+                {plan.link_pagamento_assinatura && (
+                  <a href={plan.link_pagamento_assinatura} target="_blank" rel="noreferrer">
+                    <Button variant="outline">
+                      Gerenciar Assinatura
+                    </Button>
+                  </a>
+                )}
+              </div>
+
+              {plan.membros_count > (plan.limite_membros ?? Number.MAX_SAFE_INTEGER) && (
+                <div className="flex items-center gap-2 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm">
+                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                  Você excedeu o limite contratado de membros. Considere um upgrade.
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          <UpgradePlanDialog
+            open={upgradeOpen}
+            onOpenChange={setUpgradeOpen}
+            churchId={currentChurchId!}
+            currentPlanId={plan.plano_id}
+            onUpgraded={async () => {
+              // Recarrega status do plano após upgrade
+              if (!currentChurchId) return
+              const { data: church } = await supabase
+                .from('igrejas')
+                .select(`
+                  id, plano_id, limite_membros, valor_mensal_assinatura,
+                  plano:planos_assinatura ( id, nome, limite_membros, preco_mensal )
+                `)
+                .eq('id', currentChurchId)
+                .maybeSingle()
+
+              if (church) {
+                setPlan((prev) => ({
+                  ...prev,
+                  plano_id: church.plano_id || null,
+                  plan_name: (Array.isArray(church.plano) ? church.plano[0]?.nome : church.plano?.nome) || prev.plan_name,
+                  limite_membros: church.limite_membros ?? (Array.isArray(church.plano) ? church.plano[0]?.limite_membros : church.plano?.limite_membros) ?? prev.limite_membros,
+                  valor_mensal_assinatura:
+                    church.valor_mensal_assinatura ??
+                    (Array.isArray(church.plano) ? church.plano[0]?.preco_mensal : church.plano?.preco_mensal) ??
+                    prev.valor_mensal_assinatura,
+                }))
+                toast.success('Status do plano atualizado.')
+              }
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
@@ -620,9 +412,7 @@ const SystemSettings = () => {
                 <Users className="w-5 h-5 text-blue-500" />
                 Gestão de Usuários
               </CardTitle>
-              <CardDescription>
-                Gerencie todos os usuários do sistema, aprovar novos cadastros e definir permissões
-              </CardDescription>
+              <CardDescription>Gerencie usuários e permissões da sua igreja</CardDescription>
             </CardHeader>
             <CardContent>
               <UserManagement />
