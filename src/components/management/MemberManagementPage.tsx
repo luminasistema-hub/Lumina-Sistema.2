@@ -44,6 +44,7 @@ import {
   Target
 } from 'lucide-react'
 import { trackEvent } from '../../lib/analytics'; // Importar trackEvent
+import copy from 'copy-to-clipboard';
 
 // Define a more accurate interface based on Supabase tables
 interface MemberProfile {
@@ -189,7 +190,7 @@ const MemberManagementPage = () => {
         email,
         ultimo_teste_data, 
         ministerio_recomendado, 
-        informacoes_pessoais (
+        informacoes_pessoais!membro_id (
           telefone,
           endereco,
           data_nascimento,
@@ -569,10 +570,29 @@ const MemberManagementPage = () => {
     console.log('--- Generated Link:', link);
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(generatedLink)
-    toast.success('Link copiado para a área de transferência!')
-    trackEvent('copy_registration_link', { churchId: currentChurchId }); // Rastrear evento
+  const handleCopyLink = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(generatedLink);
+        toast.success('Link copiado para a área de transferência!');
+      } else {
+        const ok = copy(generatedLink);
+        if (ok) {
+          toast.success('Link copiado para a área de transferência!');
+        } else {
+          toast.error('Não foi possível copiar o link automaticamente.');
+        }
+      }
+      trackEvent('copy_registration_link', { churchId: currentChurchId });
+    } catch {
+      const ok = copy(generatedLink);
+      if (ok) {
+        toast.success('Link copiado para a área de transferência!');
+      } else {
+        toast.error('Não foi possível copiar o link automaticamente.');
+      }
+      trackEvent('copy_registration_link', { churchId: currentChurchId });
+    }
   }
 
   const getRoleIcon = (role: UserRole) => {
