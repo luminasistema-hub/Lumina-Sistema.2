@@ -14,7 +14,6 @@ import KidsPage from '../components/family/KidsPage';
 import MemberManagementPage from '../components/management/MemberManagementPage';
 import MinistriesPage from '../components/management/MinistriesPage';
 import FinancialPanel from '../components/management/FinancialPanel';
-import SystemStatus from '../components/admin/SystemStatus';
 import SystemSettings from '../components/admin/SystemSettings';
 import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada'; 
 import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog'; 
@@ -61,7 +60,6 @@ const DashboardPage = () => {
       case 'my-ministry': 
         return <MyMinistryPage />;
       case 'system-settings': return <SystemSettings />;
-      case 'system-status': return <SystemStatus />;
       default: return <DashboardHome />;
     }
   }

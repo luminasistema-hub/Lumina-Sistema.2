@@ -81,8 +81,7 @@ const moduleCategories: ModuleCategory[] = [
     title: "Administração",
     icon: <Settings className="w-5 h-5" />,
     modules: [
-      { id: "system-settings", title: "Configurações", icon: <Settings className="w-4 h-4" />, roles: ["admin"], status: "basic" },
-      { id: "system-status", title: "Status do Sistema", icon: <Activity className="w-4 h-4" />, roles: ["admin"], status: "complete" }
+      { id: "system-settings", title: "Configurações", icon: <Settings className="w-4 h-4" />, roles: ["admin"], status: "basic" }
     ]
   }
 ];
