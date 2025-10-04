@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Users, UserPlus, UserX, CheckCircle, XCircle, Plus, MapPin } from 'lucide-react';
+import MinistryRolesManager from '@/components/management/MinistryRolesManager';
 
 type Ministry = { id: string; nome: string; descricao: string; lider_id: string | null; isLeader: boolean; };
-type MemberOption = { id: string; nome_completo: string; };
+type MemberOption = { id: string; nome_completo: string; funcao?: string | null; };
 type ScheduleRow = {
   id: string;
   data_servico: string;
@@ -32,6 +33,7 @@ const MyMinistryPage = () => {
   const [selectedMinistryId, setSelectedMinistryId] = useState<string | null>(null);
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
   const [volunteers, setVolunteers] = useState<MemberOption[]>([]);
+  const [ministryRoles, setMinistryRoles] = useState<{ id: string; nome: string }[]>([]);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [eventOptions, setEventOptions] = useState<{ id: string; nome: string; data_hora?: string; local?: string | null }[]>([]);
@@ -119,10 +121,20 @@ const MyMinistryPage = () => {
   const loadVolunteers = useCallback(async (ministryId: string) => {
     const { data, error } = await supabase
       .from('ministerio_voluntarios')
-      .select('membro:membros(id, nome_completo)')
+      .select('membro:membros(id, nome_completo), funcao_no_ministerio')
       .eq('ministerio_id', ministryId);
     if (error) { toast.error('Erro ao carregar voluntários'); return; }
-    setVolunteers((data || []).map((v: any) => ({ id: v.membro.id, nome_completo: v.membro.nome_completo })));
+    setVolunteers((data || []).map((v: any) => ({ id: v.membro.id, nome_completo: v.membro.nome_completo, funcao: v.funcao_no_ministerio })));
+  }, []);
+
+  const loadRoles = useCallback(async (ministryId: string) => {
+    const { data, error } = await supabase
+      .from('ministerio_funcoes')
+      .select('id, nome')
+      .eq('ministerio_id', ministryId)
+      .order('nome');
+    if (error) { toast.error('Erro ao carregar funções'); return; }
+    setMinistryRoles((data || []) as { id: string; nome: string }[]);
   }, []);
 
   const loadSchedules = useCallback(async (ministryId: string) => {
@@ -179,7 +191,8 @@ const MyMinistryPage = () => {
     loadVolunteers(selectedMinistryId);
     loadSchedules(selectedMinistryId);
     loadMyAssignments(selectedMinistryId);
-  }, [selectedMinistryId, loadVolunteers, loadSchedules, loadMyAssignments]);
+    loadRoles(selectedMinistryId);
+  }, [selectedMinistryId, loadVolunteers, loadSchedules, loadMyAssignments, loadRoles]);
 
   const selectedEvent = useMemo(
     () => eventOptions.find(e => e.id === newScheduleEventId),
@@ -216,6 +229,19 @@ const MyMinistryPage = () => {
       .eq('membro_id', membroId);
     if (error) { toast.error('Erro ao remover voluntário'); return; }
     toast.success('Voluntário removido!');
+    loadVolunteers(selectedMinistryId);
+  };
+
+  const handleChangeVolunteerRole = async (membroId: string, newRole: string) => {
+    if (!selectedMinistryId) return;
+    const funcao = newRole || 'voluntario';
+    const { error } = await supabase
+      .from('ministerio_voluntarios')
+      .update({ funcao_no_ministerio: funcao })
+      .eq('ministerio_id', selectedMinistryId)
+      .eq('membro_id', membroId);
+    if (error) { toast.error('Erro ao atualizar função'); return; }
+    toast.success('Função atualizada!');
     loadVolunteers(selectedMinistryId);
   };
 
@@ -310,6 +336,12 @@ const MyMinistryPage = () => {
       {/* Seção do Líder */}
       {selectedMinistry && isLeader && (
         <div className="space-y-4">
+          <MinistryRolesManager
+            ministryId={selectedMinistry.id}
+            churchId={currentChurchId!}
+            onRolesChanged={(roles) => setMinistryRoles(roles.map(r => ({ id: r.id, nome: r.nome })))}
+          />
+
           <Card>
             <CardHeader><CardTitle>Voluntários do Ministério</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -332,10 +364,29 @@ const MyMinistryPage = () => {
               <div className="space-y-2">
                 {volunteers.map(v => (
                   <div key={v.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium">{v.nome_completo}</span>
-                    <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleRemoveVolunteer(v.id)}>
-                      <UserX className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium truncate">{v.nome_completo}</span>
+                      <Badge variant="outline" className="truncate max-w-[160px]">{v.funcao || 'voluntario'}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={(v.funcao || 'voluntario')}
+                        onValueChange={(val) => handleChangeVolunteerRole(v.id, val)}
+                      >
+                        <SelectTrigger className="w-40 truncate">
+                          <SelectValue placeholder="Definir função" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="voluntario">voluntario</SelectItem>
+                          {ministryRoles.map(r => (
+                            <SelectItem key={r.id} value={r.nome}>{r.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleRemoveVolunteer(v.id)}>
+                        <UserX className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
                 {volunteers.length === 0 && (
