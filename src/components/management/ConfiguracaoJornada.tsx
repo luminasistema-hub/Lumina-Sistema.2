@@ -14,6 +14,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableEtapaItem } from './SortableEtapaItem';
 import { SortablePassoItem } from './SortablePassoItem';
+import CreateTrilhaDialog from './CreateTrilhaDialog';
 
 interface QuizPergunta {
   id?: string;
@@ -52,6 +53,7 @@ const ConfiguracaoJornada = () => {
   const [loading, setLoading] = useState(true);
   const { currentChurchId } = useAuthStore();
   const [etapaAberta, setEtapaAberta] = useState<string | null>(null);
+  const [trilhaAtual, setTrilhaAtual] = useState<{ id: string; titulo: string; descricao: string } | null>(null);
 
   const [isEtapaModalOpen, setIsEtapaModalOpen] = useState(false);
   const [etapaParaEditar, setEtapaParaEditar] = useState<EtapaTrilha | null>(null);
@@ -69,6 +71,8 @@ const ConfiguracaoJornada = () => {
     conteudo: '',
     quiz_perguntas: [],
   });
+
+  const [isCreateTrilhaOpen, setIsCreateTrilhaOpen] = useState(false);
 
   const coresDisponiveis = [
     { value: '#e0f2fe', name: 'Azul Claro' },
@@ -98,6 +102,7 @@ const ConfiguracaoJornada = () => {
     if (!currentChurchId) {
       setLoading(false);
       setEtapasAninhadas([]);
+      setTrilhaAtual(null);
       return;
     }
     setLoading(true);
@@ -105,7 +110,7 @@ const ConfiguracaoJornada = () => {
       const { data: trilhaData, error } = await supabase
         .from('trilhas_crescimento')
         .select(`
-          id,
+          id, titulo, descricao,
           etapas_trilha (
             *,
             passos_etapa (
@@ -116,11 +121,12 @@ const ConfiguracaoJornada = () => {
         `)
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
-        .single();
+        .maybeSingle();
       
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
 
       if (trilhaData && trilhaData.etapas_trilha) {
+        setTrilhaAtual({ id: trilhaData.id, titulo: trilhaData.titulo, descricao: trilhaData.descricao });
         const etapasOrdenadas = (trilhaData.etapas_trilha as any[]).map(etapa => {
           const passosOrdenados = etapa.passos_etapa 
             ? [...etapa.passos_etapa].sort((a, b) => a.ordem - b.ordem)
@@ -137,11 +143,13 @@ const ConfiguracaoJornada = () => {
         setEtapasAninhadas(etapasOrdenadas);
       } else {
         setEtapasAninhadas([]);
+        setTrilhaAtual(null);
       }
     } catch (error: any) {
       console.error("Erro ao carregar a jornada completa:", error);
       toast.error("Erro ao carregar a jornada. Tente novamente.");
       setEtapasAninhadas([]);
+      setTrilhaAtual(null);
     } finally {
       setLoading(false);
     }
@@ -183,16 +191,10 @@ const ConfiguracaoJornada = () => {
 
     setLoading(true);
     try {
-      const { data: trilha, error: trilhaError } = await supabase
-        .from('trilhas_crescimento')
-        .select('id')
-        .eq('id_igreja', currentChurchId)
-        .eq('is_ativa', true)
-        .single();
-
-      if (trilhaError || !trilha) {
-        toast.error('Nenhuma trilha de crescimento ativa encontrada para esta igreja.');
+      if (!trilhaAtual) {
+        toast.error('Nenhuma trilha ativa. Crie a trilha antes de adicionar etapas.');
         setLoading(false);
+        setIsCreateTrilhaOpen(true);
         return;
       }
 
@@ -213,7 +215,7 @@ const ConfiguracaoJornada = () => {
         const { error } = await supabase
           .from('etapas_trilha')
           .insert({
-            id_trilha: trilha.id,
+            id_trilha: trilhaAtual.id,
             ordem: novaOrdem,
             titulo: formEtapaData.titulo,
             descricao: formEtapaData.descricao,
@@ -565,6 +567,11 @@ const ConfiguracaoJornada = () => {
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 text-white mb-6 shadow-lg">
           <h1 className="text-3xl font-bold">Configuração da Jornada 🗺️</h1>
           <p className="opacity-90 mt-1">Gerencie as etapas e passos da trilha de crescimento da sua igreja.</p>
+          {!trilhaAtual && (
+            <div className="mt-4">
+              <Button variant="secondary" onClick={() => setIsCreateTrilhaOpen(true)}>Criar Trilha</Button>
+            </div>
+          )}
       </div>
 
       <Card className="bg-white p-6 rounded-xl shadow-lg">
@@ -633,11 +640,35 @@ const ConfiguracaoJornada = () => {
         ) : (
           <div className="text-center py-16">
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-xl font-semibold text-gray-800">Nenhuma etapa encontrada</h3>
-            <p className="text-gray-500 mt-2">Parece que ainda não há uma jornada configurada para esta igreja.<br/>Clique em "+ Nova Etapa" para começar a criar.</p>
+            <h3 className="text-xl font-semibold text-gray-800">
+              {trilhaAtual ? 'Nenhuma etapa encontrada' : 'Nenhuma trilha ativa'}
+            </h3>
+            <p className="text-gray-500 mt-2">
+              {trilhaAtual
+                ? 'Crie etapas para sua trilha de crescimento.'
+                : 'Crie a trilha do membro para sua igreja.'}
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              {!trilhaAtual ? (
+                <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={() => setIsCreateTrilhaOpen(true)}>
+                  Criar Trilha
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={handleOpenCreateEtapaModal}>
+                  + Nova Etapa
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </Card>
+
+      <CreateTrilhaDialog
+        isOpen={isCreateTrilhaOpen}
+        onOpenChange={setIsCreateTrilhaOpen}
+        currentChurchId={currentChurchId!}
+        onCreated={carregarJornadaCompleta}
+      />
 
       {/* Modal para Etapas */}
       <Dialog open={isEtapaModalOpen} onOpenChange={setIsEtapaModalOpen}>

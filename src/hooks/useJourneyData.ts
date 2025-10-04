@@ -76,9 +76,9 @@ export const useJourneyData = () => {
         .select('id, titulo, descricao')
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
-        .single();
+        .maybeSingle();
 
-      if (trilhaError && trilhaError.code !== 'PGRST116') throw trilhaError;
+      if (trilhaError) throw trilhaError;
       if (!trilhaData) {
         setEtapas([]);
         setTrilhaInfo(null);
