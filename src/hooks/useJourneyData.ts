@@ -110,12 +110,16 @@ export const useJourneyData = () => {
       if (passosError) throw passosError;
 
       const passoIds = (passosRawData || []).map(passo => passo.id);
-      const { data: progressoData, error: progressoError } = await supabase
-        .from('progresso_membros')
-        .select('*')
-        .eq('id_membro', user.id)
-        .in('id_passo', passoIds);
-      if (progressoError) throw progressoError;
+      let progressoData: ProgressoMembro[] = [];
+      if (passoIds.length > 0) {
+        const { data, error: progressoError } = await supabase
+          .from('progresso_membros')
+          .select('*')
+          .eq('id_membro', user.id)
+          .in('id_passo', passoIds);
+        if (progressoError) throw progressoError;
+        progressoData = data || [];
+      }
 
       const quizPassoIds = (passosRawData || []).filter(p => p.tipo_passo === 'quiz').map(p => p.id);
       let quizPerguntasData: QuizPergunta[] = [];
