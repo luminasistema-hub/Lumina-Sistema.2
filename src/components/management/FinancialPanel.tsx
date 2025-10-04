@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -223,6 +223,12 @@ const FinancialPanel = () => {
     'Jurídico',
     'Outros'
   ]
+
+  // Lista única de categorias para o filtro (evita duplicatas como 'Eventos' e 'Outros')
+  const allCategories = useMemo(
+    () => Array.from(new Set([...categoriesEntrada, ...categoriesSaida])),
+    []
+  )
 
   const subcategorias: Record<string, string[]> = {
     'Pessoal': ['Salários', 'Benefícios', 'Encargos', 'Ajuda de Custo', 'Treinamentos'],
@@ -1172,8 +1178,10 @@ const FinancialPanel = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {[...categoriesEntrada, ...categoriesSaida].map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  {allCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
