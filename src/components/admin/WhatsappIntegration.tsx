@@ -99,20 +99,59 @@ const WhatsappIntegration = () => {
 
   const handleStartLinking = async () => {
     if (!currentChurchId) return;
-    const payload = {
-      church_id: currentChurchId,
+
+    const baseUpdate = {
       status: 'awaiting_qr' as const,
-      qr_code: 'QR será exibido pelo serviço de sessão externo.',
+      qr_code: null as string | null,
       last_heartbeat: new Date().toISOString(),
     };
-    const { data, error } = await supabase
+
+    // Verifica se já existe sessão para a igreja
+    const { data: existing, error: findErr } = await supabase
       .from('whatsapp_sessions')
-      .upsert(payload, { onConflict: 'church_id' })
-      .select('*')
+      .select('id')
+      .eq('church_id', currentChurchId)
+      .limit(1)
       .maybeSingle();
-    if (error) { toast.error('Erro ao iniciar vinculação'); return; }
-    setSession(data as SessionRow);
-    toast.success('Sessão iniciada. Escaneie o QR no serviço de sessão.');
+
+    if (findErr) {
+      toast.error('Erro ao verificar sessão existente');
+      return;
+    }
+
+    if (existing?.id) {
+      // Atualiza sessão existente
+      const { data, error } = await supabase
+        .from('whatsapp_sessions')
+        .update(baseUpdate)
+        .eq('id', existing.id)
+        .select('*')
+        .single();
+
+      if (error) {
+        toast.error('Erro ao atualizar sessão');
+        return;
+      }
+      setSession(data as SessionRow);
+      toast.success('Sessão atualizada. Aguarde o QR...');
+    } else {
+      // Cria nova sessão
+      const { data, error } = await supabase
+        .from('whatsapp_sessions')
+        .insert({
+          church_id: currentChurchId,
+          ...baseUpdate,
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        toast.error('Erro ao criar sessão');
+        return;
+      }
+      setSession(data as SessionRow);
+      toast.success('Sessão criada. Aguarde o QR...');
+    }
   };
 
   const handleSaveTemplate = async () => {
