@@ -125,7 +125,7 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
           <div className="flex justify-between pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
             <div className="flex items-center gap-2">
-              {transaction.tipo === 'Entrada' && transaction.status === 'Confirmado' && onReceipt && (
+              {transaction.tipo === 'Entrada' && onReceipt && (
                 <Button variant="outline" onClick={() => onReceipt(transaction)}>
                   Emitir/Ver Recibo
                 </Button>
