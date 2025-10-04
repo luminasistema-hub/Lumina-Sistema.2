@@ -16,11 +16,9 @@ import {
   Plus, 
   Users, 
   Crown,
-  Calendar,
   Settings,
   Search,
   Loader2,
-  Trash2,
   UserX,
   UserPlus
 } from 'lucide-react'
@@ -40,9 +38,7 @@ const MinistriesPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([])
-  const [eventOptions, setEventOptions] = useState<EventOption[]>([])
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
-  const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
   const [openAddDialog, setOpenAddDialog] = useState(false);
 
@@ -81,10 +77,7 @@ const MinistriesPage = () => {
       if (membersError) throw membersError;
       setMemberOptions(membersData);
 
-      const { data: eventsData, error: eventsError } = await supabase.from('eventos')
-        .select('id, nome').eq('id_igreja', currentChurchId).order('data_hora', { ascending: false });
-      if (eventsError) throw eventsError;
-      setEventOptions(eventsData);
+      // Removido: este módulo não gerencia mais eventos/escalas
 
     } catch (error: any) {
       toast.error('Falha ao carregar dados: ' + error.message);
@@ -100,12 +93,6 @@ const MinistriesPage = () => {
       .select('id, membro:membros(id, nome_completo)').eq('ministerio_id', ministryId);
     if (volunteerError) toast.error('Erro ao carregar voluntários.');
     else setVolunteers(volunteerData.map((v: any) => ({ volunteer_id: v.id, ...v.membro })) as Volunteer[]);
-
-    const { data: scheduleData, error: scheduleError } = await supabase.from('escalas_servico')
-      .select('*, evento:eventos(nome), voluntarios:escala_voluntarios!escala_voluntarios_escala_id_fkey(membro:membros(id, nome_completo))')
-      .eq('ministerio_id', ministryId).order('data_servico', { ascending: false });
-    if (scheduleError) toast.error('Erro ao carregar escalas: ' + scheduleError.message);
-    else setSchedules(scheduleData.map((s: any) => ({ ...s, evento_nome: s.evento?.nome, voluntarios: s.voluntarios.map((v:any) => v.membro)})) as Schedule[]);
   }, []);
   
   useEffect(() => {
@@ -113,7 +100,6 @@ const MinistriesPage = () => {
       loadMinistryDetails(selectedMinistry.id);
     } else {
       setVolunteers([]);
-      setSchedules([]);
     }
   }, [selectedMinistry, loadMinistryDetails]);
 
@@ -156,18 +142,7 @@ const MinistriesPage = () => {
     });
   }
 
-  const handleCreateSchedule = (ministryId: string, eventId: string, date: string, notes: string) => {
-      const finalEventId = eventId === 'null' ? null : eventId;
-      const promise = async () => {
-          const { error } = await supabase.from('escalas_servico').insert({ ministerio_id: ministryId, evento_id: finalEventId, data_servico: date, observacoes: notes, id_igreja: currentChurchId });
-          if(error) throw error;
-      }
-      toast.promise(promise(), {
-          loading: 'Criando escala...',
-          success: () => { loadMinistryDetails(ministryId); return "Escala criada!"},
-          error: (err: any) => `Erro: ${err.message}`
-      })
-  }
+  // Removido: criação de escalas agora fica apenas em "Meu Ministério"
 
   const filteredMinistries = ministries.filter(m => m.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -243,9 +218,8 @@ const MinistriesPage = () => {
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader><DialogTitle className="text-2xl">{selectedMinistry?.nome}</DialogTitle><DialogDescription>Liderado por {selectedMinistry?.lider_nome}</DialogDescription></DialogHeader>
           <Tabs defaultValue="volunteers" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-1">
               <TabsTrigger value="volunteers">Voluntários</TabsTrigger>
-              <TabsTrigger value="schedules">Escalas de Serviço</TabsTrigger>
             </TabsList>
             <TabsContent value="volunteers" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
               {(canManage) && (
@@ -262,10 +236,12 @@ const MinistriesPage = () => {
                             .update({ lider_id: memberId === 'null' ? null : memberId })
                             .eq('id', selectedMinistry.id);
                           if (error) { toast.error('Falha ao definir líder: ' + error.message); return; }
+                          // Atualização otimista do item selecionado
+                          const newLeaderId = memberId === 'null' ? null : memberId;
+                          const newLeaderName = newLeaderId ? (memberOptions.find(m => m.id === newLeaderId)?.nome_completo || 'Líder') : 'Não Atribuído';
+                          setSelectedMinistry((prev) => prev ? { ...prev, lider_id: newLeaderId, lider_nome: newLeaderName } as Ministry : prev);
+                          setMinistries((prev) => prev.map(m => m.id === selectedMinistry.id ? { ...m, lider_id: newLeaderId, lider_nome: newLeaderName } : m));
                           toast.success('Líder definido!');
-                          // recarregar detalhes
-                          await loadData();
-                          await loadMinistryDetails(selectedMinistry.id);
                         }}
                       >
                         <SelectTrigger className="w-full"><SelectValue placeholder="Selecione um líder" /></SelectTrigger>
@@ -299,30 +275,6 @@ const MinistriesPage = () => {
                   ))}
                   {volunteers.length === 0 && <p className="text-center text-gray-500 py-4">Nenhum voluntário neste ministério ainda.</p>}
               </div>
-            </TabsContent>
-            <TabsContent value="schedules" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
-                {(canManage || isLeaderOfSelected) && (
-                    <Card className="mb-4">
-                        <CardHeader><CardTitle className="text-base">Nova Escala</CardTitle></CardHeader>
-                        <CardContent as="form" className="space-y-4" onSubmit={(e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.currentTarget);
-                            handleCreateSchedule(selectedMinistry!.id, formData.get('evento') as string, formData.get('data') as string, formData.get('observacoes') as string);
-                            (e.target as HTMLFormElement).reset();
-                        }}>
-                           <Select name="evento"><SelectTrigger><SelectValue placeholder="Vincular a um evento (opcional)"/></SelectTrigger><SelectContent><SelectItem value="null">Nenhum</SelectItem>{eventOptions.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}</SelectContent></Select>
-                           <Input type="date" name="data" required/>
-                           <Textarea name="observacoes" placeholder="Observações (ex: chegar 30 min antes)"/>
-                           <Button type="submit" className="w-full"><Plus className="w-4 h-4 mr-2"/>Criar Escala</Button>
-                        </CardContent>
-                    </Card>
-                )}
-                 <div className="space-y-4">
-                    {schedules.map(s => (
-                        <Card key={s.id}><CardHeader><CardTitle className="text-base flex justify-between"><span>Escala de {new Date(s.data_servico).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</span><Badge variant="outline">{s.evento_nome || 'Sem evento'}</Badge></CardTitle></CardHeader><CardContent><p className="text-sm text-gray-600 mb-2">{s.observacoes}</p><div><h4 className="font-semibold text-sm mb-1">Voluntários na escala:</h4>{s.voluntarios.length > 0 ? s.voluntarios.map(v => <p key={v.id} className="text-sm">- {v.nome_completo}</p>) : <p className="text-sm italic">Nenhum voluntário escalado.</p>}</div></CardContent></Card>
-                    ))}
-                    {schedules.length === 0 && <p className="text-center text-gray-500 py-4">Nenhuma escala criada para este ministério ainda.</p>}
-                 </div>
             </TabsContent>
           </Tabs>
         </DialogContent>
