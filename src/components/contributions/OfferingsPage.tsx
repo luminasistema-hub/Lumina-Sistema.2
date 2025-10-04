@@ -60,6 +60,7 @@ const OfferingsPage = () => {
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
   const [receiptTransaction, setReceiptTransaction] = useState<Contribution | null>(null)
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedType, setSelectedType] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -235,6 +236,12 @@ const OfferingsPage = () => {
   const handleOpenReceipt = (contribution: Contribution) => {
     // Abre sempre o recibo para visualização/impressão
     setReceiptTransaction(contribution)
+    setIsReceiptOpen(true)
+  }
+
+  const handleCloseReceipt = (open: boolean) => {
+    setIsReceiptOpen(open)
+    if (!open) setReceiptTransaction(null)
   }
 
   const getStatusColor = (status: Contribution['status']) => {
@@ -644,6 +651,31 @@ const OfferingsPage = () => {
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {receiptTransaction && (
+        <UnifiedReceiptDialog
+          isOpen={isReceiptOpen}
+          onOpenChange={handleCloseReceipt}
+          transaction={{
+            id: receiptTransaction.id,
+            tipo: 'Entrada',
+            categoria: receiptTransaction.categoria,
+            valor: receiptTransaction.valor,
+            data_transacao: receiptTransaction.data_transacao,
+            descricao: receiptTransaction.descricao || '',
+            metodo_pagamento: receiptTransaction.metodo_pagamento || 'Indefinido',
+            membro_nome: receiptTransaction.membro_nome || user?.name || '',
+            numero_documento: receiptTransaction.numero_documento,
+            recibo_emitido: !!receiptTransaction.recibo_emitido,
+          }}
+          church={currentChurch || null}
+          onMarkAsIssued={(id) => {
+            // opcional: marcar como emitido (se já tiver essa ação na página)
+            // você pode reaproveitar uma função existente se houver
+          }}
+          canManage={false}
+        />
       )}
 
       <UnifiedReceiptDialog
