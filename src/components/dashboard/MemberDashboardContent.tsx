@@ -2,13 +2,19 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
-import { Calendar, BookOpen, Heart, TrendingUp, Clock, CheckCircle, ArrowRight, Play, Eye, Target } from 'lucide-react';
+import { Calendar, BookOpen, Heart, Clock, CheckCircle, ArrowRight, Play, Eye, Target } from 'lucide-react';
 import { useJourneyData } from '../../hooks/useJourneyData';
 import { Skeleton } from '../ui/skeleton';
 import { Link } from 'react-router-dom';
+import { useRecentEvents } from '../../hooks/useRecentEvents';
+import { useRecentDevotionals } from '../../hooks/useRecentDevotionals';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const MemberDashboardContent = () => {
   const { loading, overallProgress, completedSteps, totalSteps, etapas } = useJourneyData();
+  const { data: recentEvents, isLoading: loadingEvents } = useRecentEvents();
+  const { data: recentDevotionals, isLoading: loadingDevotionals } = useRecentDevotionals();
 
   // Cursos disponíveis
   const availableCourses = [
@@ -32,50 +38,6 @@ const MemberDashboardContent = () => {
       duration: '6 semanas',
       students: 30,
       progress: 0,
-    },
-  ];
-
-  // Próximos eventos
-  const upcomingEvents = [
-    {
-      title: 'Culto de Domingo',
-      date: '15 Set',
-      time: '19:00',
-      type: 'Culto',
-    },
-    {
-      title: 'Estudo Bíblico',
-      date: '17 Set',
-      time: '20:00',
-      type: 'Ensino',
-    },
-    {
-      title: 'Conferência de Avivamento',
-      date: '20 Set',
-      time: '19:30',
-      type: 'Evento Especial',
-    },
-  ];
-
-  // Devocionais recentes
-  const recentDevotionals = [
-    {
-      title: 'A Força do Perdão',
-      author: 'Pastor João',
-      date: '11 Set',
-      readTime: '3 min',
-    },
-    {
-      title: 'Caminhando pela Fé',
-      author: 'Pastora Maria',
-      date: '10 Set',
-      readTime: '2 min',
-    },
-    {
-      title: 'O Poder da Gratidão',
-      author: 'Líder Pedro',
-      date: '09 Set',
-      readTime: '4 min',
     },
   ];
 
@@ -230,28 +192,41 @@ const MemberDashboardContent = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-purple-500" />
-              Próximos Eventos
+              Últimos Eventos
             </CardTitle>
-            <CardDescription>Não perca os eventos da igreja</CardDescription>
+            <CardDescription>Três mais recentes cadastrados</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {upcomingEvents.map((event, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="text-center">
-                    <p className="text-sm font-bold text-purple-700">{event.date}</p>
-                    <p className="text-xs text-purple-600">{event.time}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{event.title}</p>
-                    <p className="text-xs text-gray-600">{event.type}</p>
-                  </div>
-                </div>
-                <Button size="sm" variant="ghost">
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
+            {loadingEvents ? (
+              <div className="space-y-3">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
               </div>
-            ))}
+            ) : (
+              (recentEvents || []).map((event) => {
+                const dt = event.data_hora ? new Date(event.data_hora) : null;
+                const dateStr = dt ? format(dt, "dd MMM", { locale: ptBR }) : '';
+                const timeStr = dt ? format(dt, "HH:mm") : '';
+                return (
+                  <div key={event.id} className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-purple-700">{dateStr}</p>
+                        <p className="text-xs text-purple-600">{timeStr}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{event.nome}</p>
+                        <p className="text-xs text-gray-600">{event.tipo || 'Evento'}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost">
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              })
+            )}
             <Button variant="outline" className="w-full">
               Ver Todos os Eventos
             </Button>
@@ -265,26 +240,39 @@ const MemberDashboardContent = () => {
               <Heart className="w-5 h-5 text-pink-500" />
               Devocionais Recentes
             </CardTitle>
-            <CardDescription>Alimento espiritual diário</CardDescription>
+            <CardDescription>Três mais recentes publicados</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentDevotionals.map((devotional, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-pink-50 rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-sm truncate">{devotional.title}</h3>
-                  <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
-                    <span>Por {devotional.author}</span>
-                    <span>•</span>
-                    <span>{devotional.date}</span>
-                    <span>•</span>
-                    <span>{devotional.readTime}</span>
-                  </div>
-                </div>
-                <Button size="sm" variant="ghost">
-                  <Eye className="w-4 h-4" />
-                </Button>
+            {loadingDevotionals ? (
+              <div className="space-y-3">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
               </div>
-            ))}
+            ) : (
+              (recentDevotionals || []).map((devotional) => {
+                const dt = devotional.data_publicacao ? new Date(devotional.data_publicacao) : null;
+                const dateStr = dt ? format(dt, "dd MMM", { locale: ptBR }) : '';
+                const readStr = devotional.tempo_leitura ? `${devotional.tempo_leitura} min` : '—';
+                return (
+                  <div key={devotional.id} className="flex items-center justify-between p-3 bg-pink-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm truncate">{devotional.titulo}</h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                        <span>Por {devotional.membros?.nome_completo || 'Autor'}</span>
+                        <span>•</span>
+                        <span>{dateStr}</span>
+                        <span>•</span>
+                        <span>{readStr}</span>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost">
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              })
+            )}
             <Button variant="outline" className="w-full">
               Ver Todos os Devocionais
             </Button>

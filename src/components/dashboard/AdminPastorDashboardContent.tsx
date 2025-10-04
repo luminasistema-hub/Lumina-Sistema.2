@@ -1,31 +1,16 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Progress } from '../ui/progress';
-import { Calendar, Clock, ArrowRight, Bell } from 'lucide-react';
+import { Calendar, Clock, ArrowRight } from 'lucide-react';
+import { useRecentEvents } from '../../hooks/useRecentEvents';
+import { useRecentDevotionals } from '../../hooks/useRecentDevotionals';
+import { Skeleton } from '../ui/skeleton';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const AdminPastorDashboardContent = () => {
-  // Próximos eventos (versão admin)
-  const upcomingEvents = [
-    {
-      title: 'Culto de Domingo',
-      date: '15 Set',
-      time: '19:00',
-      type: 'Culto',
-    },
-    {
-      title: 'Estudo Bíblico',
-      date: '17 Set',
-      time: '20:00',
-      type: 'Ensino',
-    },
-    {
-      title: 'Conferência de Avivamento',
-      date: '20 Set',
-      time: '19:30',
-      type: 'Evento Especial',
-    },
-  ];
+  const { data: recentEvents, isLoading: loadingEvents } = useRecentEvents();
+  const { data: recentDevotionals, isLoading: loadingDevotionals } = useRecentDevotionals();
 
   return (
     <>
@@ -40,20 +25,13 @@ const AdminPastorDashboardContent = () => {
             <CardDescription>Últimas atualizações do sistema</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { title: 'Novo membro cadastrado', description: 'Maria Silva se juntou à igreja', time: '2 horas atrás' },
-              { title: 'Evento atualizado', description: 'Culto de Louvor - Domingo 15/09', time: '4 horas atrás' },
-              { title: 'Doação recebida', description: 'Oferta de R$ 250,00 via PIX', time: '1 dia atrás' },
-            ].map((activity, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{activity.title}</p>
-                  <p className="text-xs text-gray-600">{activity.description}</p>
-                  <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
-                </div>
+            <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
+              <div className="flex-1">
+                <p className="font-medium text-sm">Eventos e devocionais são mostrados abaixo com dados reais.</p>
+                <p className="text-xs text-gray-600">Blocos estáticos foram removidos para refletir o sistema.</p>
               </div>
-            ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -62,28 +40,39 @@ const AdminPastorDashboardContent = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-green-500" />
-              Próximos Eventos
+              Últimos Eventos
             </CardTitle>
-            <CardDescription>Eventos programados</CardDescription>
+            <CardDescription>Três mais recentes cadastrados</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {upcomingEvents.map((event, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="text-center">
-                    <p className="text-sm font-bold text-green-700">{event.date}</p>
-                    <p className="text-xs text-green-600">{event.time}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{event.title}</p>
-                    <p className="text-xs text-gray-600">{event.type}</p>
-                  </div>
-                </div>
-                <Button size="sm" variant="ghost">
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
+            {loadingEvents ? (
+              <div className="space-y-3">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
               </div>
-            ))}
+            ) : (recentEvents || []).map((event, index) => {
+              const dt = event.data_hora ? new Date(event.data_hora) : null;
+              const dateStr = dt ? format(dt, "dd MMM", { locale: ptBR }) : '';
+              const timeStr = dt ? format(dt, "HH:mm") : '';
+              return (
+                <div key={event.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-green-700">{dateStr}</p>
+                      <p className="text-xs text-green-600">{timeStr}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{event.nome}</p>
+                      <p className="text-xs text-gray-600">{event.tipo || 'Evento'}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" aria-label={`Ver evento ${index + 1}`}>
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -118,29 +107,45 @@ const AdminPastorDashboardContent = () => {
         </Card>
       </div>
 
-      {/* Notifications */}
+      {/* Devocionais Recentes */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle>Notificações</CardTitle>
-          <CardDescription>Alertas e lembretes importantes</CardDescription>
+          <CardTitle>Últimos Devocionais</CardTitle>
+          <CardDescription>Três mais recentes publicados</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
-              <Clock className="w-5 h-5 text-yellow-600" />
-              <div>
-                <p className="text-sm font-medium">Reunião de Liderança</p>
-                <p className="text-xs text-gray-600">Amanhã às 19:00</p>
-              </div>
+          {loadingDevotionals ? (
+            <div className="space-y-3">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
             </div>
-            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium">Aniversário de Membro</p>
-                <p className="text-xs text-gray-600">3 aniversários esta semana</p>
-              </div>
+          ) : (
+            <div className="space-y-3">
+              {(recentDevotionals || []).map((devotional) => {
+                const dt = devotional.data_publicacao ? new Date(devotional.data_publicacao) : null;
+                const dateStr = dt ? format(dt, "dd MMM", { locale: ptBR }) : '';
+                const readStr = devotional.tempo_leitura ? `${devotional.tempo_leitura} min` : '—';
+                return (
+                  <div key={devotional.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm truncate">{devotional.titulo}</h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                        <span>Por {devotional.membros?.nome_completo || 'Autor'}</span>
+                        <span>•</span>
+                        <span>{dateStr}</span>
+                        <span>•</span>
+                        <span>{readStr}</span>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost">
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </>
