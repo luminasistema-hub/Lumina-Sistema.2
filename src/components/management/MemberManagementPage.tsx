@@ -117,6 +117,15 @@ const MemberManagementPage = () => {
 
   const [editMemberData, setEditMemberData] = useState<Partial<Member>>({});
 
+  // Estatísticas por membro
+  const [memberStats, setMemberStats] = useState<Record<string, {
+    ministries: number;
+    events: number;
+    upcomingEvents: number;
+    courses: number;
+    progressPercent: number; // 0-100
+  }>>({});
+  const [journeyTotalSteps, setJourneyTotalSteps] = useState<number>(0);
 
   useEffect(() => {
     console.log('MemberManagementPage: Initializing loadChurches on mount.');
@@ -243,14 +252,111 @@ const MemberManagementPage = () => {
       data_conversao: member.informacoes_pessoais?.data_conversao,
       dias_disponiveis: member.informacoes_pessoais?.dias_disponiveis,
       horarios_disponiveis: member.informacoes_pessoais?.horarios_disponiveis,
-      // Map membros fields (agora diretamente do objeto 'member' principal)
+      // Map membros fields
       ultimo_teste_data: member.ultimo_teste_data, 
       ministerio_recomendado: member.ministerio_recomendado, 
     }));
 
     setMembers(membersData);
     setFilteredMembers(membersData);
+    // Carregar total de passos da jornada ativa da igreja e estatísticas por membro
+    await computeJourneyTotalSteps(churchId);
+    await loadMembersStats(churchId, membersData);
   }
+
+  const computeJourneyTotalSteps = async (churchId: string) => {
+    // Busca trilhas ativas da igreja
+    const { data: trilhas, error: trilhasErr } = await supabase
+      .from('trilhas_crescimento')
+      .select('id')
+      .eq('id_igreja', churchId)
+      .eq('is_ativa', true);
+    if (trilhasErr) {
+      console.error('Erro ao buscar trilhas ativas:', trilhasErr);
+      setJourneyTotalSteps(0);
+      return;
+    }
+    const trilhaIds = (trilhas || []).map(t => t.id);
+    if (trilhaIds.length === 0) {
+      setJourneyTotalSteps(0);
+      return;
+    }
+    const { data: etapas, error: etapasErr } = await supabase
+      .from('etapas_trilha')
+      .select('id')
+      .in('id_trilha', trilhaIds);
+    if (etapasErr) {
+      console.error('Erro ao buscar etapas:', etapasErr);
+      setJourneyTotalSteps(0);
+      return;
+    }
+    const etapaIds = (etapas || []).map(e => e.id);
+    if (etapaIds.length === 0) {
+      setJourneyTotalSteps(0);
+      return;
+    }
+    const { data: passos, error: passosErr } = await supabase
+      .from('passos_etapa')
+      .select('id')
+      .in('id_etapa', etapaIds);
+    if (passosErr) {
+      console.error('Erro ao buscar passos:', passosErr);
+      setJourneyTotalSteps(0);
+      return;
+    }
+    setJourneyTotalSteps((passos || []).length);
+  };
+
+  const loadMembersStats = async (churchId: string, membersList: Member[]) => {
+    const nowIso = new Date().toISOString();
+    const statsEntries = await Promise.all(
+      membersList.map(async (m) => {
+        // Ministérios
+        const { data: mins } = await supabase
+          .from('ministerio_voluntarios')
+          .select('id')
+          .eq('membro_id', m.id)
+          .eq('id_igreja', churchId);
+        const ministries = (mins || []).length;
+        // Eventos
+        const { data: parts } = await supabase
+          .from('evento_participantes')
+          .select('id, evento_id')
+          .eq('membro_id', m.id)
+          .eq('id_igreja', churchId);
+        const events = (parts || []).length;
+        const eventoIds = (parts || []).map(p => p.evento_id).filter(Boolean) as string[];
+        let upcomingEvents = 0;
+        if (eventoIds.length > 0) {
+          const { data: eventos } = await supabase
+            .from('eventos')
+            .select('id, data_hora')
+            .in('id', eventoIds)
+            .gt('data_hora', nowIso);
+          upcomingEvents = (eventos || []).length;
+        }
+        // Cursos
+        const { data: cursosInscr } = await supabase
+          .from('cursos_inscricoes')
+          .select('id')
+          .eq('id_membro', m.id)
+          .eq('id_igreja', churchId);
+        const courses = (cursosInscr || []).length;
+        // Progresso da jornada
+        let progressPercent = 0;
+        if (journeyTotalSteps > 0) {
+          const { data: prog } = await supabase
+            .from('progresso_membros')
+            .select('id, status, data_conclusao')
+            .eq('id_membro', m.id);
+          const completed = (prog || []).filter(p => !!p.data_conclusao || (p.status && p.status !== 'pendente')).length;
+          progressPercent = Math.round((completed / journeyTotalSteps) * 100);
+        }
+        return [m.id, { ministries, events, upcomingEvents, courses, progressPercent }] as const;
+      })
+    );
+    setMemberStats(Object.fromEntries(statsEntries));
+  };
 
   const handleAddMember = async () => {
     if (!newMember.name || !newMember.email || !currentChurchId) {
@@ -455,7 +561,8 @@ const MemberManagementPage = () => {
     }
 
     const baseUrl =  window.location.origin;
-    const link = `${baseUrl}/register?churchId=${currentChurchId}&churchName=${encodeURIComponent(church.name)}&initialRole=membro`;
+    // Link único por igreja: o próprio churchId garante unicidade
+    const link = `${baseUrl}/register?churchId=${currentChurchId}&initialRole=membro`;
     setGeneratedLink(link);
     setIsGenerateLinkDialogOpen(true);
     trackEvent('generate_registration_link', { churchId: currentChurchId }); // Rastrear evento
@@ -854,6 +961,34 @@ const MemberManagementPage = () => {
                     )}
                   </div>
 
+                  {/* Indicadores de atividade */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+                    <div className="text-xs bg-gray-50 rounded-md px-2 py-1">
+                      <span className="text-gray-500">Jornada</span>
+                      <div className="font-semibold">
+                        {memberStats[member.id]?.progressPercent ?? 0}%
+                      </div>
+                    </div>
+                    <div className="text-xs bg-gray-50 rounded-md px-2 py-1">
+                      <span className="text-gray-500">Ministérios</span>
+                      <div className="font-semibold">
+                        {memberStats[member.id]?.ministries ?? 0}
+                      </div>
+                    </div>
+                    <div className="text-xs bg-gray-50 rounded-md px-2 py-1">
+                      <span className="text-gray-500">Eventos</span>
+                      <div className="font-semibold">
+                        {memberStats[member.id]?.events ?? 0}
+                      </div>
+                    </div>
+                    <div className="text-xs bg-gray-50 rounded-md px-2 py-1">
+                      <span className="text-gray-500">Cursos</span>
+                      <div className="font-semibold">
+                        {memberStats[member.id]?.courses ?? 0}
+                      </div>
+                    </div>
+                  </div>
+
                   {member.endereco && (
                     <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
                       <MapPin className="w-4 h-4" />
@@ -948,6 +1083,11 @@ const MemberManagementPage = () => {
                 <TabsTrigger value="personal">Pessoal</TabsTrigger>
                 <TabsTrigger value="spiritual">Espiritual</TabsTrigger>
                 <TabsTrigger value="ministry">Ministério</TabsTrigger>
+              </TabsList>
+              
+              {/* Aba de atividade */}
+              <TabsList className="grid w-full grid-cols-1 mt-2">
+                <TabsTrigger value="activity">Atividade</TabsTrigger>
               </TabsList>
               
               <TabsContent value="personal" className="space-y-4">
@@ -1103,6 +1243,39 @@ const MemberManagementPage = () => {
                       <p className="text-gray-900">{selectedMember.horarios_disponiveis}</p>
                     </div>
                   )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="activity" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <Label className="text-sm font-medium text-gray-500">Progresso na Jornada</Label>
+                    <p className="text-gray-900 text-lg font-bold">
+                      {memberStats[selectedMember.id]?.progressPercent ?? 0}%
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Total de passos: {journeyTotalSteps}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <Label className="text-sm font-medium text-gray-500">Participação em Ministérios</Label>
+                    <p className="text-gray-900 text-lg font-bold">
+                      {memberStats[selectedMember.id]?.ministries ?? 0}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <Label className="text-sm font-medium text-gray-500">Eventos Participados</Label>
+                    <p className="text-gray-900 text-lg font-bold">
+                      {memberStats[selectedMember.id]?.events ?? 0}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Próximos: {memberStats[selectedMember.id]?.upcomingEvents ?? 0}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <Label className="text-sm font-medium text-gray-500">Cursos</Label>
+                    <p className="text-gray-900 text-lg font-bold">
+                      {memberStats[selectedMember.id]?.courses ?? 0}
+                    </p>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
@@ -1401,7 +1574,7 @@ const MemberManagementPage = () => {
           <DialogHeader>
             <DialogTitle>Link de Cadastro para Membros</DialogTitle>
             <DialogDescription>
-              Compartilhe este link com novos membros para que se cadastrem diretamente na sua igreja.
+              Compartilhe este link com novos membros para que se cadastrem diretamente na sua igreja. Este link é único para a sua igreja.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1420,7 +1593,7 @@ const MemberManagementPage = () => {
               </div>
             </div>
             <p className="text-sm text-gray-600">
-              Novos usuários que se cadastrarem por este link serão automaticamente associados à sua igreja como "Membros".
+              Novos usuários que se cadastrarem por este link serão automaticamente associados à sua igreja como "Membros". O identificador único (churchId) no link garante que o cadastro seja vinculado corretamente.
             </p>
             <div className="flex justify-end">
               <Button variant="outline" onClick={() => setIsGenerateLinkDialogOpen(false)}>
