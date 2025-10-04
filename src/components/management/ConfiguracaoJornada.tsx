@@ -580,10 +580,16 @@ const ConfiguracaoJornada = () => {
             <ListOrdered className="w-5 h-5 text-purple-500" />
             Etapas da Trilha
           </CardTitle>
-          <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={handleOpenCreateEtapaModal}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Etapa
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsCreateTrilhaOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Trilha
+            </Button>
+            <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={handleOpenCreateEtapaModal}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Etapa
+            </Button>
+          </div>
         </CardHeader>
 
         {etapasAninhadas.length > 0 ? (

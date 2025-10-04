@@ -26,6 +26,13 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
     }
     setLoading(true);
     try {
+      // Desativar trilha ativa anterior da igreja (garante apenas uma ativa)
+      await supabase
+        .from('trilhas_crescimento')
+        .update({ is_ativa: false })
+        .eq('id_igreja', currentChurchId)
+        .eq('is_ativa', true);
+
       const { error } = await supabase
         .from('trilhas_crescimento')
         .insert({

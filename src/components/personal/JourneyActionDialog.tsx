@@ -18,9 +18,18 @@ interface JourneyActionDialogProps {
 
 const getYoutubeVideoId = (url: string): string | null => {
   if (!url) return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  return (match && match[2].length === 11) ? match[2] : null;
+  // Suporta várias formas de URL do YouTube
+  const shortMatch = url.match(/youtu\.be\/([^#&?]{11})/);
+  if (shortMatch) return shortMatch[1];
+  const embedMatch = url.match(/youtube\.com\/embed\/([^#&?]{11})/);
+  if (embedMatch) return embedMatch[1];
+  const vParam = new URL(url, window.location.origin).searchParams.get('v');
+  if (vParam && vParam.length === 11) return vParam;
+  return null;
+};
+
+const isVideoFileUrl = (url: string): boolean => {
+  return /\.(mp4|webm|ogg)(\?.*)?$/i.test(url);
 };
 
 const QuizComponent = ({ passo, onQuizComplete }: { passo: PassoEtapa; onQuizComplete: (details: any) => void }) => {
@@ -99,19 +108,50 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
   const renderContent = () => {
     switch (passo.tipo_passo) {
       case 'video':
-        return videoId ? (
-          <div className="aspect-video">
-            <iframe
-              width="100%"
-              height="100%"
-              src={`https://www.youtube.com/embed/${videoId}`}
-              title="YouTube video player"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            ></iframe>
-          </div>
-        ) : <p>Link do vídeo inválido.</p>;
+        return (() => {
+          const url = passo.conteudo || '';
+          const videoId = getYoutubeVideoId(url);
+          if (videoId) {
+            return (
+              <div className="aspect-video">
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src={`https://www.youtube.com/embed/${videoId}`}
+                  title="YouTube video player"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                ></iframe>
+              </div>
+            );
+          }
+          if (isVideoFileUrl(url)) {
+            return (
+              <video
+                src={url}
+                controls
+                className="w-full rounded-lg"
+              />
+            );
+          }
+          // Fallback: tentar embutir o link diretamente
+          return url ? (
+            <div className="aspect-video">
+              <iframe
+                width="100%"
+                height="100%"
+                src={url}
+                title="Video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              ></iframe>
+            </div>
+          ) : (
+            <p>Link de vídeo inválido.</p>
+          );
+        })();
       
       case 'leitura':
         return <DescricaoFormatada texto={passo.conteudo || 'Nenhum conteúdo de leitura fornecido.'} />;
