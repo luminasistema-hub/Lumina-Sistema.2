@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, UserPlus, UserX, CheckCircle, XCircle, Plus } from 'lucide-react';
+import { Calendar, Users, UserPlus, UserX, CheckCircle, XCircle, Plus, MapPin } from 'lucide-react';
 
 type Ministry = { id: string; nome: string; descricao: string; lider_id: string | null; isLeader: boolean; };
 type MemberOption = { id: string; nome_completo: string; };
@@ -34,9 +34,11 @@ const MyMinistryPage = () => {
   const [volunteers, setVolunteers] = useState<MemberOption[]>([]);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
-  const [eventOptions, setEventOptions] = useState<{ id: string; nome: string }[]>([]);
+  const [eventOptions, setEventOptions] = useState<{ id: string; nome: string; data_hora?: string; local?: string | null }[]>([]);
   const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
   const [newScheduleEventId, setNewScheduleEventId] = useState<string | null>(null);
+  const [newScheduleDate, setNewScheduleDate] = useState<string>('');
+  const [newScheduleNotes, setNewScheduleNotes] = useState<string>('');
 
   const selectedMinistry = useMemo(
     () => myMinistries.find(m => m.id === selectedMinistryId) || null,
@@ -108,7 +110,7 @@ const MyMinistryPage = () => {
     setMemberOptions(members || []);
     const { data: events } = await supabase
       .from('eventos')
-      .select('id, nome')
+      .select('id, nome, data_hora, local')
       .eq('id_igreja', currentChurchId)
       .order('data_hora', { ascending: false });
     setEventOptions(events || []);
@@ -179,6 +181,18 @@ const MyMinistryPage = () => {
     loadMyAssignments(selectedMinistryId);
   }, [selectedMinistryId, loadVolunteers, loadSchedules, loadMyAssignments]);
 
+  const selectedEvent = useMemo(
+    () => eventOptions.find(e => e.id === newScheduleEventId),
+    [eventOptions, newScheduleEventId]
+  );
+
+  const toYMD = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const handleAddVolunteer = async () => {
     if (!selectedMinistryId || !selectedVolunteerToAdd || !currentChurchId) return;
     const { error } = await supabase
@@ -217,6 +231,8 @@ const MyMinistryPage = () => {
     if (error) { toast.error('Erro ao criar escala: ' + error.message); return; }
     toast.success('Escala criada!');
     setNewScheduleEventId(null);
+    setNewScheduleDate('');
+    setNewScheduleNotes('');
     loadSchedules(selectedMinistryId);
   };
 
@@ -333,21 +349,59 @@ const MyMinistryPage = () => {
             <CardHeader><CardTitle>Criar Escala</CardTitle></CardHeader>
             <CardContent as="form" className="space-y-3" onSubmit={(e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget as HTMLFormElement);
-              const date = fd.get('data') as string;
-              const notes = fd.get('observacoes') as string;
-              handleCreateSchedule(date, notes);
-              (e.currentTarget as HTMLFormElement).reset();
+              if (!newScheduleEventId || !newScheduleDate) return;
+              handleCreateSchedule(newScheduleDate, newScheduleNotes);
             }}>
-              <Select onValueChange={setNewScheduleEventId}>
-                <SelectTrigger><SelectValue placeholder="Selecione um evento para a escala" /></SelectTrigger>
+              <Select
+                onValueChange={(val) => {
+                  setNewScheduleEventId(val);
+                  const ev = eventOptions.find(e => e.id === val);
+                  if (ev?.data_hora) {
+                    const d = new Date(ev.data_hora);
+                    setNewScheduleDate(toYMD(d));
+                  }
+                }}
+              >
+                <SelectTrigger className="truncate">
+                  <SelectValue placeholder="Selecione um evento para a escala" />
+                </SelectTrigger>
                 <SelectContent>
                   {eventOptions.map(ev => <SelectItem key={ev.id} value={ev.id}>{ev.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Input type="date" name="data" required />
-              <Textarea name="observacoes" placeholder="Observações (ex: chegar 30 min antes)" />
-              <Button type="submit" className="w-full"><Plus className="w-4 h-4 mr-2" />Criar Escala</Button>
+              {selectedEvent && (
+                <div className="text-sm text-gray-600 flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-500" />
+                    <span className="truncate">
+                      {new Date(selectedEvent.data_hora || '').toLocaleString('pt-BR')}
+                    </span>
+                  </div>
+                  {selectedEvent.local && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-gray-500" />
+                      <span className="truncate">{selectedEvent.local}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              <Input
+                type="date"
+                name="data"
+                value={newScheduleDate}
+                onChange={(e) => setNewScheduleDate(e.target.value)}
+                required
+              />
+              <Textarea
+                name="observacoes"
+                value={newScheduleNotes}
+                onChange={(e) => setNewScheduleNotes(e.target.value)}
+                placeholder="Observações (ex: chegar 30 min antes)"
+                className="placeholder:text-gray-500"
+              />
+              <Button type="submit" className="w-full" disabled={!newScheduleEventId || !newScheduleDate}>
+                <Plus className="w-4 h-4 mr-2" />Criar Escala
+              </Button>
             </CardContent>
           </Card>
 
@@ -361,7 +415,7 @@ const MyMinistryPage = () => {
                       <Calendar className="w-4 h-4" />
                       {new Date(s.data_servico).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                     </div>
-                    <Badge variant="outline">{s.evento?.nome || 'Sem evento'}</Badge>
+                    <Badge variant="outline" className="max-w-[60%] truncate">{s.evento?.nome || 'Sem evento'}</Badge>
                   </div>
                   {s.observacoes && <p className="text-sm text-gray-600 mt-1">{s.observacoes}</p>}
 
