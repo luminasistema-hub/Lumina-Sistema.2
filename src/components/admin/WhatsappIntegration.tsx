@@ -202,7 +202,8 @@ const WhatsappIntegration = () => {
               <Button variant="outline" onClick={handleSaveTemplate}>Salvar Template</Button>
             </div>
             <p className="text-xs text-gray-500">
-              Variáveis: use {{'{{chaves}}'}} como {{'{{evento_nome}}'}}, {{'{{data}}'}}, {{'{{ministerio}}'}}, {{'{{codigo}}'}}, {{'{{hora}}'}}, {{'{{valor}}'}}, {{'{{numero_documento}}'}}.
+              Variáveis: use chaves duplas, por exemplo:
+              <span className="ml-1 font-mono">{'{{evento_nome}}'}</span>, <span className="font-mono">{'{{data}}'}</span>, <span className="font-mono">{'{{ministerio}}'}</span>, <span className="font-mono">{'{{codigo}}'}</span>, <span className="font-mono">{'{{hora}}'}</span>, <span className="font-mono">{'{{valor}}'}</span>, <span className="font-mono">{'{{numero_documento}}'}</span>.
             </p>
           </div>
 
