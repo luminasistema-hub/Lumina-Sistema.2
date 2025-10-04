@@ -155,6 +155,8 @@ const FinancialPanel = () => {
   const [detailsTransaction, setDetailsTransaction] = useState<FinancialTransaction | null>(null)
   const [reportViewerOpen, setReportViewerOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<FinancialReport | null>(null)
+  const [members, setMembers] = useState<Array<{ id: string; nome_completo: string }>>([])
+  const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>('all')
 
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
@@ -168,7 +170,8 @@ const FinancialPanel = () => {
     metodo_pagamento: 'PIX',
     observacoes: '',
     centro_custo: '',
-    numero_documento: ''
+    numero_documento: '',
+    membro_id: '' as string
   })
 
   const [newBudget, setNewBudget] = useState({
@@ -280,6 +283,7 @@ const FinancialPanel = () => {
       if (notificationsError) {
         console.error('Error loading notifications:', notificationsError)
       }
+      setPendingNotifications(notificationsData || [])
 
       // Load Budgets
       const { data: budgetsData, error: budgetsError } = await supabase
@@ -294,15 +298,17 @@ const FinancialPanel = () => {
         valor_disponivel: b.valor_orcado - b.valor_gasto
       })) as Budget[])
 
-      // Load Goals
-      const { data: goalsData, error: goalsError } = await supabase
-        .from('metas_financeiras')
-        .select('*')
+      // Load Members (para filtros e vínculo em lançamentos)
+      const { data: membersData, error: membersError } = await supabase
+        .from('membros')
+        .select('id, nome_completo')
         .eq('id_igreja', currentChurchId)
-        .order('data_limite', { ascending: true })
-
-      if (goalsError) throw goalsError
-      setGoals(goalsData as FinancialGoal[])
+        .order('nome_completo', { ascending: true })
+      if (membersError) {
+        console.error('Error loading members:', membersError)
+      } else {
+        setMembers(membersData || [])
+      }
 
       // Load Reports
       setReports([])
@@ -356,6 +362,9 @@ const FinancialPanel = () => {
     try {
       const numeroDocumento = `${newTransaction.tipo === 'Entrada' ? 'ENT' : 'SAI'}-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(transactions.length + 1).padStart(3, '0')}`
 
+      // Se tipo for Entrada e houver membro selecionado, buscar o nome para integrar ao painel do membro
+      const selectedMember = members.find(m => m.id === newTransaction.membro_id)
+
       const { error } = await supabase
         .from('transacoes_financeiras')
         .insert({
@@ -371,7 +380,9 @@ const FinancialPanel = () => {
           status: 'Pendente',
           observacoes: newTransaction.observacoes || null,
           numero_documento: numeroDocumento,
-          centro_custo: newTransaction.centro_custo || null
+          centro_custo: newTransaction.centro_custo || null,
+          membro_id: newTransaction.tipo === 'Entrada' && newTransaction.membro_id ? newTransaction.membro_id : null,
+          membro_nome: newTransaction.tipo === 'Entrada' && selectedMember ? selectedMember.nome_completo : null
         })
 
       if (error) throw error
@@ -379,7 +390,7 @@ const FinancialPanel = () => {
       setIsAddTransactionOpen(false)
       setNewTransaction({
         tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
-        descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
+        descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: '', membro_id: ''
       })
       loadFinancialData()
     } catch (error: any) {
@@ -402,6 +413,7 @@ const FinancialPanel = () => {
 
     setLoadingData(true)
     try {
+      const selectedMember = members.find(m => m.id === newTransaction.membro_id)
       const { error } = await supabase
         .from('transacoes_financeiras')
         .update({
@@ -419,6 +431,8 @@ const FinancialPanel = () => {
           aprovado_por: transactionToEdit.aprovado_por,
           data_aprovacao: transactionToEdit.data_aprovacao,
           recibo_emitido: transactionToEdit.recibo_emitido,
+          membro_id: newTransaction.tipo === 'Entrada' ? (newTransaction.membro_id || null) : transactionToEdit.membro_id || null,
+          membro_nome: newTransaction.tipo === 'Entrada' && selectedMember ? selectedMember.nome_completo : transactionToEdit.membro_nome || null
         })
         .eq('id', transactionToEdit.id)
 
@@ -881,9 +895,6 @@ const FinancialPanel = () => {
   const budgetUsed = budgets.reduce((sum, b) => sum + b.valor_gasto, 0)
   const budgetProgress = budgetTotal > 0 ? (budgetUsed / budgetTotal) * 100 : 0
 
-  const activeGoals = goals.filter(g => g.status === 'Ativo')
-  const completedGoals = goals.filter(g => g.status === 'Concluído')
-
   if (!currentChurchId) {
     return (
       <div className="p-6 text-center text-gray-600">
@@ -914,11 +925,10 @@ const FinancialPanel = () => {
       {/* Navigation */}
       <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as typeof viewMode)}>
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-          <TabsList className="grid grid-cols-5 w-full lg:w-auto">
+          <TabsList className="grid grid-cols-4 w-full lg:w-auto">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="transactions">Transações</TabsTrigger>
             <TabsTrigger value="budget">Orçamento</TabsTrigger>
-            <TabsTrigger value="goals">Metas</TabsTrigger>
             <TabsTrigger value="reports">Relatórios</TabsTrigger>
           </TabsList>
 
@@ -1100,14 +1110,6 @@ const FinancialPanel = () => {
                     </Button>
                   </DialogTrigger>
                 </Dialog>
-                <Dialog open={isAddGoalOpen} onOpenChange={setIsAddGoalOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="w-full justify-start" variant="outline">
-                      <Calculator className="w-4 h-4 mr-2" />
-                      Nova Meta
-                    </Button>
-                  </DialogTrigger>
-                </Dialog>
               </CardContent>
             </Card>
 
@@ -1128,38 +1130,39 @@ const FinancialPanel = () => {
                     </div>
                   </div>
                 ))}
-                {pendingTransactions.length > 0 && (
-                  <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
+                {pendingNotifications.map((n) => (
+                  <div key={n.id} className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
                     <Clock className="w-4 h-4 text-yellow-500" />
                     <div className="text-sm">
-                      <p className="font-medium text-yellow-800">{pendingTransactions.length} Pendências</p>
-                      <p className="text-yellow-600">Aguardando aprovação</p>
+                      <p className="font-medium text-yellow-800">Nova transação pendente</p>
+                      <p className="text-yellow-600">
+                        {n.event_details?.mensagem || `Valor R$ ${Number(n.event_details?.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                      </p>
                     </div>
                   </div>
-                )}
+                ))}
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Target className="w-5 h-5 text-blue-500" />
-                  Metas em Andamento
+                  <FileText className="w-5 h-5 text-blue-500" />
+                  Transações Recentes
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {activeGoals.slice(0, 3).map(goal => (
-                  <div key={goal.id} className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium truncate">{goal.nome}</span>
-                      <span>{Math.round((goal.valor_atual / goal.valor_meta) * 100)}%</span>
-                    </div>
-                    <Progress value={(goal.valor_atual / goal.valor_meta) * 100} className="h-2" />
-                    <p className="text-xs text-gray-500">
-                      R$ {goal.valor_atual.toLocaleString('pt-BR')} de R$ {goal.valor_meta.toLocaleString('pt-BR')}
-                    </p>
+                {transactions.slice(0, 5).map(t => (
+                  <div key={t.id} className="flex items-center justify-between text-sm">
+                    <span className="truncate">
+                      {t.tipo === 'Entrada' ? '➕' : '➖'} {t.categoria} • R$ {t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-gray-500">{new Date(t.data_transacao).toLocaleDateString('pt-BR')}</span>
                   </div>
                 ))}
+                {transactions.length === 0 && (
+                  <p className="text-sm text-gray-500">Nenhuma transação registrada.</p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1229,6 +1232,17 @@ const FinancialPanel = () => {
                     <SelectItem key={cat} value={cat}>
                       {cat}
                     </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedMemberFilter} onValueChange={setSelectedMemberFilter}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Filtrar por membro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os membros</SelectItem>
+                  {members.map(m => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1354,6 +1368,26 @@ const FinancialPanel = () => {
                       </div>
                     </div>
 
+                    {newTransaction.tipo === 'Entrada' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="membro">Membro (Entrada)</Label>
+                        <Select
+                          value={newTransaction.membro_id || ''}
+                          onValueChange={(value) => setNewTransaction({ ...newTransaction, membro_id: value === 'null' ? '' : value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o membro" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="null">Nenhum</SelectItem>
+                            {members.map(m => (
+                              <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label htmlFor="observacoes">Observações</Label>
                       <Textarea
@@ -1448,6 +1482,7 @@ const FinancialPanel = () => {
             {transactions
               .filter(t => 
                 (selectedCategory === 'all' || t.categoria === selectedCategory) &&
+                (selectedMemberFilter === 'all' || t.membro_id === selectedMemberFilter) &&
                 (searchTerm === '' || 
                   t.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   t.numero_documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -2156,6 +2191,26 @@ const FinancialPanel = () => {
               </div>
             </div>
 
+            {newTransaction.tipo === 'Entrada' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-membro">Membro (Entrada)</Label>
+                <Select
+                  value={newTransaction.membro_id || ''}
+                  onValueChange={(value) => setNewTransaction({ ...newTransaction, membro_id: value === 'null' ? '' : value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o membro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="null">Nenhum</SelectItem>
+                    {members.map(m => (
+                      <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="edit-observacoes">Observações</Label>
               <Textarea
@@ -2172,96 +2227,6 @@ const FinancialPanel = () => {
                 Cancelar
               </Button>
               <Button onClick={handleEditTransaction}>
-                Salvar Alterações
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Budget Dialog */}
-      <Dialog open={isEditBudgetOpen} onOpenChange={setIsEditBudgetOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Editar Orçamento</DialogTitle>
-            <DialogDescription>
-              Edite os detalhes do orçamento selecionado
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-budget-categoria">Categoria *</Label>
-              <Select value={newBudget.categoria || ''} onValueChange={(value) => setNewBudget({...newBudget, categoria: value === 'null' ? '' : value, subcategoria: ''})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="null">Nenhum</SelectItem>
-                  {categoriesSaida.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {newBudget.categoria && subcategorias[newBudget.categoria as keyof typeof subcategorias] && (
-              <div className="space-y-2">
-                <Label htmlFor="edit-budget-subcategoria">Subcategoria</Label>
-                <Select value={newBudget.subcategoria || ''} onValueChange={(value) => setNewBudget({...newBudget, subcategoria: value === 'null' ? '' : value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a subcategoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="null">Nenhum</SelectItem>
-                    {subcategorias[newBudget.categoria as keyof typeof subcategorias]?.map(subcat => (
-                      <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="edit-budget-valor_orcado">Valor Orçado (R$) *</Label>
-              <Input
-                id="edit-budget-valor_orcado"
-                type="number"
-                step="0.01"
-                value={newBudget.valor_orcado || ''}
-                onChange={(e) => setNewBudget({...newBudget, valor_orcado: parseFloat(e.target.value) || 0})}
-                placeholder="0,00"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-budget-mes_ano">Mês/Ano</Label>
-              <Input
-                id="edit-budget-mes_ano"
-                type="month"
-                value={newBudget.mes_ano}
-                onChange={(e) => setNewBudget({...newBudget, mes_ano: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-budget-descricao">Descrição</Label>
-              <Textarea
-                id="edit-budget-descricao"
-                value={newBudget.descricao}
-                onChange={(e) => setNewBudget({...newBudget, descricao: e.target.value})}
-                placeholder="Descrição do orçamento"
-                rows={2}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="edit-budget-alertas"
-                checked={newBudget.alertas_configurados}
-                onCheckedChange={(checked) => setNewBudget({...newBudget, alertas_configurados: checked as boolean})}
-              />
-              <Label htmlFor="edit-budget-alertas">Configurar alertas automáticos</Label>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsEditBudgetOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleEditBudget}>
                 Salvar Alterações
               </Button>
             </div>
