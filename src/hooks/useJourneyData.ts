@@ -201,9 +201,8 @@ export const useJourneyData = () => {
         .select('id')
         .eq('id_membro', user.id)
         .eq('id_passo', passoId)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+        .maybeSingle();
+      if (fetchError) throw fetchError;
 
       const progressData = {
         status: 'concluido',
