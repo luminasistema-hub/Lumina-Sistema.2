@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
 import { UnifiedReceiptDialog } from '../financial/UnifiedReceiptDialog'
-import ReportViewerDialog from '../financial/ReportViewerDialog'
 import { 
   DollarSign, 
   CreditCard, 
@@ -277,34 +276,6 @@ const OfferingsPage = () => {
              c.status === 'Confirmado'
     })
     .reduce((sum, c) => sum + c.valor, 0)
-
-  const getPeriodRange = () => {
-    const now = new Date()
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    let start = new Date(end)
-    if (selectedPeriod === 'month') {
-      start = new Date(end.getFullYear(), end.getMonth(), 1)
-    } else if (selectedPeriod === 'quarter') {
-      const qStartMonth = Math.floor(end.getMonth() / 3) * 3
-      start = new Date(end.getFullYear(), qStartMonth, 1)
-    } else if (selectedPeriod === 'year') {
-      start = new Date(end.getFullYear(), 0, 1)
-    } else {
-      // 'all' → usa a primeira contribuição confirmada
-      const confirmed = contributions.filter(c => c.status === 'Confirmado')
-      if (confirmed.length > 0) {
-        const minDate = confirmed.reduce((min, c) => {
-          const d = new Date(c.data_transacao)
-          return d < min ? d : min
-        }, new Date(confirmed[0].data_transacao))
-        start = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate())
-      } else {
-        start = new Date(end.getFullYear(), end.getMonth(), end.getDate())
-      }
-    }
-    const fmt = (d: Date) => d.toISOString().split('T')[0]
-    return { startStr: fmt(start), endStr: fmt(end), start, end }
-  }
 
   const openOfferingsReport = () => {
     const { startStr, endStr, start, end } = getPeriodRange()
@@ -682,13 +653,6 @@ const OfferingsPage = () => {
         church={currentChurch}
         onMarkAsIssued={markReceiptAsIssued}
         canManage={canManageFinancial}
-      />
-
-      {/* Report Viewer Dialog (Ofertas & Doações) */}
-      <ReportViewerDialog
-        isOpen={reportViewerOpen}
-        onOpenChange={setReportViewerOpen}
-        report={selectedReport}
       />
     </div>
   )
