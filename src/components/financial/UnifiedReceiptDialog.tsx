@@ -42,6 +42,11 @@ export const UnifiedReceiptDialog = ({
 }: UnifiedReceiptDialogProps) => {
   if (!transaction || !church) return null
 
+  const handleDownloadPdf = () => {
+    // Usa a impressora do navegador; o usuário pode escolher "Salvar como PDF"
+    window.print()
+  }
+
   const receiptData = {
     numero: transaction.numero_documento || transaction.id.substring(0, 8).toUpperCase(),
     data_emissao: new Date().toLocaleDateString('pt-BR'),
@@ -72,7 +77,7 @@ export const UnifiedReceiptDialog = ({
           <DialogTitle>Recibo de Doação</DialogTitle>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto px-6">
-          <ReceiptGenerator data={receiptData} />
+          <ReceiptGenerator data={receiptData} onDownload={handleDownloadPdf} />
         </div>
         <DialogFooter className="bg-slate-50 p-4 border-t print:hidden">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

@@ -149,6 +149,10 @@ const FinancialPanel = () => {
   const [loadingData, setLoadingData] = useState(true)
   const [pendingNotifications, setPendingNotifications] = useState<any[]>([])
   const [receiptTransaction, setReceiptTransaction] = useState<FinancialTransaction | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [detailsTransaction, setDetailsTransaction] = useState<FinancialTransaction | null>(null)
+  const [reportViewerOpen, setReportViewerOpen] = useState(false)
+  const [selectedReport, setSelectedReport] = useState<FinancialReport | null>(null)
 
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
@@ -547,6 +551,47 @@ const FinancialPanel = () => {
       return
     }
     setReceiptTransaction(transaction)
+  }
+
+  const openDetails = (transaction: FinancialTransaction) => {
+    setDetailsTransaction(transaction)
+    setDetailsOpen(true)
+  }
+
+  const viewReport = (report: FinancialReport) => {
+    setSelectedReport(report)
+    setReportViewerOpen(true)
+  }
+
+  const downloadReportCsv = (report: FinancialReport) => {
+    // Reaproveita a lógica do viewer criando o CSV aqui também
+    const lines: string[] = []
+    lines.push(`Relatório,${report.tipo}`)
+    lines.push(`Período,${report.periodo_inicio},${report.periodo_fim}`)
+    lines.push(`Gerado por,${report.gerado_por}`)
+    lines.push(`Data de geração,${new Date(report.data_geracao).toLocaleString('pt-BR')}`)
+    lines.push('')
+    lines.push('Resumo')
+    lines.push(`Total Entradas,${report.dados.total_entradas.toFixed(2)}`)
+    lines.push(`Total Saídas,${report.dados.total_saidas.toFixed(2)}`)
+    lines.push(`Saldo do Período,${report.dados.saldo_periodo.toFixed(2)}`)
+    lines.push('')
+    lines.push('Categorias de Entrada')
+    lines.push('Categoria,Valor')
+    report.dados.categorias_entrada.forEach(c => lines.push(`${c.categoria},${c.valor.toFixed(2)}`))
+    lines.push('')
+    lines.push('Categorias de Saída')
+    lines.push('Categoria,Valor')
+    report.dados.categorias_saida.forEach(c => lines.push(`${c.categoria},${c.valor.toFixed(2)}`))
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `relatorio-${report.tipo}-${report.periodo_inicio}-${report.periodo_fim}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const handleAddBudget = async () => {
@@ -1500,7 +1545,7 @@ const FinancialPanel = () => {
                           {transaction.recibo_emitido ? 'Ver Recibo' : 'Emitir Recibo'}
                         </Button>
                       )}
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => openDetails(transaction)}>
                         <Eye className="w-4 h-4 mr-2" />
                         Ver
                       </Button>
@@ -1941,11 +1986,11 @@ const FinancialPanel = () => {
                         </p>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => viewReport(report)}>
                           <Eye className="w-4 h-4 mr-2" />
                           Visualizar
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => downloadReportCsv(report)}>
                           <Download className="w-4 h-4 mr-2" />
                           Download
                         </Button>
@@ -2230,6 +2275,21 @@ const FinancialPanel = () => {
         church={currentChurchId ? getChurchById(currentChurchId) : null}
         onMarkAsIssued={markReceiptAsIssued}
         canManage={canManageFinancial}
+      />
+
+      {/* Transaction Details Dialog */}
+      <TransactionDetailsDialog
+        isOpen={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        transaction={detailsTransaction}
+        onReceipt={(t) => generateReceipt(t)}
+      />
+
+      {/* Report Viewer Dialog */}
+      <ReportViewerDialog
+        isOpen={reportViewerOpen}
+        onOpenChange={setReportViewerOpen}
+        report={selectedReport}
       />
     </div>
   )
