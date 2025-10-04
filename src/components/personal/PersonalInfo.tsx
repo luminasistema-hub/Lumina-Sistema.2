@@ -80,7 +80,7 @@ const PersonalInfo = () => {
         dataNascimento: personalInfo.data_nascimento || '',
         estadoCivil: personalInfo.estado_civil || '',
         conjugeId: personalInfo.conjuge_id || null,
-        conjugeNome: '', // será preenchido abaixo, se aplicável
+        conjugeNome: '',
         dataCasamento: personalInfo.data_casamento || '',
         paisCristaos: personalInfo.pais_cristaos || '',
         tempoIgreja: personalInfo.tempo_igreja || '',
@@ -93,7 +93,6 @@ const PersonalInfo = () => {
         horariosDisponiveis: personalInfo.horarios_disponiveis || '',
       }));
 
-      // Buscar nome do cônjuge separadamente se existir conjuge_id
       if (personalInfo.conjuge_id) {
         const { data: spouse, error: spouseError } = await supabase
           .from('membros')
@@ -106,9 +105,15 @@ const PersonalInfo = () => {
       }
     }
 
-    const { data: kidsData, error: kidsError } = await supabase.from('criancas')
+    const responsibleIds = [user.id];
+    if (personalInfo?.conjuge_id) responsibleIds.push(personalInfo.conjuge_id);
+    const { data: kidsData, error: kidsError } = await supabase
+      .from('criancas')
       .select('id, nome_crianca, data_nascimento, alergias, medicamentos, informacoes_especiais')
-      .eq('responsavel_id', user.id).order('nome_crianca');
+      .eq('id_igreja', currentChurchId)
+      .in('responsavel_id', responsibleIds)
+      .order('nome_crianca');
+
     if (kidsError) toast.error('Erro ao carregar informações dos filhos.');
     const formattedKids: Kid[] = (kidsData || []).map(k => ({...k, idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000) }));
     setUserKids(formattedKids);

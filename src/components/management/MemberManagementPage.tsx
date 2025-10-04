@@ -299,11 +299,21 @@ const MemberManagementPage = () => {
       if (!kidsByResponsible[k.responsavel_id]) kidsByResponsible[k.responsavel_id] = [];
       kidsByResponsible[k.responsavel_id].push(entry);
     });
-    membersData = membersData.map(m => ({
-      ...m,
-      conjuge_nome: m.conjuge_id ? spouseMap[m.conjuge_id] : undefined,
-      filhos: kidsByResponsible[m.id] || []
-    }));
+    membersData = membersData.map(m => {
+      const ownKids = kidsByResponsible[m.id] || [];
+      const spouseKids = m.conjuge_id ? (kidsByResponsible[m.conjuge_id] || []) : [];
+      const combined = [...ownKids, ...spouseKids];
+      // Remover possíveis duplicatas (por nome+idade)
+      const unique = combined.reduce((acc, kid) => {
+        if (!acc.some(k => k.nome === kid.nome && k.idade === kid.idade)) acc.push(kid);
+        return acc;
+      }, [] as Array<{nome: string, idade: number}>);
+      return {
+        ...m,
+        conjuge_nome: m.conjuge_id ? spouseMap[m.conjuge_id] : undefined,
+        filhos: unique
+      };
+    });
 
     setMembers(membersData);
     setFilteredMembers(membersData);

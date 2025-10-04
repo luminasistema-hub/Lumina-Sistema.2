@@ -121,6 +121,14 @@ const KidsPage = () => {
 
     setLoading(true)
     try {
+      // Descobrir cônjuge do usuário (se houver)
+      const { data: ipData } = await supabase
+        .from('informacoes_pessoais')
+        .select('conjuge_id')
+        .eq('membro_id', user.id)
+        .maybeSingle();
+      const spouseId: string | null = ipData?.conjuge_id || null;
+
       // Fetch children
       let kidsQuery = supabase
         .from('criancas')
@@ -131,9 +139,11 @@ const KidsPage = () => {
         .eq('id_igreja', currentChurchId)
         .order('nome_crianca', { ascending: true });
 
-      // Membros só podem ver seus próprios filhos
+      // Membros só podem ver seus próprios filhos (e do cônjuge, se houver vínculo)
       if (!canManageKids) {
-        kidsQuery = kidsQuery.eq('responsavel_id', user.id);
+        kidsQuery = spouseId
+          ? kidsQuery.in('responsavel_id', [user.id, spouseId])
+          : kidsQuery.eq('responsavel_id', user.id);
       }
 
       const { data: kidsData, error: kidsError } = await kidsQuery;
@@ -159,7 +169,7 @@ const KidsPage = () => {
         .eq('id_igreja', currentChurchId)
         .order('created_at', { ascending: false });
 
-      // Membros só podem ver check-ins de seus próprios filhos
+      // Membros só podem ver check-ins de seus próprios filhos (lista já inclui filhos do cônjuge)
       if (!canManageKids) {
         const userKidsIds = formattedKids.map(k => k.id);
         checkinQuery = checkinQuery.in('crianca_id', userKidsIds);
