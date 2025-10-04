@@ -301,7 +301,7 @@ const MyMinistryPage = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600 self-center md:text-right truncate">
             {selectedMinistry ? selectedMinistry.descricao : '—'}
           </div>
         </CardContent>
@@ -347,61 +347,66 @@ const MyMinistryPage = () => {
 
           <Card>
             <CardHeader><CardTitle>Criar Escala</CardTitle></CardHeader>
-            <CardContent as="form" className="space-y-3" onSubmit={(e) => {
-              e.preventDefault();
-              if (!newScheduleEventId || !newScheduleDate) return;
-              handleCreateSchedule(newScheduleDate, newScheduleNotes);
-            }}>
-              <Select
-                onValueChange={(val) => {
-                  setNewScheduleEventId(val);
-                  const ev = eventOptions.find(e => e.id === val);
-                  if (ev?.data_hora) {
-                    const d = new Date(ev.data_hora);
-                    setNewScheduleDate(toYMD(d));
-                  }
+            <CardContent className="space-y-3">
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newScheduleEventId || !newScheduleDate) return;
+                  handleCreateSchedule(newScheduleDate, newScheduleNotes);
                 }}
               >
-                <SelectTrigger className="truncate">
-                  <SelectValue placeholder="Selecione um evento para a escala" />
-                </SelectTrigger>
-                <SelectContent>
-                  {eventOptions.map(ev => <SelectItem key={ev.id} value={ev.id}>{ev.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {selectedEvent && (
-                <div className="text-sm text-gray-600 flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-500" />
-                    <span className="truncate">
-                      {new Date(selectedEvent.data_hora || '').toLocaleString('pt-BR')}
-                    </span>
-                  </div>
-                  {selectedEvent.local && (
+                <Select
+                  onValueChange={(val) => {
+                    setNewScheduleEventId(val);
+                    const ev = eventOptions.find(e => e.id === val);
+                    if (ev?.data_hora) {
+                      const d = new Date(ev.data_hora);
+                      setNewScheduleDate(toYMD(d));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="truncate">
+                    <SelectValue placeholder="Selecione um evento para a escala" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eventOptions.map(ev => <SelectItem key={ev.id} value={ev.id}>{ev.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {selectedEvent && (
+                  <div className="text-sm text-gray-600 flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-500" />
-                      <span className="truncate">{selectedEvent.local}</span>
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <span className="truncate">
+                        {new Date(selectedEvent.data_hora || '').toLocaleString('pt-BR')}
+                      </span>
                     </div>
-                  )}
-                </div>
-              )}
-              <Input
-                type="date"
-                name="data"
-                value={newScheduleDate}
-                onChange={(e) => setNewScheduleDate(e.target.value)}
-                required
-              />
-              <Textarea
-                name="observacoes"
-                value={newScheduleNotes}
-                onChange={(e) => setNewScheduleNotes(e.target.value)}
-                placeholder="Observações (ex: chegar 30 min antes)"
-                className="placeholder:text-gray-500"
-              />
-              <Button type="submit" className="w-full" disabled={!newScheduleEventId || !newScheduleDate}>
-                <Plus className="w-4 h-4 mr-2" />Criar Escala
-              </Button>
+                    {selectedEvent.local && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-500" />
+                        <span className="truncate">{selectedEvent.local}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <Input
+                  type="date"
+                  name="data"
+                  value={newScheduleDate}
+                  onChange={(e) => setNewScheduleDate(e.target.value)}
+                  required
+                />
+                <Textarea
+                  name="observacoes"
+                  value={newScheduleNotes}
+                  onChange={(e) => setNewScheduleNotes(e.target.value)}
+                  placeholder="Observações (ex: chegar 30 min antes)"
+                  className="placeholder:text-gray-500"
+                />
+                <Button type="submit" className="w-full" disabled={!newScheduleEventId || !newScheduleDate}>
+                  <Plus className="w-4 h-4 mr-2" />Criar Escala
+                </Button>
+              </form>
             </CardContent>
           </Card>
 
