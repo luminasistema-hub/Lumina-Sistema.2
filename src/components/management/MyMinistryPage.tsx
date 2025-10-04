@@ -36,6 +36,7 @@ const MyMinistryPage = () => {
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [eventOptions, setEventOptions] = useState<{ id: string; nome: string }[]>([]);
   const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
+  const [newScheduleEventId, setNewScheduleEventId] = useState<string | null>(null);
 
   const selectedMinistry = useMemo(
     () => myMinistries.find(m => m.id === selectedMinistryId) || null,
@@ -175,17 +176,18 @@ const MyMinistryPage = () => {
     loadVolunteers(selectedMinistryId);
   };
 
-  const handleCreateSchedule = async (form: FormData) => {
+  const handleCreateSchedule = async (date: string, notes: string) => {
     if (!selectedMinistryId || !currentChurchId) return;
-    const eventId = form.get('evento') as string;
-    const date = form.get('data') as string;
-    const notes = form.get('observacoes') as string;
-    const finalEventId = eventId === 'null' ? null : eventId;
+    if (!newScheduleEventId) {
+      toast.error('Selecione um evento para criar a escala.');
+      return;
+    }
     const { error } = await supabase
       .from('escalas_servico')
-      .insert({ ministerio_id: selectedMinistryId, evento_id: finalEventId, data_servico: date, observacoes: notes, id_igreja: currentChurchId });
+      .insert({ ministerio_id: selectedMinistryId, evento_id: newScheduleEventId, data_servico: date, observacoes: notes, id_igreja: currentChurchId });
     if (error) { toast.error('Erro ao criar escala: ' + error.message); return; }
     toast.success('Escala criada!');
+    setNewScheduleEventId(null);
     loadSchedules(selectedMinistryId);
   };
 
@@ -303,13 +305,14 @@ const MyMinistryPage = () => {
             <CardContent as="form" className="space-y-3" onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget as HTMLFormElement);
-              handleCreateSchedule(fd);
+              const date = fd.get('data') as string;
+              const notes = fd.get('observacoes') as string;
+              handleCreateSchedule(date, notes);
               (e.currentTarget as HTMLFormElement).reset();
             }}>
-              <Select name="evento">
-                <SelectTrigger><SelectValue placeholder="Vincular a um evento (opcional)" /></SelectTrigger>
+              <Select onValueChange={setNewScheduleEventId}>
+                <SelectTrigger><SelectValue placeholder="Selecione um evento para a escala" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="null">Nenhum</SelectItem>
                   {eventOptions.map(ev => <SelectItem key={ev.id} value={ev.id}>{ev.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
