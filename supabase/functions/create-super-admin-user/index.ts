@@ -4,14 +4,31 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Optional: simple health check
+    if (req.method === 'GET') {
+      return new Response(JSON.stringify({ status: 'ok' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Método não permitido.' }), {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { name, email, password } = await req.json();
 
     if (!name || !email || !password) {
@@ -35,7 +52,6 @@ serve(async (req) => {
       user_metadata: {
         full_name: name,
         initial_role: 'super_admin',
-        // church_id não é mais necessário
       },
     });
 
@@ -77,7 +93,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Unexpected error in Edge Function:', error);
-    return new Response(JSON.stringify({ error: 'Ocorreu um erro inesperado: ' + error.message }), {
+    const msg = (error as any)?.message || 'Erro inesperado.';
+    return new Response(JSON.stringify({ error: 'Ocorreu um erro inesperado: ' + msg }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

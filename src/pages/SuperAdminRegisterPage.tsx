@@ -38,7 +38,7 @@ const SuperAdminRegisterPage = () => {
       // Invoca a Edge Function usando a URL completa do projeto (recomendado)
       const { data, error } = await supabase.functions.invoke(
         'https://zcowqahrhuzrxdzdrref.supabase.co/functions/v1/create-super-admin-user',
-        { body: { name, email, password } }
+        { body: { name, email, password }, headers: { 'Content-Type': 'application/json' } }
       );
 
       if (error) {
