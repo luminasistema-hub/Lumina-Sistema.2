@@ -223,12 +223,19 @@ const PersonalInfo = () => {
   }
 
   const handleDeleteKid = async (kidId: string) => {
-    const promise = () => supabase.from('criancas').delete().eq('id', kidId);
-    toast.promise(promise(), {
-      loading: 'Removendo criança...',
-      success: () => { loadKidsData(); return "Criança removida!"; },
-      error: (err) => `Falha ao remover: ${err.message}`,
-    });
+    const loadingId = toast.loading('Removendo criança...');
+    const { error } = await supabase
+      .from('criancas')
+      .delete()
+      .eq('id', kidId);
+    if (error) {
+      toast.dismiss(loadingId);
+      toast.error(`Falha ao remover: ${error.message}`);
+      return;
+    }
+    await loadKidsData();
+    toast.dismiss(loadingId);
+    toast.success('Criança removida!');
   };
 
   const isFirstAccess = !user?.perfil_completo;

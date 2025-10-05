@@ -27,6 +27,8 @@ const DashboardPage = () => {
   const location = useLocation(); 
   const [activeModule, setActiveModule] = useState('dashboard');
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  // Chave de prompt por usuário (evita reabrir o alerta várias vezes)
+  const promptKey = user?.id ? `profilePromptSeen_${user.id}` : null;
 
   useEffect(() => {
     if (location.state?.activeModule) {
@@ -37,7 +39,10 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (!isLoading && user && !user.perfil_completo && user.role !== 'super_admin') {
-      setShowProfileDialog(true);
+      const seen = promptKey ? localStorage.getItem(promptKey) : null;
+      if (!seen) {
+        setShowProfileDialog(true);
+      }
     }
   }, [user, isLoading]);
 
@@ -77,9 +82,13 @@ const DashboardPage = () => {
       {showProfileDialog && (
         <ProfileCompletionDialog
           isOpen={showProfileDialog}
-          onClose={() => setShowProfileDialog(false)}
+          onClose={() => {
+            if (promptKey) localStorage.setItem(promptKey, 'true');
+            setShowProfileDialog(false);
+          }}
           onNavigateToProfile={() => {
               setActiveModule('personal-info');
+              if (promptKey) localStorage.setItem(promptKey, 'true');
               setShowProfileDialog(false);
           }}
         />
