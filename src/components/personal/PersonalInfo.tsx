@@ -57,12 +57,10 @@ interface CheckinRecord {
 }
 
 const PersonalInfo = () => {
-  const { user, currentChurchId, updateUserProfile } = useAuthStore()
+  const { user, currentChurchId, checkAuth } = useAuthStore()
   const navigate = useNavigate(); 
   const [isEditing, setIsEditing] = useState(false)
-  const hasInitialized = useRef(false)
   const [isDirty, setIsDirty] = useState(false)
-  const editInitRef = useRef(false)
   const [currentStep, setCurrentStep] = useState(1) // 1: Dados pessoais | 2: Endereço e Família | 3: Vida Espiritual
   const [formData, setFormData] = useState<PersonalInfoData>({
     nomeCompleto: user?.name || '', email: user?.email || '', dataNascimento: '',
@@ -78,80 +76,85 @@ const PersonalInfo = () => {
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false);
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
 
-  const loadPersonalInfoData = useCallback(async () => {
+  const isFirstAccess = !user?.perfil_completo;
+
+  const loadData = useCallback(async () => {
     if (!user || !currentChurchId) return;
 
+    // Carregar informações pessoais
     const { data: personalInfo, error: personalInfoError } = await supabase
       .from('informacoes_pessoais')
       .select('*')
       .eq('membro_id', user.id)
       .maybeSingle();
     if (personalInfoError) toast.error('Erro ao carregar informações pessoais.');
+    
     if (personalInfo) {
-      // Preenche o formulário apenas na primeira carga ou quando o form NÃO estiver sujo
-      if (!hasInitialized.current || !isDirty) {
-        setFormData(prev => ({
-          ...prev,
-          ...personalInfo,
-          nomeCompleto: user.name,
-          email: user.email,
-          telefone: personalInfo.telefone || '',
-          endereco: personalInfo.endereco || '',
-          profissao: personalInfo.profissao || '',
-          dataNascimento: personalInfo.data_nascimento || '',
-          estadoCivil: personalInfo.estado_civil || '',
-          conjugeId: personalInfo.conjuge_id || null,
-          conjugeNome: '',
-          dataCasamento: personalInfo.data_casamento || '',
-          paisCristaos: personalInfo.pais_cristaos || '',
-          tempoIgreja: personalInfo.tempo_igreja || '',
-          batizado: personalInfo.batizado || false,
-          dataBatismo: personalInfo.data_batismo || '',
-          participaMinisterio: personalInfo.participa_ministerio || false,
-          ministerioAtual: personalInfo.ministerio_anterior || '',
-          dataConversao: personalInfo.data_conversao || '',
-          diasDisponiveis: personalInfo.dias_disponiveis || [],
-          horariosDisponiveis: personalInfo.horarios_disponiveis || '',
-        }));
-        hasInitialized.current = true;
-      }
+      setFormData(prev => ({
+        ...prev,
+        nomeCompleto: user.name,
+        email: user.email,
+        telefone: personalInfo.telefone || '',
+        endereco: personalInfo.endereco || '',
+        profissao: personalInfo.profissao || '',
+        dataNascimento: personalInfo.data_nascimento || '',
+        estadoCivil: personalInfo.estado_civil || '',
+        conjugeId: personalInfo.conjuge_id || null,
+        dataCasamento: personalInfo.data_casamento || '',
+        paisCristaos: personalInfo.pais_cristaos || '',
+        tempoIgreja: personalInfo.tempo_igreja || '',
+        batizado: personalInfo.batizado || false,
+        dataBatismo: personalInfo.data_batismo || '',
+        participaMinisterio: personalInfo.participa_ministerio || false,
+        ministerioAtual: personalInfo.ministerio_anterior || '',
+        dataConversao: personalInfo.data_conversao || '',
+        diasDisponiveis: personalInfo.dias_disponiveis || [],
+        horariosDisponiveis: personalInfo.horarios_disponiveis || '',
+      }));
 
       if (personalInfo.conjuge_id) {
-        const { data: spouse, error: spouseError } = await supabase
+        const { data: spouse } = await supabase
           .from('membros')
           .select('nome_completo')
           .eq('id', personalInfo.conjuge_id)
           .maybeSingle();
-        if (!spouseError && spouse?.nome_completo) {
+        if (spouse?.nome_completo) {
           setFormData(prev => ({ ...prev, conjugeNome: spouse.nome_completo }));
         }
       }
     }
-  }, [user, currentChurchId, isDirty]);
 
-  const loadKidsData = useCallback(async () => {
-    if (!user || !currentChurchId) return;
-    // Precisamos do conjuge_id para incluir filhos do cônjuge
-    const { data: personalInfo } = await supabase
-      .from('informacoes_pessoais')
-      .select('conjuge_id')
-      .eq('membro_id', user.id)
-      .maybeSingle();
+    // Carregar filhos
     const responsibleIds = [user.id];
     if (personalInfo?.conjuge_id) responsibleIds.push(personalInfo.conjuge_id);
-
-    const { data: kidsData, error: kidsError } = await supabase
+    const { data: kidsData } = await supabase
       .from('criancas')
-      .select('id, nome_crianca, data_nascimento, alergias, medicamentos, informacoes_especiais')
+      .select('id, nome_crianca, data_nascimento')
       .eq('id_igreja', currentChurchId)
       .in('responsavel_id', responsibleIds)
       .order('nome_crianca');
-    if (kidsError) toast.error('Erro ao carregar informações dos filhos.');
     const formattedKids: Kid[] = (kidsData || []).map(k => ({
       ...k,
       idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000)
     }));
     setUserKids(formattedKids);
+
+    // Carregar teste vocacional
+    const { data: tests } = await supabase
+      .from('testes_vocacionais')
+      .select('id, data_teste, ministerio_recomendado, is_ultimo')
+      .eq('membro_id', user.id)
+      .order('data_teste', { ascending: false });
+    if (tests?.length) {
+      setLatestVocationalTest(tests.find(t => t.is_ultimo) || tests[0]);
+    }
+
+    // Carregar membros para seleção de cônjuge
+    const { data: members } = await supabase.from('membros').select('id, nome_completo, email')
+      .eq('id_igreja', currentChurchId).eq('status', 'ativo').neq('id', user.id)
+      .order('nome_completo');
+    setMemberOptions(members as MemberOption[] || []);
+
   }, [user, currentChurchId]);
 
   const loadCheckinHistory = useCallback(async () => {
@@ -163,9 +166,7 @@ const PersonalInfo = () => {
     const { data, error } = await supabase
       .from('kids_checkin')
       .select(`
-        id,
-        data_checkin,
-        data_checkout,
+        id, data_checkin, data_checkout,
         criancas ( nome_crianca ),
         responsavel_checkin:membros!kids_checkin_responsavel_checkin_id_fkey( nome_completo ),
         responsavel_checkout:membros!kids_checkin_responsavel_checkout_id_fkey( nome_completo )
@@ -174,12 +175,13 @@ const PersonalInfo = () => {
       .order('data_checkin', { ascending: false })
       .limit(5);
 
-    if (error) {
-      toast.error('Erro ao carregar histórico de check-in.');
-    } else {
-      setCheckinHistory(data as CheckinRecord[]);
-    }
+    if (error) toast.error('Erro ao carregar histórico de check-in.');
+    else setCheckinHistory(data as CheckinRecord[]);
   }, [userKids]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     if (userKids.length > 0) {
@@ -187,42 +189,11 @@ const PersonalInfo = () => {
     }
   }, [userKids, loadCheckinHistory]);
 
-  const loadVocationalTest = useCallback(async () => {
-    if (!user) return;
-    const { data: tests, error: testsError } = await supabase
-      .from('testes_vocacionais')
-      .select('id, data_teste, ministerio_recomendado, is_ultimo')
-      .eq('membro_id', user.id)
-      .order('data_teste', { ascending: false });
-    if (testsError) toast.error('Erro ao carregar testes vocacionais.');
-    if (tests?.length) {
-      setLatestVocationalTest(tests.find(t => t.is_ultimo) || tests[0]);
-    }
-  }, [user]);
-
-  const loadMemberOptions = useCallback(async () => {
-    if (!currentChurchId || !user?.id) return;
-    const { data, error } = await supabase.from('membros').select('id, nome_completo, email')
-      .eq('id_igreja', currentChurchId).eq('status', 'ativo').neq('id', user.id)
-      .order('nome_completo');
-    if (error) toast.error('Erro ao carregar membros para seleção.');
-    else setMemberOptions(data as MemberOption[]);
-  }, [currentChurchId, user?.id]);
-
   useEffect(() => {
-    loadPersonalInfoData();
-    loadKidsData();
-    loadVocationalTest();
-    loadMemberOptions();
-  }, [loadPersonalInfoData, loadKidsData, loadVocationalTest, loadMemberOptions]);
-
-  // Define modo edição apenas no primeiro acesso
-  useEffect(() => {
-    if (!editInitRef.current) {
-      setIsEditing(!user?.perfil_completo);
-      editInitRef.current = true;
+    if (isFirstAccess) {
+      setIsEditing(true);
     }
-  }, [user?.perfil_completo]);
+  }, [isFirstAccess]);
 
   const handleInputChange = (field: string, value: any) => {
     setIsDirty(true);
@@ -257,7 +228,7 @@ const PersonalInfo = () => {
     toast.promise(promise(), {
       loading: 'Salvando informações...',
       success: () => {
-        updateUserProfile({ ...formData });
+        checkAuth(); // Força a atualização do perfil do usuário no estado global
         setIsDirty(false);
         setIsEditing(false);
         return 'Informações salvas com sucesso!';
@@ -268,24 +239,19 @@ const PersonalInfo = () => {
 
   const handleDeleteKid = async (kidId: string) => {
     const loadingId = toast.loading('Removendo criança...');
-    const { error } = await supabase
-      .from('criancas')
-      .delete()
-      .eq('id', kidId);
+    const { error } = await supabase.from('criancas').delete().eq('id', kidId);
     if (error) {
       toast.dismiss(loadingId);
       toast.error(`Falha ao remover: ${error.message}`);
       return;
     }
-    await loadKidsData();
+    await loadData();
     toast.dismiss(loadingId);
     toast.success('Criança removida!');
   };
 
-  const isFirstAccess = !user?.perfil_completo;
-
   // --- MODO DE EDIÇÃO (FORMULÁRIO) ---
-  if (isFirstAccess || isEditing) {
+  if (isEditing) {
     return (
       <div className="p-4 md:p-6 space-y-6">
         {isFirstAccess && (
@@ -294,14 +260,10 @@ const PersonalInfo = () => {
             <p className="text-blue-100 text-lg">Para começarmos, preencha suas informações pessoais.</p>
           </div>
         )}
-        {/* Status do Membro */}
         <PersonalStatusCards />
-        {/* Wizard header */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">
-              Etapa {currentStep} de 3
-            </p>
+            <p className="text-sm font-medium text-gray-700">Etapa {currentStep} de 3</p>
             <span className="text-xs text-gray-500 hidden sm:inline">
               {currentStep === 1 ? 'Dados Pessoais' : currentStep === 2 ? 'Endereço e Família' : 'Vida Espiritual'}
             </span>
@@ -449,48 +411,22 @@ const PersonalInfo = () => {
           </Card>
           )}
 
-          {/* Navegação do Wizard */}
           <div className="flex flex-col sm:flex-row justify-between gap-3">
             <div className="flex gap-2">
-              {currentStep > 1 && (
-                <Button type="button" variant="outline" onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}>
-                  Voltar
-                </Button>
-              )}
+              {currentStep > 1 && (<Button type="button" variant="outline" onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}>Voltar</Button>)}
             </div>
             <div className="flex gap-2 justify-end">
-              {!isFirstAccess && (
-                <Button type="button" variant="ghost" onClick={() => setIsEditing(false)}>
-                  Cancelar
-                </Button>
-              )}
+              {!isFirstAccess && (<Button type="button" variant="ghost" onClick={() => setIsEditing(false)}>Cancelar</Button>)}
               {currentStep < 3 ? (
-                <Button
-                  type="button"
-                  onClick={() => setCurrentStep((s) => Math.min(3, s + 1))}
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold"
-                >
-                  Próximo
-                </Button>
+                <Button type="button" onClick={() => setCurrentStep((s) => Math.min(3, s + 1))} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold">Próximo</Button>
               ) : (
-                <Button type="button" onClick={handleSave} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold">
-                  <Save className="w-4 h-4 mr-2" />
-                  Salvar Informações
-                </Button>
+                <Button type="button" onClick={handleSave} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold"><Save className="w-4 h-4 mr-2" />Salvar Informações</Button>
               )}
             </div>
           </div>
         </form>
         {user && currentChurchId && (
-          <AddKidDialog
-            isOpen={isAddKidDialogOpen}
-            onClose={() => setIsAddKidDialogOpen(false)}
-            responsibleId={user.id}
-            responsibleName={user.name}
-            responsibleEmail={user.email}
-            churchId={currentChurchId}
-            onKidAdded={loadKidsData}
-          />
+          <AddKidDialog isOpen={isAddKidDialogOpen} onClose={() => setIsAddKidDialogOpen(false)} responsibleId={user.id} responsibleName={user.name} responsibleEmail={user.email} churchId={currentChurchId} onKidAdded={loadData} />
         )}
       </div>
     )
@@ -510,10 +446,8 @@ const PersonalInfo = () => {
         <div><h1 className="text-3xl font-bold text-gray-800">Meu Perfil</h1><p className="text-gray-500 mt-1">Seus dados pessoais, familiares e ministeriais.</p></div>
         <Button variant="outline" onClick={() => setIsEditing(true)}><Edit className="w-4 h-4 mr-2" />Editar Perfil</Button>
       </div>
-      {/* Status do Membro */}
       <PersonalStatusCards />
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Coluna 1: Dados Pessoais e Família */}
         <div className="xl:col-span-2 space-y-6">
           <Card className="overflow-hidden">
             <CardHeader><CardTitle className="flex items-center gap-3 text-xl"><User className="text-blue-500"/>Dados Pessoais</CardTitle></CardHeader>
@@ -564,7 +498,6 @@ const PersonalInfo = () => {
             </CardContent>
           </Card>
         </div>
-        {/* Coluna 2: Teste Vocacional e Histórico de Check-in */}
         <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-xl"><Target className="text-purple-500"/>Teste Vocacional</CardTitle></CardHeader>

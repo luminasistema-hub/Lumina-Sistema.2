@@ -50,7 +50,9 @@ const EventsManagementPage = () => {
 
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey });
-    queryClient.invalidateQueries({ queryKey: ['events'] }); // Invalida a query da página do membro
+    // Invalida a query da página do membro, que não usa react-query mas depende do realtime
+    // A melhor abordagem é deixar o realtime do EventsPage.tsx cuidar disso.
+    // Apenas para garantir, podemos forçar uma atualização se necessário, mas o realtime é o ideal.
     setCreateOpen(false);
     setEditOpen(false);
   };
