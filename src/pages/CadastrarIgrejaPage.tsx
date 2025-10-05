@@ -111,7 +111,7 @@ const CadastrarIgrejaPage = () => {
           email: adminEmail,
           nome_responsavel: adminName,
           plano_id: selectedPlan,
-          status: 'pending',
+          status: planDetails.monthlyValue === 0 ? 'active' : 'pending',
           valor_mensal_assinatura: planDetails.monthlyValue,
           limite_membros: planDetails.memberLimit,
           ultimo_pagamento_status: planDetails.monthlyValue === 0 ? 'Confirmado' : 'Pendente',
