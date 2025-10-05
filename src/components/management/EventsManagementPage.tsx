@@ -1,270 +1,154 @@
-import { useEffect, useMemo, useState, useRef } from "react";
-import { useAuthStore } from "@/stores/authStore";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
-import { useLoadingProtection } from "@/hooks/useLoadingProtection";
-import { Calendar, MapPin, Pencil, Plus, Search, Eye, Users, DollarSign, ExternalLink } from "lucide-react";
-import { CreateEventDialog } from "./CreateEventDialog";
-import EditEventDialog, { EventItem } from "./EditEventDialog";
-import EventParticipantsDialog from "./EventParticipantsDialog";
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/authStore';
+import { EventCard, Event } from './EventCard';
+import CreateEventDialog from './CreateEventDialog';
+import EditEventDialog from './EditEventDialog';
+import EventParticipantsDialog from './EventParticipantsDialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { Plus, Search, Users, Loader2 } from 'lucide-react';
 
 const EventsManagementPage = () => {
-  const { currentChurchId, user } = useAuthStore();
-  type ManagedEvent = EventItem & { participantes_count?: number };
-  const [events, setEvents] = useState<ManagedEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterTipo, setFilterTipo] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editEvent, setEditEvent] = useState<EventItem | null>(null);
-  const [participantsEvent, setParticipantsEvent] = useState<EventItem | null>(null);
-  const { protectedFetch, cleanup, isFetching } = useLoadingProtection();
-  const channelRef = useRef<any>(null)
+  const { currentChurchId } = useAuthStore();
+  const queryClient = useQueryClient();
 
-  const canManage = user?.role === "admin" || user?.role === "pastor";
+  const [isCreateOpen, setCreateOpen] = useState(false);
+  const [isEditOpen, setEditOpen] = useState(false);
+  const [isParticipantsOpen, setParticipantsOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState('upcoming');
 
-  const loadEvents = async () => {
-    return protectedFetch(
-      async () => {
-        if (!currentChurchId) {
-          return [];
-        }
-        
-        const { data, error } = await supabase
-          .from("eventos")
-          .select("*, participantes:evento_participantes(count)")
-          .eq("id_igreja", currentChurchId)
-          .order("data_hora", { ascending: true });
-        
-        if (error) throw error;
-        
-        const mapped = (data || []).map((e: any) => ({
-          ...e,
-          participantes_count: e.participantes?.[0]?.count || 0,
-        })) as ManagedEvent[];
-        
-        return mapped;
-      },
-      (mapped) => {
-        setEvents(mapped);
-      },
-      (error: any) => {
-        toast.error("Erro ao carregar eventos: " + error.message);
-        setEvents([]);
-      },
-      () => {
-        setLoading(false);
+  const queryKey = useMemo(() => ['eventsManagement', currentChurchId, filter, searchTerm], [currentChurchId, filter, searchTerm]);
+
+  const { data: events, isLoading, error } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      if (!currentChurchId) return [];
+      let query = supabase.from('eventos').select('*').eq('id_igreja', currentChurchId);
+
+      if (filter === 'upcoming') {
+        query = query.gt('data_hora', new Date().toISOString());
+      } else if (filter === 'past') {
+        query = query.lt('data_hora', new Date().toISOString());
       }
-    );
+
+      if (searchTerm) {
+        query = query.ilike('nome', `%${searchTerm}%`);
+      }
+
+      const { data, error } = await query.order('data_hora', { ascending: filter === 'upcoming' });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: !!currentChurchId,
+  });
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey });
+    queryClient.invalidateQueries({ queryKey: ['events'] }); // Invalida a query da página do membro
+    setCreateOpen(false);
+    setEditOpen(false);
   };
 
-  useEffect(() => {
-    setLoading(true);
-    loadEvents();
-    
-    // Realtime subscription com proteção única
-    if (channelRef.current) {
-      try { supabase.removeChannel(channelRef.current); } catch {}
-      channelRef.current = null;
-    }
-    
-    if (currentChurchId) {
-      const channel = supabase
-        .channel(`events-management-${currentChurchId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { loadEvents(); }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { loadEvents(); }
-        )
-        .subscribe();
-      channelRef.current = channel;
-    }
-    
-    return () => {
-      if (channelRef.current) {
-        try { supabase.removeChannel(channelRef.current); } catch {}
-        channelRef.current = null;
-      }
-      cleanup();
-    };
-  }, [currentChurchId]);
+  const deleteMutation = useMutation({
+    mutationFn: async (eventId: string) => {
+      const { error } = await supabase.from('eventos').delete().eq('id', eventId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success('Evento removido com sucesso!');
+      handleSuccess();
+    },
+    onError: (err: any) => {
+      toast.error(`Erro ao remover evento: ${err.message}`);
+    },
+  });
 
-  const filtered = useMemo(() => {
-    return events.filter(e => {
-      const matchesSearch =
-        e.nome.toLowerCase().includes(search.toLowerCase()) ||
-        e.local.toLowerCase().includes(search.toLowerCase());
-      const matchesTipo = filterTipo === "all" || e.tipo === filterTipo;
-      const matchesStatus = filterStatus === "all" || e.status === filterStatus;
-      return matchesSearch && matchesTipo && matchesStatus;
-    });
-  }, [events, search, filterTipo, filterStatus]);
-
-  const toggleInscricoes = async (event: EventItem, value: boolean) => {
-    const { error } = await supabase.from("eventos").update({ inscricoes_abertas: value }).eq("id", event.id);
-    if (error) {
-      toast.error("Erro ao atualizar inscrições: " + error.message);
-      return;
-    }
-    toast.success(value ? "Inscrições abertas." : "Inscrições fechadas.");
-    loadEvents();
+  const handleEdit = (event: Event) => {
+    setSelectedEvent(event);
+    setEditOpen(true);
   };
 
-  if (!canManage) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-gray-700">Apenas administradores e pastores podem gerenciar eventos.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  const handleViewParticipants = (event: Event) => {
+    setSelectedEvent(event);
+    setParticipantsOpen(true);
+  };
+
+  if (!currentChurchId) {
+    return <div className="p-6 text-center">Por favor, selecione uma igreja para gerenciar os eventos.</div>;
   }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Gestão de Eventos</h1>
-          <p className="text-gray-500">Crie, edite e organize os eventos da sua igreja.</p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="bg-green-600 hover:bg-green-700">
-          <Plus className="w-4 h-4 mr-2" /> Novo Evento
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-4 flex flex-col md:flex-row gap-4 items-center">
-          <div className="relative w-full md:w-auto flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input placeholder="Pesquisar por nome ou local..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Gestão de Eventos</h1>
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+          <div className="relative w-full sm:w-auto flex-grow">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar evento..."
+              className="pl-9 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <Select value={filterTipo} onValueChange={setFilterTipo}>
-            <SelectTrigger className="w-full md:w-[200px]">
-              <SelectValue placeholder="Tipo" />
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Filtrar eventos" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="Culto">Culto</SelectItem>
-              <SelectItem value="Conferência">Conferência</SelectItem>
-              <SelectItem value="Retiro">Retiro</SelectItem>
-              <SelectItem value="Evangelismo">Evangelismo</SelectItem>
-              <SelectItem value="Casamento">Casamento</SelectItem>
-              <SelectItem value="Funeral">Funeral</SelectItem>
-              <SelectItem value="Outro">Outro</SelectItem>
+              <SelectItem value="upcoming">Próximos</SelectItem>
+              <SelectItem value="past">Passados</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-full md:w-[200px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="Planejado">Planejado</SelectItem>
-              <SelectItem value="Confirmado">Confirmado</SelectItem>
-              <SelectItem value="Em Andamento">Em Andamento</SelectItem>
-              <SelectItem value="Finalizado">Finalizado</SelectItem>
-              <SelectItem value="Cancelado">Cancelado</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6">
-        {loading ? (
-          <Card><CardContent className="p-6">Carregando eventos...</CardContent></Card>
-        ) : filtered.length === 0 ? (
-          <Card><CardContent className="p-12 text-center"><Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" /><h3 className="text-xl font-semibold text-gray-800 mb-2">Nenhum evento encontrado</h3><p className="text-gray-500">Crie um novo evento para começar.</p></CardContent></Card>
-        ) : (
-          filtered.map((e) => (
-            <Card key={e.id} className="shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden">
-              <CardContent className="p-4 flex flex-col md:flex-row md:justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2 flex-wrap">
-                    <h3 className="text-lg font-bold text-gray-900">{e.nome}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">{e.tipo}</span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">{e.status}</span>
-                    {e.valor_inscricao && Number(e.valor_inscricao) > 0 && e.link_externo ? (
-                      <a
-                        href={e.link_externo}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs inline-flex items-center gap-1 text-blue-600 hover:underline"
-                        title="Abrir link externo de inscrição/pagamento"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        Link externo
-                      </a>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 mb-3">
-                    <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /><span>{new Date(e.data_hora).toLocaleString("pt-BR")}</span></div>
-                    <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /><span>{e.local}</span></div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-700">
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-4 h-4" />
-                      <span>
-                        Inscritos {e.participantes_count ?? 0}
-                        {typeof e.capacidade_maxima === "number" ? ` / ${e.capacidade_maxima}` : " / -"}
-                      </span>
-                    </div>
-                    {e.valor_inscricao ? <div className="flex items-center gap-1.5 font-semibold text-green-600"><DollarSign className="w-4 h-4" /><span>{Number(e.valor_inscricao).toFixed(2)}</span></div> : null}
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 self-end md:self-center">
-                  <Button variant="outline" onClick={() => setEditEvent(e)}><Pencil className="w-4 h-4 mr-2" />Editar</Button>
-                  <Button variant="outline" onClick={() => setParticipantsEvent(e)}>
-                    <Eye className="w-4 h-4 mr-2" /> Inscritos
-                  </Button>
-                  <Button
-                    variant={e.inscricoes_abertas ? "secondary" : "default"}
-                    onClick={() => toggleInscricoes(e, !e.inscricoes_abertas)}
-                  >
-                    {e.inscricoes_abertas ? "Fechar inscrições" : "Abrir inscrições"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+          <Button onClick={() => setCreateOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" /> Criar Evento
+          </Button>
+        </div>
       </div>
 
-      <CreateEventDialog
-        igrejaId={currentChurchId || ""}
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={() => loadEvents()}
-      />
+      {isLoading && (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Carregando eventos...</span>
+        </div>
+      )}
+      {error && <div className="text-red-500 p-4 bg-red-50 rounded-md">Erro ao carregar eventos: {error.message}</div>}
 
-      {editEvent && (
-        <EditEventDialog
-          event={editEvent}
-          open={!!editEvent}
-          onClose={() => setEditEvent(null)}
-          onUpdated={() => loadEvents()}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {events?.map((event) => (
+          <div key={event.id} className="flex flex-col">
+            <EventCard event={event as any} onClick={() => handleEdit(event)} />
+            <div className="mt-2 flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewParticipants(event)}>
+                <Users className="mr-2 h-4 w-4" /> Ver Inscritos
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(event.id)} disabled={deleteMutation.isPending}>
+                Remover
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {events?.length === 0 && !isLoading && (
+        <div className="text-center py-12 text-gray-500">
+          <p>Nenhum evento encontrado para os filtros selecionados.</p>
+        </div>
       )}
 
-      {participantsEvent && (
-        <EventParticipantsDialog
-          eventId={participantsEvent.id}
-          churchId={participantsEvent.id_igreja || ""}
-          eventName={participantsEvent.nome}
-          open={!!participantsEvent}
-          onClose={() => setParticipantsEvent(null)}
-        />
+      <CreateEventDialog isOpen={isCreateOpen} onClose={() => setCreateOpen(false)} onSuccess={handleSuccess} />
+      {selectedEvent && (
+        <>
+          <EditEventDialog isOpen={isEditOpen} onClose={() => setEditOpen(false)} event={selectedEvent} onSuccess={handleSuccess} />
+          <EventParticipantsDialog isOpen={isParticipantsOpen} onClose={() => setParticipantsOpen(false)} eventId={selectedEvent.id} />
+        </>
       )}
     </div>
   );

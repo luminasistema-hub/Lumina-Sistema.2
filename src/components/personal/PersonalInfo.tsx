@@ -18,12 +18,14 @@ import {
   Target,
   Baby,
   Plus,
-  Trash2
+  Trash2,
+  UserCheck
 } from 'lucide-react'
 import { Progress } from '../ui/progress'
 import { useNavigate } from 'react-router-dom' 
 import AddKidDialog from './AddKidDialog';
 import PersonalStatusCards from './PersonalStatusCards';
+import { Badge } from '../ui/badge'
 
 // Interfaces para tipagem dos dados
 interface PersonalInfoData {
@@ -45,6 +47,14 @@ interface Kid {
 interface MemberOption {
   id: string; nome_completo: string; email: string;
 }
+interface CheckinRecord {
+  id: string;
+  data_checkin: string;
+  data_checkout?: string;
+  criancas: { nome_crianca: string };
+  responsavel_checkin: { nome_completo: string } | null;
+  responsavel_checkout: { nome_completo: string } | null;
+}
 
 const PersonalInfo = () => {
   const { user, currentChurchId, updateUserProfile } = useAuthStore()
@@ -64,6 +74,7 @@ const PersonalInfo = () => {
   })
   const [latestVocationalTest, setLatestVocationalTest] = useState<VocationalTestResult | null>(null);
   const [userKids, setUserKids] = useState<Kid[]>([]);
+  const [checkinHistory, setCheckinHistory] = useState<CheckinRecord[]>([]);
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false);
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
 
@@ -142,6 +153,39 @@ const PersonalInfo = () => {
     }));
     setUserKids(formattedKids);
   }, [user, currentChurchId]);
+
+  const loadCheckinHistory = useCallback(async () => {
+    if (userKids.length === 0) {
+      setCheckinHistory([]);
+      return;
+    }
+    const kidIds = userKids.map(k => k.id);
+    const { data, error } = await supabase
+      .from('kids_checkin')
+      .select(`
+        id,
+        data_checkin,
+        data_checkout,
+        criancas ( nome_crianca ),
+        responsavel_checkin:membros!kids_checkin_responsavel_checkin_id_fkey( nome_completo ),
+        responsavel_checkout:membros!kids_checkin_responsavel_checkout_id_fkey( nome_completo )
+      `)
+      .in('crianca_id', kidIds)
+      .order('data_checkin', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      toast.error('Erro ao carregar histórico de check-in.');
+    } else {
+      setCheckinHistory(data as CheckinRecord[]);
+    }
+  }, [userKids]);
+
+  useEffect(() => {
+    if (userKids.length > 0) {
+      loadCheckinHistory();
+    }
+  }, [userKids, loadCheckinHistory]);
 
   const loadVocationalTest = useCallback(async () => {
     if (!user) return;
@@ -510,8 +554,17 @@ const PersonalInfo = () => {
               </div>
             </CardContent>
           </Card>
+          <Card className="overflow-hidden">
+            <CardHeader><CardTitle className="flex items-center gap-3 text-xl"><Church className="text-yellow-500"/>Vida Espiritual</CardTitle></CardHeader>
+            <CardContent className="divide-y divide-gray-100 px-6 pb-6">
+              <InfoItem label="Data da Conversão" value={formData.dataConversao ? new Date(formData.dataConversao).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : ''} />
+              <InfoItem label="Tempo na igreja" value={formData.tempoIgreja} />
+              <InfoItem label="Batizado" value={<Badge variant={formData.batizado ? "default" : "outline"}>{formData.batizado ? 'Sim' : 'Não'}</Badge>} />
+              {formData.batizado && <InfoItem label="Data do Batismo" value={formData.dataBatismo ? new Date(formData.dataBatismo).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : ''} />}
+            </CardContent>
+          </Card>
         </div>
-        {/* Coluna 2: Teste Vocacional */}
+        {/* Coluna 2: Teste Vocacional e Histórico de Check-in */}
         <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-xl"><Target className="text-purple-500"/>Teste Vocacional</CardTitle></CardHeader>
@@ -530,6 +583,32 @@ const PersonalInfo = () => {
                   <p className="text-gray-600 mb-3">Você ainda não realizou o teste vocacional.</p>
                   <Button onClick={() => navigate('/dashboard', { state: { activeModule: 'vocational-test' } })}>Fazer Teste Agora</Button>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-3 text-xl"><UserCheck className="text-teal-500"/>Histórico de Check-in (Kids)</CardTitle></CardHeader>
+            <CardContent className="px-6 pb-6">
+              {checkinHistory.length > 0 ? (
+                <ul className="divide-y divide-gray-100 -mx-6">
+                  {checkinHistory.map(record => (
+                    <li key={record.id} className="px-6 py-3">
+                      <p className="font-semibold text-gray-800">{record.criancas?.nome_crianca || 'Criança'}</p>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium text-green-600">Check-in:</span> {new Date(record.data_checkin).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {record.responsavel_checkin?.nome_completo && ` por ${record.responsavel_checkin.nome_completo}`}
+                      </p>
+                      {record.data_checkout && (
+                        <p className="text-sm text-gray-500">
+                          <span className="font-medium text-red-600">Check-out:</span> {new Date(record.data_checkout).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          {record.responsavel_checkout?.nome_completo && ` por ${record.responsavel_checkout.nome_completo}`}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">Nenhum histórico de check-in recente encontrado.</p>
               )}
             </CardContent>
           </Card>
