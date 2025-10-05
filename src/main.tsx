@@ -11,6 +11,11 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
       retry: 1,
+      // Evita recarregar tudo quando a aba volta ao foco ou reconecta
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      // Se já houver cache válido, não refazer fetch só por montar novamente
+      refetchOnMount: false,
     },
   },
 })
