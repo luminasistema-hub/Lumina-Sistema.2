@@ -23,6 +23,7 @@ import {
   UserPlus
 } from 'lucide-react'
 import AddMinistryDialog from './AddMinistryDialog'
+import { useLoadingProtection } from '@/hooks/useLoadingProtection'
 
 // Interfaces
 interface Ministry {
@@ -41,78 +42,94 @@ const MinistriesPage = () => {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
   const [openAddDialog, setOpenAddDialog] = useState(false);
-  const isFetchingRef = useRef(false)
-  const debounceTimerRef = useRef<number | null>(null)
+  const { protectedFetch, cleanup } = useLoadingProtection();
+  const channelRef = useRef<any>(null)
 
   const canManage = user?.role === 'admin' || user?.role === 'pastor';
   const isLeaderOfSelected = selectedMinistry?.lider_id === user?.id;
 
   const loadData = useCallback(async () => {
-    // Evita reentradas concorrentes
-    if (isFetchingRef.current) return
-    isFetchingRef.current = true
-    
-    if (!currentChurchId) {
-      setLoading(false)
-      isFetchingRef.current = false
-      return
-    }
-    setLoading(true);
-    try {
-      let { data: ministriesData, error: ministriesError } = await supabase.from('ministerios')
-        .select(`*, volunteers:ministerio_voluntarios!ministerio_voluntarios_ministerio_id_fkey(count)`)
-        .eq('id_igreja', currentChurchId).order('nome');
-      if (ministriesError) throw ministriesError;
+    return protectedFetch(
+      async () => {
+        if (!currentChurchId) {
+          return { ministries: [], members: [] };
+        }
+        
+        let { data: ministriesData, error: ministriesError } = await supabase.from('ministerios')
+          .select(`*, volunteers:ministerio_voluntarios!ministerio_voluntarios_ministerio_id_fkey(count)`)
+          .eq('id_igreja', currentChurchId).order('nome');
+        if (ministriesError) throw ministriesError;
 
-      // Removido: não criar ministérios automaticamente; admin fará manualmente.
-      
-      const leaderIds = ministriesData.map(m => m.lider_id).filter(Boolean) as string[];
-      const leadersMap = new Map<string, string>();
-      if (leaderIds.length > 0) {
-          const { data: leadersData, error: leadersError } = await supabase.from('membros')
-              .select('id, nome_completo').in('id', leaderIds);
-          if (leadersError) throw leadersError;
-          leadersData.forEach(l => leadersMap.set(l.id, l.nome_completo));
+        const leaderIds = ministriesData.map(m => m.lider_id).filter(Boolean) as string[];
+        const leadersMap = new Map<string, string>();
+        if (leaderIds.length > 0) {
+            const { data: leadersData, error: leadersError } = await supabase.from('membros')
+                .select('id, nome_completo').in('id', leaderIds);
+            if (leadersError) throw leadersError;
+            leadersData.forEach(l => leadersMap.set(l.id, l.nome_completo));
+        }
+
+        const formattedMinistries: Ministry[] = ministriesData.map((m: any) => ({
+          ...m,
+          lider_nome: leadersMap.get(m.lider_id) || 'Não Atribuído',
+          volunteers_count: m.volunteers[0]?.count || 0,
+        }));
+        
+        const { data: membersData, error: membersError } = await supabase.from('membros')
+          .select('id, nome_completo').eq('id_igreja', currentChurchId).eq('status', 'ativo').order('nome_completo');
+        if (membersError) throw membersError;
+        
+        return { ministries: formattedMinistries, members: membersData };
+      },
+      (result) => {
+        setMinistries(result.ministries);
+        setMemberOptions(result.members);
+      },
+      (error: any) => {
+        toast.error('Falha ao carregar dados: ' + error.message);
+        setMinistries([]);
+        setMemberOptions([]);
+      },
+      () => {
+        setLoading(false);
       }
-
-      const formattedMinistries: Ministry[] = ministriesData.map((m: any) => ({
-        ...m,
-        lider_nome: leadersMap.get(m.lider_id) || 'Não Atribuído',
-        volunteers_count: m.volunteers[0]?.count || 0,
-      }));
-      setMinistries(formattedMinistries);
-
-      const { data: membersData, error: membersError } = await supabase.from('membros')
-        .select('id, nome_completo').eq('id_igreja', currentChurchId).eq('status', 'ativo').order('nome_completo');
-      if (membersError) throw membersError;
-      setMemberOptions(membersData);
-
-      // Removido: este módulo não gerencia mais eventos/escalas
-
-    } catch (error: any) {
-      toast.error('Falha ao carregar dados: ' + error.message);
-      setMinistries([])
-      setMemberOptions([])
-    } finally {
-      setLoading(false)
-      isFetchingRef.current = false
-    }
+    );
   }, [currentChurchId]);
 
   useEffect(() => {
-    // Debounce para evitar múltiplas chamadas seguidas
-    if (debounceTimerRef.current) {
-      window.clearTimeout(debounceTimerRef.current)
+    setLoading(true);
+    loadData();
+    
+    // Realtime subscription com proteção única
+    if (channelRef.current) {
+      try { supabase.removeChannel(channelRef.current); } catch {}
+      channelRef.current = null;
     }
-    debounceTimerRef.current = window.setTimeout(() => {
-      loadData()
-    }, 150)
+    
+    if (currentChurchId) {
+      const channel = supabase
+        .channel(`ministries-management-${currentChurchId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'ministerios', filter: `id_igreja=eq.${currentChurchId}` },
+          () => { loadData(); }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'ministerio_voluntarios', filter: `id_igreja=eq.${currentChurchId}` },
+          () => { loadData(); }
+        )
+        .subscribe();
+      channelRef.current = channel;
+    }
     
     return () => {
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current)
+      if (channelRef.current) {
+        try { supabase.removeChannel(channelRef.current); } catch {}
+        channelRef.current = null;
       }
-    }
+      cleanup();
+    };
   }, [loadData]);
 
   const loadMinistryDetails = useCallback(async (ministryId: string) => {

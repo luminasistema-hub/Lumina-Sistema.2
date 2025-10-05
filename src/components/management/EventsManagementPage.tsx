@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useLoadingProtection } from "@/hooks/useLoadingProtection";
 import { Calendar, MapPin, Pencil, Plus, Search, Eye, Users, DollarSign, ExternalLink } from "lucide-react";
 import { CreateEventDialog } from "./CreateEventDialog";
 import EditEventDialog, { EventItem } from "./EditEventDialog";
@@ -22,60 +23,80 @@ const EventsManagementPage = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<EventItem | null>(null);
   const [participantsEvent, setParticipantsEvent] = useState<EventItem | null>(null);
-  const isFetchingRef = useRef(false)
-  const debounceTimerRef = useRef<number | null>(null)
+  const { protectedFetch, cleanup, isFetching } = useLoadingProtection();
+  const channelRef = useRef<any>(null)
 
   const canManage = user?.role === "admin" || user?.role === "pastor";
 
   const loadEvents = async () => {
-    // Evita reentradas concorrentes
-    if (isFetchingRef.current) return
-    isFetchingRef.current = true
-    
-    if (!currentChurchId) {
-      setLoading(false)
-      isFetchingRef.current = false
-      return;
-    }
-    setLoading(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from("eventos")
-        .select("*, participantes:evento_participantes(count)")
-        .eq("id_igreja", currentChurchId)
-        .order("data_hora", { ascending: true });
-
-      if (error) throw error;
-
-      const mapped = (data || []).map((e: any) => ({
-        ...e,
-        participantes_count: e.participantes?.[0]?.count || 0,
-      })) as ManagedEvent[];
-      setEvents(mapped);
-    } catch (error: any) {
-      toast.error("Erro ao carregar eventos: " + error.message);
-      setEvents([]);
-    } finally {
-      setLoading(false)
-      isFetchingRef.current = false
-    }
+    return protectedFetch(
+      async () => {
+        if (!currentChurchId) {
+          return [];
+        }
+        
+        const { data, error } = await supabase
+          .from("eventos")
+          .select("*, participantes:evento_participantes(count)")
+          .eq("id_igreja", currentChurchId)
+          .order("data_hora", { ascending: true });
+        
+        if (error) throw error;
+        
+        const mapped = (data || []).map((e: any) => ({
+          ...e,
+          participantes_count: e.participantes?.[0]?.count || 0,
+        })) as ManagedEvent[];
+        
+        return mapped;
+      },
+      (mapped) => {
+        setEvents(mapped);
+      },
+      (error: any) => {
+        toast.error("Erro ao carregar eventos: " + error.message);
+        setEvents([]);
+      },
+      () => {
+        setLoading(false);
+      }
+    );
   };
 
   useEffect(() => {
-    // Debounce para evitar múltiplas chamadas seguidas
-    if (debounceTimerRef.current) {
-      window.clearTimeout(debounceTimerRef.current)
+    setLoading(true);
+    loadEvents();
+    
+    // Realtime subscription com proteção única
+    if (channelRef.current) {
+      try { supabase.removeChannel(channelRef.current); } catch {}
+      channelRef.current = null;
     }
-    debounceTimerRef.current = window.setTimeout(() => {
-      loadEvents()
-    }, 150)
+    
+    if (currentChurchId) {
+      const channel = supabase
+        .channel(`events-management-${currentChurchId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
+          () => { loadEvents(); }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
+          () => { loadEvents(); }
+        )
+        .subscribe();
+      channelRef.current = channel;
+    }
     
     return () => {
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current)
+      if (channelRef.current) {
+        try { supabase.removeChannel(channelRef.current); } catch {}
+        channelRef.current = null;
       }
-    }
+      cleanup();
+    };
   }, [currentChurchId]);
 
   const filtered = useMemo(() => {
