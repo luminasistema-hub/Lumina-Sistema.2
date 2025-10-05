@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore, UserRole } from '../../stores/authStore' 
 import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -104,6 +104,9 @@ const MemberManagementPage = () => {
   const [filterBirthday, setFilterBirthday] = useState('all') // all | mes_atual
   const [filterWedding, setFilterWedding] = useState('all') // all | mes_atual
   const [churchesLoaded, setChurchesLoaded] = useState(false); 
+  const [loading, setLoading] = useState(true);
+  const isFetchingRef = useRef(false)
+  const debounceTimerRef = useRef<number | null>(null)
 
   const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
   const canEditRoles = user?.role === 'admin' || user?.role === 'pastor'
@@ -703,6 +706,61 @@ const MemberManagementPage = () => {
     leaders: members.filter(m => m.funcao === 'lider_ministerio' || m.funcao === 'pastor' || m.funcao === 'admin' || m.funcao === 'super_admin').length,
     baptized: members.filter(m => m.batizado).length
   }
+
+  const loadData = async () => {
+    if (isFetchingRef.current) return
+    
+    if (!user?.id || !currentChurchId) {
+      setLoading(false);
+      setMembers([]);
+      setIsAdmin(false);
+      return;
+    }
+
+    setLoading(true);
+    isFetchingRef.current = true
+    try {
+      // Busca a função do usuário atual nessa igreja (para habilitar edição)
+      const { data: me, error: meErr } = await supabase
+        .from('membros')
+        .select('funcao')
+        .eq('id', user.id)
+        .eq('id_igreja', currentChurchId)
+        .maybeSingle();
+      if (meErr) throw meErr;
+
+      const myRole = me?.funcao || 'membro';
+      setIsAdmin(['admin', 'pastor'].includes(myRole));
+
+      // Lista de membros da igreja
+      const { data, error } = await supabase
+        .from('membros')
+        .select('id, id_igreja, nome_completo, email, funcao, status, created_at, updated_at')
+        .eq('id_igreja', currentChurchId)
+        .order('nome_completo', { ascending: true });
+      if (error) throw error;
+
+      setMembers(data || []);
+    } catch (err: any) {
+      console.error('Erro ao carregar membros:', err);
+      toast.error('Não foi possível carregar os membros.');
+      setMembers([]);
+      setIsAdmin(false);
+    } finally {
+      setLoading(false)
+      isFetchingRef.current = false
+    }
+  };
+
+  useEffect(() => {
+    // Debounce para evitar múltiplas chamadas seguidas ao recuperar foco
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = window.setTimeout(() => {
+      loadData()
+    }, 150)
+  }, [user?.id, currentChurchId]);
 
   if (!currentChurchId) {
     return (

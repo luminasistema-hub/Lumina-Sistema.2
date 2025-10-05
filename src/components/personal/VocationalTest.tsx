@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -56,6 +56,8 @@ const VocationalTest = () => {
   const [topMinistry, setTopMinistry] = useState<MinistryResult | null>(null)
   const [hasPreviousTest, setHasPreviousTest] = useState(false)
   const [isLoadingResults, setIsLoadingResults] = useState(true)
+  const isFetchingRef = useRef(false)
+  const timeoutRef = useRef<number | null>(null)
 
   const questions: Question[] = [
     { id: 1, text: "Tenho facilidade com equipamentos eletrônicos e tecnologia", ministry: "midia" },
@@ -263,10 +265,39 @@ const VocationalTest = () => {
 
   useEffect(() => {
     const loadPreviousTest = async () => {
-      if (!user?.id) {
-        setIsLoadingResults(false);
-        return;
+      // Evita reentradas concorrentes
+      if (isFetchingRef.current) return
+      isFetchingRef.current = true
+      // Timeout de segurança para nunca travar a UI
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current)
       }
+      timeoutRef.current = window.setTimeout(() => {
+        setIsLoadingResults(false)
+      }, 8000)
+
+      if (!user?.id) {
+        setIsLoadingResults(false)
+        isFetchingRef.current = false
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+        return
+      }
+
+      // Hidratar de cache local para exibir de imediato
+      try {
+        const cached = localStorage.getItem(`vt_results_${user.id}`)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (parsed?.results?.length) {
+            setResults(parsed.results)
+            setTopMinistry(parsed.topMinistry || parsed.results[0] || null)
+            setHasPreviousTest(true)
+            setCurrentStep('results')
+            setIsLoadingResults(false)
+          }
+        }
+      } catch {}
 
       console.log('VocationalTest: Loading previous test results for user:', user.id);
       const { data, error } = await supabase
@@ -279,8 +310,11 @@ const VocationalTest = () => {
       if (error) {
         console.error('VocationalTest: Error loading previous test:', error);
         toast.error('Erro ao carregar teste vocacional anterior.');
-        setIsLoadingResults(false);
-        return;
+        setIsLoadingResults(false)
+        isFetchingRef.current = false
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+        return
       }
 
       if (data) {
@@ -314,17 +348,28 @@ const VocationalTest = () => {
         setResults(calculatedResults);
         setTopMinistry(calculatedResults[0]);
         setCurrentStep('results');
+        // Atualiza cache local
+        try {
+          localStorage.setItem(`vt_results_${user.id}`, JSON.stringify({
+            results: calculatedResults,
+            topMinistry: calculatedResults[0],
+            ts: Date.now()
+          }))
+        } catch {}
       } else {
         console.log('VocationalTest: No previous test found.');
         setHasPreviousTest(false);
       }
-      setIsLoadingResults(false);
+      setIsLoadingResults(false)
+      isFetchingRef.current = false
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
     };
 
     if (user?.id) {
       loadPreviousTest();
     } else {
-      setIsLoadingResults(false);
+      setIsLoadingResults(false)
     }
   }, [user?.id]);
 
@@ -394,6 +439,14 @@ const VocationalTest = () => {
 
     setHasPreviousTest(true);
     setCurrentStep('results');
+    // Atualiza cache local imediatamente após salvar
+    try {
+      localStorage.setItem(`vt_results_${user.id}`, JSON.stringify({
+        results: calculatedResults,
+        topMinistry: calculatedResults[0],
+        ts: Date.now()
+      }))
+    } catch {}
     toast.success('Teste vocacional concluído e resultados salvos!');
   }
 
