@@ -342,9 +342,16 @@ const MemberManagementPage = () => {
   };
 
   useEffect(() => {
+    if (!currentChurchId) {
+      setMembers([]);
+      setFilteredMembers([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     debouncedFetch(
-      () => loadMembers(currentChurchId!),
+      () => loadMembers(currentChurchId),
       undefined,
       undefined,
       () => setLoading(false)
@@ -356,36 +363,34 @@ const MemberManagementPage = () => {
       channelRef.current = null;
     }
     
-    if (currentChurchId) {
-      const channel = supabase
-        .channel(`members-management-${currentChurchId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'membros', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { 
-            debouncedFetch(
-              () => loadMembers(currentChurchId!),
-              undefined,
-              undefined,
-              () => setLoading(false)
-            );
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'informacoes_pessoais', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { 
-            debouncedFetch(
-              () => loadMembers(currentChurchId!),
-              undefined,
-              undefined,
-              () => setLoading(false)
-            );
-          }
-        )
-        .subscribe();
-      channelRef.current = channel;
-    }
+    const channel = supabase
+      .channel(`members-management-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'membros', filter: `id_igreja=eq.${currentChurchId}` },
+        () => { 
+          debouncedFetch(
+            () => loadMembers(currentChurchId),
+            undefined,
+            undefined,
+            () => setLoading(false)
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'informacoes_pessoais', filter: `id_igreja=eq.${currentChurchId}` },
+        () => { 
+          debouncedFetch(
+            () => loadMembers(currentChurchId),
+            undefined,
+            undefined,
+            () => setLoading(false)
+          );
+        }
+      )
+      .subscribe();
+    channelRef.current = channel;
     
     return () => {
       if (channelRef.current) {
@@ -780,60 +785,65 @@ const MemberManagementPage = () => {
     baptized: members.filter(m => m.batizado).length
   }
 
-  const loadData = async () => {
-    if (isFetchingRef.current) return
-    
-    if (!user?.id || !currentChurchId) {
-      setLoading(false);
+  useEffect(() => {
+    if (!currentChurchId) {
       setMembers([]);
-      setIsAdmin(false);
+      setFilteredMembers([]);
+      setLoading(false);
       return;
     }
 
     setLoading(true);
-    isFetchingRef.current = true
-    try {
-      // Busca a função do usuário atual nessa igreja (para habilitar edição)
-      const { data: me, error: meErr } = await supabase
-        .from('membros')
-        .select('funcao')
-        .eq('id', user.id)
-        .eq('id_igreja', currentChurchId)
-        .maybeSingle();
-      if (meErr) throw meErr;
-
-      const myRole = me?.funcao || 'membro';
-      setIsAdmin(['admin', 'pastor'].includes(myRole));
-
-      // Lista de membros da igreja
-      const { data, error } = await supabase
-        .from('membros')
-        .select('id, id_igreja, nome_completo, email, funcao, status, created_at, updated_at')
-        .eq('id_igreja', currentChurchId)
-        .order('nome_completo', { ascending: true });
-      if (error) throw error;
-
-      setMembers(data || []);
-    } catch (err: any) {
-      console.error('Erro ao carregar membros:', err);
-      toast.error('Não foi possível carregar os membros.');
-      setMembers([]);
-      setIsAdmin(false);
-    } finally {
-      setLoading(false)
-      isFetchingRef.current = false
+    debouncedFetch(
+      () => loadMembers(currentChurchId),
+      undefined,
+      undefined,
+      () => setLoading(false)
+    );
+    
+    // Realtime subscription com proteção única
+    if (channelRef.current) {
+      try { supabase.removeChannel(channelRef.current); } catch {}
+      channelRef.current = null;
     }
-  };
-
-  useEffect(() => {
-    // Debounce para evitar múltiplas chamadas seguidas ao recuperar foco
-    if (debounceTimerRef.current) {
-      window.clearTimeout(debounceTimerRef.current)
-    }
-    debounceTimerRef.current = window.setTimeout(() => {
-      loadData()
-    }, 150)
-  }, [user?.id, currentChurchId]);
+    
+    const channel = supabase
+      .channel(`members-management-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'membros', filter: `id_igreja=eq.${currentChurchId}` },
+        () => { 
+          debouncedFetch(
+            () => loadMembers(currentChurchId),
+            undefined,
+            undefined,
+            () => setLoading(false)
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'informacoes_pessoais', filter: `id_igreja=eq.${currentChurchId}` },
+        () => { 
+          debouncedFetch(
+            () => loadMembers(currentChurchId),
+            undefined,
+            undefined,
+            () => setLoading(false)
+          );
+        }
+      )
+      .subscribe();
+    channelRef.current = channel;
+    
+    return () => {
+      if (channelRef.current) {
+        try { supabase.removeChannel(channelRef.current); } catch {}
+        channelRef.current = null;
+      }
+      cleanup();
+    };
+  }, [currentChurchId]);
 
   if (!currentChurchId) {
     return (
