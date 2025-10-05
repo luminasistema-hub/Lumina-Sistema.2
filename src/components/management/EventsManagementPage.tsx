@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { Plus, Search, Users, Loader2 } from 'lucide-react';
 
 const EventsManagementPage = () => {
-  const { currentChurchId } = useAuthStore();
+  const { currentChurchId, user } = useAuthStore();
   const queryClient = useQueryClient();
 
   const [isCreateOpen, setCreateOpen] = useState(false);
@@ -49,10 +49,8 @@ const EventsManagementPage = () => {
   });
 
   const handleSuccess = () => {
-    queryClient.invalidateQueries({ queryKey });
-    // Invalida a query da página do membro, que não usa react-query mas depende do realtime
-    // A melhor abordagem é deixar o realtime do EventsPage.tsx cuidar disso.
-    // Apenas para garantir, podemos forçar uma atualização se necessário, mas o realtime é o ideal.
+    queryClient.invalidateQueries({ queryKey: ['eventsManagement'] });
+    queryClient.invalidateQueries({ queryKey: ['events', currentChurchId, user?.id] });
     setCreateOpen(false);
     setEditOpen(false);
   };
@@ -156,7 +154,7 @@ const EventsManagementPage = () => {
       {selectedEvent && (
         <>
           <EditEventDialog isOpen={isEditOpen} onClose={() => setEditOpen(false)} event={selectedEvent} onSuccess={handleSuccess} />
-          <EventParticipantsDialog isOpen={isParticipantsOpen} onClose={() => setParticipantsOpen(false)} eventId={selectedEvent.id} />
+          <EventParticipantsDialog open={isParticipantsOpen} onClose={() => setParticipantsOpen(false)} eventId={selectedEvent.id} churchId={currentChurchId} eventName={selectedEvent.nome} />
         </>
       )}
     </div>

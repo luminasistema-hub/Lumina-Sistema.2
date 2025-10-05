@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
@@ -19,7 +19,7 @@ import {
   UserX,
   DollarSign
 } from 'lucide-react'
-import { useLoadingProtection } from '@/hooks/useLoadingProtection'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 // Interfaces
 interface Event {
@@ -30,142 +30,80 @@ interface Event {
   participantes_count: number; is_registered?: boolean;
 }
 
+const fetchEvents = async (churchId: string | null, userId: string | null) => {
+  if (!churchId) return [];
+
+  const { data, error } = await supabase.from('eventos')
+    .select(`*, participantes:evento_participantes(count)`)
+    .eq('id_igreja', churchId)
+    .order('data_hora', { ascending: true });
+
+  if (error) throw error;
+
+  let fetchedEvents: Event[] = data.map((event: any) => ({
+    ...event,
+    participantes_count: event.participantes?.[0]?.count || 0,
+    is_registered: false,
+  }));
+
+  if (userId) {
+    const { data: userRegistrations } = await supabase.from('evento_participantes')
+      .select('evento_id').eq('membro_id', userId)
+      .in('evento_id', fetchedEvents.map(e => e.id));
+    
+    const registeredEventIds = new Set(userRegistrations?.map(r => r.evento_id));
+    fetchedEvents = fetchedEvents.map(event => ({...event, is_registered: registeredEventIds.has(event.id)}));
+  }
+  
+  return fetchedEvents;
+};
+
 const EventsPage = () => {
   const { user, currentChurchId } = useAuthStore()
-  const [events, setEvents] = useState<Event[]>([])
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
-  const [loading, setLoading] = useState(true)
-  const { protectedFetch, debouncedFetch, cleanup } = useLoadingProtection();
-  const channelEventosRef = useRef<any>(null);
-  const channelInscricoesRef = useRef<any>(null);
 
-  const loadEvents = useCallback(async () => {
-    return protectedFetch(
-      async () => {
-        if (!currentChurchId) {
-          return [];
-        }
-        
-        const { data, error } = await supabase.from('eventos')
-          .select(`*, participantes:evento_participantes(count)`)
-          .eq('id_igreja', currentChurchId)
-          .order('data_hora', { ascending: true });
+  const queryKey = useMemo(() => ['events', currentChurchId, user?.id], [currentChurchId, user?.id]);
 
-        if (error) throw error;
-
-        let fetchedEvents: Event[] = data.map((event: any) => ({
-          ...event,
-          participantes_count: event.participantes?.[0]?.count || 0,
-          is_registered: false,
-        }));
-
-        if (user?.id) {
-          const { data: userRegistrations } = await supabase.from('evento_participantes')
-            .select('evento_id').eq('membro_id', user.id)
-            .in('evento_id', fetchedEvents.map(e => e.id));
-          
-          const registeredEventIds = new Set(userRegistrations?.map(r => r.evento_id));
-          fetchedEvents = fetchedEvents.map(event => ({...event, is_registered: registeredEventIds.has(event.id)}));
-        }
-        
-        return fetchedEvents;
-      },
-      (fetchedEvents) => {
-        setEvents(fetchedEvents);
-      },
-      (error: any) => {
-        toast.error('Erro ao carregar eventos: ' + error.message);
-        setEvents([]);
-      },
-      () => {
-        setLoading(false);
-      }
-    );
-  }, [currentChurchId, user?.id])
+  const { data: events = [], isLoading } = useQuery({
+    queryKey,
+    queryFn: () => fetchEvents(currentChurchId, user?.id),
+    enabled: !!currentChurchId,
+  });
 
   useEffect(() => {
-    setLoading(true);
-    debouncedFetch(
-      loadEvents,
-      undefined,
-      undefined,
-      () => setLoading(false)
-    );
-    
-    // Realtime subscriptions com proteção única
-    if (channelEventosRef.current) {
-      try { supabase.removeChannel(channelEventosRef.current); } catch {}
-      channelEventosRef.current = null;
-    }
-    
-    if (channelInscricoesRef.current) {
-      try { supabase.removeChannel(channelInscricoesRef.current); } catch {}
-      channelInscricoesRef.current = null;
-    }
-    
-    if (currentChurchId) {
-      const channelEventos = supabase
-        .channel(`events-${currentChurchId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { 
-            debouncedFetch(
-              loadEvents,
-              undefined,
-              undefined,
-              () => setLoading(false)
-            );
-          }
-        )
-        .subscribe();
-        
-      const channelInscricoes = supabase
-        .channel(`event-registrations-${currentChurchId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { 
-            debouncedFetch(
-              loadEvents,
-              undefined,
-              undefined,
-              () => setLoading(false)
-            );
-          }
-        )
-        .subscribe();
-        
-      channelEventosRef.current = channelEventos;
-      channelInscricoesRef.current = channelInscricoes;
-    }
-    
+    if (!currentChurchId) return;
+
+    const channel = supabase
+      .channel(`public-events-page-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
+        () => queryClient.invalidateQueries({ queryKey })
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
+        () => queryClient.invalidateQueries({ queryKey })
+      )
+      .subscribe();
+
     return () => {
-      if (channelEventosRef.current) {
-        try { supabase.removeChannel(channelEventosRef.current); } catch {}
-        channelEventosRef.current = null;
-      }
-      if (channelInscricoesRef.current) {
-        try { supabase.removeChannel(channelInscricoesRef.current); } catch {}
-        channelInscricoesRef.current = null;
-      }
-      cleanup();
-    }
-  }, [currentChurchId, user?.id]);
+      supabase.removeChannel(channel);
+    };
+  }, [currentChurchId, queryClient, queryKey]);
 
-  useEffect(() => {
-    let filtered = events.filter(event => 
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => 
         (filterType === 'all' || event.tipo === filterType) &&
         (event.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
          event.local.toLowerCase().includes(searchTerm.toLowerCase()))
     );
-    setFilteredEvents(filtered)
-  }, [events, filterType, searchTerm])
+  }, [events, filterType, searchTerm]);
 
   const handleRegister = (event: Event) => {
-    if (!user?.id) return toast.error('Você precisa estar logado para se inscrever.');
+    if (!user?.id || !currentChurchId) return toast.error('Você precisa estar logado para se inscrever.');
     if (event.participantes_count >= (event.capacidade_maxima || Infinity)) return toast.error('Capacidade máxima atingida.');
     
     const promise = async () => {
@@ -177,7 +115,7 @@ const EventsPage = () => {
 
     toast.promise(promise(), {
         loading: 'Realizando inscrição...',
-        success: () => { loadEvents(); return 'Inscrição realizada com sucesso!'; },
+        success: 'Inscrição realizada com sucesso!',
         error: (err: any) => `Erro na inscrição: ${err.message}`,
     });
   }
@@ -192,7 +130,7 @@ const EventsPage = () => {
     
     toast.promise(promise(), {
       loading: 'Cancelando inscrição...',
-      success: () => { loadEvents(); return 'Inscrição cancelada!'; },
+      success: 'Inscrição cancelada!',
       error: (err: any) => `Erro ao cancelar: ${err.message}`,
     });
   }
@@ -218,7 +156,7 @@ const EventsPage = () => {
     };
   }
 
-  if (loading && events.length === 0) {
+  if (isLoading && events.length === 0) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="w-10 h-10 text-purple-600 animate-spin" />
@@ -294,7 +232,7 @@ const EventsPage = () => {
           )})}
       </div>
 
-      {filteredEvents.length === 0 && !loading && (
+      {filteredEvents.length === 0 && !isLoading && (
         <Card className="border-dashed"><CardContent className="p-12 text-center"><Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" /><h3 className="text-xl font-semibold text-gray-800 mb-2">Nenhum evento encontrado</h3><p className="text-gray-500">{searchTerm || filterType !== 'all' ? 'Tente ajustar os filtros de busca.' : 'Não há eventos agendados no momento.'}</p></CardContent></Card>
       )}
     </div>

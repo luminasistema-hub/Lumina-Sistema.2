@@ -9,7 +9,7 @@ import { Printer } from "lucide-react";
 type ParticipantRow = {
   id: string;
   membro_id: string;
-  nome?: string | null;
+  nome_completo?: string | null;
   email?: string | null;
   status_inscricao?: string | null;
   data_inscricao?: string | null;
@@ -37,7 +37,7 @@ export function EventParticipantsDialog({
     try {
       const { data: regs, error } = await supabase
         .from("evento_participantes")
-        .select("id, membro_id, status_inscricao, data_inscricao, created_at")
+        .select("id, membro_id, status_inscricao, data_inscricao, created_at, membros(id, nome_completo, email)")
         .eq("evento_id", eventId)
         .eq("id_igreja", churchId)
         .order("created_at", { ascending: true });
@@ -49,27 +49,12 @@ export function EventParticipantsDialog({
         membro_id: r.membro_id,
         status_inscricao: r.status_inscricao,
         data_inscricao: r.data_inscricao || r.created_at,
+        nome_completo: r.membros?.nome_completo,
+        email: r.membros?.email,
       }));
+      
+      setParticipants(rows);
 
-      const memberIds = Array.from(new Set(rows.map(r => r.membro_id).filter(Boolean)));
-      if (memberIds.length > 0) {
-        const { data: members, error: mErr } = await supabase
-          .from("membros")
-          .select("id, nome_completo, email")
-          .in("id", memberIds);
-        if (mErr) throw mErr;
-        const map = new Map<string, { nome_completo?: string | null; email?: string | null }>();
-        (members || []).forEach((m: any) => {
-          map.set(m.id, { nome_completo: m.nome_completo, email: m.email });
-        });
-        setParticipants(rows.map(r => ({
-          ...r,
-          nome: map.get(r.membro_id)?.nome_completo || null,
-          email: map.get(r.membro_id)?.email || null,
-        })));
-      } else {
-        setParticipants(rows);
-      }
     } catch (err: any) {
       toast.error("Erro ao carregar inscritos: " + err.message);
       setParticipants([]);
@@ -90,7 +75,7 @@ export function EventParticipantsDialog({
     `;
     const rows = participants.map(p => `
       <tr>
-        <td>${p.nome || "-"}</td>
+        <td>${p.nome_completo || "-"}</td>
         <td>${p.email || "-"}</td>
         <td>${p.status_inscricao || "-"}</td>
         <td>${p.data_inscricao ? new Date(p.data_inscricao).toLocaleString("pt-BR") : "-"}</td>
@@ -171,7 +156,7 @@ export function EventParticipantsDialog({
                 </TableRow>
               ) : participants.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell>{p.nome || "-"}</TableCell>
+                  <TableCell>{p.nome_completo || "-"}</TableCell>
                   <TableCell>{p.email || "-"}</TableCell>
                   <TableCell>{p.status_inscricao || "-"}</TableCell>
                   <TableCell>{p.data_inscricao ? new Date(p.data_inscricao).toLocaleString("pt-BR") : "-"}</TableCell>
