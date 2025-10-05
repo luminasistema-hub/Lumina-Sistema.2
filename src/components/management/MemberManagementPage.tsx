@@ -107,7 +107,7 @@ const MemberManagementPage = () => {
   const [churchesLoaded, setChurchesLoaded] = useState(false); 
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const { protectedFetch, debouncedFetch, cleanup, isFetching } = useLoadingProtection();
+  const { protectedFetch, debouncedFetch, cleanup } = useLoadingProtection();
   const channelRef = useRef<any>(null);
 
   const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
