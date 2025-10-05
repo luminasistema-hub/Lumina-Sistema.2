@@ -226,9 +226,6 @@ const MemberManagementPage = () => {
           data_conversao,
           dias_disponiveis,
           horarios_disponiveis
-        ),
-        igrejas (
-          nome
         )
       `)
       .eq('id_igreja', churchId);
@@ -250,7 +247,8 @@ const MemberManagementPage = () => {
       status: member.status,
       email: member.email, 
       created_at: member.created_at, 
-      churchName: member.igrejas?.nome,
+      // churchName preenchido via store (todos são desta igreja)
+      churchName: getChurchById(churchId)?.name,
       // Map informacoes_pessoais fields
       telefone: member.informacoes_pessoais?.telefone,
       endereco: member.informacoes_pessoais?.endereco,
