@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,34 +22,61 @@ const EventsManagementPage = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<EventItem | null>(null);
   const [participantsEvent, setParticipantsEvent] = useState<EventItem | null>(null);
+  const isFetchingRef = useRef(false)
+  const debounceTimerRef = useRef<number | null>(null)
 
   const canManage = user?.role === "admin" || user?.role === "pastor";
 
   const loadEvents = async () => {
+    // Evita reentradas concorrentes
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+    
     if (!currentChurchId) {
-      setLoading(false);
+      setLoading(false)
+      isFetchingRef.current = false
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("eventos")
-      .select("*, participantes:evento_participantes(count)")
-      .eq("id_igreja", currentChurchId)
-      .order("data_hora", { ascending: true });
-    setLoading(false);
+    
+    try {
+      const { data, error } = await supabase
+        .from("eventos")
+        .select("*, participantes:evento_participantes(count)")
+        .eq("id_igreja", currentChurchId)
+        .order("data_hora", { ascending: true });
 
-    if (error) {
+      if (error) throw error;
+
+      const mapped = (data || []).map((e: any) => ({
+        ...e,
+        participantes_count: e.participantes?.[0]?.count || 0,
+      })) as ManagedEvent[];
+      setEvents(mapped);
+    } catch (error: any) {
       toast.error("Erro ao carregar eventos: " + error.message);
-      return;
+      setEvents([]);
+    } finally {
+      setLoading(false)
+      isFetchingRef.current = false
     }
-    const mapped = (data || []).map((e: any) => ({
-      ...e,
-      participantes_count: e.participantes?.[0]?.count || 0,
-    })) as ManagedEvent[];
-    setEvents(mapped);
   };
 
-  useEffect(() => { loadEvents(); }, [currentChurchId]);
+  useEffect(() => {
+    // Debounce para evitar múltiplas chamadas seguidas
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = window.setTimeout(() => {
+      loadEvents()
+    }, 150)
+    
+    return () => {
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [currentChurchId]);
 
   const filtered = useMemo(() => {
     return events.filter(e => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -41,12 +41,22 @@ const MinistriesPage = () => {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
   const [openAddDialog, setOpenAddDialog] = useState(false);
+  const isFetchingRef = useRef(false)
+  const debounceTimerRef = useRef<number | null>(null)
 
   const canManage = user?.role === 'admin' || user?.role === 'pastor';
   const isLeaderOfSelected = selectedMinistry?.lider_id === user?.id;
 
   const loadData = useCallback(async () => {
-    if (!currentChurchId) return setLoading(false);
+    // Evita reentradas concorrentes
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+    
+    if (!currentChurchId) {
+      setLoading(false)
+      isFetchingRef.current = false
+      return
+    }
     setLoading(true);
     try {
       let { data: ministriesData, error: ministriesError } = await supabase.from('ministerios')
@@ -81,12 +91,29 @@ const MinistriesPage = () => {
 
     } catch (error: any) {
       toast.error('Falha ao carregar dados: ' + error.message);
+      setMinistries([])
+      setMemberOptions([])
     } finally {
-      setLoading(false);
+      setLoading(false)
+      isFetchingRef.current = false
     }
   }, [currentChurchId]);
 
-  useEffect(() => { loadData() }, [loadData]);
+  useEffect(() => {
+    // Debounce para evitar múltiplas chamadas seguidas
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = window.setTimeout(() => {
+      loadData()
+    }, 150)
+    
+    return () => {
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [loadData]);
 
   const loadMinistryDetails = useCallback(async (ministryId: string) => {
     const { data: volunteerData, error: volunteerError } = await supabase.from('ministerio_voluntarios')

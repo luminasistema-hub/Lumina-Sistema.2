@@ -78,6 +78,10 @@ const DevotionalsManagementPage = () => {
     queryKey,
     queryFn: () => fetchDevotionals(currentChurchId!, statusFilter, categoryFilter, searchTerm),
     enabled: !!currentChurchId,
+    staleTime: 30000, // 30 segundos de cache
+    gcTime: 5 * 60 * 1000, // 5 minutos no cache
+    refetchOnWindowFocus: false, // Evita refetch ao focar janela
+    retry: 1, // Apenas 1 retry em caso de erro
   });
 
   const resetForm = () => {
