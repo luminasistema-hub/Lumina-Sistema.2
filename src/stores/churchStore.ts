@@ -48,6 +48,8 @@ export interface Church {
 
 interface ChurchState {
   churches: Church[]
+  isLoadingChurches: boolean
+  lastLoadedAt: number | null
   updateChurch: (churchId: string, updates: Partial<Church>) => Promise<Church | null>
   getChurchById: (churchId: string) => Church | undefined
   loadChurches: () => Promise<void>
@@ -60,6 +62,8 @@ export const useChurchStore = create<ChurchState>()(
   persist(
     (set, get) => ({
       churches: [],
+      isLoadingChurches: false,
+      lastLoadedAt: null,
 
       getSubscriptionPlans: () => [
         { label: '0 a 100 Membros', value: '0-100 membros', memberLimit: 100, monthlyValue: 99.00 },
@@ -73,6 +77,14 @@ export const useChurchStore = create<ChurchState>()(
       },
 
       loadChurches: async () => {
+        // Evita múltiplos carregamentos em sequência (até 5s)
+        const { isLoadingChurches, lastLoadedAt } = get();
+        if (isLoadingChurches) return;
+        if (lastLoadedAt && Date.now() - lastLoadedAt < 5000) {
+          return;
+        }
+        set({ isLoadingChurches: true });
+        
         console.log('churchStore: Loading churches from Supabase...');
         const { data, error } = await supabase
           .from('igrejas')
@@ -80,6 +92,7 @@ export const useChurchStore = create<ChurchState>()(
 
         if (error) {
           console.error('churchStore: Error loading churches from Supabase:', error);
+          set({ isLoadingChurches: false });
           return;
         }
         console.log('churchStore: Churches loaded from Supabase:', data);
@@ -111,7 +124,7 @@ export const useChurchStore = create<ChurchState>()(
           nome_responsavel: c.nome_responsavel,
           site: c.site,
           descricao: c.descricao,
-        })) as Church[] });
+        })) as Church[], isLoadingChurches: false, lastLoadedAt: Date.now() });
       },
 
       addChurch: async (newChurch) => {

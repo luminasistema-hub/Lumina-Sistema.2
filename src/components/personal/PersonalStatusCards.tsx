@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Progress } from '../ui/progress';
 import { useJourneyData } from '@/hooks/useJourneyData';
@@ -26,6 +26,9 @@ const PersonalStatusCards: React.FC = () => {
   const [eventsTotal, setEventsTotal] = useState<number>(0);
   const [eventsUpcoming, setEventsUpcoming] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const isFetchingRef = useRef(false);
+  const debounceTimerRef = useRef<number | null>(null);
+  const channelRef = useRef<any>(null);
 
   const isGlobalLeader = useMemo(() => {
     const role = user?.role;
@@ -59,7 +62,7 @@ const PersonalStatusCards: React.FC = () => {
         if (minsErr) throw minsErr;
         const volunteerRows: MinistryRow[] = (mins || []) as any;
 
-        // Ministérios onde o usuário é líder (mesmo sem estar na tabela de voluntários)
+        // Ministérios onde o usuário é líder
         const { data: leaderMins, error: leaderErr } = await supabase
           .from('ministerios')
           .select('id, nome')
@@ -72,7 +75,7 @@ const PersonalStatusCards: React.FC = () => {
           funcao_no_ministerio: 'lider',
         }));
 
-        // Mescla e remove duplicados pelo ministerio_id/id
+        // Mescla e remove duplicados
         const merged = [...volunteerRows, ...leaderRowsToMerge];
         const uniqueMap = new Map<string, MinistryRow>();
         for (const item of merged) {
@@ -81,7 +84,6 @@ const PersonalStatusCards: React.FC = () => {
           if (!uniqueMap.has(key)) {
             uniqueMap.set(key, item);
           } else {
-            // Se já existe, prioriza marcar como liderança caso algum seja 'lider'
             const existing = uniqueMap.get(key)!;
             const isLeaderExisting = (existing.funcao_no_ministerio || '').toLowerCase().includes('lider');
             const isLeaderNew = (item.funcao_no_ministerio || '').toLowerCase().includes('lider');
@@ -91,7 +93,7 @@ const PersonalStatusCards: React.FC = () => {
         const unique = Array.from(uniqueMap.values());
         setMinistries(unique);
 
-        // Anexar ao perfil: salva nome do ministério principal (preferindo liderança)
+        // Anexar ao perfil
         const ids = unique.map((u) => u.ministerio_id || u.id).filter(Boolean) as string[];
         if (ids.length > 0) {
           const leaderPreferredId = unique.find((u) => (u.funcao_no_ministerio || '').toLowerCase().includes('lider'))?.ministerio_id || unique[0].ministerio_id || unique[0].id;
@@ -135,18 +137,42 @@ const PersonalStatusCards: React.FC = () => {
         setMinistries([]);
         setEventsTotal(0);
         setEventsUpcoming(0);
-        // Em caso de erro, não mexe no perfil para evitar sobrescrever com indefinido
       } finally {
         setLoading(false);
       }
     };
 
-    load();
+    // Debounce e bloqueio de reentradas
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = window.setTimeout(async () => {
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
+      try {
+        await load();
+      } finally {
+        isFetchingRef.current = false;
+      }
+    }, 150);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, [user?.id, currentChurchId]);
 
   // Realtime: atualizar quando o usuário inscrever/cancelar
   useEffect(() => {
     if (!user?.id || !currentChurchId) return;
+    
+    // Fecha canal anterior antes de abrir outro
+    if (channelRef.current) {
+      try { supabase.removeChannel(channelRef.current); } catch {}
+      channelRef.current = null;
+    }
+    
     const channel = supabase
       .channel(`my-event-registrations-${user.id}-${currentChurchId}`)
       .on(
@@ -182,8 +208,14 @@ const PersonalStatusCards: React.FC = () => {
         }
       )
       .subscribe();
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      try {
+        if (channelRef.current) supabase.removeChannel(channelRef.current);
+      } finally {
+        channelRef.current = null;
+      }
     };
   }, [user?.id, currentChurchId]);
 
