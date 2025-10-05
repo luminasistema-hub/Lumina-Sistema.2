@@ -151,6 +151,21 @@ const CadastrarIgrejaPage = () => {
       }
 
       toast.success('Igreja e conta de administrador criadas com sucesso! Verifique seu email para confirmar o cadastro.');
+      
+      // Gerar checkout de pagamento via Abacate PAY
+      if (newChurchId) {
+        const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke('create-abacatepay-checkout', {
+          body: { churchId: newChurchId, payerEmail: adminEmail }
+        });
+        if (checkoutError) {
+          console.error('Erro ao gerar checkout Abacate PAY:', checkoutError.message);
+          toast.error('Não foi possível gerar o link de pagamento agora. Você poderá tentar novamente no painel.');
+        } else if (checkoutData?.checkoutUrl) {
+          toast.success('Redirecionando para pagamento...');
+          window.open(checkoutData.checkoutUrl, '_blank');
+        }
+      }
+
       navigate('/login');
 
     } catch (err: any) {

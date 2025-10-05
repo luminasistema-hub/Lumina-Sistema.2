@@ -20,6 +20,7 @@ import {
   Sparkles,
   PhoneCall,
 } from "lucide-react";
+import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 
 const Feature = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
   <Card className="h-full bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700 backdrop-blur-sm transition-transform hover:-translate-y-1 hover:shadow-xl">
@@ -46,6 +47,7 @@ const LandingPage = () => {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [mensagem, setMensagem] = useState("");
+  const { plans, isLoading } = useSubscriptionPlans();
 
   const handleContatoWhatsApp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +125,50 @@ const LandingPage = () => {
           <Feature icon={MessageSquare} title="WhatsApp Integrado" desc="Templates por igreja e fila automática para escala, kids e recibos." />
           <Feature icon={LayoutDashboard} title="Dashboard por Função" desc="Painéis para admin/pastor e membros com métricas e atalhos." />
           <Feature icon={ShieldCheck} title="Segurança por Igreja" desc="Supabase Auth + RLS: cada igreja vê apenas seus dados." />
+        </div>
+      </section>
+
+      {/* PLANOS */}
+      <section className="container mx-auto px-4 py-12 md:py-16">
+        <div className="max-w-2xl">
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Planos de Assinatura</h2>
+          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+            Escolha um plano para começar o cadastro da sua igreja.
+          </p>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {isLoading ? (
+            <Card className="p-6">
+              <CardContent className="p-0">Carregando planos...</CardContent>
+            </Card>
+          ) : plans.length === 0 ? (
+            <Card className="p-6">
+              <CardContent className="p-0">Nenhum plano disponível no momento.</CardContent>
+            </Card>
+          ) : (
+            plans.map((plan) => (
+              <Card key={plan.id} className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-zinc-800 dark:text-zinc-100">{plan.nome}</h3>
+                    <Badge className="bg-indigo-100 text-indigo-700">
+                      R$ {plan.preco_mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">{plan.descricao}</p>
+                  <ul className="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 mb-4">
+                    <li>Até {plan.limite_membros} membros</li>
+                    <li>{plan.limite_quizes_por_etapa} quizzes por etapa</li>
+                    <li>{plan.limite_armazenamento_mb} MB de armazenamento</li>
+                  </ul>
+                  <Button asChild className="w-full bg-indigo-600 hover:bg-indigo-700">
+                    <Link to={`/cadastrar-igreja?plano=${plan.id}`}>Escolher este plano</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </section>
 
