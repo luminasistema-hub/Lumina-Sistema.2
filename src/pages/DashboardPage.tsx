@@ -25,14 +25,24 @@ import WhatsappIntegration from '../components/admin/WhatsappIntegration';
 const DashboardPage = () => {
   const { user, isLoading } = useAuthStore(); 
   const location = useLocation(); 
-  const [activeModule, setActiveModule] = useState('dashboard');
+  // Restaura o último módulo ativo salvo; fallback para 'dashboard'
+  const [activeModule, setActiveModule] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('lastDashboardModule');
+      return saved || 'dashboard';
+    } catch {
+      return 'dashboard';
+    }
+  });
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   // Chave de prompt por usuário (evita reabrir o alerta várias vezes)
   const promptKey = user?.id ? `profilePromptSeen_${user.id}` : null;
 
   useEffect(() => {
     if (location.state?.activeModule) {
-      setActiveModule(location.state.activeModule);
+      const next = location.state.activeModule;
+      setActiveModule(next);
+      try { localStorage.setItem('lastDashboardModule', next); } catch {}
       window.history.replaceState({}, document.title); 
     }
   }, [location.state]);
@@ -73,8 +83,16 @@ const DashboardPage = () => {
 
   const handleModuleSelect = (moduleId: string) => {
     setActiveModule(moduleId);
+    try { localStorage.setItem('lastDashboardModule', moduleId); } catch {}
     setShowProfileDialog(false);
   }
+
+  // Em toda mudança de módulo (incluindo restauração inicial), garantimos persistência
+  useEffect(() => {
+    if (activeModule) {
+      try { localStorage.setItem('lastDashboardModule', activeModule); } catch {}
+    }
+  }, [activeModule])
 
   return (
     <MainLayout activeModule={activeModule} onModuleSelect={handleModuleSelect}>
