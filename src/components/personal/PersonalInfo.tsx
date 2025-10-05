@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -49,6 +49,8 @@ const PersonalInfo = () => {
   const { user, currentChurchId, updateUserProfile } = useAuthStore()
   const navigate = useNavigate(); 
   const [isEditing, setIsEditing] = useState(false)
+  const hasInitialized = useRef(false)
+  const [isDirty, setIsDirty] = useState(false)
   const [formData, setFormData] = useState<PersonalInfoData>({
     nomeCompleto: user?.name || '', email: user?.email || '', dataNascimento: '',
     estadoCivil: '', profissao: '', telefone: '', endereco: '', conjugeId: null,
@@ -72,29 +74,33 @@ const PersonalInfo = () => {
       .maybeSingle();
     if (personalInfoError) toast.error('Erro ao carregar informações pessoais.');
     if (personalInfo) {
-      setFormData(prev => ({
-        ...prev,
-        ...personalInfo,
-        nomeCompleto: user.name,
-        email: user.email,
-        telefone: personalInfo.telefone || '',
-        endereco: personalInfo.endereco || '',
-        profissao: personalInfo.profissao || '',
-        dataNascimento: personalInfo.data_nascimento || '',
-        estadoCivil: personalInfo.estado_civil || '',
-        conjugeId: personalInfo.conjuge_id || null,
-        conjugeNome: '',
-        dataCasamento: personalInfo.data_casamento || '',
-        paisCristaos: personalInfo.pais_cristaos || '',
-        tempoIgreja: personalInfo.tempo_igreja || '',
-        batizado: personalInfo.batizado || false,
-        dataBatismo: personalInfo.data_batismo || '',
-        participaMinisterio: personalInfo.participa_ministerio || false,
-        ministerioAtual: personalInfo.ministerio_anterior || '',
-        dataConversao: personalInfo.data_conversao || '',
-        diasDisponiveis: personalInfo.dias_disponiveis || [],
-        horariosDisponiveis: personalInfo.horarios_disponiveis || '',
-      }));
+      // Preenche o formulário apenas na primeira carga ou quando o form NÃO estiver sujo
+      if (!hasInitialized.current || !isDirty) {
+        setFormData(prev => ({
+          ...prev,
+          ...personalInfo,
+          nomeCompleto: user.name,
+          email: user.email,
+          telefone: personalInfo.telefone || '',
+          endereco: personalInfo.endereco || '',
+          profissao: personalInfo.profissao || '',
+          dataNascimento: personalInfo.data_nascimento || '',
+          estadoCivil: personalInfo.estado_civil || '',
+          conjugeId: personalInfo.conjuge_id || null,
+          conjugeNome: '',
+          dataCasamento: personalInfo.data_casamento || '',
+          paisCristaos: personalInfo.pais_cristaos || '',
+          tempoIgreja: personalInfo.tempo_igreja || '',
+          batizado: personalInfo.batizado || false,
+          dataBatismo: personalInfo.data_batismo || '',
+          participaMinisterio: personalInfo.participa_ministerio || false,
+          ministerioAtual: personalInfo.ministerio_anterior || '',
+          dataConversao: personalInfo.data_conversao || '',
+          diasDisponiveis: personalInfo.dias_disponiveis || [],
+          horariosDisponiveis: personalInfo.horarios_disponiveis || '',
+        }));
+        hasInitialized.current = true;
+      }
 
       if (personalInfo.conjuge_id) {
         const { data: spouse, error: spouseError } = await supabase
@@ -146,7 +152,10 @@ const PersonalInfo = () => {
     loadMemberOptions();
   }, [loadProfileData, loadMemberOptions]);
 
-  const handleInputChange = (field: string, value: any) => setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: string, value: any) => {
+    setIsDirty(true);
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   const handleSave = async () => {
     if (!user || !currentChurchId) return toast.error('Usuário ou igreja não identificados.');
@@ -177,6 +186,7 @@ const PersonalInfo = () => {
       loading: 'Salvando informações...',
       success: () => {
         updateUserProfile({ ...formData });
+        setIsDirty(false);
         setIsEditing(false);
         return 'Informações salvas com sucesso!';
       },
