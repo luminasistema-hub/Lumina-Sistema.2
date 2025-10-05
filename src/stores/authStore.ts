@@ -119,6 +119,9 @@ export const useAuthStore = create<AuthState>()(
             }
 
             if (profile) {
+              // Nome da igreja calculado com segurança
+              let resolvedChurchName: string | undefined = undefined;
+
               // Verifica status de pagamento da igreja quando aplicável
               if (profile.id_igreja) {
                 const { data: churchRow } = await supabase
@@ -137,6 +140,11 @@ export const useAuthStore = create<AuthState>()(
                   set({ user: null, currentChurchId: null, isLoading: false })
                   isCheckingAuth = false
                   return
+                }
+
+                // Captura o nome da igreja (se existir)
+                if (churchRow && typeof churchRow.nome === 'string' && churchRow.nome) {
+                  resolvedChurchName = churchRow.nome;
                 }
               }
 
@@ -164,7 +172,7 @@ export const useAuthStore = create<AuthState>()(
                   email: session.user.email!,
                   role: profile.funcao as UserRole,
                   churchId: profile.id_igreja,
-                  churchName: (typeof churchRow?.nome === 'string' && churchRow?.nome) ? churchRow.nome : 'Igreja',
+                  churchName: resolvedChurchName ?? 'Igreja',
                   status: profile.status as any,
                   created_at: profile.created_at,
                   perfil_completo: profile.perfil_completo,
