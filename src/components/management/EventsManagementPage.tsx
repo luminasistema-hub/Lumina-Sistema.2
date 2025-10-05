@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { EventCard, Event } from './EventCard';
-import CreateEventDialog from './CreateEventDialog';
+import { CreateEventDialog } from './CreateEventDialog';
 import EditEventDialog from './EditEventDialog';
 import EventParticipantsDialog from './EventParticipantsDialog';
 import { Button } from '@/components/ui/button';
@@ -143,7 +143,14 @@ const EventsManagementPage = () => {
         </div>
       )}
 
-      <CreateEventDialog isOpen={isCreateOpen} onClose={() => setCreateOpen(false)} onSuccess={handleSuccess} />
+      {currentChurchId && (
+        <CreateEventDialog
+          open={isCreateOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={handleSuccess}
+          igrejaId={currentChurchId}
+        />
+      )}
       {selectedEvent && (
         <>
           <EditEventDialog isOpen={isEditOpen} onClose={() => setEditOpen(false)} event={selectedEvent} onSuccess={handleSuccess} />
