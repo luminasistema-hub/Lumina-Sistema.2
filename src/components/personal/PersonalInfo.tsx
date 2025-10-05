@@ -77,6 +77,9 @@ const PersonalInfo = () => {
         ...personalInfo,
         nomeCompleto: user.name,
         email: user.email,
+        telefone: personalInfo.telefone || '',
+        endereco: personalInfo.endereco || '',
+        profissao: personalInfo.profissao || '',
         dataNascimento: personalInfo.data_nascimento || '',
         estadoCivil: personalInfo.estado_civil || '',
         conjugeId: personalInfo.conjuge_id || null,
@@ -211,8 +214,8 @@ const PersonalInfo = () => {
               <CardDescription>Informações básicas sobre você.</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-              <div className="space-y-2"><Label htmlFor="nomeCompleto">Nome Completo *</Label><Input id="nomeCompleto" value={formData.nomeCompleto} onChange={(e) => handleInputChange('nomeCompleto', e.target.value)} /></div>
-              <div className="space-y-2"><Label htmlFor="dataNascimento">Data de Nascimento</Label><Input id="dataNascimento" type="date" value={formData.dataNascimento} onChange={(e) => handleInputChange('dataNascimento', e.target.value)} /></div>
+              <div className="space-y-2"><Label htmlFor="nomeCompleto">Nome Completo *</Label><Input id="nomeCompleto" value={formData.nomeCompleto ?? ''} onChange={(e) => handleInputChange('nomeCompleto', e.target.value)} /></div>
+              <div className="space-y-2"><Label htmlFor="dataNascimento">Data de Nascimento</Label><Input id="dataNascimento" type="date" value={formData.dataNascimento ?? ''} onChange={(e) => handleInputChange('dataNascimento', e.target.value)} /></div>
               <div className="space-y-2">
                 <Label htmlFor="estadoCivil">Estado Civil</Label>
                 <Select value={formData.estadoCivil || ''} onValueChange={(v) => handleInputChange('estadoCivil', v === 'null' ? null : v)}>
@@ -226,9 +229,9 @@ const PersonalInfo = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2"><Label htmlFor="profissao">Profissão</Label><Input id="profissao" value={formData.profissao} onChange={(e) => handleInputChange('profissao', e.target.value)} /></div>
-              <div className="space-y-2"><Label htmlFor="telefone">Telefone *</Label><Input id="telefone" value={formData.telefone} onChange={(e) => handleInputChange('telefone', e.target.value)} /></div>
-              <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={formData.email} disabled /></div>
+              <div className="space-y-2"><Label htmlFor="profissao">Profissão</Label><Input id="profissao" value={formData.profissao ?? ''} onChange={(e) => handleInputChange('profissao', e.target.value)} /></div>
+              <div className="space-y-2"><Label htmlFor="telefone">Telefone *</Label><Input id="telefone" value={formData.telefone ?? ''} onChange={(e) => handleInputChange('telefone', e.target.value)} /></div>
+              <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={formData.email ?? ''} disabled /></div>
             </CardContent>
           </Card>
 
@@ -239,7 +242,7 @@ const PersonalInfo = () => {
             </CardHeader>
             <CardContent>
               <Label htmlFor="endereco">Endereço Completo *</Label>
-              <Input id="endereco" value={formData.endereco} onChange={(e) => handleInputChange('endereco', e.target.value)} />
+              <Input id="endereco" value={formData.endereco ?? ''} onChange={(e) => handleInputChange('endereco', e.target.value)} />
             </CardContent>
           </Card>
 
@@ -263,7 +266,7 @@ const PersonalInfo = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="dataCasamento">Data do Casamento</Label>
-                    <Input id="dataCasamento" type="date" value={formData.dataCasamento} onChange={(e) => handleInputChange('dataCasamento', e.target.value)} />
+                    <Input id="dataCasamento" type="date" value={formData.dataCasamento ?? ''} onChange={(e) => handleInputChange('dataCasamento', e.target.value)} />
                   </div>
                 </div>
               )}
@@ -309,7 +312,7 @@ const PersonalInfo = () => {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               <div className="space-y-2">
                 <Label htmlFor="dataConversao">Data da Conversão</Label>
-                <Input id="dataConversao" type="date" value={formData.dataConversao} onChange={(e) => handleInputChange('dataConversao', e.target.value)} />
+                <Input id="dataConversao" type="date" value={formData.dataConversao ?? ''} onChange={(e) => handleInputChange('dataConversao', e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tempoIgreja">Tempo na igreja?</Label>
@@ -331,7 +334,7 @@ const PersonalInfo = () => {
               {formData.batizado && (
                 <div className="space-y-2">
                   <Label htmlFor="dataBatismo">Data do Batismo</Label>
-                  <Input id="dataBatismo" type="date" value={formData.dataBatismo} onChange={(e) => handleInputChange('dataBatismo', e.target.value)} />
+                  <Input id="dataBatismo" type="date" value={formData.dataBatismo ?? ''} onChange={(e) => handleInputChange('dataBatismo', e.target.value)} />
                 </div>
               )}
             </CardContent>
