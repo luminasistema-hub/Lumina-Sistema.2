@@ -20,6 +20,7 @@ import {
   Plus,
   Trash2
 } from 'lucide-react'
+import { Progress } from '../ui/progress'
 import { useNavigate } from 'react-router-dom' 
 import AddKidDialog from './AddKidDialog';
 import PersonalStatusCards from './PersonalStatusCards';
@@ -51,6 +52,8 @@ const PersonalInfo = () => {
   const [isEditing, setIsEditing] = useState(false)
   const hasInitialized = useRef(false)
   const [isDirty, setIsDirty] = useState(false)
+  const editInitRef = useRef(false)
+  const [currentStep, setCurrentStep] = useState(1) // 1: Dados pessoais | 2: Endereço e Família | 3: Vida Espiritual
   const [formData, setFormData] = useState<PersonalInfoData>({
     nomeCompleto: user?.name || '', email: user?.email || '', dataNascimento: '',
     estadoCivil: '', profissao: '', telefone: '', endereco: '', conjugeId: null,
@@ -64,7 +67,7 @@ const PersonalInfo = () => {
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false);
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
 
-  const loadProfileData = useCallback(async () => {
+  const loadPersonalInfoData = useCallback(async () => {
     if (!user || !currentChurchId) return;
 
     const { data: personalInfo, error: personalInfoError } = await supabase
@@ -113,30 +116,45 @@ const PersonalInfo = () => {
         }
       }
     }
+  }, [user, currentChurchId, isDirty]);
 
+  const loadKidsData = useCallback(async () => {
+    if (!user || !currentChurchId) return;
+    // Precisamos do conjuge_id para incluir filhos do cônjuge
+    const { data: personalInfo } = await supabase
+      .from('informacoes_pessoais')
+      .select('conjuge_id')
+      .eq('membro_id', user.id)
+      .maybeSingle();
     const responsibleIds = [user.id];
     if (personalInfo?.conjuge_id) responsibleIds.push(personalInfo.conjuge_id);
+
     const { data: kidsData, error: kidsError } = await supabase
       .from('criancas')
       .select('id, nome_crianca, data_nascimento, alergias, medicamentos, informacoes_especiais')
       .eq('id_igreja', currentChurchId)
       .in('responsavel_id', responsibleIds)
       .order('nome_crianca');
-
     if (kidsError) toast.error('Erro ao carregar informações dos filhos.');
-    const formattedKids: Kid[] = (kidsData || []).map(k => ({...k, idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000) }));
+    const formattedKids: Kid[] = (kidsData || []).map(k => ({
+      ...k,
+      idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000)
+    }));
     setUserKids(formattedKids);
+  }, [user, currentChurchId]);
 
-    const { data: tests, error: testsError } = await supabase.from('testes_vocacionais')
-      .select('id, data_teste, ministerio_recomendado, is_ultimo').eq('membro_id', user.id)
+  const loadVocationalTest = useCallback(async () => {
+    if (!user) return;
+    const { data: tests, error: testsError } = await supabase
+      .from('testes_vocacionais')
+      .select('id, data_teste, ministerio_recomendado, is_ultimo')
+      .eq('membro_id', user.id)
       .order('data_teste', { ascending: false });
     if (testsError) toast.error('Erro ao carregar testes vocacionais.');
     if (tests?.length) {
       setLatestVocationalTest(tests.find(t => t.is_ultimo) || tests[0]);
     }
-
-    setIsEditing(!user.perfil_completo);
-  }, [user, currentChurchId]);
+  }, [user]);
 
   const loadMemberOptions = useCallback(async () => {
     if (!currentChurchId || !user?.id) return;
@@ -148,9 +166,19 @@ const PersonalInfo = () => {
   }, [currentChurchId, user?.id]);
 
   useEffect(() => {
-    loadProfileData();
+    loadPersonalInfoData();
+    loadKidsData();
+    loadVocationalTest();
     loadMemberOptions();
-  }, [loadProfileData, loadMemberOptions]);
+  }, [loadPersonalInfoData, loadKidsData, loadVocationalTest, loadMemberOptions]);
+
+  // Define modo edição apenas no primeiro acesso
+  useEffect(() => {
+    if (!editInitRef.current) {
+      setIsEditing(!user?.perfil_completo);
+      editInitRef.current = true;
+    }
+  }, [user?.perfil_completo]);
 
   const handleInputChange = (field: string, value: any) => {
     setIsDirty(true);
@@ -198,7 +226,7 @@ const PersonalInfo = () => {
     const promise = () => supabase.from('criancas').delete().eq('id', kidId);
     toast.promise(promise(), {
       loading: 'Removendo criança...',
-      success: () => { loadProfileData(); return "Criança removida!"; },
+      success: () => { loadKidsData(); return "Criança removida!"; },
       error: (err) => `Falha ao remover: ${err.message}`,
     });
   };
@@ -217,7 +245,20 @@ const PersonalInfo = () => {
         )}
         {/* Status do Membro */}
         <PersonalStatusCards />
+        {/* Wizard header */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-700">
+              Etapa {currentStep} de 3
+            </p>
+            <span className="text-xs text-gray-500 hidden sm:inline">
+              {currentStep === 1 ? 'Dados Pessoais' : currentStep === 2 ? 'Endereço e Família' : 'Vida Espiritual'}
+            </span>
+          </div>
+          <Progress value={currentStep * (100 / 3)} />
+        </div>
         <form className="space-y-8">
+          {currentStep === 1 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3"><User className="text-blue-500"/>Dados Pessoais</CardTitle>
@@ -244,7 +285,9 @@ const PersonalInfo = () => {
               <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={formData.email ?? ''} disabled /></div>
             </CardContent>
           </Card>
+          )}
 
+          {currentStep === 2 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3"><MapPin className="text-green-500"/>Endereço</CardTitle>
@@ -255,7 +298,9 @@ const PersonalInfo = () => {
               <Input id="endereco" value={formData.endereco ?? ''} onChange={(e) => handleInputChange('endereco', e.target.value)} />
             </CardContent>
           </Card>
+          )}
 
+          {currentStep === 2 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3"><Users className="text-orange-500"/>Informações Familiares</CardTitle>
@@ -313,7 +358,9 @@ const PersonalInfo = () => {
               </div>
             </CardContent>
           </Card>
-          
+          )}
+
+          {currentStep === 3 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-3"><Church className="text-yellow-500"/>Vida Espiritual</CardTitle>
@@ -349,16 +396,51 @@ const PersonalInfo = () => {
               )}
             </CardContent>
           </Card>
-          
-          <div className="flex justify-end gap-4">
-            <Button type="button" variant="ghost" onClick={() => { if(!isFirstAccess) setIsEditing(false) }}>Cancelar</Button>
-            <Button type="button" onClick={handleSave} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold">
-              <Save className="w-4 h-4 mr-2" />
-              Salvar Informações
-            </Button>
+          )}
+
+          {/* Navegação do Wizard */}
+          <div className="flex flex-col sm:flex-row justify-between gap-3">
+            <div className="flex gap-2">
+              {currentStep > 1 && (
+                <Button type="button" variant="outline" onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}>
+                  Voltar
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              {!isFirstAccess && (
+                <Button type="button" variant="ghost" onClick={() => setIsEditing(false)}>
+                  Cancelar
+                </Button>
+              )}
+              {currentStep < 3 ? (
+                <Button
+                  type="button"
+                  onClick={() => setCurrentStep((s) => Math.min(3, s + 1))}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold"
+                >
+                  Próximo
+                </Button>
+              ) : (
+                <Button type="button" onClick={handleSave} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-semibold">
+                  <Save className="w-4 h-4 mr-2" />
+                  Salvar Informações
+                </Button>
+              )}
+            </div>
           </div>
         </form>
-        {user && currentChurchId && (<AddKidDialog isOpen={isAddKidDialogOpen} onClose={() => setIsAddKidDialogOpen(false)} responsibleId={user.id} responsibleName={user.name} responsibleEmail={user.email} churchId={currentChurchId} onKidAdded={loadProfileData}/>)}
+        {user && currentChurchId && (
+          <AddKidDialog
+            isOpen={isAddKidDialogOpen}
+            onClose={() => setIsAddKidDialogOpen(false)}
+            responsibleId={user.id}
+            responsibleName={user.name}
+            responsibleEmail={user.email}
+            churchId={currentChurchId}
+            onKidAdded={loadKidsData}
+          />
+        )}
       </div>
     )
   }
