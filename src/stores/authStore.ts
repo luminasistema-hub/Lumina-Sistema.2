@@ -110,7 +110,7 @@ export const useAuthStore = create<AuthState>()(
             // 1) Tenta carregar perfil de membro (fluxo normal)
             const { data: profile, error: profileError } = await supabase
               .from('membros')
-              .select(`*, igrejas(id, nome)`)
+              .select('*')
               .eq('id', session.user.id)
               .maybeSingle()
 
@@ -123,7 +123,7 @@ export const useAuthStore = create<AuthState>()(
               if (profile.id_igreja) {
                 const { data: churchRow } = await supabase
                   .from('igrejas')
-                  .select('valor_mensal_assinatura, ultimo_pagamento_status, link_pagamento_assinatura')
+                  .select('nome, valor_mensal_assinatura, ultimo_pagamento_status, link_pagamento_assinatura')
                   .eq('id', profile.id_igreja)
                   .maybeSingle()
 
@@ -164,7 +164,7 @@ export const useAuthStore = create<AuthState>()(
                   email: session.user.email!,
                   role: profile.funcao as UserRole,
                   churchId: profile.id_igreja,
-                  churchName: profile.igrejas?.nome || 'Igreja',
+                  churchName: (typeof churchRow?.nome === 'string' && churchRow?.nome) ? churchRow.nome : 'Igreja',
                   status: profile.status as any,
                   created_at: profile.created_at,
                   perfil_completo: profile.perfil_completo,
