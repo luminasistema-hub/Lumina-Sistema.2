@@ -197,131 +197,163 @@ const MemberManagementPage = () => {
   };
 
   const loadMembers = async (churchId: string) => {
+    // Evita reentradas concorrentes
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+    
     console.log('MemberManagementPage: Loading members for churchId:', churchId);
-    const { data, error } = await supabase
-      .from('membros') 
-      .select(`
-        id,
-        id_igreja,
-        funcao,
-        perfil_completo,
-        nome_completo, 
-        status,
-        created_at,
-        email,
-        ultimo_teste_data, 
-        ministerio_recomendado, 
-        informacoes_pessoais!membro_id (
-          telefone,
-          endereco,
-          data_nascimento,
-          estado_civil,
-          profissao,
-          conjuge_id,
-          data_casamento,
-          pais_cristaos,
-          tempo_igreja,
-          batizado,
-          data_batismo,
-          participa_ministerio,
-          ministerio_anterior,
-          experiencia_anterior,
-          data_conversao,
-          dias_disponiveis,
-          horarios_disponiveis
-        )
-      `)
-      .eq('id_igreja', churchId);
+    setLoading(true);
+    
+     try {
+      // Primeiro, verificar permissões do usuário atual
+      if (user?.id) {
+        const { data: me, error: meErr } = await supabase
+          .from('membros')
+          .select('funcao')
+          .eq('id', user.id)
+          .eq('id_igreja', churchId)
+          .maybeSingle();
+        
+        if (!meErr && me) {
+          const myRole = me.funcao || 'membro';
+          setIsAdmin(['admin', 'pastor'].includes(myRole));
+        } else {
+          setIsAdmin(false);
+        }
+      } else {
+        setIsAdmin(false);
+      }
 
-    if (error) {
-      console.error('Error loading members:', error);
-      toast.error('Erro ao carregar membros: ' + error.message);
-      return;
-    }
+       const { data, error } = await supabase
+         .from('membros') 
+         .select(`
+           id,
+           id_igreja,
+           funcao,
+           perfil_completo,
+           nome_completo, 
+           status,
+           created_at,
+           email,
+           ultimo_teste_data, 
+           ministerio_recomendado, 
+           informacoes_pessoais!membro_id (
+             telefone,
+             endereco,
+             data_nascimento,
+             estado_civil,
+             profissao,
+             conjuge_id,
+             data_casamento,
+             pais_cristaos,
+             tempo_igreja,
+             batizado,
+             data_batismo,
+             participa_ministerio,
+             ministerio_anterior,
+             experiencia_anterior,
+             data_conversao,
+             dias_disponiveis,
+             horarios_disponiveis
+           )
+         `)
+         .eq('id_igreja', churchId);
 
-    console.log('Loaded raw member data:', data);
+       if (error) throw error;
 
-    let membersData: Member[] = data.map((member: any) => ({
-      id: member.id,
-      id_igreja: member.id_igreja,
-      funcao: member.funcao,
-      perfil_completo: member.perfil_completo,
-      nome_completo: member.nome_completo, 
-      status: member.status,
-      email: member.email, 
-      created_at: member.created_at, 
-      // churchName preenchido via store (todos são desta igreja)
-      churchName: getChurchById(churchId)?.name,
-      // Map informacoes_pessoais fields
-      telefone: member.informacoes_pessoais?.telefone,
-      endereco: member.informacoes_pessoais?.endereco,
-      data_nascimento: member.informacoes_pessoais?.data_nascimento,
-      data_casamento: member.informacoes_pessoais?.data_casamento,
-      estado_civil: member.informacoes_pessoais?.estado_civil,
-      profissao: member.informacoes_pessoais?.profissao,
-      conjuge_id: member.informacoes_pessoais?.conjuge_id ?? null,
-      pais_cristaos: member.informacoes_pessoais?.pais_cristaos,
-      tempo_igreja: member.informacoes_pessoais?.tempo_igreja,
-      batizado: member.informacoes_pessoais?.batizado,
-      data_batismo: member.informacoes_pessoais?.data_batismo,
-      participa_ministerio: member.informacoes_pessoais?.participa_ministerio,
-      ministerio_anterior: member.informacoes_pessoais?.ministerio_anterior,
-      experiencia_anterior: member.informacoes_pessoais?.experiencia_anterior,
-      data_conversao: member.informacoes_pessoais?.data_conversao,
-      dias_disponiveis: member.informacoes_pessoais?.dias_disponiveis,
-      horarios_disponiveis: member.informacoes_pessoais?.horarios_disponiveis,
-      // Map membros fields
-      ultimo_teste_data: member.ultimo_teste_data, 
-      ministerio_recomendado: member.ministerio_recomendado, 
-    }));
+       console.log('Loaded raw member data:', data);
 
-    // Enriquecer com nome do cônjuge e filhos (tabelas corretas)
-    const memberIds = membersData.map(m => m.id);
-    // Cônjuges
-    const spouseIds = Array.from(new Set(membersData.map(m => m.conjuge_id).filter(Boolean))) as string[];
-    let spouseMap: Record<string, string> = {};
-    if (spouseIds.length > 0) {
-      const { data: spouses } = await supabase
-        .from('membros')
-        .select('id, nome_completo')
-        .in('id', spouseIds);
-      spouseMap = Object.fromEntries((spouses || []).map(s => [s.id, s.nome_completo]));
-    }
-    // Filhos
-    const { data: kids } = await supabase
-      .from('criancas')
-      .select('responsavel_id, nome_crianca, data_nascimento')
-      .in('responsavel_id', memberIds)
-      .eq('id_igreja', churchId);
-    const kidsByResponsible: Record<string, Array<{nome: string, idade: number}>> = {};
-    (kids || []).forEach(k => {
-      const idade = Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000);
-      const entry = { nome: k.nome_crianca, idade };
-      if (!kidsByResponsible[k.responsavel_id]) kidsByResponsible[k.responsavel_id] = [];
-      kidsByResponsible[k.responsavel_id].push(entry);
-    });
-    membersData = membersData.map(m => {
-      const ownKids = kidsByResponsible[m.id] || [];
-      const spouseKids = m.conjuge_id ? (kidsByResponsible[m.conjuge_id] || []) : [];
-      const combined = [...ownKids, ...spouseKids];
-      // Remover possíveis duplicatas (por nome+idade)
-      const unique = combined.reduce((acc, kid) => {
-        if (!acc.some(k => k.nome === kid.nome && k.idade === kid.idade)) acc.push(kid);
-        return acc;
-      }, [] as Array<{nome: string, idade: number}>);
-      return {
-        ...m,
-        conjuge_nome: m.conjuge_id ? spouseMap[m.conjuge_id] : undefined,
-        filhos: unique
-      };
-    });
+       let membersData: Member[] = data.map((member: any) => ({
+         id: member.id,
+         id_igreja: member.id_igreja,
+         funcao: member.funcao,
+         perfil_completo: member.perfil_completo,
+         nome_completo: member.nome_completo, 
+         status: member.status,
+         email: member.email, 
+         created_at: member.created_at, 
+         // churchName preenchido via store (todos são desta igreja)
+         churchName: getChurchById(churchId)?.name,
+         // Map informacoes_pessoais fields
+         telefone: member.informacoes_pessoais?.telefone,
+         endereco: member.informacoes_pessoais?.endereco,
+         data_nascimento: member.informacoes_pessoais?.data_nascimento,
+         data_casamento: member.informacoes_pessoais?.data_casamento,
+         estado_civil: member.informacoes_pessoais?.estado_civil,
+         profissao: member.informacoes_pessoais?.profissao,
+         conjuge_id: member.informacoes_pessoais?.conjuge_id ?? null,
+         pais_cristaos: member.informacoes_pessoais?.pais_cristaos,
+         tempo_igreja: member.informacoes_pessoais?.tempo_igreja,
+         batizado: member.informacoes_pessoais?.batizado,
+         data_batismo: member.informacoes_pessoais?.data_batismo,
+         participa_ministerio: member.informacoes_pessoais?.participa_ministerio,
+         ministerio_anterior: member.informacoes_pessoais?.ministerio_anterior,
+         experiencia_anterior: member.informacoes_pessoais?.experiencia_anterior,
+         data_conversao: member.informacoes_pessoais?.data_conversao,
+         dias_disponiveis: member.informacoes_pessoais?.dias_disponiveis,
+         horarios_disponiveis: member.informacoes_pessoais?.horarios_disponiveis,
+         // Map membros fields
+         ultimo_teste_data: member.ultimo_teste_data, 
+         ministerio_recomendado: member.ministerio_recomendado, 
+       }));
 
-    setMembers(membersData);
-    setFilteredMembers(membersData);
-    // Carregar total de passos da jornada ativa da igreja e estatísticas por membro
-    await computeJourneyTotalSteps(churchId);
-    await loadMembersStats(churchId, membersData);
-  }
+       // Enriquecer com nome do cônjuge e filhos (tabelas corretas)
+       const memberIds = membersData.map(m => m.id);
+       // Cônjuges
+       const spouseIds = Array.from(new Set(membersData.map(m => m.conjuge_id).filter(Boolean))) as string[];
+       let spouseMap: Record<string, string> = {};
+       if (spouseIds.length > 0) {
+         const { data: spouses } = await supabase
+           .from('membros')
+           .select('id, nome_completo')
+           .in('id', spouseIds);
+         spouseMap = Object.fromEntries((spouses || []).map(s => [s.id, s.nome_completo]));
+       }
+       // Filhos
+       const { data: kids } = await supabase
+         .from('criancas')
+         .select('responsavel_id, nome_crianca, data_nascimento')
+         .in('responsavel_id', memberIds)
+         .eq('id_igreja', churchId);
+       const kidsByResponsible: Record<string, Array<{nome: string, idade: number}>> = {};
+       (kids || []).forEach(k => {
+         const idade = Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000);
+         const entry = { nome: k.nome_crianca, idade };
+         if (!kidsByResponsible[k.responsavel_id]) kidsByResponsible[k.responsavel_id] = [];
+         kidsByResponsible[k.responsavel_id].push(entry);
+       });
+       membersData = membersData.map(m => {
+         const ownKids = kidsByResponsible[m.id] || [];
+         const spouseKids = m.conjuge_id ? (kidsByResponsible[m.conjuge_id] || []) : [];
+         const combined = [...ownKids, ...spouseKids];
+         // Remover possíveis duplicatas (por nome+idade)
+         const unique = combined.reduce((acc, kid) => {
+           if (!acc.some(k => k.nome === kid.nome && k.idade === kid.idade)) acc.push(kid);
+           return acc;
+         }, [] as Array<{nome: string, idade: number}>);
+         return {
+           ...m,
+           conjuge_nome: m.conjuge_id ? spouseMap[m.conjuge_id] : undefined,
+           filhos: unique
+         };
+       });
+
+       setMembers(membersData);
+       setFilteredMembers(membersData);
+       // Carregar total de passos da jornada ativa da igreja e estatísticas por membro
+       await computeJourneyTotalSteps(churchId);
+       await loadMembersStats(churchId, membersData);
+     } catch (error: any) {
+       console.error('Error loading members:', error);
+       toast.error('Erro ao carregar membros: ' + error.message);
+       setMembers([]);
+       setFilteredMembers([]);
+       setIsAdmin(false);
+     } finally {
+       setLoading(false);
+       isFetchingRef.current = false;
+     }
+   }
 
   const computeJourneyTotalSteps = async (churchId: string) => {
     // Busca trilhas ativas da igreja
