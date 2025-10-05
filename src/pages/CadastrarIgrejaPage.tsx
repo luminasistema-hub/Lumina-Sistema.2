@@ -114,7 +114,7 @@ const CadastrarIgrejaPage = () => {
           status: 'pending',
           valor_mensal_assinatura: planDetails.monthlyValue,
           limite_membros: planDetails.memberLimit,
-          ultimo_pagamento_status: 'Pendente',
+          ultimo_pagamento_status: planDetails.monthlyValue === 0 ? 'Confirmado' : 'Pendente',
         })
         .select('id, nome')
         .single();
@@ -152,7 +152,14 @@ const CadastrarIgrejaPage = () => {
 
       toast.success('Igreja e conta de administrador criadas com sucesso! Verifique seu email para confirmar o cadastro.');
       
-      // Gerar checkout de pagamento via Abacate PAY
+      // Plano Free: acesso liberado sem checkout
+      if (planDetails.monthlyValue === 0) {
+        toast.success('Plano Free selecionado: acesso liberado após confirmar seu e-mail.');
+        navigate('/login');
+        return;
+      }
+
+      // Plano Pago: Gerar checkout de pagamento via Abacate PAY
       if (newChurchId) {
         const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke('create-abacatepay-checkout', {
           body: { churchId: newChurchId, payerEmail: adminEmail }

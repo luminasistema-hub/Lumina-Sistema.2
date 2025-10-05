@@ -119,6 +119,27 @@ export const useAuthStore = create<AuthState>()(
             }
 
             if (profile) {
+              // Verifica status de pagamento da igreja quando aplicável
+              if (profile.id_igreja) {
+                const { data: churchRow } = await supabase
+                  .from('igrejas')
+                  .select('valor_mensal_assinatura, ultimo_pagamento_status, link_pagamento_assinatura')
+                  .eq('id', profile.id_igreja)
+                  .maybeSingle()
+
+                const mensalidade = Number(churchRow?.valor_mensal_assinatura ?? 0)
+                const pagamentoOk = churchRow?.ultimo_pagamento_status === 'Confirmado'
+
+                // Para plano pago, exige pagamento confirmado para acessar
+                if (mensalidade > 0 && !pagamentoOk) {
+                  toast.error('Pagamento pendente: finalize o checkout para acessar.')
+                  await supabase.auth.signOut()
+                  set({ user: null, currentChurchId: null, isLoading: false })
+                  isCheckingAuth = false
+                  return
+                }
+              }
+
               // Buscar informacoes_pessoais separadamente
               const { data: personalRecord } = await supabase
                 .from('informacoes_pessoais')
