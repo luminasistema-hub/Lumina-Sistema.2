@@ -46,6 +46,18 @@ export function EditEventDialog({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!event) return;
+    
+    setNome(event.nome);
+    setLocal(event.local);
+    setDescricao(event.descricao || "");
+    setTipo(event.tipo);
+    setStatus(event.status);
+    setCapacidadeMaxima(event.capacidade_maxima ? String(event.capacidade_maxima) : "");
+    setValorInscricao(event.valor_inscricao ? String(event.valor_inscricao) : "");
+    setLinkExterno(event.link_externo || "");
+    setInscricoesAbertas(event.inscricoes_abertas);
+
     // Converter ISO para datetime-local exibível
     try {
       const d = new Date(event.data_hora);
@@ -55,7 +67,7 @@ export function EditEventDialog({
     } catch {
       setDataHora("");
     }
-  }, [event.data_hora]);
+  }, [event]);
 
   const handleUpdate = async () => {
     if (!nome || !dataHora || !local) {

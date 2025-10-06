@@ -2,15 +2,15 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
-import { EventCard, Event } from './EventCard';
+import { EventCard } from './EventCard';
 import { CreateEventDialog } from './CreateEventDialog';
-import EditEventDialog from './EditEventDialog';
+import EditEventDialog, { EventItem } from './EditEventDialog';
 import EventParticipantsDialog from './EventParticipantsDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Search, Users, Loader2 } from 'lucide-react';
+import { Plus, Search, Users, Loader2, Trash2 } from 'lucide-react';
 
 const EventsManagementPage = () => {
   const { currentChurchId, user } = useAuthStore();
@@ -19,7 +19,7 @@ const EventsManagementPage = () => {
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [isEditOpen, setEditOpen] = useState(false);
   const [isParticipantsOpen, setParticipantsOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('upcoming');
 
@@ -43,7 +43,7 @@ const EventsManagementPage = () => {
 
       const { data, error } = await query.order('data_hora', { ascending: filter === 'upcoming' });
       if (error) throw new Error(error.message);
-      return data;
+      return data as EventItem[];
     },
     enabled: !!currentChurchId,
   });
@@ -69,12 +69,12 @@ const EventsManagementPage = () => {
     },
   });
 
-  const handleEdit = (event: Event) => {
+  const handleEdit = (event: EventItem) => {
     setSelectedEvent(event);
     setEditOpen(true);
   };
 
-  const handleViewParticipants = (event: Event) => {
+  const handleViewParticipants = (event: EventItem) => {
     setSelectedEvent(event);
     setParticipantsOpen(true);
   };
@@ -130,7 +130,7 @@ const EventsManagementPage = () => {
                 <Users className="mr-2 h-4 w-4" /> Ver Inscritos
               </Button>
               <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(event.id)} disabled={deleteMutation.isPending}>
-                Remover
+                <Trash2 className="mr-2 h-4 w-4" /> Remover
               </Button>
             </div>
           </div>
@@ -153,7 +153,7 @@ const EventsManagementPage = () => {
       )}
       {selectedEvent && (
         <>
-          <EditEventDialog isOpen={isEditOpen} onClose={() => setEditOpen(false)} event={selectedEvent} onSuccess={handleSuccess} />
+          <EditEventDialog open={isEditOpen} onClose={() => setEditOpen(false)} event={selectedEvent} onUpdated={handleSuccess} />
           <EventParticipantsDialog open={isParticipantsOpen} onClose={() => setParticipantsOpen(false)} eventId={selectedEvent.id} churchId={currentChurchId} eventName={selectedEvent.nome} />
         </>
       )}
