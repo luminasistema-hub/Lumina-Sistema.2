@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
-import { useChurchStore, Church } from '../../stores/churchStore';
+import { useChurchStore } from '../../stores/churchStore';
 import { Key, Mail, RefreshCw, Loader2, Users, Shield, AlertTriangle, Save, Server, Cpu, HardDrive, Wifi, Database, Trash2 } from 'lucide-react';
 import PaymentIntegrationSettings from './PaymentIntegrationSettings';
 
@@ -16,6 +16,7 @@ interface AdminToolsTabProps {
 }
 
 const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch }) => {
+  const { user } = useAuthStore();
   const [selectedChurchId, setSelectedChurchId] = useState<string>('');
   const [churchAdmins, setChurchAdmins] = useState<Array<{ id: string; email: string; name: string }>>([]);
   const [selectedAdminEmail, setSelectedAdminEmail] = useState<string>('');
@@ -119,6 +120,85 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch 
     } catch (error) {
       console.error('Error saving advanced settings:', error);
       toast.error('Erro ao salvar configurações avançadas.');
+    }
+  };
+
+  const handleClearCache = async () => {
+    if (!confirm('Tem certeza que deseja limpar todo o cache do sistema? Isso removerá dados temporários e fará logout de todos os usuários.')) {
+      return;
+    }
+
+    try {
+      // Limpa cache do navegador
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+
+      // Limpa localStorage e sessionStorage (exceto auth)
+      const preserveKeys = ['connect-vida-auth', 'connect-vida-churches'];
+      Object.keys(localStorage).forEach(key => {
+        if (!preserveKeys.some(preserveKey => key.includes(preserveKey))) {
+          localStorage.removeItem(key);
+        }
+      });
+      Object.keys(sessionStorage).forEach(key => {
+        sessionStorage.removeItem(key);
+      });
+
+      // Invalida queries do React Query
+      if (window.queryClient) {
+        window.queryClient.invalidateQueries();
+      }
+
+      toast.success('Cache limpo com sucesso!');
+      
+      // Recarrega a página para aplicar as mudanças
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      toast.error('Erro ao limpar cache.');
+    }
+  };
+
+  const handleResetSystem = async () => {
+    if (!confirm('⚠️ ATENÇÃO: Isso irá resetar TODO o sistema, removendo TODOS os dados de usuários, igrejas e configurações. Esta ação é IRREVERSÍVEL. Tem certeza absoluta?')) {
+      return;
+    }
+
+    if (!confirm('⚠️ CONFIRMAÇÃO FINAL: Digite "RESETAR" para confirmar que você deseja apagar todos os dados do sistema:')) {
+      return;
+    }
+
+    const confirmationText = prompt('Digite "RESETAR" para confirmar:');
+    if (confirmationText !== 'RESETAR') {
+      toast.error('Texto de confirmação incorreto. Operação cancelada.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Chama a função de reset do sistema
+      const { error } = await supabase.functions.invoke('reset-system', {
+        body: { confirm: true }
+      });
+
+      if (error) throw error;
+
+      toast.success('Sistema resetado com sucesso! Redirecionando...');
+      
+      // Faz logout e redireciona
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error resetting system:', error);
+      toast.error('Erro ao resetar sistema: ' + error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -342,9 +422,9 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch 
               <div className="border-t pt-6">
                 <h4 className="font-semibold mb-4">Ações Críticas</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button variant="outline" className="text-blue-600">
+                  <Button variant="outline" className="text-blue-600" onClick={handleClearCache}>
                     <RefreshCw className="w-4 h-4 mr-2" />
-                    Reiniciar Sistema
+                    Limpar Cache
                   </Button>
                   <Button variant="outline" className="text-orange-600">
                     <Database className="w-4 h-4 mr-2" />
@@ -385,6 +465,45 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch 
           <Button variant="outline" className="mt-4" disabled>
             <Shield className="w-4 h-4 mr-2" />
             Acessar Ferramentas Globais
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Nova seção de reset do sistema */}
+      <Card className="border-red-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-600">
+            <AlertTriangle className="w-5 h-5" />
+            Reset do Sistema
+          </CardTitle>
+          <CardDescription className="text-red-700">
+            ⚠️ AÇÃO PERIGOSA: Use apenas em casos extremos. Isso apagará TODOS os dados do sistema.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-800">
+              Esta ação irá remover permanentemente todos os usuários, igrejas, dados e configurações. 
+              O sistema voltará ao estado inicial. Use com extrema cautela.
+            </p>
+          </div>
+          <Button 
+            variant="destructive" 
+            onClick={handleResetSystem}
+            disabled={isLoading}
+            className="w-full"
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Resetando...
+              </div>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4 mr-2" />
+                RESETAR SISTEMA COMPLETO
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>

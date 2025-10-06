@@ -6,16 +6,32 @@ import { Toaster } from 'sonner'
 import App from './App.tsx'
 import './index.css'
 
+// Limpa cache do navegador ao iniciar
+if ('caches' in window) {
+  caches.keys().then((names) => {
+    names.forEach((name) => {
+      caches.delete(name);
+    });
+  });
+}
+
+// Limpa localStorage e sessionStorage (exceto auth)
+const preserveKeys = ['connect-vida-auth', 'connect-vida-churches'];
+Object.keys(localStorage).forEach(key => {
+  if (!preserveKeys.some(preserveKey => key.includes(preserveKey))) {
+    localStorage.removeItem(key);
+  }
+});
+Object.keys(sessionStorage).forEach(key => {
+  sessionStorage.removeItem(key);
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-      // Evita recarregar tudo quando a aba volta ao foco ou reconecta
+      staleTime: 1000 * 60 * 5, // 5 minutos
+      cacheTime: 1000 * 60 * 10, // 10 minutos
       refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      // Se já houver cache válido, não refazer fetch só por montar novamente
-      refetchOnMount: false,
     },
   },
 })
@@ -25,14 +41,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <App />
-        <Toaster 
-          position="top-right" 
-          richColors 
-          closeButton
-          toastOptions={{
-            duration: 4000,
-          }}
-        />
+        <Toaster />
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,
