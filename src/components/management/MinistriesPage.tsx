@@ -75,8 +75,13 @@ const MinistriesPage = () => {
           volunteers_count: m.volunteers[0]?.count || 0,
         }));
         
-        const { data: membersData, error: membersError } = await supabase.from('membros')
-          .select('id, nome_completo').eq('id_igreja', currentChurchId).eq('status', 'ativo').order('nome_completo');
+        // Buscar TODOS os usuários da igreja (sem filtrar por status),
+        // permitindo eleger líder dentre qualquer membro vinculado à igreja.
+        const { data: membersData, error: membersError } = await supabase
+          .from('membros')
+          .select('id, nome_completo')
+          .eq('id_igreja', currentChurchId)
+          .order('nome_completo');
         if (membersError) throw membersError;
         
         return { ministries: formattedMinistries, members: membersData };
@@ -291,9 +296,15 @@ const MinistriesPage = () => {
                         <SelectTrigger className="w-full"><SelectValue placeholder="Selecione um líder" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="null">Sem líder</SelectItem>
-                          {memberOptions.map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
-                          ))}
+                          {memberOptions.length === 0 ? (
+                            <SelectItem value="__empty" disabled>
+                              Nenhum membro encontrado na sua igreja
+                            </SelectItem>
+                          ) : (
+                            memberOptions.map(m => (
+                              <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
