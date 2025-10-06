@@ -19,7 +19,8 @@ const MasterAdminSystemOverview: React.FC<MasterAdminSystemOverviewProps> = ({ t
       try {
         const { count, error } = await supabase
           .from('transacoes_financeiras')
-          .select('*', { count: 'exact', head: true });
+          .select('id', { count: 'exact' })
+          .limit(1);
 
         if (error) throw error;
         setTotalTransactions(count || 0);

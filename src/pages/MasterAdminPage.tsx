@@ -39,8 +39,8 @@ const MasterAdminPage = () => {
       // Total de usuários: soma membros + super_admins
       try {
         const [{ count: memberCount, error: mErr }, { count: saCount, error: saErr }] = await Promise.all([
-          supabase.from('membros').select('id', { count: 'exact', head: true }),
-          supabase.from('super_admins').select('id', { count: 'exact', head: true }),
+          supabase.from('membros').select('id', { count: 'exact' }).limit(1),
+          supabase.from('super_admins').select('id', { count: 'exact' }).limit(1),
         ])
 
         if (mErr) throw mErr
@@ -56,8 +56,9 @@ const MasterAdminPage = () => {
       try {
         const { count, error: membersError } = await supabase
           .from('membros')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'ativo');
+          .select('id', { count: 'exact' })
+          .eq('status', 'ativo')
+          .limit(1);
         if (membersError) throw membersError;
         setActiveMembersCount(count || 0);
       } catch (error: any) {
