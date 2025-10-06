@@ -321,16 +321,22 @@ const VocationalTest = () => {
         console.log('VocationalTest: Previous test found:', data);
         setHasPreviousTest(true);
         
+        // Calcula as pontuações a partir do JSON de respostas
+        const respostas = (data as any)?.respostas || {};
         const ministryScores: Record<string, number> = {
-          midia: data.soma_midia || 0,
-          louvor: data.soma_louvor || 0,
-          diaconato: data.soma_diaconato || 0,
-          integracao: data.soma_integra || 0,
-          ensino: data.soma_ensino || 0,
-          kids: data.soma_kids || 0,
-          organizacao: data.soma_organizacao || 0,
-          acao_social: data.soma_acao_social || 0
+          midia: 0,
+          louvor: 0,
+          diaconato: 0,
+          integracao: 0,
+          ensino: 0,
+          kids: 0,
+          organizacao: 0,
+          acao_social: 0,
         };
+        questions.forEach((q) => {
+          const v = typeof respostas[`q${q.id}`] === 'number' ? respostas[`q${q.id}`] : 0;
+          ministryScores[q.ministry] += v;
+        });
 
         const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
           const score = ministryScores[ministryKey];
@@ -385,20 +391,46 @@ const VocationalTest = () => {
 
     console.log('Calculating vocational test results and saving to Supabase...');
     
-    const testDataToSave: any = {
-      membro_id: user.id,
-      data_teste: new Date().toISOString().split('T')[0],
-      is_ultimo: true, 
-      id_igreja: currentChurchId,
-    };
-
-    questions.forEach(q => {
-      testDataToSave[`q${q.id}`] = answers[q.id] || 0;
+    // Monta respostas em JSON e calcula pontuações por ministério
+    const respostas: Record<string, number> = {};
+    questions.forEach((q) => {
+      respostas[`q${q.id}`] = answers[q.id] ?? 0;
     });
+    const ministryScores: Record<string, number> = {
+      midia: 0,
+      louvor: 0,
+      diaconato: 0,
+      integracao: 0,
+      ensino: 0,
+      kids: 0,
+      organizacao: 0,
+      acao_social: 0,
+    };
+    questions.forEach((q) => {
+      ministryScores[q.ministry] += respostas[`q${q.id}`];
+    });
+    
+    // Ministério recomendado (maior pontuação)
+    const topKey = Object.keys(ministryScores).sort((a, b) => ministryScores[b] - ministryScores[a])[0];
+    const recommendedName = (ministryData as any)[topKey]?.name ?? topKey;
 
+    // Marca testes anteriores como não-últimos
+    await supabase
+      .from('testes_vocacionais')
+      .update({ is_ultimo: false })
+      .eq('membro_id', user.id);
+
+    // Insere novo teste com respostas JSON e recomendação
     const { data, error } = await supabase
       .from('testes_vocacionais')
-      .insert([testDataToSave])
+      .insert([{
+        membro_id: user.id,
+        id_igreja: currentChurchId,
+        is_ultimo: true,
+        data_teste: new Date().toISOString(),
+        respostas,
+        ministerio_recomendado: recommendedName,
+      }])
       .select()
       .single();
 
@@ -410,17 +442,6 @@ const VocationalTest = () => {
 
     console.log('VocationalTest: Test results saved to Supabase:', data);
     
-    const ministryScores: Record<string, number> = {
-      midia: data.soma_midia || 0,
-      louvor: data.soma_louvor || 0,
-      diaconato: data.soma_diaconato || 0,
-      integracao: data.soma_integra || 0,
-      ensino: data.soma_ensino || 0,
-      kids: data.soma_kids || 0,
-      organizacao: data.soma_organizacao || 0,
-      acao_social: data.soma_acao_social || 0
-    };
-
     const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
       const score = ministryScores[ministryKey];
       const maxScore = 25; 
