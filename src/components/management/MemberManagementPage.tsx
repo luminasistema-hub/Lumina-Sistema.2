@@ -266,10 +266,11 @@ const MemberManagementPage = () => {
       return;
     }
     const baseUrl = window.location.origin;
-    const link = `${baseUrl}/register?churchId=${currentChurchId}&initialRole=membro`;
+    const encodedChurchName = encodeURIComponent(church.nome || '');
+    const link = `${baseUrl}/register?churchId=${currentChurchId}&churchName=${encodedChurchName}&initialRole=membro`;
     setGeneratedLink(link);
     setIsGenerateLinkDialogOpen(true);
-    trackEvent('generate_registration_link', { churchId: currentChurchId });
+    trackEvent('generate_registration_link', { churchId: currentChurchId, churchName: church.nome });
   }, [currentChurchId, getChurchById]);
 
   const handleCopyLink = useCallback(() => {
@@ -576,7 +577,7 @@ const MemberManagementPage = () => {
                     Membro desde {new Date(member.created_at).toLocaleDateString('pt-BR')}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 justify-end">
                   <Button variant="outline" size="sm" onClick={() => setSelectedMember(member)}>
                     <Eye className="w-4 h-4 mr-2" />Ver Perfil
                   </Button>
@@ -614,18 +615,27 @@ const MemberManagementPage = () => {
 
       {selectedMember && (
         <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Detalhes do Membro</DialogTitle>
+              <DialogTitle className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">{selectedMember.nome_completo}</span>
+                <Badge className={getRoleColor(selectedMember.funcao)}>
+                  {getRoleIcon(selectedMember.funcao)}
+                  <span className="ml-1">{selectedMember.funcao}</span>
+                </Badge>
+                <Badge className={getStatusColor(selectedMember.status)}>
+                  {selectedMember.status}
+                </Badge>
+              </DialogTitle>
               <DialogDescription>
-                Informações completas sobre {selectedMember.nome_completo}
+                Membro desde {new Date(selectedMember.created_at).toLocaleDateString('pt-BR')}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Email</Label>
-                  <div className="text-sm">{selectedMember.email}</div>
+                  <div className="text-sm break-all">{selectedMember.email}</div>
                 </div>
                 {selectedMember.telefone && (
                   <div>
@@ -637,8 +647,7 @@ const MemberManagementPage = () => {
                   <div>
                     <Label>Data de Nascimento</Label>
                     <div className="text-sm">
-                      {new Date(selectedMember.data_nascimento).toLocaleDateString('pt-BR')} 
-                      ({calculateAge(selectedMember.data_nascimento)} anos)
+                      {new Date(selectedMember.data_nascimento).toLocaleDateString('pt-BR')} ({calculateAge(selectedMember.data_nascimento)} anos)
                     </div>
                   </div>
                 )}
@@ -660,8 +669,19 @@ const MemberManagementPage = () => {
                     <div className="text-sm">{selectedMember.ministerio_recomendado}</div>
                   </div>
                 )}
+                {selectedMember.endereco && (
+                  <div className="md:col-span-2">
+                    <Label>Endereço</Label>
+                    <div className="text-sm">{selectedMember.endereco}</div>
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-2">
+                {(canManageMembers || selectedMember.id === user?.id) && (
+                  <Button variant="outline" onClick={() => handleOpenEditMemberDialog(selectedMember)}>
+                    <Edit className="w-4 h-4 mr-2" />Editar
+                  </Button>
+                )}
                 <Button variant="ghost" onClick={() => setSelectedMember(null)}>
                   Fechar
                 </Button>
