@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuthStore, UserRole } from '../../stores/authStore' 
 import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -71,8 +71,13 @@ const MemberManagementPage = () => {
   const [filterBirthday, setFilterBirthday] = useState('all')
   const [filterWedding, setFilterWedding] = useState('all')
 
-  const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
-  const canEditRoles = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
+  const canManageMembers = useMemo(() => {
+    return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
+  }, [user?.role])
+
+  const canEditRoles = useMemo(() => {
+    return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
+  }, [user?.role])
 
   const [newMember, setNewMember] = useState({
     name: '',
@@ -87,14 +92,23 @@ const MemberManagementPage = () => {
 
   const [editMemberData, setEditMemberData] = useState<Partial<Member>>({});
 
-  // Filtragem de membros
+  // Memoizar funções de filtro para evitar recriação desnecessária
+  const isSameMonth = useCallback((dateStr?: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(`${dateStr}T00:00:00`);
+    const now = new Date();
+    return d.getMonth() === now.getMonth();
+  }, []);
+
+  // Filtragem de membros otimizada
   useEffect(() => {
     let filtered = members
 
     if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(member => 
-        member.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.nome_completo.toLowerCase().includes(searchLower) || 
+        member.email.toLowerCase().includes(searchLower) ||
         (member.telefone && member.telefone.includes(searchTerm))
       )
     }
@@ -108,17 +122,11 @@ const MemberManagementPage = () => {
     }
 
     if (filterMinistry !== 'all') {
+      const ministryLower = filterMinistry.toLowerCase();
       filtered = filtered.filter(member => 
-        member.ministerio_recomendado?.toLowerCase().includes(filterMinistry.toLowerCase())
+        member.ministerio_recomendado?.toLowerCase().includes(ministryLower)
       )
     }
-
-    const isSameMonth = (dateStr?: string | null) => {
-      if (!dateStr) return false;
-      const d = new Date(`${dateStr}T00:00:00`);
-      const now = new Date();
-      return d.getMonth() === now.getMonth();
-    };
 
     if (filterBirthday === 'mes_atual') {
       filtered = filtered.filter(member => isSameMonth(member.data_nascimento))
@@ -129,7 +137,7 @@ const MemberManagementPage = () => {
     }
 
     setFilteredMembers(filtered)
-  }, [members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding])
+  }, [members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding, isSameMonth])
 
   const addMemberMutation = useMutation({
     mutationFn: async (newMemberData: typeof newMember) => {
@@ -217,25 +225,29 @@ const MemberManagementPage = () => {
     }
   });
 
-  const handleAddMember = () => addMemberMutation.mutate(newMember);
-  const handleEditMember = () => {
+  const handleAddMember = useCallback(() => {
+    addMemberMutation.mutate(newMember);
+  }, [newMember, addMemberMutation]);
+
+  const handleEditMember = useCallback(() => {
     if (selectedMember) {
       editMemberMutation.mutate({ memberId: selectedMember.id, data: editMemberData });
     }
-  };
-  const handleDeleteMember = (memberId: string) => {
+  }, [selectedMember, editMemberData, editMemberMutation]);
+
+  const handleDeleteMember = useCallback((memberId: string) => {
     if (confirm('Tem certeza que deseja remover este usuário? Esta ação é irreversível.')) {
       deleteMemberMutation.mutate(memberId);
     }
-  };
+  }, [deleteMemberMutation]);
 
-  const handleOpenEditMemberDialog = (member: Member) => {
+  const handleOpenEditMemberDialog = useCallback((member: Member) => {
     setSelectedMember(member);
     setEditMemberData({ ...member });
     setIsEditMemberDialogOpen(true);
-  };
+  }, []);
 
-  const handleGenerateRegistrationLink = () => {
+  const handleGenerateRegistrationLink = useCallback(() => {
     if (!currentChurchId) {
       toast.error('Nenhuma igreja selecionada.');
       return;
@@ -250,24 +262,24 @@ const MemberManagementPage = () => {
     setGeneratedLink(link);
     setIsGenerateLinkDialogOpen(true);
     trackEvent('generate_registration_link', { churchId: currentChurchId });
-  };
+  }, [currentChurchId, getChurchById]);
 
-  const handleCopyLink = () => {
+  const handleCopyLink = useCallback(() => {
     copy(generatedLink);
     toast.success('Link copiado para a área de transferência!');
     trackEvent('copy_registration_link', { churchId: currentChurchId });
-  };
+  }, [generatedLink, currentChurchId]);
 
-  const getRoleIcon = (role: UserRole) => {
+  const getRoleIcon = useCallback((role: UserRole) => {
     const icons: Record<UserRole, JSX.Element> = {
       super_admin: <Shield className="w-4 h-4" />, admin: <Shield className="w-4 h-4" />, pastor: <Crown className="w-4 h-4" />,
       lider_ministerio: <UserCheck className="w-4 h-4" />, financeiro: <DollarSign className="w-4 h-4" />, voluntario: <Users className="w-4 h-4" />,
       midia_tecnologia: <Headphones className="w-4 h-4" />, integra: <Heart className="w-4 h-4" />, membro: <UserIcon className="w-4 h-4" />
     };
     return icons[role] || <UserIcon className="w-4 h-4" />;
-  };
+  }, []);
 
-  const getRoleColor = (role: UserRole) => {
+  const getRoleColor = useCallback((role: UserRole) => {
     const colors: Record<UserRole, string> = {
       super_admin: 'bg-red-100 text-red-800 border-red-200', admin: 'bg-red-100 text-red-800 border-red-200',
       pastor: 'bg-purple-100 text-purple-800 border-purple-200', lider_ministerio: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -276,27 +288,28 @@ const MemberManagementPage = () => {
       membro: 'bg-gray-100 text-gray-800 border-gray-200'
     };
     return colors[role] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
+  }, []);
 
-  const getStatusColor = (status: Member['status']) => {
+  const getStatusColor = useCallback((status: Member['status']) => {
     const colors: Record<Member['status'], string> = {
       ativo: 'bg-green-100 text-green-800', inativo: 'bg-gray-100 text-gray-800', pendente: 'bg-yellow-100 text-yellow-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
-  };
+  }, []);
 
-  const calculateAge = (birthDate?: string) => {
+  const calculateAge = useCallback((birthDate?: string) => {
     if (!birthDate) return 'N/A';
     const age = new Date().getFullYear() - new Date(birthDate).getFullYear();
     return age > 0 ? age : 'N/A';
-  };
+  }, []);
 
-  const statsData = {
+  // Memoizar estatísticas para evitar recálculo desnecessário
+  const statsData = useMemo(() => ({
     total: members.length,
     active: members.filter(m => m.status === 'ativo').length,
     leaders: members.filter(m => ['lider_ministerio', 'pastor', 'admin', 'super_admin'].includes(m.funcao)).length,
     baptized: members.filter(m => m.batizado).length
-  };
+  }), [members]);
 
   if (!currentChurchId) {
     return <div className="p-6 text-center text-gray-600">Selecione uma igreja para gerenciar os membros.</div>;
