@@ -34,8 +34,9 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Tenta criar o usuário diretamente
     let authUserId: string | null = null;
+
+    // Tenta criar o usuário
     const createRes = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -47,8 +48,7 @@ serve(async (req) => {
     });
 
     if (createRes.error) {
-      // Se já existir, tenta localizar e atualizar
-      // Observação: listUsers é paginada; para projetos menores, perPage 200 geralmente é suficiente
+      // Se deu erro (ex.: já existe), tenta localizar e atualizar
       const list = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
       if (list.error) {
         console.error("Erro ao listar usuários:", list.error);
@@ -69,7 +69,6 @@ serve(async (req) => {
 
       authUserId = existing.id;
 
-      // Atualiza senha e metadados para garantir acesso
       const upd = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
         password,
         user_metadata: {
@@ -95,24 +94,10 @@ serve(async (req) => {
       });
     }
 
-    // Remove registros conflitantes (mesmo email com id diferente)
-    const { data: adminsByEmail, error: adminsQueryErr } = await supabaseAdmin
-      .from("super_admins")
-      .select("id, email")
-      .eq("email", email);
-
-    if (!adminsQueryErr && (adminsByEmail ?? []).length > 0) {
-      const conflicts = (adminsByEmail ?? []).filter((row: any) => row.id !== authUserId);
-      if (conflicts.length > 0) {
-        const conflictIds = conflicts.map((c: any) => c.id);
-        await supabaseAdmin.from("super_admins").delete().in("id", conflictIds);
-      }
-    }
-
-    // Garante o registro na tabela com o mesmo id do auth.users
+    // Upsert no super_admins usando colunas válidas do schema (id, nome)
     const upsertRes = await supabaseAdmin
       .from("super_admins")
-      .upsert({ id: authUserId, nome_completo: name, email }, { onConflict: "id" });
+      .upsert({ id: authUserId, nome: name }, { onConflict: "id" });
 
     if (upsertRes.error) {
       console.error("Erro ao upsert em super_admins:", upsertRes.error);

@@ -176,7 +176,7 @@ export const useAuthStore = create<AuthState>()(
               // 2) Fallback: verifica se é Super Admin
               const { data: sa, error: saError } = await supabase
                 .from('super_admins')
-                .select('id, nome_completo, email, created_at')
+                .select('id, nome, created_at')
                 .eq('id', session.user.id)
                 .maybeSingle();
 
@@ -188,8 +188,8 @@ export const useAuthStore = create<AuthState>()(
                 set({
                   user: {
                     id: sa.id,
-                    name: sa.nome_completo || session.user.email || 'Super Admin',
-                    email: sa.email || session.user.email!,
+                    name: sa.nome || session.user.email || 'Super Admin',
+                    email: session.user.email!,
                     role: 'super_admin',
                     churchId: null,
                     churchName: 'Painel Master',
