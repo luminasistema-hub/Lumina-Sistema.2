@@ -22,7 +22,7 @@ const fetchPastorItems = async (churchId: string | null): Promise<PastorAreaItem
     .from('pastor_area_items')
     .select(`
       *,
-      membros:pastor_id ( nome_completo )
+      membros!pastor_id ( nome_completo )
     `)
     .eq('id_igreja', churchId)
     .order('created_at', { ascending: false });
