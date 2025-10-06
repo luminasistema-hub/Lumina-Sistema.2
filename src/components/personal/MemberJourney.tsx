@@ -309,35 +309,6 @@ const MemberJourney = () => {
         })}
       </div>
 
-      <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
-        <CardContent className="p-6">
-          <div className="text-center">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Continue Crescendo! 🌱</h3>
-            <p className="text-gray-700 mb-4">
-              Cada passo na sua jornada espiritual é importante. Deus tem um plano maravilhoso para sua vida e ministério.
-            </p>
-            <div className="flex justify-center gap-3">
-              {nextUncompletedPasso ? (
-                <Button 
-                  className="bg-green-500 hover:bg-green-600"
-                  onClick={() => handleOpenActionDialog(nextUncompletedPasso)}
-                >
-                  <ArrowRight className="w-4 h-4 mr-2" />
-                  Continuar Jornada
-                </Button>
-              ) : (
-                <Button className="bg-green-500 hover:bg-green-600" disabled>
-                  Jornada Concluída!
-                </Button>
-              )}
-              <Button variant="outline">
-                Conversar com um Líder
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       <JourneyActionDialog
         isOpen={isActionDialogOpen}
         onClose={() => setIsActionDialogOpen(false)}
