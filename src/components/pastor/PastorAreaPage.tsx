@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, FileText, Book, ClipboardSignature, Trash2, Edit, Download, Search, X } from 'lucide-react';
+import { Loader2, Plus, FileText, Book, ClipboardSignature, Trash2, Edit, Download, Search, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -26,6 +26,7 @@ const PastorAreaPage = () => {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<PastorAreaItem | null>(null);
+  const [itemToView, setItemToView] = useState<PastorAreaItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<PastorAreaItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('todos');
@@ -257,12 +258,15 @@ const PastorAreaPage = () => {
                           Criado por {item.pastor_name} em {format(new Date(item.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="flex gap-2">
+                      <CardContent className="flex flex-wrap gap-2">
                         {item.tipo === 'documento_pdf' && item.file_path && (
                           <Button variant="outline" size="sm" onClick={() => handleDownload(item.file_path!)}><Download className="w-4 h-4 mr-2" /> Baixar</Button>
                         )}
                         {item.tipo !== 'documento_pdf' && (
-                          <Button variant="outline" size="sm" onClick={() => handleEditClick(item)}><Edit className="w-4 h-4 mr-2" /> Editar</Button>
+                          <>
+                            <Button variant="secondary" size="sm" onClick={() => setItemToView(item)}><Eye className="w-4 h-4 mr-2" /> Visualizar</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleEditClick(item)}><Edit className="w-4 h-4 mr-2" /> Editar</Button>
+                          </>
                         )}
                         <Button variant="destructive" size="sm" onClick={() => setItemToDelete(item)}><Trash2 className="w-4 h-4 mr-2" /> Excluir</Button>
                       </CardContent>
@@ -289,6 +293,23 @@ const PastorAreaPage = () => {
               {deleteItemMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Excluir
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!itemToView} onOpenChange={() => setItemToView(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{itemToView?.titulo}</DialogTitle>
+            <DialogDescription>
+              Criado por {itemToView?.pastor_name} em {itemToView && format(new Date(itemToView.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto py-4 prose prose-sm max-w-none dark:prose-invert">
+            <p className="whitespace-pre-wrap">{itemToView?.conteudo}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setItemToView(null)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
