@@ -38,13 +38,13 @@ const CadastrarIgrejaPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const [subscriptionPlans, setSubscriptionPlans] = useState<{ value: string; label: string; monthlyValue: number; memberLimit: number }[]>([]);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<{ value: string; label: string; monthlyValue: number; memberLimit: number; link_pagamento?: string; }[]>([]);
 
   useEffect(() => {
     const fetchPlans = async () => {
         const { data, error } = await supabase
             .from('planos_assinatura')
-            .select('id, nome, preco_mensal, limite_membros');
+            .select('id, nome, preco_mensal, limite_membros, link_pagamento');
         
         if (data) {
             const formattedPlans = data.map(plan => ({
@@ -52,6 +52,7 @@ const CadastrarIgrejaPage = () => {
                 label: plan.nome,
                 monthlyValue: plan.preco_mensal,
                 memberLimit: plan.limite_membros,
+                link_pagamento: plan.link_pagamento,
             }));
             setSubscriptionPlans(formattedPlans);
             
@@ -150,7 +151,7 @@ const CadastrarIgrejaPage = () => {
         throw authError;
       }
 
-      toast.success('Igreja e conta de administrador criadas com sucesso! Verifique seu email para confirmar o cadastro.');
+      toast.success('Igreja e conta de administrador criadas! Verifique seu email para confirmar o cadastro.');
       
       // Plano Free: acesso liberado sem checkout
       if (planDetails.monthlyValue === 0) {
@@ -159,21 +160,17 @@ const CadastrarIgrejaPage = () => {
         return;
       }
 
-      // Plano Pago: Gerar checkout de pagamento via Abacate PAY
-      if (newChurchId) {
-        const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke('create-abacatepay-checkout', {
-          body: { churchId: newChurchId, payerEmail: adminEmail }
-        });
-        if (checkoutError) {
-          console.error('Erro ao gerar checkout Abacate PAY:', checkoutError.message);
-          toast.error('Não foi possível gerar o link de pagamento agora. Você poderá tentar novamente no painel.');
-        } else if (checkoutData?.checkoutUrl) {
-          toast.success('Redirecionando para pagamento...');
-          window.open(checkoutData.checkoutUrl, '_blank');
-        }
+      // Plano Pago: Redirecionar para o link de pagamento
+      if (newChurchId && planDetails.link_pagamento) {
+        toast.loading('Cadastro realizado. Redirecionando para pagamento...');
+        // Substitui o placeholder {CHURCH_ID} pelo ID real da igreja, se existir no link
+        const finalPaymentLink = planDetails.link_pagamento.replace('{CHURCH_ID}', newChurchId);
+        // Redireciona o usuário para a página de pagamento
+        window.location.href = finalPaymentLink;
+      } else {
+        toast.info('Cadastro concluído. O link de pagamento não está configurado. Faça login para gerenciar sua assinatura.');
+        navigate('/login');
       }
-
-      navigate('/login');
 
     } catch (err: any) {
       console.error('FormularioCadastroIgreja: Erro no cadastro:', err);
@@ -277,7 +274,7 @@ const CadastrarIgrejaPage = () => {
                   Cadastrando...
                 </div>
               ) : (
-                'Cadastrar Igreja e Administrador'
+                'Cadastrar e Continuar'
               )}
             </Button>
           </form>

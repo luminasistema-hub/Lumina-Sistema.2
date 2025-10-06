@@ -6,7 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
-import { Plus, Edit, DollarSign, Users, Database, HardDrive, Loader2 } from 'lucide-react';
+import { Plus, Edit, Link, Users, Database, HardDrive, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
 
@@ -25,7 +25,8 @@ const SubscriptionPlanManagement = () => {
       limite_membros: 0,
       limite_quizes_por_etapa: 5,
       limite_armazenamento_mb: 1024,
-      descricao: ''
+      descricao: '',
+      link_pagamento: ''
     });
     setIsDialogOpen(true);
   };
@@ -40,6 +41,7 @@ const SubscriptionPlanManagement = () => {
         limite_quizes_por_etapa: formData.limite_quizes_por_etapa,
         limite_armazenamento_mb: formData.limite_armazenamento_mb,
         descricao: formData.descricao,
+        link_pagamento: formData.link_pagamento,
       };
 
       if (!payload.nome || payload.preco_mensal === undefined || payload.limite_membros === undefined) {
@@ -133,7 +135,7 @@ const SubscriptionPlanManagement = () => {
       </CardContent>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>{selectedPlan ? 'Editar Plano' : 'Criar Novo Plano'}</DialogTitle>
             <DialogDescription>
@@ -168,6 +170,14 @@ const SubscriptionPlanManagement = () => {
                 <Label htmlFor="storage">Armazenamento (MB)</Label>
                 <Input id="storage" type="number" value={formData.limite_armazenamento_mb || 0} onChange={(e) => setFormData({ ...formData, limite_armazenamento_mb: parseInt(e.target.value) })} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payment_link">Link de Pagamento</Label>
+              <div className="relative">
+                <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input id="payment_link" placeholder="https://seu-provedor.com/checkout/..." value={formData.link_pagamento || ''} onChange={(e) => setFormData({ ...formData, link_pagamento: e.target.value })} className="pl-10" />
+              </div>
+              <p className="text-xs text-muted-foreground">Opcional. Se o seu provedor de pagamento permitir, use a variável `{CHURCH_ID}` no link para identificar a igreja. Ex: `...&external_reference={CHURCH_ID}`</p>
             </div>
           </div>
           <div className="flex justify-end gap-2">

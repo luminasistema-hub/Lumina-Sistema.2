@@ -10,6 +10,7 @@ import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage'
 import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
 import EADPortalPage from './pages/EADPortalPage'
+import PaymentSuccessPage from './pages/PaymentSuccessPage'
 import { useEffect } from 'react'
 
 // ----------------------------
@@ -116,6 +117,12 @@ function App() {
           path="/cadastrar-igreja"
           element={
             <CadastrarIgrejaPage />
+          }
+        />
+        <Route
+          path="/payment-success"
+          element={
+            <PaymentSuccessPage />
           }
         />
 
