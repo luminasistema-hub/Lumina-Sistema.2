@@ -34,7 +34,7 @@ import {
   Loader2,
   Baby,
   DollarSign,
-  Headphones // <-- ÍCONE ADICIONADO AQUI
+  Headphones
 } from 'lucide-react'
 import { trackEvent } from '../../lib/analytics';
 import copy from 'copy-to-clipboard';
@@ -478,9 +478,55 @@ const MemberManagementPage = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto p-4">
-               {/* Detalhes do membro aqui */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">
+                <div className="space-y-1">
+                  <Label className="text-gray-500">Email</Label>
+                  <p className="text-sm font-medium">{selectedMember.email}</p>
+                </div>
+                {selectedMember.telefone && (
+                  <div className="space-y-1">
+                    <Label className="text-gray-500">Telefone</Label>
+                    <p className="text-sm font-medium">{selectedMember.telefone}</p>
+                  </div>
+                )}
+                {selectedMember.data_nascimento && (
+                  <div className="space-y-1">
+                    <Label className="text-gray-500">Nascimento</Label>
+                    <p className="text-sm font-medium">{new Date(selectedMember.data_nascimento).toLocaleDateString('pt-BR')} ({calculateAge(selectedMember.data_nascimento)} anos)</p>
+                  </div>
+                )}
+                {selectedMember.estado_civil && (
+                  <div className="space-y-1">
+                    <Label className="text-gray-500">Estado Civil</Label>
+                    <p className="text-sm font-medium">{selectedMember.estado_civil}</p>
+                  </div>
+                )}
+                {selectedMember.profissao && (
+                  <div className="space-y-1">
+                    <Label className="text-gray-500">Profissão</Label>
+                    <p className="text-sm font-medium">{selectedMember.profissao}</p>
+                  </div>
+                )}
+                {selectedMember.endereco && (
+                  <div className="space-y-1 col-span-1 sm:col-span-2">
+                    <Label className="text-gray-500">Endereço</Label>
+                    <p className="text-sm font-medium">{selectedMember.endereco}</p>
+                  </div>
+                )}
+                <div className="border-t col-span-1 sm:col-span-2 my-2"></div>
+                {selectedMember.ministerio_recomendado && (
+                  <div className="space-y-1">
+                    <Label className="text-gray-500">Ministério Recomendado</Label>
+                    <p className="text-sm font-medium">{selectedMember.ministerio_recomendado}</p>
+                  </div>
+                )}
+                 <div className="space-y-1">
+                    <Label className="text-gray-500">Batizado</Label>
+                    <p className="text-sm font-medium">{selectedMember.batizado ? 'Sim' : 'Não'}</p>
+                  </div>
+              </div>
             </div>
-             <div className="flex justify-end gap-2 mt-4">
+             <div className="flex justify-end gap-2 mt-4 px-6 pb-4">
                <Button variant="ghost" onClick={() => setIsViewMemberDialogOpen(false)}>Fechar</Button>
              </div>
           </DialogContent>
