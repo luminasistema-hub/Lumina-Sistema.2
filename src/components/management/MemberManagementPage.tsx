@@ -45,7 +45,7 @@ import {
   Loader2
 } from 'lucide-react'
 import { trackEvent } from '../../lib/analytics';
-import copy from '@/vendor/copy-to-clipboard';
+import copy from 'copy-to-clipboard';
 import { useMembers, MemberProfile } from '@/hooks/useMembers';
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 
