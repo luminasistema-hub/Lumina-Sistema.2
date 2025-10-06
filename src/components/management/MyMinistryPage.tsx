@@ -183,25 +183,56 @@ const MyMinistryPage = () => {
   }, []);
 
   const loadSchedules = useCallback(async (ministryId: string) => {
-    const { data, error } = await supabase
+    const { data: esRows, error } = await supabase
       .from('escalas_servico')
-      .select('*, evento:eventos(id, nome), voluntarios:escala_voluntarios(membro:membros(id, nome_completo, email))')
+      .select('id, data_servico, observacoes, evento:eventos(id, nome)')
       .eq('ministerio_id', ministryId)
       .order('data_servico', { ascending: true });
-    if (error) { toast.error('Erro ao carregar escalas'); return; }
-    const mapped: ScheduleRow[] = (data || []).map((s: any) => ({
+
+    if (error) { toast.error('Erro ao carregar escalas'); setSchedules([]); return; }
+
+    const scheduleIds = (esRows || []).map((s: any) => s.id);
+    if (scheduleIds.length === 0) { setSchedules([]); return; }
+
+    const { data: evRows, error: evErr } = await supabase
+      .from('escala_voluntarios')
+      .select('escala_id, membro_id')
+      .in('escala_id', scheduleIds);
+
+    if (evErr) { toast.error('Erro ao carregar voluntários das escalas'); }
+
+    const memberIds = Array.from(new Set((evRows || []).map((r: any) => r?.membro_id).filter(Boolean)));
+    let membersMap = new Map<string, { id: string; nome_completo: string; email?: string }>();
+    if (memberIds.length > 0) {
+      const { data: memRows, error: memErr } = await supabase
+        .from('membros')
+        .select('id, nome_completo, email')
+        .in('id', memberIds);
+
+      if (memErr) { toast.error('Erro ao carregar dados dos membros'); }
+      (memRows || []).forEach((m: any) => {
+        if (m?.id) membersMap.set(m.id, { id: m.id, nome_completo: m.nome_completo, email: m.email });
+      });
+    }
+
+    const volsBySchedule = new Map<string, string[]>();
+    (evRows || []).forEach((r: any) => {
+      const list = volsBySchedule.get(r.escala_id) || [];
+      if (r?.membro_id) list.push(r.membro_id);
+      volsBySchedule.set(r.escala_id, list);
+    });
+
+    const mapped: ScheduleRow[] = (esRows || []).map((s: any) => ({
       id: s.id,
       data_servico: s.data_servico,
       observacoes: s.observacoes,
       evento: s.evento ? { id: s.evento.id, nome: s.evento.nome } : null,
-      voluntarios: (s.voluntarios || [])
-        .map((ev: any) => {
-          const m = ev?.membro;
-          if (!m || !m.id) return null;
-          return { id: m.id, nome_completo: m.nome_completo, email: m.email };
-        })
-        .filter(Boolean)
+      voluntarios: (volsBySchedule.get(s.id) || []).map((mid: string) => {
+        const m = membersMap.get(mid);
+        return m ? { id: m.id, nome_completo: m.nome_completo, email: m.email } : { id: mid, nome_completo: '—' };
+      })
     }));
+
     setSchedules(mapped);
   }, []);
 
@@ -255,12 +286,26 @@ const MyMinistryPage = () => {
 
   const handleAddVolunteer = async () => {
     if (!selectedMinistryId || !selectedVolunteerToAdd || !currentChurchId) return;
+
+    // Evita duplicar sem depender de upsert
+    const { data: exists, error: checkErr } = await supabase
+      .from('ministerio_voluntarios')
+      .select('id')
+      .eq('ministerio_id', selectedMinistryId)
+      .eq('membro_id', selectedVolunteerToAdd)
+      .maybeSingle();
+
+    if (checkErr) { toast.error('Erro ao verificar voluntário'); return; }
+    if (exists) {
+      toast.info('Este membro já é voluntário neste ministério.');
+      setSelectedVolunteerToAdd(null);
+      return;
+    }
+
     const { error } = await supabase
       .from('ministerio_voluntarios')
-      .upsert(
-        { ministerio_id: selectedMinistryId, membro_id: selectedVolunteerToAdd, id_igreja: currentChurchId },
-        { onConflict: 'ministerio_id,membro_id', ignoreDuplicates: true }
-      );
+      .insert({ ministerio_id: selectedMinistryId, membro_id: selectedVolunteerToAdd, id_igreja: currentChurchId });
+
     if (error) { toast.error('Erro ao adicionar voluntário: ' + error.message); return; }
     toast.success('Voluntário adicionado!');
     setSelectedVolunteerToAdd(null);
