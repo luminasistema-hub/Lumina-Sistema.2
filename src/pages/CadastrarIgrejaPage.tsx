@@ -160,6 +160,14 @@ const CadastrarIgrejaPage = () => {
         return;
       }
 
+      // Plano Pago: Redirecionar para a página de sucesso
+      if (newChurchId && planDetails.monthlyValue > 0) {
+        toast.loading('Cadastro realizado. Redirecionando para confirmação...');
+        // Redireciona para a página de sucesso com o ID da igreja
+        navigate(`/payment-success?church_id=${newChurchId}`);
+        return;
+      }
+
       // Plano Pago: Redirecionar para o link de pagamento
       if (newChurchId && planDetails.link_pagamento) {
         toast.loading('Cadastro realizado. Redirecionando para pagamento...');
