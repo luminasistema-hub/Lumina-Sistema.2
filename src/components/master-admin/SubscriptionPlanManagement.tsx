@@ -177,7 +177,7 @@ const SubscriptionPlanManagement = () => {
                 <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input id="payment_link" placeholder="https://seu-provedor.com/checkout/..." value={formData.link_pagamento || ''} onChange={(e) => setFormData({ ...formData, link_pagamento: e.target.value })} className="pl-10" />
               </div>
-              <p className="text-xs text-muted-foreground">Opcional. Se o seu provedor de pagamento permitir, use a variável `{CHURCH_ID}` no link para identificar a igreja. Ex: `...&external_reference={CHURCH_ID}`</p>
+              <p className="text-xs text-muted-foreground">Opcional. Se o seu provedor de pagamento permitir, use a variável {'{CHURCH_ID}'} no link para identificar a igreja. Ex: {'...&external_reference={CHURCH_ID}'}</p>
             </div>
           </div>
           <div className="flex justify-end gap-2">
