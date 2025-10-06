@@ -6,13 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, Send, History, FileText } from 'lucide-react';
+import { Loader2, Send, History, FileText, ChevronsUpDown, Check, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import NotificationTemplateEditor from './NotificationTemplateEditor';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '../ui/badge';
 
 const NotificationManager = () => {
   const { currentChurchId } = useAuthStore();
@@ -20,11 +23,14 @@ const NotificationManager = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [link, setLink] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState<any[]>([]);
+  const [openCombobox, setOpenCombobox] = useState(false);
 
-  const queryKey = ['all-notifications', currentChurchId];
+  const historyQueryKey = ['all-notifications', currentChurchId];
+  const membersQueryKey = ['church-members', currentChurchId];
 
   const { data: notifications, isLoading: isLoadingHistory } = useQuery({
-    queryKey,
+    queryKey: historyQueryKey,
     queryFn: async () => {
       if (!currentChurchId) return [];
       const { data, error } = await supabase
@@ -39,28 +45,63 @@ const NotificationManager = () => {
     enabled: !!currentChurchId,
   });
 
+  const { data: members, isLoading: isLoadingMembers } = useQuery({
+    queryKey: membersQueryKey,
+    queryFn: async () => {
+      if (!currentChurchId) return [];
+      const { data, error } = await supabase
+        .from('membros')
+        .select('id, nome_completo')
+        .eq('id_igreja', currentChurchId)
+        .order('nome_completo');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentChurchId,
+  });
+
   const sendMutation = useMutation({
     mutationFn: async () => {
       if (!currentChurchId || !title || !description) {
         throw new Error('Título e descrição são obrigatórios.');
       }
-      const { error } = await supabase.from('notificacoes').insert({
-        id_igreja: currentChurchId,
-        user_id: null, // Para todos
-        tipo: 'CUSTOM_ADMIN',
-        titulo: title,
-        descricao: description,
-        link: link || null,
-      });
+
+      let notificationsToSend: any[] = [];
+
+      if (selectedMembers.length > 0) {
+        // Enviar para membros selecionados
+        notificationsToSend = selectedMembers.map(member => ({
+          id_igreja: currentChurchId,
+          user_id: member.id,
+          tipo: 'CUSTOM_ADMIN',
+          titulo: title,
+          descricao: description,
+          link: link || null,
+        }));
+      } else {
+        // Enviar para todos
+        notificationsToSend.push({
+          id_igreja: currentChurchId,
+          user_id: null, // Para todos
+          tipo: 'CUSTOM_ADMIN',
+          titulo: title,
+          descricao: description,
+          link: link || null,
+        });
+      }
+
+      const { error } = await supabase.from('notificacoes').insert(notificationsToSend);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Notificação enviada para toda a igreja!');
-      queryClient.invalidateQueries({ queryKey });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] }); // Invalida o hook de notificações dos usuários
+      const target = selectedMembers.length > 0 ? `${selectedMembers.length} membro(s)` : 'toda a igreja';
+      toast.success(`Notificação enviada para ${target}!`);
+      queryClient.invalidateQueries({ queryKey: historyQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       setTitle('');
       setDescription('');
       setLink('');
+      setSelectedMembers([]);
     },
     onError: (err: any) => {
       toast.error(`Erro ao enviar: ${err.message}`);
@@ -80,8 +121,61 @@ const NotificationManager = () => {
           <Card>
             <CardHeader>
               <CardTitle>Enviar Notificação Personalizada</CardTitle>
+              <CardDescription>Envie uma mensagem para membros específicos ou para toda a igreja.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Destinatários</Label>
+                <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={openCombobox} className="w-full justify-between">
+                      {selectedMembers.length > 0 ? `${selectedMembers.length} membro(s) selecionado(s)` : "Selecionar membros..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar membro..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {members?.map((member) => (
+                            <CommandItem
+                              key={member.id}
+                              value={member.nome_completo}
+                              onSelect={() => {
+                                const isSelected = selectedMembers.some(m => m.id === member.id);
+                                if (isSelected) {
+                                  setSelectedMembers(prev => prev.filter(m => m.id !== member.id));
+                                } else {
+                                  setSelectedMembers(prev => [...prev, member]);
+                                }
+                                setOpenCombobox(false);
+                              }}
+                            >
+                              <Check className={`mr-2 h-4 w-4 ${selectedMembers.some(m => m.id === member.id) ? "opacity-100" : "opacity-0"}`} />
+                              {member.nome_completo}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">Deixe em branco para enviar para todos os membros da igreja.</p>
+                {selectedMembers.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {selectedMembers.map(member => (
+                      <Badge key={member.id} variant="secondary" className="flex items-center gap-1">
+                        {member.nome_completo}
+                        <button onClick={() => setSelectedMembers(prev => prev.filter(m => m.id !== member.id))} className="rounded-full hover:bg-muted-foreground/20">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="title">Título</Label>
                 <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Reunião de Oração" />
@@ -94,9 +188,9 @@ const NotificationManager = () => {
                 <Label htmlFor="link">Link (Opcional)</Label>
                 <Input id="link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ex: /dashboard?module=events" />
               </div>
-              <Button onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending}>
+              <Button onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending || !title || !description}>
                 {sendMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                {sendMutation.isPending ? 'Enviando...' : 'Enviar para Todos'}
+                {sendMutation.isPending ? 'Enviando...' : (selectedMembers.length > 0 ? `Enviar para ${selectedMembers.length} Membro(s)` : 'Enviar para Todos')}
               </Button>
             </CardContent>
           </Card>
@@ -128,7 +222,8 @@ const NotificationManager = () => {
                       <p className="font-semibold">{n.titulo}</p>
                       <p className="text-sm text-gray-600">{n.descricao}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
+                        Enviado {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
+                        {n.user_id ? ` para um usuário específico` : ' para toda a igreja'}
                       </p>
                     </div>
                   ))}

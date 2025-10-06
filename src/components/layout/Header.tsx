@@ -18,6 +18,7 @@ import {
   Heart,
   Menu,
   Loader2,
+  CheckCheck,
 } from 'lucide-react'
 import { Input } from '../ui/input'
 import { useState } from 'react' 
@@ -48,12 +49,21 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
   const [isDarkMode, setIsDarkMode] = useState(false)
   const { notifications, unreadCount, markAllAsRead, isLoading } = useNotifications();
   const navigate = useNavigate();
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
-  if (!user) return null
+  const unreadNotifications = notifications.filter(n => !n.lido);
 
   const handleNotificationClick = (notification: any) => {
     if (notification.link) {
       navigate(notification.link);
+    }
+    // Fecha o popover após o clique
+    setPopoverOpen(false);
+  }
+
+  const handleMarkAllAsRead = () => {
+    if (unreadCount > 0) {
+      markAllAsRead();
     }
   }
 
@@ -99,6 +109,8 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
     }
   }
 
+  if (!user) return null
+
   return (
     <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-4">
       <div className="flex items-center justify-between">
@@ -125,7 +137,7 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
-          <Popover onOpenChange={(open) => { if (open && unreadCount > 0) { /* markAllAsRead() - Desativado por enquanto */ } }}>
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="sm" className="relative flex">
                 <Bell className="w-5 h-5" />
@@ -137,16 +149,22 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0">
-              <div className="p-3 border-b">
+              <div className="p-3 border-b flex justify-between items-center">
                 <h4 className="font-medium text-md">Notificações</h4>
+                {unreadCount > 0 && (
+                  <Button variant="ghost" size="sm" onClick={handleMarkAllAsRead} className="text-xs h-auto py-1 px-2">
+                    <CheckCheck className="w-3 h-3 mr-1" />
+                    Marcar como lidas
+                  </Button>
+                )}
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {isLoading ? (
                   <div className="flex items-center justify-center p-8">
                     <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
                   </div>
-                ) : notifications.length > 0 ? (
-                  notifications.map(n => <NotificationItem key={n.id} notification={n} onClick={() => handleNotificationClick(n)} />)
+                ) : unreadNotifications.length > 0 ? (
+                  unreadNotifications.map(n => <NotificationItem key={n.id} notification={n} onClick={() => handleNotificationClick(n)} />)
                 ) : (
                   <p className="text-center text-sm text-gray-500 p-8">Nenhuma notificação nova.</p>
                 )}
