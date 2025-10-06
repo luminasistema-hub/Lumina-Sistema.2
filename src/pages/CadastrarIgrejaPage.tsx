@@ -138,18 +138,18 @@ const CadastrarIgrejaPage = () => {
       return false;
     }
     try {
-      const { data, error } = await supabase
-        .from('igrejas')
-        .select('id')
-        .eq('cnpj', cleanedCnpj)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return !!data; // Retorna true se encontrar um CNPJ, false caso contrário
+      // Usa RPC segura para checar CNPJ
+      const { data, error } = await supabase.rpc('is_cnpj_taken', { cnpj_input: cleanedCnpj });
+      if (error) {
+        console.error('Erro ao verificar CNPJ via RPC:', error.message);
+        toast.error('Erro ao verificar CNPJ. Tente novamente.');
+        return true; // evita duplicidade em caso de erro
+      }
+      return Boolean(data);
     } catch (error: any) {
-      console.error('Erro ao verificar CNPJ:', error.message);
+      console.error('Erro inesperado ao verificar CNPJ:', error?.message || error);
       toast.error('Erro ao verificar CNPJ. Tente novamente.');
-      return true; // Assume que existe para evitar duplicidade em caso de erro
+      return true;
     } finally {
       setIsCnpjChecking(false);
     }
