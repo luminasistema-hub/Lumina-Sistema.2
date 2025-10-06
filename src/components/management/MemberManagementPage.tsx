@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuthStore, UserRole } from '../../stores/authStore' 
 import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -53,7 +53,7 @@ type Member = MemberProfile;
 
 const MemberManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
-  const { updateChurch, getChurchById, loadChurches, churches } = useChurchStore()
+  const { getChurchById, loadChurches } = useChurchStore()
   const queryClient = useQueryClient();
 
   const { data: members = [], isLoading, error } = useMembers();
@@ -105,6 +105,13 @@ const MemberManagementPage = () => {
     fetchChurches();
   }, [loadChurches]);
 
+  const isSameMonth = (dateStr?: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(`${dateStr}T00:00:00`);
+    const now = new Date();
+    return d.getMonth() === now.getMonth();
+  };
+
   useEffect(() => {
     let filtered = members
 
@@ -141,14 +148,7 @@ const MemberManagementPage = () => {
     setFilteredMembers(filtered)
   }, [members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding])
 
-  const isSameMonth = (dateStr?: string | null) => {
-    if (!dateStr) return false;
-    const d = new Date(`${dateStr}T00:00:00`);
-    const now = new Date();
-    return d.getMonth() === now.getMonth();
-  };
-
-  const computeJourneyTotalSteps = async (churchId: string) => {
+  const computeJourneyTotalSteps = useCallback(async (churchId: string) => {
     const { data: trilhas } = await supabase.from('trilhas_crescimento').select('id').eq('id_igreja', churchId).eq('is_ativa', true);
     const trilhaIds = (trilhas || []).map(t => t.id);
     if (trilhaIds.length === 0) { setJourneyTotalSteps(0); return; }
@@ -157,9 +157,9 @@ const MemberManagementPage = () => {
     if (etapaIds.length === 0) { setJourneyTotalSteps(0); return; }
     const { count } = await supabase.from('passos_etapa').select('id', { count: 'exact' }).in('id_etapa', etapaIds);
     setJourneyTotalSteps(count || 0);
-  };
+  }, []);
 
-  const loadMembersStats = async (churchId: string, membersList: Member[]) => {
+  const loadMembersStats = useCallback(async (churchId: string, membersList: Member[], totalSteps: number) => {
     const nowIso = new Date().toISOString();
     const statsEntries = await Promise.all(
       membersList.map(async (m) => {
@@ -167,26 +167,31 @@ const MemberManagementPage = () => {
           supabase.from('ministerio_voluntarios').select('id', { count: 'exact' }).eq('membro_id', m.id).eq('id_igreja', churchId),
           supabase.from('evento_participantes').select('evento_id', { count: 'exact' }).eq('membro_id', m.id).eq('id_igreja', churchId),
           supabase.from('cursos_inscricoes').select('id', { count: 'exact' }).eq('id_membro', m.id).eq('id_igreja', churchId),
-          journeyTotalSteps > 0 ? supabase.from('progresso_membros').select('id', { count: 'exact' }).eq('id_membro', m.id).or('status.neq.pendente,data_conclusao.not.is.null') : Promise.resolve({ count: 0 }),
+          totalSteps > 0 ? supabase.from('progresso_membros').select('id', { count: 'exact' }).eq('id_membro', m.id).or('status.neq.pendente,data_conclusao.not.is.null') : Promise.resolve({ count: 0 }),
         ]);
         
         const eventoIds = (parts.data || []).map(p => p.evento_id).filter(Boolean) as string[];
         const { count: upcomingEventsCount } = eventoIds.length > 0 ? await supabase.from('eventos').select('id', { count: 'exact' }).in('id', eventoIds).gt('data_hora', nowIso) : { count: 0 };
 
-        const progressPercent = journeyTotalSteps > 0 ? Math.round(((prog.count || 0) / journeyTotalSteps) * 100) : 0;
+        const progressPercent = totalSteps > 0 ? Math.round(((prog.count || 0) / totalSteps) * 100) : 0;
 
         return [m.id, { ministries: mins.count || 0, events: parts.count || 0, upcomingEvents: upcomingEventsCount || 0, courses: cursosInscr.count || 0, progressPercent }] as const;
       })
     );
     setMemberStats(Object.fromEntries(statsEntries));
-  };
+  }, []);
+
+  useEffect(() => {
+    if (currentChurchId) {
+      computeJourneyTotalSteps(currentChurchId);
+    }
+  }, [currentChurchId, computeJourneyTotalSteps]);
 
   useEffect(() => {
     if (currentChurchId && members.length > 0) {
-      computeJourneyTotalSteps(currentChurchId);
-      loadMembersStats(currentChurchId, members);
+      loadMembersStats(currentChurchId, members, journeyTotalSteps);
     }
-  }, [currentChurchId, members]);
+  }, [currentChurchId, members, journeyTotalSteps, loadMembersStats]);
 
   const addMemberMutation = useMutation({
     mutationFn: async (newMemberData: typeof newMember) => {
