@@ -170,7 +170,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
 
   return (
     <div className={cn(
-      "h-screen bg-white border-r flex flex-col transition-all duration-300",
+      "h-screen bg-white border-r flex flex-col transition-all duration-300 overflow-x-hidden min-w-0",
       isCollapsed ? "w-16" : "w-72"
     )}>
       {/* Cabeçalho */}
@@ -178,9 +178,9 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
         {!isCollapsed && (
           <div className="flex items-center gap-3">
             <img src="/favicon.ico" alt="Lumina Logo" className="h-8 w-8" />
-            <div>
-              <h1 className="font-bold">Lumina</h1>
-              <p className="text-xs text-gray-500">Sistema de Gestão</p>
+            <div className="min-w-0">
+              <h1 className="font-bold truncate">Lumina</h1>
+              <p className="text-xs text-gray-500 truncate">Sistema de Gestão</p>
             </div>
           </div>
         )}
@@ -206,7 +206,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
       )}
 
       {/* Conteúdo da Sidebar */}
-      <div className="flex-1 overflow-y-auto py-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-4">
         {/* Dashboard */}
         <div className="px-4 mb-4">
           <Button
@@ -215,7 +215,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
             onClick={() => handleModuleClick("dashboard")}
           >
             <Home className="w-4 h-4" />
-            {!isCollapsed && <span className="ml-3">Dashboard</span>}
+            {!isCollapsed && <span className="ml-3 truncate">Dashboard</span>}
           </Button>
         </div>
 
@@ -261,13 +261,13 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
                       <Button
                         key={module.id}
                         variant={activeModule === module.id ? "secondary" : "ghost"}
-                        className="w-full justify-start text-sm"
+                        className="w-full justify-start text-sm truncate"
                         onClick={() => handleModuleClick(module.id)}
                         title={isCollapsed ? module.title : undefined}
                       >
-                        <div className="flex items-center gap-2 w-full">
+                        <div className="flex items-center gap-2 w-full min-w-0">
                           {module.icon}
-                          {!isCollapsed && <span className="ml-1 flex-1">{module.title}</span>}
+                          {!isCollapsed && <span className="ml-1 flex-1 truncate">{module.title}</span>}
                         </div>
                       </Button>
                     ))}
