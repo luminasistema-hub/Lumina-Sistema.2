@@ -57,13 +57,15 @@ const MyMinistryPage = () => {
       .select('ministerio:ministerios(id, nome, descricao, lider_id)')
       .eq('membro_id', user.id)
       .eq('id_igreja', currentChurchId);
-    const volunteerList = (mv || []).map((row: any) => ({
-      id: row.ministerio.id,
-      nome: row.ministerio.nome,
-      descricao: row.ministerio.descricao,
-      lider_id: row.ministerio.lider_id,
-      isLeader: row.ministerio.lider_id === user.id
-    })) as Ministry[];
+    const volunteerList = (mv || [])
+      .filter((row: any) => !!row?.ministerio && !!row.ministerio.id)
+      .map((row: any) => ({
+        id: row.ministerio.id,
+        nome: row.ministerio.nome,
+        descricao: row.ministerio.descricao,
+        lider_id: row.ministerio.lider_id,
+        isLeader: row.ministerio.lider_id === user.id
+      })) as Ministry[];
 
     // Carrega também os ministérios onde o usuário é LÍDER (mesmo que não esteja na tabela de voluntários)
     const { data: leaderRows } = await supabase
@@ -149,11 +151,13 @@ const MyMinistryPage = () => {
       data_servico: s.data_servico,
       observacoes: s.observacoes,
       evento: s.evento ? { id: s.evento.id, nome: s.evento.nome } : null,
-      voluntarios: (s.voluntarios || []).map((ev: any) => ({
-        id: ev.membro?.id,
-        nome_completo: ev.membro?.nome_completo,
-        email: ev.membro?.email
-      }))
+      voluntarios: (s.voluntarios || [])
+        .map((ev: any) => {
+          const m = ev?.membro;
+          if (!m || !m.id) return null;
+          return { id: m.id, nome_completo: m.nome_completo, email: m.email };
+        })
+        .filter(Boolean)
     }));
     setSchedules(mapped);
   }, []);
@@ -388,8 +392,8 @@ const MyMinistryPage = () => {
               </div>
 
               <div className="space-y-2">
-                {volunteers.map(v => (
-                  <div key={v.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                {volunteers.map((v, idx) => (
+                  <div key={v.id || `vol-${idx}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium truncate">{v.nome_completo}</span>
                       <Badge variant="outline" className="truncate max-w-[160px]">{v.funcao || 'voluntario'}</Badge>
@@ -504,8 +508,8 @@ const MyMinistryPage = () => {
                   <div className="mt-3">
                     <h4 className="font-semibold text-sm mb-1">Voluntários na escala:</h4>
                     <div className="space-y-1">
-                      {s.voluntarios.length > 0 ? s.voluntarios.map(v => (
-                        <div key={v.id} className="flex items-center justify-between text-sm">
+                      {s.voluntarios.length > 0 ? s.voluntarios.map((v, idx) => (
+                        <div key={v.id || `svol-${s.id}-${idx}`} className="flex items-center justify-between text-sm">
                           <span>- {v.nome_completo}</span>
                           <Button variant="ghost" size="sm" className="text-red-600"
                             onClick={() => handleRemoveVolunteerFromSchedule(s.id, v.id)}>
