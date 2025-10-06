@@ -66,6 +66,8 @@ const CadastrarIgrejaPage = () => {
   const [estado, setEstado] = useState('');
   const [telefoneContato, setTelefoneContato] = useState('');
   const [isCepLoading, setIsCepLoading] = useState(false);
+  const [isCnpjChecking, setIsCnpjChecking] = useState(false);
+
 
   // Step 3: Plan data
   const [selectedPlan, setSelectedPlan] = useState('');
@@ -128,7 +130,32 @@ const CadastrarIgrejaPage = () => {
     fetchAddress();
   }, [cep]);
 
-  const nextStep = () => {
+  const checkCnpjExists = async (cnpjValue: string) => {
+    setIsCnpjChecking(true);
+    const cleanedCnpj = cnpjValue.replace(/[^\d]+/g, '');
+    if (cleanedCnpj.length !== 14) {
+      setIsCnpjChecking(false);
+      return false;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('igrejas')
+        .select('id')
+        .eq('cnpj', cleanedCnpj)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return !!data; // Retorna true se encontrar um CNPJ, false caso contrário
+    } catch (error: any) {
+      console.error('Erro ao verificar CNPJ:', error.message);
+      toast.error('Erro ao verificar CNPJ. Tente novamente.');
+      return true; // Assume que existe para evitar duplicidade em caso de erro
+    } finally {
+      setIsCnpjChecking(false);
+    }
+  };
+
+  const nextStep = async () => {
     if (step === 1) {
       if (!adminName || !adminEmail || !adminPassword) {
         return toast.error('Preencha todos os dados do administrador.');
@@ -140,6 +167,10 @@ const CadastrarIgrejaPage = () => {
     if (step === 2) {
       if (!churchName || !cnpj || !cep || !endereco || !numero || !cidade || !estado || !telefoneContato) {
         return toast.error('Preencha todos os dados da igreja.');
+      }
+      const cnpjExists = await checkCnpjExists(cnpj);
+      if (cnpjExists) {
+        return toast.error('O CNPJ informado já está em uso. Por favor, utilize um CNPJ diferente.');
       }
     }
     setStep(s => s + 1);
@@ -285,6 +316,7 @@ const CadastrarIgrejaPage = () => {
                 <Label htmlFor="cnpj">CNPJ *</Label>
                 <div className="relative">
                   <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  {isCnpjChecking && <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 animate-spin" />}
                   <Input id="cnpj" type="text" placeholder="Apenas números" value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="pl-10 h-12" required maxLength={18} />
                 </div>
               </div>
@@ -393,7 +425,7 @@ const CadastrarIgrejaPage = () => {
               ) : <div />}
 
               {step < 3 ? (
-                <Button type="button" onClick={nextStep} className="h-12 px-6 bg-blue-600 hover:bg-blue-700">
+                <Button type="button" onClick={nextStep} className="h-12 px-6 bg-blue-600 hover:bg-blue-700" disabled={isCnpjChecking}>
                   Próximo
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
