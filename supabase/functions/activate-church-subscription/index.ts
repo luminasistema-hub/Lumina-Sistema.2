@@ -25,7 +25,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Atualize o status da igreja para 'active'
+    // Atualize o status da igreja para 'active' imediatamente
     const { data, error } = await supabaseAdmin
       .from('igrejas')
       .update({ 
@@ -41,11 +41,15 @@ serve(async (req) => {
       throw error
     }
 
+    // Log para debug
+    console.log('Igreja ativada com sucesso:', data);
+
     return new Response(JSON.stringify({ message: 'Assinatura ativada com sucesso!', church: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error) {
+    console.error('Erro ao ativar assinatura:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
