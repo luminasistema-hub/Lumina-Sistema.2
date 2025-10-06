@@ -19,7 +19,7 @@ import {
   UserX,
   DollarSign
 } from 'lucide-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 
 // Interfaces
 interface Event {
@@ -102,38 +102,40 @@ const EventsPage = () => {
     );
   }, [events, filterType, searchTerm]);
 
-  const handleRegister = (event: Event) => {
-    if (!user?.id || !currentChurchId) return toast.error('Você precisa estar logado para se inscrever.');
-    if (event.participantes_count >= (event.capacidade_maxima || Infinity)) return toast.error('Capacidade máxima atingida.');
-    
-    const promise = async () => {
-        const { error } = await supabase.from('evento_participantes').insert({
-            evento_id: event.id, membro_id: user.id, id_igreja: currentChurchId
-        });
-        if (error) throw error;
-    };
+  const registerMutation = useMutation({
+    mutationFn: async (event: Event) => {
+      if (!user?.id || !currentChurchId) throw new Error('Você precisa estar logado para se inscrever.');
+      if (event.participantes_count >= (event.capacidade_maxima || Infinity)) throw new Error('Capacidade máxima atingida.');
+      
+      const { error } = await supabase.from('evento_participantes').insert({
+          evento_id: event.id, membro_id: user.id, id_igreja: currentChurchId
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Inscrição realizada com sucesso!');
+      queryClient.invalidateQueries({ queryKey });
+    },
+    onError: (err: any) => {
+      toast.error(`Erro na inscrição: ${err.message}`);
+    },
+  });
 
-    toast.promise(promise(), {
-        loading: 'Realizando inscrição...',
-        success: 'Inscrição realizada com sucesso!',
-        error: (err: any) => `Erro na inscrição: ${err.message}`,
-    });
-  }
-
-  const handleUnregister = (eventId: string) => {
-    if (!user?.id) return;
-    const promise = async () => {
-        const { error } = await supabase.from('evento_participantes').delete()
-            .eq('evento_id', eventId).eq('membro_id', user.id);
-        if (error) throw error;
-    };
-    
-    toast.promise(promise(), {
-      loading: 'Cancelando inscrição...',
-      success: 'Inscrição cancelada!',
-      error: (err: any) => `Erro ao cancelar: ${err.message}`,
-    });
-  }
+  const unregisterMutation = useMutation({
+    mutationFn: async (eventId: string) => {
+      if (!user?.id) throw new Error('Usuário não encontrado.');
+      const { error } = await supabase.from('evento_participantes').delete()
+          .eq('evento_id', eventId).eq('membro_id', user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Inscrição cancelada!');
+      queryClient.invalidateQueries({ queryKey });
+    },
+    onError: (err: any) => {
+      toast.error(`Erro ao cancelar: ${err.message}`);
+    },
+  });
   
   const getStatusColor = (status: Event['status']) => ({
     'Planejado': 'bg-yellow-100 text-yellow-800', 'Confirmado': 'bg-green-100 text-green-800',
@@ -222,8 +224,25 @@ const EventsPage = () => {
                   </div>
                   <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 self-end md:self-center">
                     {event.is_registered ? 
-                      (<Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => handleUnregister(event.id)}><UserX className="w-4 h-4 mr-2" />Cancelar Inscrição</Button>) :
-                      (<Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleRegister(event)} disabled={!event.inscricoes_abertas || event.participantes_count >= (event.capacidade_maxima || Infinity)}><UserCheck className="w-4 h-4 mr-2" />Inscrever-se</Button>)
+                      (<Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="text-red-600 hover:bg-red-50" 
+                          onClick={() => unregisterMutation.mutate(event.id)}
+                          disabled={unregisterMutation.isPending}
+                        >
+                          {unregisterMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserX className="w-4 h-4 mr-2" />}
+                          {unregisterMutation.isPending ? 'Cancelando...' : 'Cancelar Inscrição'}
+                        </Button>) :
+                      (<Button 
+                          size="sm" 
+                          className="bg-green-600 hover:bg-green-700" 
+                          onClick={() => registerMutation.mutate(event)} 
+                          disabled={!event.inscricoes_abertas || event.participantes_count >= (event.capacidade_maxima || Infinity) || registerMutation.isPending}
+                        >
+                          {registerMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}
+                          {registerMutation.isPending ? 'Inscrevendo...' : 'Inscrever-se'}
+                        </Button>)
                     }
                   </div>
                 </div>
