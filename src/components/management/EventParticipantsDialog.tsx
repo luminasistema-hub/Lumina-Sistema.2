@@ -37,21 +37,37 @@ export function EventParticipantsDialog({
     try {
       const { data: regs, error } = await supabase
         .from("evento_participantes")
-        .select("id, membro_id, status_inscricao, data_inscricao, created_at, membros(id, nome_completo, email)")
+        .select("id, membro_id, created_at")
         .eq("evento_id", eventId)
         .eq("id_igreja", churchId)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
 
-      const rows: ParticipantRow[] = (regs || []).map((r: any) => ({
-        id: r.id,
-        membro_id: r.membro_id,
-        status_inscricao: r.status_inscricao,
-        data_inscricao: r.data_inscricao || r.created_at,
-        nome_completo: r.membros?.nome_completo,
-        email: r.membros?.email,
-      }));
+      const memberIds = Array.from(new Set((regs || []).map((r: any) => r?.membro_id).filter(Boolean)));
+      let membersMap = new Map<string, { nome_completo?: string | null; email?: string | null }>();
+      if (memberIds.length > 0) {
+        const { data: mems, error: memErr } = await supabase
+          .from("membros")
+          .select("id, nome_completo, email")
+          .in("id", memberIds);
+        if (memErr) throw memErr;
+        (mems || []).forEach((m: any) => {
+          if (m?.id) membersMap.set(m.id, { nome_completo: m.nome_completo, email: m.email });
+        });
+      }
+
+      const rows: ParticipantRow[] = (regs || []).map((r: any) => {
+        const m = membersMap.get(r.membro_id) || {};
+        return {
+          id: r.id,
+          membro_id: r.membro_id,
+          status_inscricao: null,
+          data_inscricao: r.created_at,
+          nome_completo: m.nome_completo ?? null,
+          email: m.email ?? null,
+        };
+      });
       
       setParticipants(rows);
 
