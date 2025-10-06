@@ -108,16 +108,18 @@ export const useAuthStore = create<AuthState>()(
           if (error) throw error
 
           if (session?.user) {
-            // 1) Tenta carregar perfil de membro (fluxo normal)
-            const { data: profile, error: profileError } = await supabase
-              .from('membros')
-              .select('*')
-              .eq('id', session.user.id)
-              .maybeSingle()
+            // 1) Buscar perfil via Edge Function (service role) para evitar recursão nas policies
+            const { data: edgeRes, error: edgeErr } = await supabase.functions.invoke('get-member-profile', {
+              body: {},
+            });
 
-            if (profileError) {
-              console.warn('AuthStore: erro ao buscar perfil em membros:', profileError.message)
+            if (edgeErr) {
+              console.warn('AuthStore: erro via edge get-member-profile:', edgeErr.message);
             }
+
+            const profile = (edgeRes as any)?.profile;
+            const churchRow = (edgeRes as any)?.church;
+            const personalRecord = (edgeRes as any)?.personal;
 
             if (profile) {
               // Nome da igreja calculado com segurança
@@ -125,22 +127,16 @@ export const useAuthStore = create<AuthState>()(
 
               // Verifica status de pagamento da igreja quando aplicável
               if (profile.id_igreja) {
-                const { data: churchRow } = await supabase
-                  .from('igrejas')
-                  .select('nome, valor_mensal_assinatura, ultimo_pagamento_status, link_pagamento_assinatura')
-                  .eq('id', profile.id_igreja)
-                  .maybeSingle()
-
-                const mensalidade = Number(churchRow?.valor_mensal_assinatura ?? 0)
-                const pagamentoOk = churchRow?.ultimo_pagamento_status === 'Confirmado'
+                const mensalidade = Number(churchRow?.valor_mensal_assinatura ?? 0);
+                const pagamentoOk = churchRow?.ultimo_pagamento_status === 'Confirmado';
 
                 // Para plano pago, exige pagamento confirmado para acessar
                 if (mensalidade > 0 && !pagamentoOk) {
-                  toast.error('Pagamento pendente: finalize o checkout para acessar.')
-                  await supabase.auth.signOut()
-                  set({ user: null, currentChurchId: null, isLoading: false })
-                  isCheckingAuth = false
-                  return
+                  toast.error('Pagamento pendente: finalize o checkout para acessar.');
+                  await supabase.auth.signOut();
+                  set({ user: null, currentChurchId: null, isLoading: false });
+                  isCheckingAuth = false;
+                  return;
                 }
 
                 // Captura o nome da igreja (se existir)
@@ -149,13 +145,7 @@ export const useAuthStore = create<AuthState>()(
                 }
               }
 
-              // Buscar informacoes_pessoais separadamente
-              const { data: personalRecord } = await supabase
-                .from('informacoes_pessoais')
-                .select('*')
-                .eq('membro_id', session.user.id)
-                .maybeSingle()
-
+              // Montar personalInfo
               const personalInfo = personalRecord
                 ? {
                     data_nascimento: personalRecord.data_nascimento ?? null,
@@ -164,7 +154,7 @@ export const useAuthStore = create<AuthState>()(
                     telefone: personalRecord.telefone ?? null,
                     endereco: personalRecord.endereco ?? null,
                   }
-                : null
+                : null;
 
               set({
                 user: {
@@ -181,17 +171,17 @@ export const useAuthStore = create<AuthState>()(
                   personalInfo,
                 },
                 currentChurchId: profile.id_igreja,
-              })
+              });
             } else {
               // 2) Fallback: verifica se é Super Admin
               const { data: sa, error: saError } = await supabase
                 .from('super_admins')
                 .select('id, nome_completo, email, created_at')
                 .eq('id', session.user.id)
-                .maybeSingle()
+                .maybeSingle();
 
               if (saError) {
-                console.warn('AuthStore: erro ao buscar super_admins:', saError.message)
+                console.warn('AuthStore: erro ao buscar super_admins:', saError.message);
               }
 
               if (sa) {
@@ -210,10 +200,10 @@ export const useAuthStore = create<AuthState>()(
                     personalInfo: null,
                   },
                   currentChurchId: null,
-                })
+                });
               } else {
                 // Não é membro nem super_admin
-                set({ user: null, currentChurchId: null })
+                set({ user: null, currentChurchId: null });
               }
             }
           } else {
