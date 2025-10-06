@@ -26,6 +26,7 @@ import {
   Heart,
 } from "lucide-react";
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
+import FloatingShapes from "@/components/visual/FloatingShapes";
 
 const Feature = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
   <Card className="h-full border border-zinc-200 dark:border-zinc-700 backdrop-blur-sm transition-transform hover:-translate-y-1 hover:shadow-xl bg-gradient-to-br from-church-blue-50/70 to-church-purple-50/70 dark:from-zinc-900/80 dark:to-zinc-800/80">
@@ -60,7 +61,13 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-church-blue-50 via-white to-church-purple-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors">
+    <div className="relative min-h-screen text-zinc-900 dark:text-zinc-100 transition-colors">
+      {/* Overlay de gradiente azul/roxo em toda a página */}
+      <div className="fixed inset-0 -z-10 bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-700 opacity-40"></div>
+      
+      {/* Shapes flutuantes interativos */}
+      <FloatingShapes />
+
       {/* HERO */}
       <header className="relative overflow-hidden bg-sidebar-accent/60 dark:bg-zinc-900/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 pt-14 md:pt-20">
