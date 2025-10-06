@@ -57,15 +57,20 @@ const MyMinistryPage = () => {
       .select('ministerio:ministerios(id, nome, descricao, lider_id)')
       .eq('membro_id', user.id)
       .eq('id_igreja', currentChurchId);
+
     const volunteerList = (mv || [])
-      .filter((row: any) => !!row?.ministerio && !!row.ministerio.id)
-      .map((row: any) => ({
-        id: row.ministerio.id,
-        nome: row.ministerio.nome,
-        descricao: row.ministerio.descricao,
-        lider_id: row.ministerio.lider_id,
-        isLeader: row.ministerio.lider_id === user.id
-      })) as Ministry[];
+      .map((row: any) => {
+        const m = row?.ministerio;
+        if (!m || !m.id) return null;
+        return {
+          id: m.id,
+          nome: m.nome,
+          descricao: m.descricao,
+          lider_id: m.lider_id,
+          isLeader: m.lider_id === user.id
+        } as Ministry;
+      })
+      .filter(Boolean) as Ministry[];
 
     // Carrega também os ministérios onde o usuário é LÍDER (mesmo que não esteja na tabela de voluntários)
     const { data: leaderRows } = await supabase
@@ -86,6 +91,7 @@ const MyMinistryPage = () => {
     const merged = [...volunteerList, ...leaderList];
     const uniqueMap = new Map<string, Ministry>();
     for (const item of merged) {
+      if (!item || !item.id) continue;
       if (!uniqueMap.has(item.id)) {
         uniqueMap.set(item.id, item);
       } else {
@@ -99,7 +105,7 @@ const MyMinistryPage = () => {
     // Se nada selecionado ainda, prioriza um ministério onde o usuário é líder
     if (unique.length > 0 && !selectedMinistryId) {
       const leaderFirst = unique.find(m => m.isLeader) || unique[0];
-      setSelectedMinistryId(leaderFirst.id);
+      if (leaderFirst?.id) setSelectedMinistryId(leaderFirst.id);
     }
   }, [user?.id, currentChurchId, selectedMinistryId]);
 
