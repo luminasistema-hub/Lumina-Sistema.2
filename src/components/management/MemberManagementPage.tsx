@@ -72,8 +72,8 @@ const MemberManagementPage = () => {
   const [filterWedding, setFilterWedding] = useState('all')
   const [churchesLoaded, setChurchesLoaded] = useState(false); 
 
-  const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
-  const canEditRoles = user?.role === 'admin' || user?.role === 'pastor'
+  const canManageMembers = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
+  const canEditRoles = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
 
   const [newMember, setNewMember] = useState({
     name: '',

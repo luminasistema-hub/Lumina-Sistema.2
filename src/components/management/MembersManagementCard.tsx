@@ -59,7 +59,7 @@ const MembersManagementCard = () => {
       if (meErr) throw meErr;
 
       const myRole = me?.funcao || 'membro';
-      setIsAdmin(['admin', 'pastor'].includes(myRole));
+      setIsAdmin(['admin', 'pastor', 'integra'].includes(myRole));
 
       // Lista de membros da igreja
       const { data, error } = await supabase

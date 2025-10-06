@@ -70,8 +70,8 @@ const moduleCategories: ModuleCategory[] = [
       { id: "member-management", title: "Gestão de Membros", icon: <Users className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin","integra"], status: "complete" },
       { id: "ministries", title: "Gestão de Ministério", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
       { id: "financial-panel", title: "Painel Financeiro", icon: <DollarSign className="w-4 h-4" />, roles: ["pastor","admin","financeiro"], status: "complete" },
-      { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor"], status: "complete" },
-      { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","membro"], status: "complete" },
+      { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor", "integra"], status: "complete" },
+      { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio"], status: "complete" },
       { id: "events-management", title: "Gestão de Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
       { id: "devotionals-management", title: "Gestão de Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" }
     ]
@@ -83,7 +83,6 @@ const moduleCategories: ModuleCategory[] = [
     modules: [
       { id: "notification-management", title: "Gestão de Notificações", icon: <MessageSquareText className="w-4 h-4" />, roles: ["admin", "pastor"], status: "basic" },
       { id: "system-settings", title: "Configurações", icon: <Settings className="w-4 h-4" />, roles: ["admin"], status: "basic" },
-      { id: "whatsapp-integration", title: "Integração WhatsApp", icon: <Link2 className="w-4 h-4" />, roles: ["admin","pastor"], status: "basic" }
     ]
   }
 ];
