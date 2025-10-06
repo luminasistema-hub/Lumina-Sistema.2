@@ -160,23 +160,16 @@ const CadastrarIgrejaPage = () => {
         return;
       }
 
-      // Plano Pago: Redirecionar para a página de sucesso
-      if (newChurchId && planDetails.monthlyValue > 0) {
-        toast.loading('Cadastro realizado. Redirecionando para confirmação...');
-        // Redireciona para a página de sucesso com o ID da igreja
-        navigate(`/payment-success?church_id=${newChurchId}`);
-        return;
-      }
-
-      // Plano Pago: Redirecionar para o link de pagamento
+      // Plano Pago: Redirecionar para o link de pagamento externo
       if (newChurchId && planDetails.link_pagamento) {
-        toast.loading('Cadastro realizado. Redirecionando para pagamento...');
-        // Substitui o placeholder {CHURCH_ID} pelo ID real da igreja, se existir no link
+        toast.loading('Cadastro realizado. Redirecionando para o portal de pagamento...');
+        // Substitui o placeholder {CHURCH_ID} pelo ID real da igreja
         const finalPaymentLink = planDetails.link_pagamento.replace('{CHURCH_ID}', newChurchId);
-        // Redireciona o usuário para a página de pagamento
+        // Redireciona o usuário para a página de pagamento externa
         window.location.href = finalPaymentLink;
       } else {
-        toast.info('Cadastro concluído. O link de pagamento não está configurado. Faça login para gerenciar sua assinatura.');
+        // Fallback se o link de pagamento não estiver configurado para um plano pago
+        toast.info('Cadastro concluído. O link de pagamento para este plano não está configurado. Faça login para gerenciar sua assinatura.');
         navigate('/login');
       }
 
