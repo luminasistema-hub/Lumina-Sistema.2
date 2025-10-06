@@ -32,7 +32,8 @@ import {
   Copy,
   Target,
   Loader2,
-  Baby
+  Baby,
+  DollarSign // <-- ÍCONE ADICIONADO AQUI
 } from 'lucide-react'
 import { trackEvent } from '../../lib/analytics';
 import copy from 'copy-to-clipboard';
@@ -539,4 +540,5 @@ const MemberManagementPage = () => {
 }
 
 export default MemberManagementPage
+
 
