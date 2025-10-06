@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useMemo } from "react";
+import { useMemo, useMemo as useReactMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,30 +27,39 @@ import {
   LockKeyhole,
   ServerCog,
   Rocket,
+  Shield,
+  Clock8,
+  Zap,
 } from "lucide-react";
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 import FloatingShapes from "@/components/visual/FloatingShapes";
 
-type FeatureProps = { icon: any; title: string; desc: string };
-const Feature = ({ icon: Icon, title, desc }: FeatureProps) => (
-  <Card className="h-full border border-zinc-200 dark:border-zinc-700 backdrop-blur-sm transition-transform hover:-translate-y-1 hover:shadow-xl bg-gradient-to-br from-white/80 to-white/60 dark:from-zinc-900/80 dark:to-zinc-900/60">
+type FeatureProps = { icon: any; title: string; desc: string; accent?: string };
+const Feature = ({ icon: Icon, title, desc, accent = "from-sky-500 to-indigo-500" }: FeatureProps) => (
+  <Card className="h-full border border-zinc-200/70 dark:border-zinc-800/70 bg-white/80 dark:bg-zinc-900/70 backdrop-blur-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgb(0,0,0,0.08)] transition-transform hover:-translate-y-0.5">
     <CardContent className="p-6">
       <div className="flex items-center gap-3 mb-3">
-        <div className="inline-flex items-center justify-center rounded-md bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 p-2">
+        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-white bg-gradient-to-br ${accent} shadow-sm`}>
           <Icon className="h-5 w-5" />
         </div>
-        <h3 className="font-semibold text-zinc-800 dark:text-zinc-100">{title}</h3>
+        <h3 className="font-semibold text-zinc-900/90 dark:text-zinc-100">{title}</h3>
       </div>
       <p className="text-sm text-zinc-600 dark:text-zinc-400">{desc}</p>
     </CardContent>
   </Card>
 );
 
-const Stat = ({ value, label }: { value: string; label: string }) => (
-  <div className="text-center">
-    <div className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white">{value}</div>
-    <div className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400">{label}</div>
-  </div>
+const StatCard = ({ icon: Icon, label }: { icon: any; label: string }) => (
+  <Card className="border border-white/60 dark:border-white/5 bg-white/70 dark:bg-white/5 backdrop-blur-md">
+    <CardContent className="p-5">
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-sky-500/15 to-emerald-500/15 flex items-center justify-center">
+          <Icon className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+        </div>
+        <span className="text-sm font-medium text-zinc-800 dark:text-zinc-100">{label}</span>
+      </div>
+    </CardContent>
+  </Card>
 );
 
 const LandingPage = () => {
@@ -73,66 +82,108 @@ const LandingPage = () => {
     toast.success("Abrindo WhatsApp...");
   };
 
+  const sortedByPrice = useReactMemo(() => {
+    if (!plans?.length) return [];
+    return [...plans].sort((a: any, b: any) => Number(a.preco_mensal || 0) - Number(b.preco_mensal || 0));
+  }, [plans]);
+
+  const popularPlanId = useReactMemo(() => {
+    if (!sortedByPrice.length) return undefined;
+    // Escolhe o plano do meio (não-free) como "Mais Popular" quando houver 3+ opções.
+    const nonFree = sortedByPrice.filter((p: any) => Number(p.preco_mensal || 0) > 0);
+    if (sortedByPrice.length >= 3 && nonFree.length) {
+      const middle = nonFree[Math.floor(nonFree.length / 2)];
+      return middle?.id;
+    }
+    return sortedByPrice[0]?.id;
+  }, [sortedByPrice]);
+
+  const formatBRL = (n: number) =>
+    n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+
   return (
     <div className="relative min-h-screen text-zinc-900 dark:text-zinc-100 transition-colors">
-      {/* Fundo com gradiente e shapes flutuantes */}
-      <div className="fixed inset-0 -z-10 bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-700 opacity-40"></div>
+      {/* Fundo com gradiente e shapes */}
+      <div className="fixed inset-0 -z-20 bg-gradient-to-br from-[#0f172a] via-[#0b2b5a] to-[#1e1b4b] opacity-90 dark:opacity-100" />
+      <div className="fixed inset-0 -z-10 pointer-events-none">
+        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-sky-500/20 blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 h-[28rem] w-[28rem] rounded-full bg-indigo-500/20 blur-3xl" />
+      </div>
       <FloatingShapes />
 
-      {/* Topbar com logo + navegação */}
-      <header className="relative z-10 border-b border-white/20 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-900/50 backdrop-blur-sm">
-        <div className="container mx-auto responsive-section py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/lumina-logo.png" alt="Lumina" className="h-8 w-8 rounded" />
-            <span className="font-semibold">Lumina Sistema de Gestão</span>
-          </div>
+      {/* Header fixo com navegação */}
+      <header className="sticky top-0 z-30 border-b border-white/20 dark:border-zinc-800/60 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-md">
+        <div className="container mx-auto responsive-section py-3 flex items-center justify-between">
+          <a href="#hero" className="flex items-center gap-3">
+            <img src="/lumina-logo.png" alt="Lumina" className="h-8 w-8 rounded-sm" />
+            <span className="font-semibold tracking-tight">Lumina Sistema de Gestão</span>
+          </a>
+          <nav className="hidden md:flex items-center gap-6 text-sm">
+            <a href="#features" className="text-zinc-700 dark:text-zinc-300 hover:text-sky-600">Funcionalidades</a>
+            <a href="#about" className="text-zinc-700 dark:text-zinc-300 hover:text-sky-600">Sobre Nós</a>
+            <a href="#plans" className="text-zinc-700 dark:text-zinc-300 hover:text-sky-600">Planos</a>
+          </nav>
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" className="text-indigo-600 hover:text-indigo-700">
-              <Link to="/register">Criar conta</Link>
+            <Button asChild variant="ghost" className="text-sky-600 hover:text-sky-700">
+              <Link to="/login">Entrar</Link>
             </Button>
-            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white">
-              <Link to="/login">
-                Entrar
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+            <Button
+              onClick={handleContatoWhatsApp}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-4"
+            >
+              <span className="relative inline-flex items-center">
+                <span className="mr-2 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
+                WhatsApp
+              </span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* HERO */}
-      <section className="relative z-10 bg-sidebar-accent/50 dark:bg-zinc-900/40">
+      <section id="hero" className="relative z-10">
         <div className="container mx-auto responsive-section pt-12 md:pt-16 pb-10">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700 backdrop-blur">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Nova identidade • Lumina Sistema de Gestão</span>
+            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 dark:bg-zinc-800/60 border-white/40 dark:border-zinc-700 backdrop-blur">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+              <span>Nova Identidade • Lumina Sistema de Gestão</span>
             </div>
 
-            <h1 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight">
-              Tecnologia que ilumina e simplifica a gestão da sua igreja
+            <h1 className="mt-5 text-[2rem] md:text-6xl font-extrabold leading-tight tracking-tight text-white">
+              <span className="bg-gradient-to-r from-sky-400 to-emerald-400 bg-clip-text text-transparent">
+                Lumina
+              </span>{" "}
+              Sistema de Gestão
             </h1>
-            <p className="mt-4 text-zinc-700 dark:text-zinc-400 text-base md:text-lg">
-              Supabase Auth + RLS por igreja, WhatsApp integrado e ferramentas completas para líderes,
-              voluntários e membros — tudo em um só lugar.
+
+            <p className="mt-5 text-zinc-100/80 text-base md:text-lg">
+              Tecnologia para{" "}
+              <span className="text-sky-300 font-semibold">iluminar</span> e simplificar a gestão da sua igreja —
+              com segurança por igreja (RLS), WhatsApp integrado e ferramentas completas para líderes e membros.
             </p>
 
-            <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild size="lg" className="shadow-md hover:shadow-lg bg-indigo-600 hover:bg-indigo-700 text-white">
+            <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
+              <Button asChild size="lg" className="rounded-full px-6 bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 shadow-md">
                 <Link to="/login">
-                  Entrar agora
+                  Entrar na Plataforma
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button variant="ghost" size="lg" className="sm:ml-2 text-indigo-600 hover:text-indigo-700" onClick={handleContatoWhatsApp}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="rounded-full px-6 border-emerald-500/40 text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10"
+                onClick={handleContatoWhatsApp}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
                 Falar no WhatsApp
-                <PhoneCall className="ml-2 h-4 w-4" />
               </Button>
             </div>
 
-            <div className="mt-8 grid grid-cols-2 justify-items-center max-w-xl mx-auto gap-4">
-              <Stat value="100%" label="RLS por igreja" />
-              <Stat value="24/7" label="Disponível" />
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+              <StatCard icon={Shield} label="100% RLS por igreja" />
+              <StatCard icon={Clock8} label="24/7 Online" />
+              <StatCard icon={Zap} label="Tudo integrado" />
             </div>
           </div>
         </div>
@@ -141,35 +192,35 @@ const LandingPage = () => {
       {/* TRUST / SEGURANÇA */}
       <section className="container mx-auto responsive-section py-10 md:py-12">
         <div className="grid sm:grid-cols-3 gap-4">
-          <Card className="bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800">
+          <Card className="bg-white/85 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/70">
             <CardContent className="p-5 flex items-start gap-3">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
               <div>
                 <h3 className="font-semibold">Segurança por Igreja (RLS)</h3>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                  Cada igreja acessa apenas seus dados com políticas de segurança robustas no banco.
+                  Cada igreja acessa apenas seus dados com políticas robustas no banco.
                 </p>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800">
+          <Card className="bg-white/85 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/70">
             <CardContent className="p-5 flex items-start gap-3">
-              <LockKeyhole className="h-5 w-5 text-indigo-600" />
+              <LockKeyhole className="h-5 w-5 text-sky-600" />
               <div>
                 <h3 className="font-semibold">Auth Supabase</h3>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                  Autenticação moderna e segura, com monitoramento de sessão e redirecionamentos automáticos.
+                  Autenticação moderna, monitoramento de sessão e redirecionamentos automáticos.
                 </p>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800">
+          <Card className="bg-white/85 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/70">
             <CardContent className="p-5 flex items-start gap-3">
-              <ServerCog className="h-5 w-5 text-blue-600" />
+              <ServerCog className="h-5 w-5 text-indigo-600" />
               <div>
                 <h3 className="font-semibold">Infraestrutura Confiável</h3>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                  Query caching, Edge Functions e integrações estáveis para alto desempenho.
+                  Caching, Edge Functions e integrações estáveis para alto desempenho.
                 </p>
               </div>
             </CardContent>
@@ -178,23 +229,26 @@ const LandingPage = () => {
       </section>
 
       {/* FEATURES */}
-      <section className="container mx-auto responsive-section py-10 md:py-14">
-        <div className="max-w-2xl">
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Tudo o que sua igreja precisa</h2>
+      <section id="features" className="container mx-auto responsive-section py-10 md:py-14">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
+            Tudo o que sua igreja precisa
+          </h2>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Funcionalidades pensadas para líderes, voluntários e membros — simples, seguras e integradas.
+            Funcionalidades pensadas para líderes, voluntários e membros —{" "}
+            <span className="text-sky-600 dark:text-sky-400 font-medium">simples, seguras e integradas</span>.
           </p>
         </div>
 
         <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          <Feature icon={Users} title="Gestão de Ministérios" desc="Cadastre ministérios, líderes e voluntários; gerencie funções e demandas." />
-          <Feature icon={CalendarCheck2} title="Escalas de Serviço" desc="Crie escalas por evento e ministério; confirme presença e visualize atribuições." />
-          <Feature icon={Baby} title="Kids Check-in/Out" desc="Check-in com código de segurança e histórico de presença por criança." />
-          <Feature icon={BookOpen} title="Devocionais e Cursos" desc="Publique devocionais e organize trilhas/cursos com módulos e aulas." />
-          <Feature icon={HandCoins} title="Doações e Recibos" desc="Registre ofertas e emita recibos; acompanhe transações e relatórios." />
-          <Feature icon={MessageSquare} title="WhatsApp Integrado" desc="Templates por igreja e fila automática para escala, kids e recibos." />
-          <Feature icon={LayoutDashboard} title="Dashboard por Função" desc="Painéis para admin/pastor e membros com métricas e atalhos." />
-          <Feature icon={ShieldCheck} title="Segurança por Igreja" desc="Supabase Auth + RLS: cada igreja vê apenas seus dados." />
+          <Feature icon={Users} title="Gestão de Ministérios" desc="Cadastre ministérios, líderes e voluntários; gerencie funções e demandas." accent="from-sky-500 to-indigo-500" />
+          <Feature icon={CalendarCheck2} title="Escalas de Serviço" desc="Crie escalas por evento e ministério; confirme presença e visualize atribuições." accent="from-emerald-500 to-teal-500" />
+          <Feature icon={Baby} title="Kids Check-in/Out" desc="Check-in com código de segurança e histórico de presença por criança." accent="from-rose-500 to-pink-500" />
+          <Feature icon={BookOpen} title="Devocionais e Cursos" desc="Publique devocionais e organize trilhas/cursos com módulos e aulas." accent="from-violet-500 to-purple-500" />
+          <Feature icon={HandCoins} title="Doações e Recibos" desc="Registre ofertas e emita recibos; acompanhe transações e relatórios." accent="from-amber-500 to-orange-500" />
+          <Feature icon={MessageSquare} title="WhatsApp Integrado" desc="Templates por igreja e fila automática para escala, kids e recibos." accent="from-emerald-500 to-green-500" />
+          <Feature icon={LayoutDashboard} title="Dashboard por Função" desc="Painéis para admin/pastor e membros com métricas e atalhos." accent="from-blue-500 to-indigo-500" />
+          <Feature icon={ShieldCheck} title="Segurança por Igreja" desc="Supabase Auth + RLS: cada igreja vê apenas seus dados." accent="from-fuchsia-500 to-pink-500" />
         </div>
       </section>
 
@@ -208,7 +262,7 @@ const LandingPage = () => {
         </div>
         <div className="mt-8 grid md:grid-cols-3 gap-4">
           {screenshots.map((src) => (
-            <Card key={src} className="overflow-hidden bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800">
+            <Card key={src} className="overflow-hidden bg-white/80 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/70">
               <CardContent className="p-0">
                 <img src={src} alt="Tela do sistema Lumina" className="w-full h-56 object-cover" />
               </CardContent>
@@ -218,9 +272,9 @@ const LandingPage = () => {
       </section>
 
       {/* SOBRE / MISSÃO / VISÃO */}
-      <section className="container mx-auto responsive-section py-10 md:py-14">
+      <section id="about" className="container mx-auto responsive-section py-10 md:py-14">
         <div className="grid lg:grid-cols-3 gap-6">
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200/70 dark:border-zinc-700/70">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Sobre Nós</h2>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -230,11 +284,11 @@ const LandingPage = () => {
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200/70 dark:border-zinc-700/70">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Nossa Missão</h2>
               <div className="flex items-start gap-3">
-                <Lightbulb className="h-5 w-5 text-indigo-600" />
+                <Lightbulb className="h-5 w-5 text-amber-600" />
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
                   Empoderar igrejas com tecnologia acessível, simplificando a gestão para dedicar mais tempo
                   à missão espiritual e ao cuidado dos membros.
@@ -242,7 +296,7 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200/70 dark:border-zinc-700/70">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Nossa Visão</h2>
               <div className="flex items-start gap-3">
@@ -259,17 +313,19 @@ const LandingPage = () => {
 
       {/* VALORES */}
       <section className="container mx-auto responsive-section py-10 md:py-14">
-        <div className="max-w-2xl">
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Nossos Valores</h2>
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight">Nossos Valores</h2>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            O que nos guia diariamente para servir melhor as igrejas.
+            O que nos guia no dia a dia para servir melhor as igrejas.
           </p>
         </div>
         <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <Heart className="h-5 w-5 text-pink-600" />
+                <div className="h-10 w-10 rounded-full bg-rose-500/15 flex items-center justify-center">
+                  <Heart className="h-5 w-5 text-rose-500" />
+                </div>
                 <div>
                   <h3 className="font-semibold">Fé e Propósito</h3>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">Trabalhamos para fortalecer o trabalho das igrejas.</p>
@@ -277,10 +333,12 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <Sparkles className="h-5 w-5 text-indigo-600" />
+                <div className="h-10 w-10 rounded-full bg-amber-500/15 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                </div>
                 <div>
                   <h3 className="font-semibold">Inovação a Serviço</h3>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">Tecnologia aplicada às necessidades do contexto eclesiástico.</p>
@@ -288,10 +346,12 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-emerald-600" />
+                <div className="h-10 w-10 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                  <CheckCircle className="h-5 w-5 text-emerald-600" />
+                </div>
                 <div>
                   <h3 className="font-semibold">Parceria e Suporte</h3>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">Suporte dedicado e relacionamento de confiança.</p>
@@ -299,10 +359,12 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <ShieldCheck className="h-5 w-5 text-zinc-600" />
+                <div className="h-10 w-10 rounded-full bg-violet-500/15 flex items-center justify-center">
+                  <ShieldCheck className="h-5 w-5 text-violet-600" />
+                </div>
                 <div>
                   <h3 className="font-semibold">Integridade</h3>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">Transparência e honestidade em todas as interações.</p>
@@ -310,10 +372,12 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow sm:col-span-2 lg:col-span-1">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <Rocket className="h-5 w-5 text-violet-600" />
+                <div className="h-10 w-10 rounded-full bg-fuchsia-500/15 flex items-center justify-center">
+                  <Rocket className="h-5 w-5 text-fuchsia-600" />
+                </div>
                 <div>
                   <h3 className="font-semibold">Simplicidade</h3>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400">Ferramentas poderosas e fáceis de usar.</p>
@@ -325,94 +389,122 @@ const LandingPage = () => {
       </section>
 
       {/* PLANOS */}
-      <section className="container mx-auto responsive-section py-10 md:py-14">
-        <div className="max-w-2xl">
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Planos de Assinatura</h2>
+      <section id="plans" className="container mx-auto responsive-section py-10 md:py-16">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 dark:bg-zinc-800/60 border-white/40 dark:border-zinc-700">
+            <span className="h-2 w-2 rounded-full bg-sky-400" />
+            <span>Planos Flexíveis</span>
+          </div>
+          <h2 className="mt-3 text-2xl md:text-4xl font-extrabold tracking-tight">Planos de Assinatura</h2>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">Escolha um plano para começar o cadastro da sua igreja.</p>
         </div>
+
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {isLoading ? (
             <Card className="p-6">
               <CardContent className="p-0">Carregando planos...</CardContent>
             </Card>
-          ) : plans.length === 0 ? (
+          ) : (plans?.length ?? 0) === 0 ? (
             <Card className="p-6">
               <CardContent className="p-0">Nenhum plano disponível no momento.</CardContent>
             </Card>
           ) : (
-            plans.map((plan) => (
-              <Card key={plan.id} className="bg-gradient-to-br from-white/80 to-indigo-50/60 dark:from-zinc-900/80 dark:to-zinc-800/80 border border-indigo-200 dark:border-zinc-700 shadow-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-zinc-800 dark:text-zinc-100">{plan.nome}</h3>
-                    <Badge className="bg-primary/10 text-primary">
-                      R$ {plan.preco_mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">{plan.descricao}</p>
-                  <ul className="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 mb-4">
-                    <li>Até {plan.limite_membros} membros</li>
-                    <li>{plan.limite_quizes_por_etapa} quizzes por etapa</li>
-                    <li>{plan.limite_armazenamento_mb} MB de armazenamento</li>
-                  </ul>
-                  <Button asChild className="w-full bg-indigo-600 hover:bg-indigo-700 shadow-md">
-                    <Link to={`/cadastrar-igreja?plano=${plan.id}`}>Escolher este plano</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))
+            plans.map((plan: any) => {
+              const price = Number(plan.preco_mensal ?? 0);
+              const isPopular = plan.id === popularPlanId && price > 0;
+              return (
+                <Card
+                  key={plan.id}
+                  className={`relative bg-white/90 dark:bg-zinc-900/85 border shadow-sm transition-all ${
+                    isPopular
+                      ? "border-sky-400/60 ring-2 ring-sky-300/40"
+                      : "border-zinc-200/70 dark:border-zinc-700/70"
+                  }`}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="rounded-full bg-sky-600 text-white text-[10px] px-2 py-1 shadow">
+                        Mais Popular
+                      </span>
+                    </div>
+                  )}
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 opacity-80" />
+                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{plan.nome}</h3>
+                      </div>
+                      <Badge className="bg-primary/10 text-primary border border-primary/20">
+                        {formatBRL(price)}/mês
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">{plan.descricao}</p>
+                    <ul className="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 mb-4">
+                      <li>Até {plan.limite_membros} membros</li>
+                      <li>{plan.limite_quizes_por_etapa} quizzes por etapa</li>
+                      <li>{plan.limite_armazenamento_mb} MB de armazenamento</li>
+                    </ul>
+                    <Button asChild className={`w-full ${isPopular ? "bg-sky-600 hover:bg-sky-700" : "bg-indigo-600 hover:bg-indigo-700"} shadow-md`}>
+                      <Link to={`/cadastrar-igreja?plano=${plan.id}`}>Escolher este plano</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       </section>
 
       {/* FOOTER */}
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-10">
+      <footer className="border-t border-white/10 bg-[#0b1220] text-zinc-300">
         <div className="container mx-auto responsive-section py-10 grid gap-8 md:grid-cols-3">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <img src="/lumina-logo.png" alt="Lumina" className="h-6 w-6 rounded" />
-              <h3 className="text-lg font-semibold">Lumina Sistema de Gestão</h3>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-sky-500/15 flex items-center justify-center">
+                <img src="/lumina-logo.png" alt="Lumina" className="h-6 w-6 rounded-sm" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Lumina Sistema de Gestão</h3>
             </div>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="text-sm text-zinc-400">
               Tecnologia para iluminar e simplificar a gestão da sua igreja.
             </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-500">
+            <p className="text-xs text-zinc-500">
               © {new Date().getFullYear()} Lumina. Todos os direitos reservados.
             </p>
           </div>
           <div className="space-y-3">
-            <h4 className="text-sm font-medium">Contato</h4>
+            <h4 className="text-sm font-medium text-white">Contato</h4>
             <div className="flex items-center gap-3">
-              <PhoneCall className="h-4 w-4 text-emerald-600" />
-              <a href="https://wa.me/5563984861923" target="_blank" rel="noreferrer" className="text-sm">+55 63 98486-1923</a>
+              <PhoneCall className="h-4 w-4 text-emerald-400" />
+              <a href="https://wa.me/5563984861923" target="_blank" rel="noreferrer" className="text-sm hover:text-white">+55 63 98486-1923</a>
             </div>
             <div className="flex items-center gap-3">
-              <Mail className="h-4 w-4 text-indigo-600" />
-              <a href="mailto:Luminasistema@gmail.com.br" className="text-sm">Luminasistema@gmail.com.br</a>
+              <Mail className="h-4 w-4 text-sky-400" />
+              <a href="mailto:Luminasistema@gmail.com.br" className="text-sm hover:text-white">Luminasistema@gmail.com.br</a>
             </div>
             <div className="flex items-center gap-3">
-              <Globe className="h-4 w-4 text-blue-600" />
-              <a href="https://www.luminasistema.com.br" target="_blank" rel="noreferrer" className="text-sm">www.luminasistema.com.br</a>
+              <Globe className="h-4 w-4 text-violet-400" />
+              <a href="https://www.luminasistema.com.br" target="_blank" rel="noreferrer" className="text-sm hover:text-white">www.luminasistema.com.br</a>
             </div>
           </div>
           <div className="space-y-3">
-            <h4 className="text-sm font-medium">Dados Empresariais</h4>
+            <h4 className="text-sm font-medium text-white">Dados Empresariais</h4>
             <div className="flex items-center gap-3">
-              <Building2 className="h-4 w-4 text-zinc-700" />
+              <Building2 className="h-4 w-4 text-zinc-400" />
               <div className="text-sm">
-                <div className="text-zinc-500">Nome Empresarial</div>
-                <div className="font-medium">49.023.921 INOVA SIMPLES (I.S.)</div>
+                <div className="text-zinc-400">Nome Empresarial</div>
+                <div className="font-medium text-white">49.023.921 INOVA SIMPLES (I.S.)</div>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <FileText className="h-4 w-4 text-zinc-700" />
+              <FileText className="h-4 w-4 text-zinc-400" />
               <div className="text-sm">
-                <div className="text-zinc-500">CNPJ</div>
-                <div className="font-medium">49.023.921/0001-69</div>
+                <div className="text-zinc-400">CNPJ</div>
+                <div className="font-medium text-white">49.023.921/0001-69</div>
               </div>
             </div>
-            <div className="mt-4">
-              <Button onClick={handleContatoWhatsApp} className="bg-indigo-600 hover:bg-indigo-700">
+            <div className="pt-1">
+              <Button onClick={handleContatoWhatsApp} className="bg-emerald-600 hover:bg-emerald-700 rounded-full">
                 Falar no WhatsApp
                 <PhoneCall className="ml-2 h-4 w-4" />
               </Button>
