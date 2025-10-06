@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -45,8 +45,8 @@ export default function AddVoluntarioDialog({
       // 2. buscar voluntários já no ministério
       const { data: voluntarios, error: errVol } = await supabase
         .from("ministerio_voluntarios")
-        .select("id_usuario")
-        .eq("id_ministerio", idMinisterio);
+        .select("membro_id")
+        .eq("ministerio_id", idMinisterio);
 
       if (errVol) {
         console.error("Erro voluntários:", errVol);
@@ -54,7 +54,7 @@ export default function AddVoluntarioDialog({
         return;
       }
 
-      const usados = voluntarios?.map(v => v.id_usuario) || [];
+      const usados = voluntarios?.map(v => v.membro_id) || [];
       const filtrados = todos?.filter(m => !usados.includes(m.id)) || [];
 
       setMembros(filtrados);
@@ -69,8 +69,9 @@ export default function AddVoluntarioDialog({
     if (!selected) return;
 
     const { error } = await supabase.from("ministerio_voluntarios").insert({
-      id_ministerio: idMinisterio,
-      id_usuario: selected,
+      ministerio_id: idMinisterio,
+      membro_id: selected,
+      id_igreja: idIgreja,
     });
 
     if (error) {
