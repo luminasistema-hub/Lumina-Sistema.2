@@ -30,6 +30,7 @@ export function CreateEventDialog({
   const [linkExterno, setLinkExterno] = useState("");
   const [inscricoesAbertas, setInscricoesAbertas] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [paidType, setPaidType] = useState<'gratuito' | 'pago'>('gratuito');
 
   const handleCreate = async () => {
     if (!nome || !dataHora || !local) {
@@ -46,9 +47,9 @@ export function CreateEventDialog({
       tipo,
       status,
       capacidade_maxima: capacidadeMaxima ? Number(capacidadeMaxima) : null,
-      valor_inscricao: valorInscricao ? Number(valorInscricao) : 0,
+      valor_inscricao: paidType === 'pago' ? (valorInscricao ? Number(valorInscricao) : 0) : 0,
       inscricoes_abertas: inscricoesAbertas,
-      link_externo: valorInscricao && Number(valorInscricao) > 0 ? (linkExterno || null) : null,
+      link_externo: paidType === 'pago' && Number(valorInscricao) > 0 ? (linkExterno || null) : null,
     };
 
     const { error } = await supabase.from("eventos").insert(payload);
@@ -158,8 +159,21 @@ export function CreateEventDialog({
               <Input id="capacidade" type="number" min={0} value={capacidadeMaxima} onChange={(e) => setCapacidadeMaxima(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="valor">Valor Inscrição (R$)</Label>
-              <Input id="valor" type="number" min={0} step="0.01" value={valorInscricao} onChange={(e) => setValorInscricao(e.target.value)} />
+              <Label>Cobrança</Label>
+              <Select value={paidType} onValueChange={(v) => {
+                const val = (v as 'gratuito' | 'pago');
+                setPaidType(val);
+                if (val === 'gratuito') {
+                  setValorInscricao('');
+                  setLinkExterno('');
+                }
+              }}>
+                <SelectTrigger><SelectValue placeholder="Tipo de cobrança" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gratuito">Gratuito</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Inscrições</Label>
@@ -173,14 +187,16 @@ export function CreateEventDialog({
             </div>
           </div>
 
-          {Number(valorInscricao) > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="linkExterno">Link externo (pagamento/inscrição)</Label>
-              <Input
-                id="linkExterno"
-                value={linkExterno}
-                onChange={(e) => setLinkExterno(e.target.value)}
-              />
+          {paidType === 'pago' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="valor">Valor Inscrição (R$)</Label>
+                <Input id="valor" type="number" min={0} step="0.01" value={valorInscricao} onChange={(e) => setValorInscricao(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="linkExterno">Link externo (pagamento/inscrição)</Label>
+                <Input id="linkExterno" value={linkExterno} onChange={(e) => setLinkExterno(e.target.value)} />
+              </div>
             </div>
           )}
 

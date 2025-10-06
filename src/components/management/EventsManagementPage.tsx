@@ -21,7 +21,7 @@ const EventsManagementPage = () => {
   const [isParticipantsOpen, setParticipantsOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState('upcoming');
+  const [filter, setFilter] = useState('all');
 
   const queryKey = useMemo(() => ['eventsManagement', currentChurchId, filter, searchTerm], [currentChurchId, filter, searchTerm]);
 
@@ -32,7 +32,7 @@ const EventsManagementPage = () => {
       let query = supabase.from('eventos').select('*').eq('id_igreja', currentChurchId);
 
       if (filter === 'upcoming') {
-        query = query.gt('data_hora', new Date().toISOString());
+        query = query.gte('data_hora', new Date().toISOString());
       } else if (filter === 'past') {
         query = query.lt('data_hora', new Date().toISOString());
       }
@@ -49,7 +49,6 @@ const EventsManagementPage = () => {
   });
 
   const handleSuccess = () => {
-    // invalida e refetch com a mesma queryKey ativa, garantindo atualização imediata
     queryClient.invalidateQueries({ queryKey });
     queryClient.refetchQueries({ queryKey });
     setCreateOpen(false);
