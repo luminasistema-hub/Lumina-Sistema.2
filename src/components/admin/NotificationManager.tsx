@@ -9,9 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, Send, History } from 'lucide-react';
+import { Loader2, Send, History, FileText } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import NotificationTemplateEditor from './NotificationTemplateEditor';
 
 const NotificationManager = () => {
   const { currentChurchId } = useAuthStore();
@@ -70,8 +71,9 @@ const NotificationManager = () => {
     <div className="p-4 md:p-6">
       <h1 className="text-2xl font-bold mb-6">Gestão de Notificações</h1>
       <Tabs defaultValue="send">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="send"><Send className="w-4 h-4 mr-2" />Enviar Nova</TabsTrigger>
+          <TabsTrigger value="templates"><FileText className="w-4 h-4 mr-2" />Modelos</TabsTrigger>
           <TabsTrigger value="history"><History className="w-4 h-4 mr-2" />Histórico</TabsTrigger>
         </TabsList>
         <TabsContent value="send">
@@ -98,6 +100,16 @@ const NotificationManager = () => {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="templates">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Modelos de Notificação Automática</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <NotificationTemplateEditor />
+                </CardContent>
+            </Card>
         </TabsContent>
         <TabsContent value="history">
           <Card>
