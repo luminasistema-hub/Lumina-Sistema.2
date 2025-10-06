@@ -23,6 +23,7 @@ import {
   CheckCircle,
   Lightbulb,
   Target,
+  Heart,
 } from "lucide-react";
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 
