@@ -11,7 +11,7 @@ export interface RecentDevotional {
   membros: { nome_completo: string | null } | null;
 }
 
-const fetchRecentDevotionals = async (churchId: string | null) => {
+const fetchRecentDevotionals = async (churchId: string | null, _userId: string | null) => {
   if (!churchId) return [];
   const { data, error } = await supabase
     .from('devocionais')
@@ -26,11 +26,11 @@ const fetchRecentDevotionals = async (churchId: string | null) => {
 };
 
 export const useRecentDevotionals = () => {
-  const { currentChurchId } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
   return useQuery({
-    queryKey: ['recentDevotionals', currentChurchId],
-    queryFn: () => fetchRecentDevotionals(currentChurchId),
-    enabled: !!currentChurchId,
+    queryKey: ['recentDevotionals', currentChurchId, user?.id],
+    queryFn: () => fetchRecentDevotionals(currentChurchId, user?.id || null),
+    enabled: !!currentChurchId && !!user?.id,
     staleTime: 1000 * 60 * 5,
   });
 };

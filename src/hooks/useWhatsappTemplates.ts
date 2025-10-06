@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 
 export type TemplateRow = { id: string; key: string; content: string };
 
-const fetchWhatsappTemplates = async (churchId: string | null): Promise<TemplateRow[]> => {
+const fetchWhatsappTemplates = async (churchId: string | null, _userId: string | null): Promise<TemplateRow[]> => {
   if (!churchId) return [];
   const { data, error } = await supabase
     .from('whatsapp_templates')
@@ -16,14 +16,14 @@ const fetchWhatsappTemplates = async (churchId: string | null): Promise<Template
 };
 
 export const useWhatsappTemplates = () => {
-  const { currentChurchId } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
-  const queryKey = ['whatsapp_templates', currentChurchId];
+  const queryKey = ['whatsapp_templates', currentChurchId, user?.id];
 
   const { data: templates = [], isLoading, error } = useQuery({
     queryKey,
-    queryFn: () => fetchWhatsappTemplates(currentChurchId),
-    enabled: !!currentChurchId,
+    queryFn: () => fetchWhatsappTemplates(currentChurchId, user?.id || null),
+    enabled: !!currentChurchId && !!user?.id,
   });
 
   const saveTemplateMutation = useMutation({

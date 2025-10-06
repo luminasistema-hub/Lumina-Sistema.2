@@ -11,7 +11,7 @@ export type SessionRow = {
   last_heartbeat?: string | null;
 };
 
-const fetchWhatsappSession = async (churchId: string | null): Promise<SessionRow | null> => {
+const fetchWhatsappSession = async (churchId: string | null, _userId: string | null): Promise<SessionRow | null> => {
   if (!churchId) return null;
   const { data, error } = await supabase
     .from('whatsapp_sessions')
@@ -23,14 +23,14 @@ const fetchWhatsappSession = async (churchId: string | null): Promise<SessionRow
 };
 
 export const useWhatsappSession = () => {
-  const { currentChurchId } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
-  const queryKey = ['whatsapp_session', currentChurchId];
+  const queryKey = ['whatsapp_session', currentChurchId, user?.id];
 
   const { data: session, isLoading, error } = useQuery({
     queryKey,
-    queryFn: () => fetchWhatsappSession(currentChurchId),
-    enabled: !!currentChurchId,
+    queryFn: () => fetchWhatsappSession(currentChurchId, user?.id || null),
+    enabled: !!currentChurchId && !!user?.id,
   });
 
   const initSessionMutation = useMutation({

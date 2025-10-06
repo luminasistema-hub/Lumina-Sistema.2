@@ -15,7 +15,7 @@ export interface PastorAreaItem {
   updated_at: string;
 }
 
-const fetchPastorItems = async (churchId: string | null): Promise<PastorAreaItem[]> => {
+const fetchPastorItems = async (churchId: string | null, _userId?: string | null): Promise<PastorAreaItem[]> => {
   if (!churchId) return [];
 
   try {
@@ -49,10 +49,10 @@ const fetchPastorItems = async (churchId: string | null): Promise<PastorAreaItem
 };
 
 export const usePastorItems = () => {
-  const { currentChurchId } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
   return useQuery({
-    queryKey: ['pastorAreaItems', currentChurchId],
-    queryFn: () => fetchPastorItems(currentChurchId),
-    enabled: !!currentChurchId,
+    queryKey: ['pastorAreaItems', currentChurchId, user?.id],
+    queryFn: () => fetchPastorItems(currentChurchId, user?.id || null),
+    enabled: !!currentChurchId && !!user?.id,
   });
 };

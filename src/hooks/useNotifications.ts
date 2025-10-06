@@ -7,7 +7,7 @@ export const useNotifications = () => {
   const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const queryKey = ['notifications', user?.id];
+  const queryKey = ['notifications', user?.id, currentChurchId];
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey,

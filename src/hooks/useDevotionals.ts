@@ -68,12 +68,12 @@ const fetchDevotionals = async (churchId: string, filters: any) => {
 }
 
 export const useDevotionals = (filters: any) => {
-  const { currentChurchId } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore();
   return useQuery({
-    queryKey: ['devotionals', currentChurchId, filters],
+    queryKey: ['devotionals', currentChurchId, user?.id, filters],
     queryFn: () => fetchDevotionals(currentChurchId!, filters),
-    enabled: !!currentChurchId,
-  })
+    enabled: !!currentChurchId && !!user?.id,
+  });
 }
 
 const fetchDevotionalDetails = async (devotionalId: string) => {
@@ -103,11 +103,12 @@ const fetchDevotionalDetails = async (devotionalId: string) => {
 }
 
 export const useDevotionalDetails = (devotionalId: string | null) => {
+  const { user } = useAuthStore();
   return useQuery({
-    queryKey: ['devotionalDetails', devotionalId],
+    queryKey: ['devotionalDetails', devotionalId, user?.id],
     queryFn: () => fetchDevotionalDetails(devotionalId!),
-    enabled: !!devotionalId,
-  })
+    enabled: !!devotionalId && !!user?.id,
+  });
 }
 
 export const useCreateDevotional = () => {

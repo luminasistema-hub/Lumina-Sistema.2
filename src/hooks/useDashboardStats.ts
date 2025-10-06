@@ -3,7 +3,7 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuthStore } from '../stores/authStore';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 
-const fetchDashboardStats = async (churchId: string | null) => {
+const fetchDashboardStats = async (churchId: string | null, _userId: string | null) => {
   if (!churchId) return null;
 
   // 1. Membros Ativos
@@ -56,12 +56,12 @@ const fetchDashboardStats = async (churchId: string | null) => {
 };
 
 export const useDashboardStats = () => {
-  const { currentChurchId } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
 
   return useQuery({
-    queryKey: ['dashboardStats', currentChurchId],
-    queryFn: () => fetchDashboardStats(currentChurchId),
-    enabled: !!currentChurchId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    queryKey: ['dashboardStats', currentChurchId, user?.id],
+    queryFn: () => fetchDashboardStats(currentChurchId, user!.id),
+    enabled: !!currentChurchId && !!user?.id,
+    staleTime: 1000 * 60 * 5,
   });
 };

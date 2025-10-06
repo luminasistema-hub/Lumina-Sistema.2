@@ -38,7 +38,7 @@ export interface MemberProfile {
   churchName?: string;
 }
 
-const fetchMembers = async (churchId: string | null, getChurchById: (id: string) => { name: string } | undefined): Promise<MemberProfile[]> => {
+const fetchMembers = async (churchId: string | null, getChurchById: (id: string) => { name: string } | undefined, _userId?: string | null): Promise<MemberProfile[]> => {
   if (!churchId) return [];
 
   const { data, error } = await supabase
@@ -97,12 +97,12 @@ const fetchMembers = async (churchId: string | null, getChurchById: (id: string)
 };
 
 export const useMembers = () => {
-  const { currentChurchId } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
   const { getChurchById } = useChurchStore();
 
   return useQuery({
-    queryKey: ['members', currentChurchId],
-    queryFn: () => fetchMembers(currentChurchId, getChurchById),
-    enabled: !!currentChurchId,
+    queryKey: ['members', currentChurchId, user?.id],
+    queryFn: () => fetchMembers(currentChurchId, getChurchById, user?.id || null),
+    enabled: !!currentChurchId && !!user?.id,
   });
 };

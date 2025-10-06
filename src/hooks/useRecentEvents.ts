@@ -11,7 +11,7 @@ export interface RecentEvent {
   status: string | null;
 }
 
-const fetchRecentEvents = async (churchId: string | null) => {
+const fetchRecentEvents = async (churchId: string | null, _userId: string | null) => {
   if (!churchId) return [];
   const { data, error } = await supabase
     .from('eventos')
@@ -25,11 +25,11 @@ const fetchRecentEvents = async (churchId: string | null) => {
 };
 
 export const useRecentEvents = () => {
-  const { currentChurchId } = useAuthStore();
+  const { user, currentChurchId } = useAuthStore();
   return useQuery({
-    queryKey: ['recentEvents', currentChurchId],
-    queryFn: () => fetchRecentEvents(currentChurchId),
-    enabled: !!currentChurchId,
+    queryKey: ['recentEvents', currentChurchId, user?.id],
+    queryFn: () => fetchRecentEvents(currentChurchId, user?.id || null),
+    enabled: !!currentChurchId && !!user?.id,
     staleTime: 1000 * 60 * 5,
   });
 };
