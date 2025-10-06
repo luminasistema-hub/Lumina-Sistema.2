@@ -28,7 +28,7 @@ import {
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 
 const Feature = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
-  <Card className="h-full bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700 backdrop-blur-sm transition-transform hover:-translate-y-1 hover:shadow-xl">
+  <Card className="h-full border border-zinc-200 dark:border-zinc-700 backdrop-blur-sm transition-transform hover:-translate-y-1 hover:shadow-xl bg-gradient-to-br from-church-blue-50/70 to-church-purple-50/70 dark:from-zinc-900/80 dark:to-zinc-800/80">
     <CardContent className="p-6">
       <div className="flex items-center gap-3 mb-3">
         <div className="inline-flex items-center justify-center rounded-md bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 p-2">
@@ -62,7 +62,7 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-church-blue-50 via-white to-church-purple-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors">
       {/* HERO */}
-      <header className="relative overflow-hidden">
+      <header className="relative overflow-hidden bg-sidebar-accent/60 dark:bg-zinc-900/50 backdrop-blur-sm">
         <div className="container mx-auto px-4 pt-14 md:pt-20">
           <div className="mx-auto max-w-4xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/60 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700 backdrop-blur">
@@ -236,7 +236,7 @@ const LandingPage = () => {
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">Escolha um plano para começar o cadastro da sua igreja.</p>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {isLoading ? (
             <Card className="p-6">
               <CardContent className="p-0">Carregando planos...</CardContent>
@@ -247,11 +247,11 @@ const LandingPage = () => {
             </Card>
           ) : (
             plans.map((plan) => (
-              <Card key={plan.id} className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+              <Card key={plan.id} className="bg-gradient-to-br from-white/80 to-church-purple-50/60 dark:from-zinc-900/80 dark:to-zinc-800/80 border border-indigo-200 dark:border-zinc-700 shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-semibold text-zinc-800 dark:text-zinc-100">{plan.nome}</h3>
-                    <Badge className="bg-indigo-100 text-indigo-700">
+                    <Badge className="bg-primary/10 text-primary">
                       R$ {plan.preco_mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
                     </Badge>
                   </div>
@@ -261,7 +261,7 @@ const LandingPage = () => {
                     <li>{plan.limite_quizes_por_etapa} quizzes por etapa</li>
                     <li>{plan.limite_armazenamento_mb} MB de armazenamento</li>
                   </ul>
-                  <Button asChild className="w-full bg-indigo-600 hover:bg-indigo-700">
+                  <Button asChild className="w-full bg-indigo-600 hover:bg-indigo-700 shadow-md">
                     <Link to={`/cadastrar-igreja?plano=${plan.id}`}>Escolher este plano</Link>
                   </Button>
                 </CardContent>
