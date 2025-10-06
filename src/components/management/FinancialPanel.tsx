@@ -279,7 +279,7 @@ const FinancialPanel = () => {
         .select('*')
         .eq('church_id', currentChurchId)
         .eq('event_name', 'nova_contribuicao_pendente')
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (notificationsError) {
         console.error('Error loading notifications:', notificationsError)
@@ -506,6 +506,7 @@ const FinancialPanel = () => {
         .delete()
         .eq('event_details->>transaction_id', transactionId)
         .eq('event_name', 'nova_contribuicao_pendente')
+        .eq('church_id', currentChurchId)
 
       if (notificationError) {
         console.error('Error deleting notification:', notificationError)
@@ -547,6 +548,7 @@ const FinancialPanel = () => {
         .delete()
         .eq('event_details->>transaction_id', transactionId)
         .eq('event_name', 'nova_contribuicao_pendente')
+        .eq('church_id', currentChurchId)
 
       if (notificationError) {
         console.error('Error deleting notification:', notificationError)

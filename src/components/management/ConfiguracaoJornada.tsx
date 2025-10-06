@@ -221,6 +221,7 @@ const ConfiguracaoJornada = () => {
             titulo: formEtapaData.titulo,
             descricao: formEtapaData.descricao,
             cor: formEtapaData.cor,
+            id_igreja: currentChurchId,
           });
 
         if (error) throw error;
@@ -351,6 +352,7 @@ const ConfiguracaoJornada = () => {
             titulo: passoDataToSave.titulo,
             tipo_passo: passoDataToSave.tipo_passo,
             conteudo: passoDataToSave.conteudo,
+            id_igreja: currentChurchId,
           })
           .select('id')
           .maybeSingle();
@@ -364,7 +366,8 @@ const ConfiguracaoJornada = () => {
         const { error: deleteError } = await supabase
           .from('quiz_perguntas')
           .delete()
-          .eq('passo_id', passoId);
+          .eq('passo_id', passoId)
+          .eq('id_igreja', currentChurchId);
         if (deleteError) throw deleteError;
 
         const perguntasToInsert = passoDataToSave.quiz_perguntas.map((q, index) => ({
@@ -374,6 +377,7 @@ const ConfiguracaoJornada = () => {
           opcoes: q.opcoes,
           resposta_correta: q.resposta_correta,
           pontuacao: q.pontuacao || 1,
+          id_igreja: currentChurchId,
         }));
 
         if (perguntasToInsert.length > 0) {
