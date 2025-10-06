@@ -8,14 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import { Calendar, Users, UserPlus, UserX, CheckCircle, XCircle, Plus, MapPin, ChevronsUpDown } from 'lucide-react';
+import { Calendar, Users, UserPlus, UserX, CheckCircle, XCircle, Plus, MapPin } from 'lucide-react';
 import MinistryRolesManager from '@/components/management/MinistryRolesManager';
 
 type Ministry = { id: string; nome: string; descricao: string; lider_id: string | null; isLeader: boolean; };
-type MemberOption = { id: string; nome_completo: string; };
-type Volunteer = { id: string; nome_completo: string; funcao?: string | null; };
+type MemberOption = { id: string; nome_completo: string; funcao?: string | null; };
 type ScheduleRow = {
   id: string;
   data_servico: string;
@@ -35,12 +32,12 @@ const MyMinistryPage = () => {
   const [myMinistries, setMyMinistries] = useState<Ministry[]>([]);
   const [selectedMinistryId, setSelectedMinistryId] = useState<string | null>(null);
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+  const [volunteers, setVolunteers] = useState<MemberOption[]>([]);
   const [ministryRoles, setMinistryRoles] = useState<{ id: string; nome: string }[]>([]);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [eventOptions, setEventOptions] = useState<{ id: string; nome: string; data_hora?: string; local?: string | null }[]>([]);
-  const [openVolunteerSelector, setOpenVolunteerSelector] = useState(false);
+  const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
   const [newScheduleEventId, setNewScheduleEventId] = useState<string | null>(null);
   const [newScheduleDate, setNewScheduleDate] = useState<string>('');
   const [newScheduleNotes, setNewScheduleNotes] = useState<string>('');
@@ -55,6 +52,7 @@ const MyMinistryPage = () => {
   const loadMyMinistries = useCallback(async () => {
     if (!user?.id || !currentChurchId) { setMyMinistries([]); return; }
 
+    // 1) IDs de ministérios onde o usuário é voluntário
     const { data: volRows } = await supabase
       .from('ministerio_voluntarios')
       .select('ministerio_id')
@@ -65,6 +63,7 @@ const MyMinistryPage = () => {
       new Set((volRows || []).map((r: any) => r?.ministerio_id).filter(Boolean))
     );
 
+    // 2) Ministérios pelos IDs coletados
     const { data: ministriesByVolunteer } = ministryIds.length > 0
       ? await supabase
           .from('ministerios')
@@ -80,6 +79,7 @@ const MyMinistryPage = () => {
       isLeader: m.lider_id === user.id
     }));
 
+    // 3) Ministérios onde o usuário é líder
     const { data: leaderRows } = await supabase
       .from('ministerios')
       .select('id, nome, descricao, lider_id')
@@ -94,6 +94,7 @@ const MyMinistryPage = () => {
       isLeader: true
     }));
 
+    // 4) Mesclar e remover duplicados
     const merged = [...volunteerList, ...leaderList];
     const uniqueMap = new Map<string, Ministry>();
     for (const item of merged) {
@@ -108,6 +109,7 @@ const MyMinistryPage = () => {
     const unique = Array.from(uniqueMap.values());
     setMyMinistries(unique);
 
+    // Seleção inicial
     if (unique.length > 0 && !selectedMinistryId) {
       const leaderFirst = unique.find(m => m.isLeader) || unique[0];
       if (leaderFirst?.id) setSelectedMinistryId(leaderFirst.id);
@@ -132,25 +134,42 @@ const MyMinistryPage = () => {
   }, [currentChurchId]);
 
   const loadVolunteers = useCallback(async (ministryId: string) => {
-    const { data, error } = await supabase
+    // Busca IDs dos membros e suas funções no ministério
+    const { data: volRows, error } = await supabase
       .from('ministerio_voluntarios')
-      .select('funcao_no_ministerio, membro:membros(id, nome_completo)')
+      .select('membro_id, funcao_no_ministerio')
       .eq('ministerio_id', ministryId);
 
-    if (error) {
-      toast.error('Erro ao carregar voluntários');
+    if (error) { toast.error('Erro ao carregar voluntários'); return; }
+
+    const memberIds = (volRows || []).map((r: any) => r?.membro_id).filter(Boolean);
+
+    if (memberIds.length === 0) {
       setVolunteers([]);
       return;
     }
 
-    const mappedVolunteers = (data || [])
-      .filter(v => v.membro) // Garante que não há voluntários sem membro associado
-      .map((v: any) => ({
-        id: v.membro.id,
-        nome_completo: v.membro.nome_completo,
-        funcao: v.funcao_no_ministerio || null,
-      }));
-    setVolunteers(mappedVolunteers);
+    // Busca dados dos membros
+    const { data: membersData, error: mErr } = await supabase
+      .from('membros')
+      .select('id, nome_completo')
+      .in('id', memberIds);
+
+    if (mErr) { toast.error('Erro ao carregar dados dos membros'); return; }
+
+    // Monta lista final com função
+    const funcaoById = new Map<string, string | null>();
+    (volRows || []).forEach((r: any) => {
+      if (r?.membro_id) funcaoById.set(r.membro_id, r.funcao_no_ministerio || null);
+    });
+
+    setVolunteers(
+      (membersData || []).map((m: any) => ({
+        id: m.id,
+        nome_completo: m.nome_completo,
+        funcao: funcaoById.get(m.id) || null
+      }))
+    );
   }, []);
 
   const loadRoles = useCallback(async (ministryId: string) => {
@@ -219,6 +238,7 @@ const MyMinistryPage = () => {
 
   const loadMyAssignments = useCallback(async (ministryId: string) => {
     if (!user?.id) { setAssignments([]); return; }
+    // Buscar escalas do ministério nas quais o usuário está na escala_voluntarios
     const { data, error } = await supabase
       .from('escala_voluntarios')
       .select(`
@@ -264,21 +284,22 @@ const MyMinistryPage = () => {
     return `${y}-${m}-${day}`;
   };
 
-  const handleAddVolunteer = async (memberId: string) => {
-    if (!selectedMinistryId || !memberId || !currentChurchId) return;
+  const handleAddVolunteer = async () => {
+    if (!selectedMinistryId || !selectedVolunteerToAdd || !currentChurchId) return;
 
     try {
       const { error } = await supabase
         .from('ministerio_voluntarios')
         .insert({ 
           ministerio_id: selectedMinistryId, 
-          membro_id: memberId, 
+          membro_id: selectedVolunteerToAdd, 
           id_igreja: currentChurchId 
         });
 
       if (error) throw error;
 
       toast.success('Voluntário adicionado!');
+      setSelectedVolunteerToAdd(null);
       loadVolunteers(selectedMinistryId);
     } catch (err: any) {
       console.error('Erro ao adicionar voluntário:', err);
@@ -336,6 +357,7 @@ const MyMinistryPage = () => {
     toast.success('Voluntário atribuído à escala!');
     loadSchedules(selectedMinistryId!);
     if (membroId === user?.id) loadMyAssignments(selectedMinistryId!);
+    // Enfileirar WhatsApp para o membro
     if (currentChurchId) {
       const { data: telRow } = await supabase
         .from('informacoes_pessoais')
@@ -424,6 +446,7 @@ const MyMinistryPage = () => {
         </CardContent>
       </Card>
 
+      {/* Seção do Líder */}
       {selectedMinistry && isLeader && (
         <div className="space-y-4">
           <MinistryRolesManager
@@ -435,36 +458,21 @@ const MyMinistryPage = () => {
           <Card>
             <CardHeader><CardTitle>Voluntários do Ministério</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <Popover open={openVolunteerSelector} onOpenChange={setOpenVolunteerSelector}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" aria-expanded={openVolunteerSelector} className="w-full justify-between">
-                    Adicionar voluntário...
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="Buscar membro..." />
-                    <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {memberOptions
-                        .filter(m => !volunteers.some(v => v.id === m.id))
-                        .map((member) => (
-                          <CommandItem
-                            key={member.id}
-                            value={member.nome_completo}
-                            onSelect={() => {
-                              handleAddVolunteer(member.id);
-                              setOpenVolunteerSelector(false);
-                            }}
-                          >
-                            {member.nome_completo}
-                          </CommandItem>
-                        ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center gap-3">
+                <Select onValueChange={setSelectedVolunteerToAdd}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Selecione um membro para adicionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {memberOptions
+                      .filter(m => !volunteers.some(v => v.id === m.id))
+                      .map(m => <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleAddVolunteer} disabled={!selectedVolunteerToAdd}>
+                  <UserPlus className="w-4 h-4 mr-2" /> Adicionar
+                </Button>
+              </div>
 
               <div className="space-y-2">
                 {volunteers.map((v, idx) => (
@@ -615,6 +623,7 @@ const MyMinistryPage = () => {
         </div>
       )}
 
+      {/* Seção do Voluntário */}
       {selectedMinistry && (
         <Card>
           <CardHeader><CardTitle>Minhas Escalas</CardTitle></CardHeader>

@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuthStore, UserRole } from '../../stores/authStore' 
+import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -8,6 +9,7 @@ import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client' 
@@ -21,20 +23,27 @@ import {
   Trash2,
   Phone,
   Mail,
+  MapPin,
   Calendar,
   UserCheck,
   Crown,
   Shield,
+  Church,
   Heart,
   Download,
+  Upload,
+  MoreHorizontal,
   User as UserIcon,
   Link as LinkIcon,
   Copy,
+  Clock,
+  XCircle,
+  CheckCircle,
+  DollarSign,
+  Headphones,
   Target,
   Loader2,
-  Baby,
-  DollarSign,
-  Headphones
+  Baby
 } from 'lucide-react'
 import { trackEvent } from '../../lib/analytics';
 import copy from 'copy-to-clipboard';
@@ -45,15 +54,18 @@ type Member = MemberProfile;
 
 const MemberManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
+  const { getChurchById } = useChurchStore()
   const queryClient = useQueryClient();
 
-  const { data: members = [], isLoading, error } = useMembers();
+  const { data: membersData, isLoading, error } = useMembers();
+  // Mantém uma referência estável para a lista de membros enquanto carrega
+  const members = useMemo(() => membersData ?? [], [membersData]);
 
+  const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false)
   const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
   const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false)
-  const [isViewMemberDialogOpen, setIsViewMemberDialogOpen] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
@@ -63,7 +75,11 @@ const MemberManagementPage = () => {
   const [filterWedding, setFilterWedding] = useState('all')
 
   const canManageMembers = useMemo(() => {
-    return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra' || user?.role === 'lider_ministerio'
+    return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
+  }, [user?.role])
+
+  const canEditRoles = useMemo(() => {
+    return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
   }, [user?.role])
 
   const [newMember, setNewMember] = useState({
@@ -79,6 +95,7 @@ const MemberManagementPage = () => {
 
   const [editMemberData, setEditMemberData] = useState<Partial<Member>>({});
 
+  // Memoizar funções de filtro para evitar recriação desnecessária
   const isSameMonth = useCallback((dateStr?: string | null) => {
     if (!dateStr) return false;
     const d = new Date(`${dateStr}T00:00:00`);
@@ -86,8 +103,14 @@ const MemberManagementPage = () => {
     return d.getMonth() === now.getMonth();
   }, []);
 
-  const filteredMembers = useMemo(() => {
-    let filtered = members;
+  // Filtragem de membros otimizada
+  useEffect(() => {
+    // Evita setState contínuo enquanto dados estão carregando
+    if (isLoading) {
+      setFilteredMembers([]);
+      return;
+    }
+    let filtered = members
 
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
@@ -97,51 +120,45 @@ const MemberManagementPage = () => {
         (member.telefone && member.telefone.includes(searchTerm))
       )
     }
+
     if (filterRole !== 'all') {
       filtered = filtered.filter(member => member.funcao === filterRole)
     }
+
     if (filterStatus !== 'all') {
       filtered = filtered.filter(member => member.status === filterStatus)
     }
+
     if (filterMinistry !== 'all') {
       const ministryLower = filterMinistry.toLowerCase();
       filtered = filtered.filter(member => 
         member.ministerio_recomendado?.toLowerCase().includes(ministryLower)
       )
     }
+
     if (filterBirthday === 'mes_atual') {
       filtered = filtered.filter(member => isSameMonth(member.data_nascimento))
     }
+
     if (filterWedding === 'mes_atual') {
       filtered = filtered.filter(member => isSameMonth(member.data_casamento))
     }
-    return filtered;
-  }, [members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding, isSameMonth]);
 
+    setFilteredMembers(filtered)
+  }, [isLoading, members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding, isSameMonth])
 
   const addMemberMutation = useMutation({
     mutationFn: async (newMemberData: typeof newMember) => {
       if (!newMemberData.name || !newMemberData.email || !currentChurchId) {
         throw new Error('Nome, email e igreja são obrigatórios.');
       }
-      
-      const { data: currentChurch, error: churchError } = await supabase
-        .from('igrejas')
-        .select('nome, membros_atuais, limite_membros')
-        .eq('id', currentChurchId)
-        .single();
-      
-      if (churchError || !currentChurch) {
-        throw new Error('Não foi possível verificar os dados da igreja.');
-      }
-
-      if (currentChurch.limite_membros !== null && currentChurch.membros_atuais >= currentChurch.limite_membros) {
+      const currentChurch = getChurchById(currentChurchId);
+      if (currentChurch && currentChurch.membros_atuais >= currentChurch.limite_membros && currentChurch.limite_membros !== Infinity) {
         throw new Error(`Limite de membros atingido para o plano atual (${currentChurch.limite_membros} membros).`);
       }
-
       const { data, error } = await supabase.auth.signUp({
         email: newMemberData.email,
-        password: 'password_temp_123', // Senha temporária
+        password: 'password_temp_123',
         options: {
           data: {
             full_name: newMemberData.name,
@@ -227,60 +244,40 @@ const MemberManagementPage = () => {
   }, [selectedMember, editMemberData, editMemberMutation]);
 
   const handleDeleteMember = useCallback((memberId: string) => {
-    if (window.confirm('Tem certeza que deseja remover este usuário? Esta ação é irreversível.')) {
+    if (confirm('Tem certeza que deseja remover este usuário? Esta ação é irreversível.')) {
       deleteMemberMutation.mutate(memberId);
     }
   }, [deleteMemberMutation]);
-  
-  const handleOpenViewMemberDialog = useCallback((member: Member) => {
-    setSelectedMember(member);
-    setIsViewMemberDialogOpen(true);
-  }, []);
 
   const handleOpenEditMemberDialog = useCallback((member: Member) => {
     setSelectedMember(member);
-    setEditMemberData({ ...member }); // Preenche os dados de edição com os dados atuais
+    setEditMemberData({ ...member });
     setIsEditMemberDialogOpen(true);
   }, []);
-  
-  const handleGenerateRegistrationLink = useCallback(async () => {
+
+  const handleGenerateRegistrationLink = useCallback(() => {
     if (!currentChurchId) {
       toast.error('Nenhuma igreja selecionada.');
       return;
     }
-    
-    try {
-      const { data: church, error } = await supabase
-        .from('igrejas')
-        .select('id, nome')
-        .eq('id', currentChurchId)
-        .single();
-
-      if (error || !church) {
-        toast.error('Erro ao buscar dados da igreja. Tente novamente.');
-        console.error('Falha ao buscar igreja:', error);
-        return;
-      }
-      
-      const baseUrl = window.location.origin;
-      const link = `${baseUrl}/register?churchId=${church.id}&initialRole=membro`;
-      
-      setGeneratedLink(link);
-      setIsGenerateLinkDialogOpen(true);
-      trackEvent('generate_registration_link', { churchId: currentChurchId });
-
-    } catch (e) {
-      toast.error('Ocorreu um erro inesperado ao gerar o link.');
-      console.error(e);
+    const church = getChurchById(currentChurchId);
+    if (!church) {
+      toast.error('Dados da igreja não encontrados.');
+      return;
     }
-  }, [currentChurchId]);
+    const baseUrl = window.location.origin;
+    const link = `${baseUrl}/register?churchId=${currentChurchId}&initialRole=membro`;
+    setGeneratedLink(link);
+    setIsGenerateLinkDialogOpen(true);
+    trackEvent('generate_registration_link', { churchId: currentChurchId });
+  }, [currentChurchId, getChurchById]);
 
   const handleCopyLink = useCallback(() => {
     copy(generatedLink);
     toast.success('Link copiado para a área de transferência!');
     trackEvent('copy_registration_link', { churchId: currentChurchId });
   }, [generatedLink, currentChurchId]);
-  
+
   const getRoleIcon = useCallback((role: UserRole) => {
     const icons: Record<UserRole, JSX.Element> = {
       super_admin: <Shield className="w-4 h-4" />, admin: <Shield className="w-4 h-4" />, pastor: <Crown className="w-4 h-4" />,
@@ -308,13 +305,13 @@ const MemberManagementPage = () => {
     return colors[status] || 'bg-gray-100 text-gray-800';
   }, []);
 
-  const calculateAge = useCallback((birthDate?: string | null) => {
+  const calculateAge = useCallback((birthDate?: string) => {
     if (!birthDate) return 'N/A';
-    const ageDifMs = Date.now() - new Date(birthDate).getTime();
-    const ageDate = new Date(ageDifMs);
-    return String(Math.abs(ageDate.getUTCFullYear() - 1970));
+    const age = new Date().getFullYear() - new Date(birthDate).getFullYear();
+    return age > 0 ? age : 'N/A';
   }, []);
 
+  // Memoizar estatísticas para evitar recálculo desnecessário
   const statsData = useMemo(() => ({
     total: members.length,
     active: members.filter(m => m.status === 'ativo').length,
@@ -333,7 +330,7 @@ const MemberManagementPage = () => {
   if (error) {
     return <div className="p-6 text-center text-red-500">Erro ao carregar membros: {error.message}</div>;
   }
-  
+
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl md:rounded-2xl p-4 md:p-6 text-white">
@@ -347,7 +344,7 @@ const MemberManagementPage = () => {
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><div className="text-xl md:text-2xl font-bold text-yellow-600">{statsData.leaders}</div><div className="text-sm text-gray-600">Líderes</div></CardContent></Card>
         <Card className="border-0 shadow-sm"><CardContent className="p-4 text-center"><div className="text-xl md:text-2xl font-bold text-orange-600">{statsData.baptized}</div><div className="text-sm text-gray-600">Batizados</div></CardContent></Card>
       </div>
-      
+
       <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 w-full lg:flex-1">
           <div className="relative flex-1 lg:max-w-md">
@@ -355,7 +352,70 @@ const MemberManagementPage = () => {
             <Input placeholder="Buscar membros..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-             {/* Filtros aqui */}
+            <Select value={filterRole} onValueChange={setFilterRole}>
+              <SelectTrigger>
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Papel" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os papéis</SelectItem>
+                <SelectItem value="membro">Membro</SelectItem>
+                <SelectItem value="voluntario">Voluntário</SelectItem>
+                <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
+                <SelectItem value="pastor">Pastor</SelectItem>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="financeiro">Financeiro</SelectItem>
+                <SelectItem value="integra">Integra</SelectItem>
+                <SelectItem value="midia_tecnologia">Mídia/Tecnologia</SelectItem>
+                <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="ativo">Ativo</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="inativo">Inativo</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterMinistry} onValueChange={setFilterMinistry}>
+              <SelectTrigger>
+                <SelectValue placeholder="Ministério" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os ministérios</SelectItem>
+                <SelectItem value="midia">Mídia</SelectItem>
+                <SelectItem value="louvor">Louvor</SelectItem>
+                <SelectItem value="diaconato">Diaconato</SelectItem>
+                <SelectItem value="integracao">Integração</SelectItem>
+                <SelectItem value="ensino">Ensino</SelectItem>
+                <SelectItem value="kids">Kids</SelectItem>
+                <SelectItem value="organizacao">Organização</SelectItem>
+                <SelectItem value="acao_social">Ação Social</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterBirthday} onValueChange={setFilterBirthday}>
+              <SelectTrigger>
+                <SelectValue placeholder="Aniversariantes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="mes_atual">Aniversariantes do mês</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterWedding} onValueChange={setFilterWedding}>
+              <SelectTrigger>
+                <SelectValue placeholder="Casamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="mes_atual">Casamentos do mês</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="flex gap-2 w-full lg:w-auto">
@@ -373,7 +433,91 @@ const MemberManagementPage = () => {
                     Preencha as informações do novo membro. Um email de confirmação será enviado automaticamente.
                   </DialogDescription>
                 </DialogHeader>
-                 {/* Conteúdo do formulário aqui */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome Completo</Label>
+                    <Input 
+                      id="name" 
+                      value={newMember.name} 
+                      onChange={(e) => setNewMember({...newMember, name: e.target.value})} 
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      value={newMember.email} 
+                      onChange={(e) => setNewMember({...newMember, email: e.target.value})} 
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telefone">Telefone</Label>
+                    <Input 
+                      id="telefone" 
+                      value={newMember.telefone} 
+                      onChange={(e) => setNewMember({...newMember, telefone: e.target.value})} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco">Endereço</Label>
+                    <Textarea 
+                      id="endereco" 
+                      value={newMember.endereco} 
+                      onChange={(e) => setNewMember({...newMember, endereco: e.target.value})} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="data_nascimento">Data de Nascimento</Label>
+                    <Input 
+                      id="data_nascimento" 
+                      type="date" 
+                      value={newMember.data_nascimento} 
+                      onChange={(e) => setNewMember({...newMember, data_nascimento: e.target.value})} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="funcao">Função</Label>
+                    <Select 
+                      value={newMember.funcao} 
+                      onValueChange={(value) => setNewMember({...newMember, funcao: value as UserRole})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="membro">Membro</SelectItem>
+                        <SelectItem value="voluntario">Voluntário</SelectItem>
+                        <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
+                        <SelectItem value="pastor">Pastor</SelectItem>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="financeiro">Financeiro</SelectItem>
+                        <SelectItem value="integra">Integra</SelectItem>
+                        <SelectItem value="midia_tecnologia">Mídia/Tecnologia</SelectItem>
+                        <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="observacoes">Observações</Label>
+                    <Textarea 
+                      id="observacoes" 
+                      value={newMember.observacoes} 
+                      onChange={(e) => setNewMember({...newMember, observacoes: e.target.value})} 
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="ghost" onClick={() => setIsAddMemberDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleAddMember} disabled={addMemberMutation.isPending}>
+                    {addMemberMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Adicionar Membro
+                  </Button>
+                </div>
               </DialogContent>
             </Dialog>
           )}
@@ -433,7 +577,7 @@ const MemberManagementPage = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleOpenViewMemberDialog(member)}>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedMember(member)}>
                     <Eye className="w-4 h-4 mr-2" />Ver Perfil
                   </Button>
                   {(canManageMembers || member.id === user?.id) && (
@@ -469,84 +613,159 @@ const MemberManagementPage = () => {
       )}
 
       {selectedMember && (
-        <Dialog open={isViewMemberDialogOpen} onOpenChange={(open) => !open && setIsViewMemberDialogOpen(false)}>
+        <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Detalhes de {selectedMember.nome_completo}</DialogTitle>
+              <DialogTitle>Detalhes do Membro</DialogTitle>
               <DialogDescription>
-                Informações completas do perfil do membro.
+                Informações completas sobre {selectedMember.nome_completo}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">
-                <div className="space-y-1">
-                  <Label className="text-gray-500">Email</Label>
-                  <p className="text-sm font-medium">{selectedMember.email}</p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Email</Label>
+                  <div className="text-sm">{selectedMember.email}</div>
                 </div>
                 {selectedMember.telefone && (
-                  <div className="space-y-1">
-                    <Label className="text-gray-500">Telefone</Label>
-                    <p className="text-sm font-medium">{selectedMember.telefone}</p>
+                  <div>
+                    <Label>Telefone</Label>
+                    <div className="text-sm">{selectedMember.telefone}</div>
                   </div>
                 )}
                 {selectedMember.data_nascimento && (
-                  <div className="space-y-1">
-                    <Label className="text-gray-500">Nascimento</Label>
-                    <p className="text-sm font-medium">{new Date(selectedMember.data_nascimento).toLocaleDateString('pt-BR')} ({calculateAge(selectedMember.data_nascimento)} anos)</p>
+                  <div>
+                    <Label>Data de Nascimento</Label>
+                    <div className="text-sm">
+                      {new Date(selectedMember.data_nascimento).toLocaleDateString('pt-BR')} 
+                      ({calculateAge(selectedMember.data_nascimento)} anos)
+                    </div>
                   </div>
                 )}
                 {selectedMember.estado_civil && (
-                  <div className="space-y-1">
-                    <Label className="text-gray-500">Estado Civil</Label>
-                    <p className="text-sm font-medium">{selectedMember.estado_civil}</p>
+                  <div>
+                    <Label>Estado Civil</Label>
+                    <div className="text-sm">{selectedMember.estado_civil}</div>
                   </div>
                 )}
                 {selectedMember.profissao && (
-                  <div className="space-y-1">
-                    <Label className="text-gray-500">Profissão</Label>
-                    <p className="text-sm font-medium">{selectedMember.profissao}</p>
+                  <div>
+                    <Label>Profissão</Label>
+                    <div className="text-sm">{selectedMember.profissao}</div>
                   </div>
                 )}
-                {selectedMember.endereco && (
-                  <div className="space-y-1 col-span-1 sm:col-span-2">
-                    <Label className="text-gray-500">Endereço</Label>
-                    <p className="text-sm font-medium">{selectedMember.endereco}</p>
-                  </div>
-                )}
-                <div className="border-t col-span-1 sm:col-span-2 my-2"></div>
                 {selectedMember.ministerio_recomendado && (
-                  <div className="space-y-1">
-                    <Label className="text-gray-500">Ministério Recomendado</Label>
-                    <p className="text-sm font-medium">{selectedMember.ministerio_recomendado}</p>
+                  <div>
+                    <Label>Ministério Recomendado</Label>
+                    <div className="text-sm">{selectedMember.ministerio_recomendado}</div>
                   </div>
                 )}
-                 <div className="space-y-1">
-                    <Label className="text-gray-500">Batizado</Label>
-                    <p className="text-sm font-medium">{selectedMember.batizado ? 'Sim' : 'Não'}</p>
-                  </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setSelectedMember(null)}>
+                  Fechar
+                </Button>
               </div>
             </div>
-             <div className="flex justify-end gap-2 mt-4 px-6 pb-4">
-               <Button variant="ghost" onClick={() => setIsViewMemberDialogOpen(false)}>Fechar</Button>
-             </div>
           </DialogContent>
         </Dialog>
       )}
 
-      {isEditMemberDialogOpen && selectedMember && (
+      {selectedMember && (
         <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Editar {selectedMember.nome_completo}</DialogTitle>
+              <DialogTitle>Editar Membro</DialogTitle>
               <DialogDescription>
-                Atualize as informações do membro abaixo.
+                Atualize as informações de {selectedMember.nome_completo}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto p-4">
-              {/* Formulário de edição aqui */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nome Completo</Label>
+                <Input 
+                  id="edit-name" 
+                  value={editMemberData.nome_completo || selectedMember.nome_completo} 
+                  onChange={(e) => setEditMemberData({...editMemberData, nome_completo: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input 
+                  id="edit-email" 
+                  type="email" 
+                  value={editMemberData.email || selectedMember.email} 
+                  onChange={(e) => setEditMemberData({...editMemberData, email: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-telefone">Telefone</Label>
+                <Input 
+                  id="edit-telefone" 
+                  value={editMemberData.telefone || selectedMember.telefone || ''} 
+                  onChange={(e) => setEditMemberData({...editMemberData, telefone: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-endereco">Endereço</Label>
+                <Textarea 
+                  id="edit-endereco" 
+                  value={editMemberData.endereco || selectedMember.endereco || ''} 
+                  onChange={(e) => setEditMemberData({...editMemberData, endereco: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-data-nascimento">Data de Nascimento</Label>
+                <Input 
+                  id="edit-data-nascimento" 
+                  type="date" 
+                  value={editMemberData.data_nascimento || selectedMember.data_nascimento || ''} 
+                  onChange={(e) => setEditMemberData({...editMemberData, data_nascimento: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-funcao">Função</Label>
+                <Select 
+                  value={editMemberData.funcao || selectedMember.funcao} 
+                  onValueChange={(value) => setEditMemberData({...editMemberData, funcao: value as UserRole})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="membro">Membro</SelectItem>
+                    <SelectItem value="voluntario">Voluntário</SelectItem>
+                    <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
+                    <SelectItem value="pastor">Pastor</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="financeiro">Financeiro</SelectItem>
+                    <SelectItem value="integra">Integra</SelectItem>
+                    <SelectItem value="midia_tecnologia">Mídia/Tecnologia</SelectItem>
+                    <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select 
+                  value={editMemberData.status || selectedMember.status} 
+                  onValueChange={(value) => setEditMemberData({...editMemberData, status: value as Member['status']})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <Button variant="ghost" onClick={() => setIsEditMemberDialogOpen(false)}>Cancelar</Button>
+              <Button variant="ghost" onClick={() => setIsEditMemberDialogOpen(false)}>
+                Cancelar
+              </Button>
               <Button onClick={handleEditMember} disabled={editMemberMutation.isPending}>
                 {editMemberMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Salvar Alterações
@@ -558,28 +777,28 @@ const MemberManagementPage = () => {
 
       <Dialog open={isGenerateLinkDialogOpen} onOpenChange={setIsGenerateLinkDialogOpen}>
         <DialogContent>
-           <DialogHeader>
-             <DialogTitle>Gerar Link de Registro</DialogTitle>
-             <DialogDescription>
-               Compartilhe este link para que novos membros possam se registrar na sua igreja.
-             </DialogDescription>
-           </DialogHeader>
-           <div className="space-y-4">
-             <div className="flex items-center gap-2">
-               <Input value={generatedLink} readOnly />
-               <Button onClick={handleCopyLink} variant="outline">
-                 <Copy className="w-4 h-4" />
-               </Button>
-             </div>
-             <p className="text-sm text-gray-600">
-               Qualquer pessoa com este link poderá se registrar como membro da sua igreja.
-             </p>
-           </div>
-           <div className="flex justify-end gap-2 mt-4">
-             <Button onClick={() => setIsGenerateLinkDialogOpen(false)}>
-               Fechar
-             </Button>
-           </div>
+          <DialogHeader>
+            <DialogTitle>Gerar Link de Registro</DialogTitle>
+            <DialogDescription>
+              Compartilhe este link para que novos membros possam se registrar na sua igreja
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Input value={generatedLink} readOnly />
+              <Button onClick={handleCopyLink} variant="outline">
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-gray-600">
+              Qualquer pessoa com este link poderá se registrar como membro da sua igreja.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button onClick={() => setIsGenerateLinkDialogOpen(false)}>
+              Fechar
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
@@ -587,4 +806,3 @@ const MemberManagementPage = () => {
 }
 
 export default MemberManagementPage
-
