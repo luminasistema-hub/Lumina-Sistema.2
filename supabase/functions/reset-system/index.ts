@@ -75,54 +75,70 @@ serve(async (req) => {
       'passos_etapa',
       'quiz_perguntas',
       'progresso_membros',
-      'transac Let me fix the import issues and ensure the system uses only one database connection.
+      'transacoes_financeiras',
+      'orcamentos',
+      'metas_financeiras',
+      'notificacoes',
+      'whatsapp_messages',
+      'pastor_area_items',
+      'kids_checkin'
+    ]
 
-<dyad-write path="src/components/management/VoluntarioDetailsModal.tsx" description="Fixes the import path to use the unified Supabase client.">
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Voluntario } from "./VoluntarioCard";
-import { supabase } from "@/integrations/supabase/client";
+    // Desabilita RLS temporariamente
+    for (const table of tablesToTruncate) {
+      await supabaseClient.rpc('exec_sql', {
+        sql: `ALTER TABLE public.${table} DISABLE ROW LEVEL SECURITY;`
+      })
+    }
 
-interface Props {
-  voluntario: Voluntario | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
+    // Limpa as tabelas
+    for (const table of tablesToTruncate) {
+      await supabaseClient.rpc('exec_sql', {
+        sql: `TRUNCATE TABLE public.${table} CASCADE;`
+      })
+    }
 
-export const VoluntarioDetailsModal = ({ voluntario, open, onOpenChange }: Props) => {
-  if (!voluntario) return null;
+    // Remove usuários de autenticação (exceto super admins)
+    await supabaseClient.rpc('exec_sql', {
+      sql: `DELETE FROM auth.users WHERE id NOT IN (SELECT id FROM public.super_admins);`
+    })
 
-  async function removerVoluntario() {
-    if (!voluntario.id) return;
-    await supabase.from("ministerio_voluntarios").delete().eq("id", voluntario.id);
-    onOpenChange(false);
+    // Limpa sessões e tokens
+    await supabaseClient.rpc('exec_sql', {
+      sql: `DELETE FROM auth.sessions;`
+    })
+
+    await supabaseClient.rpc('exec_sql', {
+      sql: `DELETE FROM auth.refresh_tokens;`
+    })
+
+    await supabaseClient.rpc('exec_sql', {
+      sql: `DELETE FROM auth.identities;`
+    })
+
+    // Reabilita RLS
+    for (const table of tablesToTruncate) {
+      await supabaseClient.rpc('exec_sql', {
+        sql: `ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY;`
+      })
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Sistema resetado com sucesso!' }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    )
+
+  } catch (error: any) {
+    console.error('Error resetting system:', error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
+    )
   }
-
-  async function tornarLider() {
-    if (!voluntario.id) return;
-    await supabase.from("ministerio_voluntarios").update({ papel: "lider" }).eq("id", voluntario.id);
-    onOpenChange(false);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Gerenciar {voluntario.email}</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Papel atual: {voluntario.papel}</p>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={tornarLider}>
-              Definir como Líder
-            </Button>
-            <Button variant="destructive" onClick={removerVoluntario}>
-              Remover
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
+})

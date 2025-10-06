@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
 import { useChurchStore } from '../../stores/churchStore';
+import { useAuthStore } from '../../stores/authStore';
 import { Key, Mail, RefreshCw, Loader2, Users, Shield, AlertTriangle, Save, Server, Cpu, HardDrive, Wifi, Database, Trash2 } from 'lucide-react';
 import PaymentIntegrationSettings from './PaymentIntegrationSettings';
 
