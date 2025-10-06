@@ -60,7 +60,7 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-emerald-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors">
+    <div className="min-h-screen bg-gradient-to-br from-church-blue-50 via-white to-church-purple-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors">
       {/* HERO */}
       <header className="relative overflow-hidden">
         <div className="container mx-auto px-4 pt-14 md:pt-20">
@@ -83,9 +83,6 @@ const LandingPage = () => {
                   Entrar
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="border-indigo-500 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-zinc-800">
-                <Link to="/register">Criar conta</Link>
               </Button>
               <Button variant="ghost" size="lg" className="sm:ml-2 text-indigo-600 hover:text-indigo-700" onClick={handleContatoWhatsApp}>
                 Falar no WhatsApp
@@ -274,86 +271,54 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CONTATO E DADOS EMPRESARIAIS */}
-      <section className="border-t border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/40 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-12 md:py-16">
-          <div className="max-w-3xl">
-            <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Contato Comercial — Lumina Sistema de Gestão</h2>
-            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-              Fale conosco para conhecer a Lumina e tirar dúvidas. Responderemos o quanto antes.
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-10">
+        <div className="container mx-auto px-4 py-10 grid gap-8 md:grid-cols-3">
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">Lumina Sistema de Gestão</h3>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Tecnologia para iluminar e simplificar a gestão da sua igreja.
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-500">
+              © {new Date().getFullYear()} Lumina. Todos os direitos reservados.
             </p>
           </div>
-          <div className="mt-6 grid md:grid-cols-2 gap-5">
-            <Card className="bg-white/80 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700">
-              <CardContent className="p-6 space-y-3">
-                <div className="flex items-center gap-3">
-                  <PhoneCall className="h-5 w-5 text-emerald-600" />
-                  <div>
-                    <div className="text-sm text-zinc-500">Telefone/WhatsApp</div>
-                    <a href="https://wa.me/5563984861923" target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      +55 63 98486-1923
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="h-5 w-5 text-indigo-600" />
-                  <div>
-                    <div className="text-sm text-zinc-500">E-mail</div>
-                    <a href="mailto:Luminasistema@gmail.com.br" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      Luminasistema@gmail.com.br
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Globe className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <div className="text-sm text-zinc-500">Website</div>
-                    <a href="https://www.luminasistema.com.br" target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      www.luminasistema.com.br
-                    </a>
-                  </div>
-                </div>
-                <Button onClick={handleContatoWhatsApp} className="mt-2 bg-emerald-600 hover:bg-emerald-700">
-                  Falar no WhatsApp
-                  <MessageSquare className="ml-2 h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/80 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700">
-              <CardContent className="p-6 space-y-3">
-                <div className="flex items-center gap-3">
-                  <Building2 className="h-5 w-5 text-zinc-700" />
-                  <div>
-                    <div className="text-sm text-zinc-500">Nome Empresarial</div>
-                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      49.023.921 INOVA SIMPLES (I.S.)
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-zinc-700" />
-                  <div>
-                    <div className="text-sm text-zinc-500">CNPJ</div>
-                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      49.023.921/0001-69
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium">Contato</h4>
+            <div className="flex items-center gap-3">
+              <PhoneCall className="h-4 w-4 text-emerald-600" />
+              <a href="https://wa.me/5563984861923" target="_blank" rel="noreferrer" className="text-sm">+55 63 98486-1923</a>
+            </div>
+            <div className="flex items-center gap-3">
+              <Mail className="h-4 w-4 text-indigo-600" />
+              <a href="mailto:Luminasistema@gmail.com.br" className="text-sm">Luminasistema@gmail.com.br</a>
+            </div>
+            <div className="flex items-center gap-3">
+              <Globe className="h-4 w-4 text-blue-600" />
+              <a href="https://www.luminasistema.com.br" target="_blank" rel="noreferrer" className="text-sm">www.luminasistema.com.br</a>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-10">
-        <div className="container mx-auto px-4 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            © {new Date().getFullYear()} Lumina Sistema de Gestão. Todos os direitos reservados.
-          </p>
-          <div className="flex items-center gap-4 text-sm">
-            <Link to="/login" className="text-indigo-600 hover:underline">Entrar</Link>
-            <Link to="/register" className="text-indigo-600 hover:underline">Criar conta</Link>
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium">Dados Empresariais</h4>
+            <div className="flex items-center gap-3">
+              <Building2 className="h-4 w-4 text-zinc-700" />
+              <div className="text-sm">
+                <div className="text-zinc-500">Nome Empresarial</div>
+                <div className="font-medium">49.023.921 INOVA SIMPLES (I.S.)</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <FileText className="h-4 w-4 text-zinc-700" />
+              <div className="text-sm">
+                <div className="text-zinc-500">CNPJ</div>
+                <div className="font-medium">49.023.921/0001-69</div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <Button onClick={handleContatoWhatsApp} className="bg-indigo-600 hover:bg-indigo-700">
+                Falar no WhatsApp
+                <PhoneCall className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </footer>
