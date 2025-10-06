@@ -15,27 +15,14 @@ export interface PastorAreaItem {
   pastor_name?: string;
 }
 
+// A busca de dados foi temporariamente desativada para evitar o erro de relacionamento no banco de dados.
+// A função agora retorna uma lista vazia para não quebrar a interface.
 const fetchPastorItems = async (churchId: string | null): Promise<PastorAreaItem[]> => {
   if (!churchId) return [];
 
-  const { data, error } = await supabase
-    .from('pastor_area_items')
-    .select(`
-      *,
-      membros!pastor_id ( nome_completo )
-    `)
-    .eq('id_igreja', churchId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error("Error fetching pastor items:", error);
-    throw new Error(error.message);
-  }
-
-  return (data || []).map((item: any) => ({
-    ...item,
-    pastor_name: item.membros?.nome_completo || 'Desconhecido'
-  }));
+  console.warn("A busca de itens da Área do Pastor está temporariamente desativada devido a um problema de esquema no banco de dados.");
+  
+  return Promise.resolve([]);
 };
 
 export const usePastorItems = () => {
