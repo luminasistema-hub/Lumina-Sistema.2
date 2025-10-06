@@ -56,7 +56,9 @@ const MemberManagementPage = () => {
   const { getChurchById } = useChurchStore()
   const queryClient = useQueryClient();
 
-  const { data: members = [], isLoading, error } = useMembers();
+  const { data: membersData, isLoading, error } = useMembers();
+  // Mantém uma referência estável para a lista de membros enquanto carrega
+  const members = useMemo(() => membersData ?? [], [membersData]);
 
   const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
@@ -102,6 +104,11 @@ const MemberManagementPage = () => {
 
   // Filtragem de membros otimizada
   useEffect(() => {
+    // Evita setState contínuo enquanto dados estão carregando
+    if (isLoading) {
+      setFilteredMembers([]);
+      return;
+    }
     let filtered = members
 
     if (searchTerm) {
@@ -137,7 +144,7 @@ const MemberManagementPage = () => {
     }
 
     setFilteredMembers(filtered)
-  }, [members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding, isSameMonth])
+  }, [isLoading, members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding, isSameMonth])
 
   const addMemberMutation = useMutation({
     mutationFn: async (newMemberData: typeof newMember) => {
