@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useMemo, useMemo as useReactMemo } from "react";
+import { useMemo as useReactMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,15 +65,6 @@ const StatCard = ({ icon: Icon, label }: { icon: any; label: string }) => (
 const LandingPage = () => {
   const { plans, isLoading } = useSubscriptionPlans();
 
-  const screenshots = useMemo(
-    () => [
-      "/attachments/Captura_223055.png",
-      "/attachments/Captura_223104.png",
-      "/attachments/Captura_223109.png",
-    ],
-    []
-  );
-
   const handleContatoWhatsApp = () => {
     const telefone = "5563984861923";
     const texto = `Olá! Gostaria de falar com a Lumina Sistema de Gestão.`;
@@ -89,7 +80,6 @@ const LandingPage = () => {
 
   const popularPlanId = useReactMemo(() => {
     if (!sortedByPrice.length) return undefined;
-    // Escolhe o plano do meio (não-free) como "Mais Popular" quando houver 3+ opções.
     const nonFree = sortedByPrice.filter((p: any) => Number(p.preco_mensal || 0) > 0);
     if (sortedByPrice.length >= 3 && nonFree.length) {
       const middle = nonFree[Math.floor(nonFree.length / 2)];
@@ -103,19 +93,12 @@ const LandingPage = () => {
 
   return (
     <div className="relative min-h-screen text-zinc-900 dark:text-zinc-100 transition-colors">
-      {/* Fundo com gradiente e shapes */}
-      <div className="fixed inset-0 -z-20 bg-gradient-to-br from-[#0f172a] via-[#0b2b5a] to-[#1e1b4b] opacity-90 dark:opacity-100" />
-      <div className="fixed inset-0 -z-10 pointer-events-none">
-        <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-sky-500/20 blur-3xl" />
-        <div className="absolute -bottom-24 -right-24 h-[28rem] w-[28rem] rounded-full bg-indigo-500/20 blur-3xl" />
-      </div>
-      <FloatingShapes />
-
-      {/* Header fixo com navegação */}
-      <header className="sticky top-0 z-30 border-b border-white/20 dark:border-zinc-800/60 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-md">
+      {/* Header fixo com navegação (fundo branco) */}
+      <header className="sticky top-0 z-30 border-b border-white/20 dark:border-zinc-800/60 bg-white/80 dark:bg-zinc-900/70 backdrop-blur-md">
         <div className="container mx-auto responsive-section py-3 flex items-center justify-between">
           <a href="#hero" className="flex items-center gap-3">
-            <img src="/lumina-logo.png" alt="Lumina" className="h-8 w-8 rounded-sm" />
+            {/* Corrige distorção da logo: altura fixa, largura automática */}
+            <img src="/lumina-logo.png" alt="Lumina" className="h-8 w-auto" />
             <span className="font-semibold tracking-tight">Lumina Sistema de Gestão</span>
           </a>
           <nav className="hidden md:flex items-center gap-6 text-sm">
@@ -140,8 +123,15 @@ const LandingPage = () => {
         </div>
       </header>
 
-      {/* HERO */}
-      <section id="hero" className="relative z-10">
+      {/* HERO com fundo azul (apenas aqui) */}
+      <section id="hero" className="relative z-10 overflow-hidden">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[#0f172a] via-[#0b2b5a] to-[#1e1b4b]" />
+        <div className="absolute inset-0 -z-10 pointer-events-none">
+          <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-sky-500/20 blur-3xl" />
+          <div className="absolute -bottom-24 -right-24 h-[28rem] w-[28rem] rounded-full bg-indigo-500/20 blur-3xl" />
+        </div>
+        <FloatingShapes />
+
         <div className="container mx-auto responsive-section pt-12 md:pt-16 pb-10">
           <div className="mx-auto max-w-4xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 dark:bg-zinc-800/60 border-white/40 dark:border-zinc-700 backdrop-blur">
@@ -157,8 +147,7 @@ const LandingPage = () => {
             </h1>
 
             <p className="mt-5 text-zinc-100/80 text-base md:text-lg">
-              Tecnologia para{" "}
-              <span className="text-sky-300 font-semibold">iluminar</span> e simplificar a gestão da sua igreja —
+              Tecnologia para <span className="text-sky-300 font-semibold">iluminar</span> e simplificar a gestão da sua igreja —
               com segurança por igreja (RLS), WhatsApp integrado e ferramentas completas para líderes e membros.
             </p>
 
@@ -189,10 +178,10 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* TRUST / SEGURANÇA */}
+      {/* TRUST / SEGURANÇA — fundo branco */}
       <section className="container mx-auto responsive-section py-10 md:py-12">
         <div className="grid sm:grid-cols-3 gap-4">
-          <Card className="bg-white/85 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/70">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70">
             <CardContent className="p-5 flex items-start gap-3">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
               <div>
@@ -203,7 +192,7 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/85 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/70">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70">
             <CardContent className="p-5 flex items-start gap-3">
               <LockKeyhole className="h-5 w-5 text-sky-600" />
               <div>
@@ -214,7 +203,7 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/85 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/70">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70">
             <CardContent className="p-5 flex items-start gap-3">
               <ServerCog className="h-5 w-5 text-indigo-600" />
               <div>
@@ -228,16 +217,12 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* FEATURES */}
+      {/* FEATURES — fundo branco */}
       <section id="features" className="container mx-auto responsive-section py-10 md:py-14">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
             Tudo o que sua igreja precisa
           </h2>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Funcionalidades pensadas para líderes, voluntários e membros —{" "}
-            <span className="text-sky-600 dark:text-sky-400 font-medium">simples, seguras e integradas</span>.
-          </p>
         </div>
 
         <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -252,29 +237,12 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* VITRINE DE TELAS */}
-      <section className="container mx-auto responsive-section py-10 md:py-14">
-        <div className="max-w-2xl">
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Uma experiência simples e bonita</h2>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Interface moderna com foco em clareza, produtividade e acessibilidade.
-          </p>
-        </div>
-        <div className="mt-8 grid md:grid-cols-3 gap-4">
-          {screenshots.map((src) => (
-            <Card key={src} className="overflow-hidden bg-white/80 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/70">
-              <CardContent className="p-0">
-                <img src={src} alt="Tela do sistema Lumina" className="w-full h-56 object-cover" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
+      {/* REMOVIDO: Vitrine de Telas */}
 
-      {/* SOBRE / MISSÃO / VISÃO */}
+      {/* SOBRE / MISSÃO / VISÃO — fundo branco */}
       <section id="about" className="container mx-auto responsive-section py-10 md:py-14">
         <div className="grid lg:grid-cols-3 gap-6">
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200/70 dark:border-zinc-700/70">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Sobre Nós</h2>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -284,7 +252,7 @@ const LandingPage = () => {
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200/70 dark:border-zinc-700/70">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Nossa Missão</h2>
               <div className="flex items-start gap-3">
@@ -296,7 +264,7 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200/70 dark:border-zinc-700/70">
+          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Nossa Visão</h2>
               <div className="flex items-start gap-3">
@@ -311,7 +279,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* VALORES */}
+      {/* VALORES — fundo branco */}
       <section className="container mx-auto responsive-section py-10 md:py-14">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight">Nossos Valores</h2>
@@ -388,7 +356,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* PLANOS */}
+      {/* PLANOS — fundo branco */}
       <section id="plans" className="container mx-auto responsive-section py-10 md:py-16">
         <div className="max-w-2xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 dark:bg-zinc-800/60 border-white/40 dark:border-zinc-700">
@@ -415,7 +383,7 @@ const LandingPage = () => {
               return (
                 <Card
                   key={plan.id}
-                  className={`relative bg-white/90 dark:bg-zinc-900/85 border shadow-sm transition-all ${
+                  className={`relative bg-white dark:bg-zinc-900 border shadow-sm transition-all ${
                     isPopular
                       ? "border-sky-400/60 ring-2 ring-sky-300/40"
                       : "border-zinc-200/70 dark:border-zinc-700/70"
@@ -455,13 +423,13 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* FOOTER */}
+      {/* FOOTER — mantém estilo próprio escuro */}
       <footer className="border-t border-white/10 bg-[#0b1220] text-zinc-300">
         <div className="container mx-auto responsive-section py-10 grid gap-8 md:grid-cols-3">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg bg-sky-500/15 flex items-center justify-center">
-                <img src="/lumina-logo.png" alt="Lumina" className="h-6 w-6 rounded-sm" />
+                <img src="/lumina-logo.png" alt="Lumina" className="h-6 w-auto" />
               </div>
               <h3 className="text-lg font-semibold text-white">Lumina Sistema de Gestão</h3>
             </div>
