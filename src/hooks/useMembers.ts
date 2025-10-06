@@ -41,57 +41,43 @@ export interface MemberProfile {
 const fetchMembers = async (churchId: string | null, getChurchById: (id: string) => { name: string } | undefined, _userId?: string | null): Promise<MemberProfile[]> => {
   if (!churchId) return [];
 
-  const { data, error } = await supabase
-    .from('membros')
-    .select(`
-      id, id_igreja, funcao, perfil_completo, nome_completo, status, created_at, email, ultimo_teste_data, ministerio_recomendado,
-      informacoes_pessoais!membro_id (
-        telefone, endereco, data_nascimento, estado_civil, profissao, conjuge_id, data_casamento, pais_cristaos, tempo_igreja,
-        batizado, data_batismo, participa_ministerio, ministerio_anterior, experiencia_anterior, data_conversao,
-        dias_disponiveis, horarios_disponiveis
-      )
-    `)
-    .eq('id_igreja', churchId);
+  const { data, error } = await supabase.functions.invoke('get-church-members', {
+    body: { church_id: churchId }
+  });
 
   if (error) throw new Error(error.message);
 
-  let membersData: MemberProfile[] = data.map((member: any) => ({
-    ...member,
-    churchName: getChurchById(churchId)?.name,
-    ...(member.informacoes_pessoais || {}),
+  const membersDataRaw = (data as any)?.members || [];
+  const membersData: MemberProfile[] = (membersDataRaw as any[]).map((member: any) => ({
+    id: member.id,
+    id_igreja: member.id_igreja,
+    funcao: member.funcao,
+    perfil_completo: member.perfil_completo,
+    nome_completo: member.nome_completo,
+    status: member.status,
+    created_at: member.created_at,
+    email: member.email,
+    ultimo_teste_data: member.ultimo_teste_data,
+    ministerio_recomendado: member.ministerio_recomendado,
+    telefone: member.informacoes_pessoais?.telefone,
+    endereco: member.informacoes_pessoais?.endereco,
+    data_nascimento: member.informacoes_pessoais?.data_nascimento,
+    estado_civil: member.informacoes_pessoais?.estado_civil,
+    profissao: member.informacoes_pessoais?.profissao,
+    conjuge_id: member.informacoes_pessoais?.conjuge_id,
+    data_casamento: member.informacoes_pessoais?.data_casamento,
+    pais_cristaos: member.informacoes_pessoais?.pais_cristaos,
+    tempo_igreja: member.informacoes_pessoais?.tempo_igreja,
+    batizado: member.informacoes_pessoais?.batizado,
+    data_batismo: member.informacoes_pessoais?.data_batismo,
+    participa_ministerio: member.informacoes_pessoais?.participa_ministerio,
+    ministerio_anterior: member.informacoes_pessoais?.ministerio_anterior,
+    experiencia_anterior: member.informacoes_pessoais?.experiencia_anterior,
+    data_conversao: member.informacoes_pessoais?.data_conversao,
+    dias_disponiveis: member.informacoes_pessoais?.dias_disponiveis,
+    horarios_disponiveis: member.informacoes_pessoais?.horarios_disponiveis,
+    churchName: getChurchById?.(churchId)?.name
   }));
-
-  const memberIds = membersData.map(m => m.id);
-  const spouseIds = Array.from(new Set(membersData.map(m => m.conjuge_id).filter(Boolean))) as string[];
-
-  const [spouseRes, kidsRes] = await Promise.all([
-    spouseIds.length > 0 ? supabase.from('membros').select('id, nome_completo').in('id', spouseIds) : Promise.resolve({ data: [] }),
-    memberIds.length > 0 ? supabase.from('criancas').select('responsavel_id, nome_crianca, data_nascimento').in('responsavel_id', memberIds).eq('id_igreja', churchId) : Promise.resolve({ data: [] }),
-  ]);
-
-  const spouseMap = Object.fromEntries((spouseRes.data || []).map(s => [s.id, s.nome_completo]));
-  const kidsByResponsible: Record<string, Array<{ nome: string; idade: number }>> = {};
-  (kidsRes.data || []).forEach(k => {
-    const idade = Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000);
-    const entry = { nome: k.nome_crianca, idade };
-    if (!kidsByResponsible[k.responsavel_id]) kidsByResponsible[k.responsavel_id] = [];
-    kidsByResponsible[k.responsavel_id].push(entry);
-  });
-
-  membersData = membersData.map(m => {
-    const ownKids = kidsByResponsible[m.id] || [];
-    const spouseKids = m.conjuge_id ? (kidsByResponsible[m.conjuge_id] || []) : [];
-    const combined = [...ownKids, ...spouseKids];
-    const unique = combined.reduce((acc, kid) => {
-      if (!acc.some(k => k.nome === kid.nome && k.idade === kid.idade)) acc.push(kid);
-      return acc;
-    }, [] as Array<{ nome: string; idade: number }>);
-    return {
-      ...m,
-      conjuge_nome: m.conjuge_id ? spouseMap[m.conjuge_id] : undefined,
-      filhos: unique,
-    };
-  });
 
   return membersData;
 };

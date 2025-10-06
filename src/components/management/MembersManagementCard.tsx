@@ -62,14 +62,24 @@ const MembersManagementCard = () => {
       setIsAdmin(['admin', 'pastor', 'integra'].includes(myRole));
 
       // Lista de membros da igreja
-      const { data, error } = await supabase
-        .from('membros')
-        .select('id, id_igreja, nome_completo, email, funcao, status, created_at, updated_at')
-        .eq('id_igreja', currentChurchId)
-        .order('nome_completo', { ascending: true });
+      const { data, error } = await supabase.functions.invoke('get-church-members', {
+        body: { church_id: currentChurchId }
+      });
       if (error) throw error;
 
-      setMembers(data || []);
+      const membersRaw: any[] = (data as any)?.members || [];
+      const formatted: MemberRow[] = membersRaw.map((member: any) => ({
+        id: member.id,
+        id_igreja: member.id_igreja,
+        nome_completo: member.nome_completo,
+        email: member.email,
+        funcao: member.funcao,
+        status: member.status,
+        created_at: member.created_at,
+        updated_at: member.updated_at,
+      }));
+
+      setMembers(formatted);
     } catch (err: any) {
       console.error('Erro ao carregar membros:', err);
       toast.error('Não foi possível carregar os membros.');

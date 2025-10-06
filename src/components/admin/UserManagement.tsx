@@ -90,20 +90,9 @@ const UserManagement = ({}: UserManagementProps) => {
 
   const loadUsers = async (churchId: string) => {
     console.log('UserManagement: Loading users for churchId:', churchId);
-    const { data, error } = await supabase
-      .from('membros') 
-      .select(`
-        id,
-        id_igreja,
-        funcao,
-        perfil_completo,
-        nome_completo, 
-        status,
-        created_at,
-        email,
-        ministerio_recomendado
-      `)
-      .eq('id_igreja', churchId);
+    const { data, error } = await supabase.functions.invoke('get-church-members', {
+      body: { church_id: churchId }
+    });
 
     if (error) {
       console.error('Error loading users:', error);
@@ -111,16 +100,17 @@ const UserManagement = ({}: UserManagementProps) => {
       return;
     }
 
-    const usersData: User[] = data.map((member: MemberDBProfile) => ({
+    const members: any[] = (data as any)?.members || [];
+    const usersData: User[] = members.map((member: any) => ({
       id: member.id,
-      name: member.nome_completo, 
+      name: member.nome_completo,
       email: member.email,
       role: member.funcao,
       churchId: member.id_igreja,
       status: member.status,
       created_at: member.created_at,
       perfil_completo: member.perfil_completo,
-      ministry: member.ministerio_recomendado, 
+      ministry: member.ministerio_recomendado,
     }));
     setUsers(usersData);
     setFilteredUsers(usersData);
