@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useAuthStore, UserRole } from '../../stores/authStore' 
-// Removido 'useChurchStore' pois não será mais necessário aqui
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -9,7 +8,6 @@ import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client' 
@@ -23,24 +21,15 @@ import {
   Trash2,
   Phone,
   Mail,
-  MapPin,
   Calendar,
   UserCheck,
   Crown,
   Shield,
-  Church,
   Heart,
   Download,
-  Upload,
-  MoreHorizontal,
   User as UserIcon,
   Link as LinkIcon,
   Copy,
-  Clock,
-  XCircle,
-  CheckCircle,
-  DollarSign,
-  Headphones,
   Target,
   Loader2,
   Baby
@@ -56,13 +45,13 @@ const MemberManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
   const queryClient = useQueryClient();
 
-  const { data: members = [], isLoading, error } = useMembers(); // Valor padrão para members
+  const { data: members = [], isLoading, error } = useMembers();
 
-  // Removido o estado 'filteredMembers'
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false)
   const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
   const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false)
+  const [isViewMemberDialogOpen, setIsViewMemberDialogOpen] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
@@ -73,10 +62,6 @@ const MemberManagementPage = () => {
 
   const canManageMembers = useMemo(() => {
     return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra' || user?.role === 'lider_ministerio'
-  }, [user?.role])
-
-  const canEditRoles = useMemo(() => {
-    return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
   }, [user?.role])
 
   const [newMember, setNewMember] = useState({
@@ -99,7 +84,6 @@ const MemberManagementPage = () => {
     return d.getMonth() === now.getMonth();
   }, []);
 
-  // Lógica de filtragem movida para um useMemo para performance
   const filteredMembers = useMemo(() => {
     let filtered = members;
 
@@ -149,7 +133,7 @@ const MemberManagementPage = () => {
         throw new Error('Não foi possível verificar os dados da igreja.');
       }
 
-      if (currentChurch.membros_atuais >= currentChurch.limite_membros) {
+      if (currentChurch.limite_membros !== null && currentChurch.membros_atuais >= currentChurch.limite_membros) {
         throw new Error(`Limite de membros atingido para o plano atual (${currentChurch.limite_membros} membros).`);
       }
 
@@ -245,10 +229,15 @@ const MemberManagementPage = () => {
       deleteMemberMutation.mutate(memberId);
     }
   }, [deleteMemberMutation]);
+  
+  const handleOpenViewMemberDialog = useCallback((member: Member) => {
+    setSelectedMember(member);
+    setIsViewMemberDialogOpen(true);
+  }, []);
 
   const handleOpenEditMemberDialog = useCallback((member: Member) => {
     setSelectedMember(member);
-    setEditMemberData({ ...member });
+    setEditMemberData({ ...member }); // Preenche os dados de edição com os dados atuais
     setIsEditMemberDialogOpen(true);
   }, []);
   
@@ -317,10 +306,11 @@ const MemberManagementPage = () => {
     return colors[status] || 'bg-gray-100 text-gray-800';
   }, []);
 
-  const calculateAge = useCallback((birthDate?: string) => {
+  const calculateAge = useCallback((birthDate?: string | null) => {
     if (!birthDate) return 'N/A';
-    const age = new Date().getFullYear() - new Date(birthDate).getFullYear();
-    return age > 0 ? age : 'N/A';
+    const ageDifMs = Date.now() - new Date(birthDate).getTime();
+    const ageDate = new Date(ageDifMs);
+    return String(Math.abs(ageDate.getUTCFullYear() - 1970));
   }, []);
 
   const statsData = useMemo(() => ({
@@ -375,7 +365,13 @@ const MemberManagementPage = () => {
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                 {/* Conteúdo do Dialog de adicionar membro */}
+                <DialogHeader>
+                  <DialogTitle>Adicionar Novo Membro</DialogTitle>
+                  <DialogDescription>
+                    Preencha as informações do novo membro. Um email de confirmação será enviado automaticamente.
+                  </DialogDescription>
+                </DialogHeader>
+                 {/* Conteúdo do formulário aqui */}
               </DialogContent>
             </Dialog>
           )}
@@ -435,7 +431,7 @@ const MemberManagementPage = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setSelectedMember(member)}>
+                  <Button variant="outline" size="sm" onClick={() => handleOpenViewMemberDialog(member)}>
                     <Eye className="w-4 h-4 mr-2" />Ver Perfil
                   </Button>
                   {(canManageMembers || member.id === user?.id) && (
@@ -471,9 +467,20 @@ const MemberManagementPage = () => {
       )}
 
       {selectedMember && (
-        <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
+        <Dialog open={isViewMemberDialogOpen} onOpenChange={(open) => !open && setIsViewMemberDialogOpen(false)}>
           <DialogContent>
-            {/* Conteúdo do Dialog de ver perfil */}
+            <DialogHeader>
+              <DialogTitle>Detalhes de {selectedMember.nome_completo}</DialogTitle>
+              <DialogDescription>
+                Informações completas do perfil do membro.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto p-4">
+               {/* Detalhes do membro aqui */}
+            </div>
+             <div className="flex justify-end gap-2 mt-4">
+               <Button variant="ghost" onClick={() => setIsViewMemberDialogOpen(false)}>Fechar</Button>
+             </div>
           </DialogContent>
         </Dialog>
       )}
@@ -481,14 +488,50 @@ const MemberManagementPage = () => {
       {isEditMemberDialogOpen && selectedMember && (
         <Dialog open={isEditMemberDialogOpen} onOpenChange={setIsEditMemberDialogOpen}>
           <DialogContent>
-            {/* Conteúdo do Dialog de editar membro */}
+            <DialogHeader>
+              <DialogTitle>Editar {selectedMember.nome_completo}</DialogTitle>
+              <DialogDescription>
+                Atualize as informações do membro abaixo.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto p-4">
+              {/* Formulário de edição aqui */}
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="ghost" onClick={() => setIsEditMemberDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleEditMember} disabled={editMemberMutation.isPending}>
+                {editMemberMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Salvar Alterações
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       )}
 
       <Dialog open={isGenerateLinkDialogOpen} onOpenChange={setIsGenerateLinkDialogOpen}>
         <DialogContent>
-           {/* Conteúdo do Dialog de gerar link */}
+           <DialogHeader>
+             <DialogTitle>Gerar Link de Registro</DialogTitle>
+             <DialogDescription>
+               Compartilhe este link para que novos membros possam se registrar na sua igreja.
+             </DialogDescription>
+           </DialogHeader>
+           <div className="space-y-4">
+             <div className="flex items-center gap-2">
+               <Input value={generatedLink} readOnly />
+               <Button onClick={handleCopyLink} variant="outline">
+                 <Copy className="w-4 h-4" />
+               </Button>
+             </div>
+             <p className="text-sm text-gray-600">
+               Qualquer pessoa com este link poderá se registrar como membro da sua igreja.
+             </p>
+           </div>
+           <div className="flex justify-end gap-2 mt-4">
+             <Button onClick={() => setIsGenerateLinkDialogOpen(false)}>
+               Fechar
+             </Button>
+           </div>
         </DialogContent>
       </Dialog>
     </div>
