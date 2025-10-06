@@ -131,7 +131,7 @@ export const useAuthStore = create<AuthState>()(
                 const pagamentoOk = churchRow?.ultimo_pagamento_status === 'Confirmado';
 
                 // Para plano pago, exige pagamento confirmado para acessar
-                if (mensalidade > 0 && !pagamentoOk) {
+                if (mensalidade > 0 && !pagamentoOk && profile.funcao !== 'admin') {
                   toast.error('Pagamento pendente: finalize o checkout para acessar.');
                   await supabase.auth.signOut();
                   set({ user: null, currentChurchId: null, isLoading: false });

@@ -73,7 +73,7 @@ serve(async (req) => {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: adminEmail,
       password: adminPassword,
-      email_confirm: true, // O usuário precisará confirmar o email
+      email_confirm: true, // Confirma o email automaticamente para admins
       user_metadata: {
         full_name: adminName,
         church_id: newChurchId,
@@ -93,6 +93,22 @@ serve(async (req) => {
         });
       }
       throw authError
+    }
+
+    // 3. Atualizar o status do membro para ativo (como admin master)
+    if (authData.user) {
+      const { error: updateError } = await supabaseAdmin
+        .from('membros')
+        .update({ 
+          status: 'ativo',
+          funcao: 'admin'
+        })
+        .eq('id', authData.user.id)
+
+      if (updateError) {
+        console.error('Erro ao atualizar status do admin:', updateError)
+        // Não falha o registro por causa disso, mas loga o erro
+      }
     }
 
     return new Response(JSON.stringify({ churchId: newChurchId }), {
