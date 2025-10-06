@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -21,9 +22,10 @@ const EventsManagementPage = () => {
   const [isParticipantsOpen, setParticipantsOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
   const [filter, setFilter] = useState('all');
 
-  const queryKey = useMemo(() => ['eventsManagement', currentChurchId, filter, searchTerm], [currentChurchId, filter, searchTerm]);
+  const queryKey = useMemo(() => ['eventsManagement', currentChurchId, filter, debouncedSearch], [currentChurchId, filter, debouncedSearch]);
 
   const { data: events, isLoading, error } = useQuery({
     queryKey,
@@ -37,8 +39,8 @@ const EventsManagementPage = () => {
         query = query.lt('data_hora', new Date().toISOString());
       }
 
-      if (searchTerm) {
-        query = query.ilike('nome', `%${searchTerm}%`);
+      if (debouncedSearch) {
+        query = query.ilike('nome', `%${debouncedSearch}%`);
       }
 
       const { data, error } = await query.order('data_hora', { ascending: filter === 'upcoming' });

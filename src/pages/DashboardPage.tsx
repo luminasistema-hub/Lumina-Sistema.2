@@ -1,24 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import MainLayout from '../components/layout/MainLayout'
-import DashboardHome from '../components/dashboard/DashboardHome'
-import PersonalInfo from '../components/personal/PersonalInfo'
-import MemberJourney from '../components/personal/MemberJourney'
-import VocationalTest from '../components/personal/VocationalTest'
-import MyMinistryPage from '../components/management/MyMinistryPage'
-import EventsPage from '../components/spiritual/EventsPage'
-import DevotionalsPage from '../components/spiritual/DevotionalsPage'
-import OfferingsPage from '../components/contributions/OfferingsPage'
-import OrderOfServiceEventsPage from '../components/management/OrderOfServiceEventsPage'
-import MemberManagementPage from '../components/management/MemberManagementPage'
-import MinistriesPage from '../components/management/MinistriesPage'
-import FinancialPanel from '../components/management/FinancialPanel'
-import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada'
-import KidsPage from '../components/family/KidsPage'
-import EventsManagementPage from '../components/management/EventsManagementPage'
-import DevotionalsManagementPage from '../components/management/DevotionalsManagementPage'
-import NotificationManager from '../components/admin/NotificationManager'
-import SystemSettings from '../components/admin/SystemSettings'
+import { lazy } from 'react'
+const DashboardHome = lazy(() => import('../components/dashboard/DashboardHome'))
+const PersonalInfo = lazy(() => import('../components/personal/PersonalInfo'))
+const MemberJourney = lazy(() => import('../components/personal/MemberJourney'))
+const VocationalTest = lazy(() => import('../components/personal/VocationalTest'))
+const MyMinistryPage = lazy(() => import('../components/management/MyMinistryPage'))
+const EventsPage = lazy(() => import('../components/spiritual/EventsPage'))
+const DevotionalsPage = lazy(() => import('../components/spiritual/DevotionalsPage'))
+const OfferingsPage = lazy(() => import('../components/contributions/OfferingsPage'))
+const OrderOfServiceEventsPage = lazy(() => import('../components/management/OrderOfServiceEventsPage'))
+const MemberManagementPage = lazy(() => import('../components/management/MemberManagementPage'))
+const MinistriesPage = lazy(() => import('../components/management/MinistriesPage'))
+const FinancialPanel = lazy(() => import('../components/management/FinancialPanel'))
+const ConfiguracaoJornada = lazy(() => import('../components/management/ConfiguracaoJornada'))
+const KidsPage = lazy(() => import('../components/family/KidsPage'))
+const EventsManagementPage = lazy(() => import('../components/management/EventsManagementPage'))
+const DevotionalsManagementPage = lazy(() => import('../components/management/DevotionalsManagementPage'))
+const NotificationManager = lazy(() => import('../components/admin/NotificationManager'))
+const SystemSettings = lazy(() => import('../components/admin/SystemSettings'))
 import { SpecialNotificationDialog } from '@/components/shared/SpecialNotificationDialog'
 import PastorAreaPage from '@/components/pastor/PastorAreaPage'
 
@@ -96,7 +97,9 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
         activeModule={activeModule}
         onModuleSelect={setActiveModule}
       >
-        {renderActiveModule()}
+        <Suspense fallback={<div className="p-6 text-center text-gray-600">Carregando módulo...</div>}>
+          {renderActiveModule()}
+        </Suspense>
       </MainLayout>
       
       {showSpecialNotification && (
