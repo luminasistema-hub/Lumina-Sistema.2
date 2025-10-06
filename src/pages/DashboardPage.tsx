@@ -21,6 +21,7 @@ import { useAuthStore } from '../stores/authStore';
 import OrderOfServiceEventsPage from '../components/management/OrderOfServiceEventsPage';
 import MyMinistryPage from '../components/management/MyMinistryPage';
 import WhatsappIntegration from '../components/admin/WhatsappIntegration';
+import NotificationManager from '../components/admin/NotificationManager';
 
 const DashboardPage = () => {
   const { user, isLoading } = useAuthStore(); 
@@ -77,6 +78,7 @@ const DashboardPage = () => {
         return <MyMinistryPage />;
       case 'whatsapp-integration': return <WhatsappIntegration />;
       case 'system-settings': return <SystemSettings />;
+      case 'notification-management': return <NotificationManager />;
       default: return <DashboardHome />;
     }
   }
