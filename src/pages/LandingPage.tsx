@@ -97,7 +97,7 @@ const LandingPage = () => {
               </Button>
             </div>
 
-            <div className="mt-8 grid grid-cols-3 max-w-xl mx-auto gap-4">
+            <div className="mt-8 grid grid-cols-2 justify-items-center max-w-xl mx-auto gap-4">
               <Stat value="100%" label="RLS por igreja" />
               <Stat value="24/7" label="Online" />
             </div>

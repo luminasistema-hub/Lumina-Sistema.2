@@ -61,22 +61,12 @@ function App() {
   const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore()
 
   useEffect(() => {
-    console.log('🔄 App montado: inicializando auth listener e checkAuth...')
     checkAuth()
     const unsub = initializeAuthListener()
     return () => {
       if (typeof unsub === 'function') unsub()
     }
   }, [checkAuth, initializeAuthListener])
-
-  useEffect(() => {
-    console.log('👤 App Render:', {
-      isLoading,
-      user: user?.email,
-      role: user?.role,
-      currentChurchId,
-    })
-  }, [isLoading, user, currentChurchId])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-church-blue-50 to-church-purple-50">
