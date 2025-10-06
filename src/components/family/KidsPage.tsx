@@ -132,7 +132,7 @@ const KidsPage = () => {
     const responsibleMember = memberOptions.find(m => m.id === editKidForm.responsavel_id);
     const dataToUpdate = {
       nome_crianca: editKidForm.nome_crianca, data_nascimento: editKidForm.data_nascimento, responsavel_id: editKidForm.responsavel_id,
-      email_responsavel: responsibleMember?.email, informacoes_especiais: editKidForm.informacoes_especiais || null,
+      informacoes_especiais: editKidForm.informacoes_especiais || null,
       alergias: editKidForm.alergias || null, medicamentos: editKidForm.medicamentos || null, autorizacao_fotos: editKidForm.autorizacao_fotos,
       contato_emergencia: editKidForm.contato_emergencia_nome ? { nome: editKidForm.contato_emergencia_nome, telefone: editKidForm.contato_emergencia_telefone, parentesco: editKidForm.contato_emergencia_parentesco } : null,
     };
