@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,12 +24,16 @@ import {
   Lightbulb,
   Target,
   Heart,
+  LockKeyhole,
+  ServerCog,
+  Rocket,
 } from "lucide-react";
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 import FloatingShapes from "@/components/visual/FloatingShapes";
 
-const Feature = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
-  <Card className="h-full border border-zinc-200 dark:border-zinc-700 backdrop-blur-sm transition-transform hover:-translate-y-1 hover:shadow-xl bg-gradient-to-br from-church-blue-50/70 to-church-purple-50/70 dark:from-zinc-900/80 dark:to-zinc-800/80">
+type FeatureProps = { icon: any; title: string; desc: string };
+const Feature = ({ icon: Icon, title, desc }: FeatureProps) => (
+  <Card className="h-full border border-zinc-200 dark:border-zinc-700 backdrop-blur-sm transition-transform hover:-translate-y-1 hover:shadow-xl bg-gradient-to-br from-white/80 to-white/60 dark:from-zinc-900/80 dark:to-zinc-900/60">
     <CardContent className="p-6">
       <div className="flex items-center gap-3 mb-3">
         <div className="inline-flex items-center justify-center rounded-md bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 p-2">
@@ -52,6 +56,15 @@ const Stat = ({ value, label }: { value: string; label: string }) => (
 const LandingPage = () => {
   const { plans, isLoading } = useSubscriptionPlans();
 
+  const screenshots = useMemo(
+    () => [
+      "/attachments/Captura_223055.png",
+      "/attachments/Captura_223104.png",
+      "/attachments/Captura_223109.png",
+    ],
+    []
+  );
+
   const handleContatoWhatsApp = () => {
     const telefone = "5563984861923";
     const texto = `Olá! Gostaria de falar com a Lumina Sistema de Gestão.`;
@@ -62,32 +75,52 @@ const LandingPage = () => {
 
   return (
     <div className="relative min-h-screen text-zinc-900 dark:text-zinc-100 transition-colors">
-      {/* Overlay de gradiente azul/roxo em toda a página */}
+      {/* Fundo com gradiente e shapes flutuantes */}
       <div className="fixed inset-0 -z-10 bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-700 opacity-40"></div>
-      
-      {/* Shapes flutuantes interativos */}
       <FloatingShapes />
 
+      {/* Topbar com logo + navegação */}
+      <header className="relative z-10 border-b border-white/20 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-900/50 backdrop-blur-sm">
+        <div className="container mx-auto responsive-section py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/lumina-logo.png" alt="Lumina" className="h-8 w-8 rounded" />
+            <span className="font-semibold">Lumina Sistema de Gestão</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" className="text-indigo-600 hover:text-indigo-700">
+              <Link to="/register">Criar conta</Link>
+            </Button>
+            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              <Link to="/login">
+                Entrar
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </header>
+
       {/* HERO */}
-      <header className="relative overflow-hidden bg-sidebar-accent/60 dark:bg-zinc-900/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 pt-14 md:pt-20">
+      <section className="relative z-10 bg-sidebar-accent/50 dark:bg-zinc-900/40">
+        <div className="container mx-auto responsive-section pt-12 md:pt-16 pb-10">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/60 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700 backdrop-blur">
+            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700 backdrop-blur">
               <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
               <span>Nova identidade • Lumina Sistema de Gestão</span>
             </div>
 
             <h1 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight">
-              Lumina Sistema de Gestão
+              Tecnologia que ilumina e simplifica a gestão da sua igreja
             </h1>
-            <p className="mt-4 text-zinc-600 dark:text-zinc-400 text-base md:text-lg">
-              Tecnologia para iluminar e simplificar a gestão da sua igreja — com segurança por igreja (RLS), WhatsApp integrado e ferramentas completas para líderes e membros.
+            <p className="mt-4 text-zinc-700 dark:text-zinc-400 text-base md:text-lg">
+              Supabase Auth + RLS por igreja, WhatsApp integrado e ferramentas completas para líderes,
+              voluntários e membros — tudo em um só lugar.
             </p>
 
             <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
               <Button asChild size="lg" className="shadow-md hover:shadow-lg bg-indigo-600 hover:bg-indigo-700 text-white">
                 <Link to="/login">
-                  Entrar
+                  Entrar agora
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -99,14 +132,53 @@ const LandingPage = () => {
 
             <div className="mt-8 grid grid-cols-2 justify-items-center max-w-xl mx-auto gap-4">
               <Stat value="100%" label="RLS por igreja" />
-              <Stat value="24/7" label="Online" />
+              <Stat value="24/7" label="Disponível" />
             </div>
           </div>
         </div>
-      </header>
+      </section>
+
+      {/* TRUST / SEGURANÇA */}
+      <section className="container mx-auto responsive-section py-10 md:py-12">
+        <div className="grid sm:grid-cols-3 gap-4">
+          <Card className="bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800">
+            <CardContent className="p-5 flex items-start gap-3">
+              <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              <div>
+                <h3 className="font-semibold">Segurança por Igreja (RLS)</h3>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  Cada igreja acessa apenas seus dados com políticas de segurança robustas no banco.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800">
+            <CardContent className="p-5 flex items-start gap-3">
+              <LockKeyhole className="h-5 w-5 text-indigo-600" />
+              <div>
+                <h3 className="font-semibold">Auth Supabase</h3>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  Autenticação moderna e segura, com monitoramento de sessão e redirecionamentos automáticos.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800">
+            <CardContent className="p-5 flex items-start gap-3">
+              <ServerCog className="h-5 w-5 text-blue-600" />
+              <div>
+                <h3 className="font-semibold">Infraestrutura Confiável</h3>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  Query caching, Edge Functions e integrações estáveis para alto desempenho.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       {/* FEATURES */}
-      <section className="container mx-auto px-4 py-12 md:py-16">
+      <section className="container mx-auto responsive-section py-10 md:py-14">
         <div className="max-w-2xl">
           <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Tudo o que sua igreja precisa</h2>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
@@ -126,16 +198,34 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* SOBRE NÓS / MISSÃO / VISÃO */}
-      <section className="container mx-auto px-4 py-12 md:py-16">
+      {/* VITRINE DE TELAS */}
+      <section className="container mx-auto responsive-section py-10 md:py-14">
+        <div className="max-w-2xl">
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Uma experiência simples e bonita</h2>
+          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+            Interface moderna com foco em clareza, produtividade e acessibilidade.
+          </p>
+        </div>
+        <div className="mt-8 grid md:grid-cols-3 gap-4">
+          {screenshots.map((src) => (
+            <Card key={src} className="overflow-hidden bg-white/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800">
+              <CardContent className="p-0">
+                <img src={src} alt="Tela do sistema Lumina" className="w-full h-56 object-cover" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* SOBRE / MISSÃO / VISÃO */}
+      <section className="container mx-auto responsive-section py-10 md:py-14">
         <div className="grid lg:grid-cols-3 gap-6">
           <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Sobre Nós</h2>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Bem-vindo à Lumina Sistema de Gestão, a plataforma criada para iluminar e simplificar a administração da sua igreja.
-                Entendemos que a gestão de uma comunidade de fé envolve dedicação, tempo e organização.
-                Por isso, desenvolvemos uma ferramenta completa e intuitiva, pensada para que líderes e equipes possam focar no que realmente importa:
+                A plataforma criada para iluminar e simplificar a administração da sua igreja.
+                Ferramentas completas e intuitivas para que líderes e equipes foquem no que importa:
                 o cuidado com as pessoas e a expansão do ministério.
               </p>
             </CardContent>
@@ -146,8 +236,8 @@ const LandingPage = () => {
               <div className="flex items-start gap-3">
                 <Lightbulb className="h-5 w-5 text-indigo-600" />
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  Empoderar igrejas com tecnologia inovadora e acessível, simplificando a gestão administrativa
-                  para que possam dedicar mais tempo e energia à sua missão espiritual e ao cuidado de seus membros.
+                  Empoderar igrejas com tecnologia acessível, simplificando a gestão para dedicar mais tempo
+                  à missão espiritual e ao cuidado dos membros.
                 </p>
               </div>
             </CardContent>
@@ -158,8 +248,8 @@ const LandingPage = () => {
               <div className="flex items-start gap-3">
                 <Target className="h-5 w-5 text-emerald-600" />
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  Ser a principal plataforma de gestão para igrejas no Brasil, reconhecida pela excelência, usabilidade
-                  e pelo impacto positivo na organização e crescimento das comunidades de fé que servimos.
+                  Ser a principal plataforma de gestão para igrejas no Brasil, reconhecida pela excelência,
+                  usabilidade e impacto positivo nas comunidades de fé.
                 </p>
               </div>
             </CardContent>
@@ -168,14 +258,13 @@ const LandingPage = () => {
       </section>
 
       {/* VALORES */}
-      <section className="container mx-auto px-4 py-12 md:py-16">
+      <section className="container mx-auto responsive-section py-10 md:py-14">
         <div className="max-w-2xl">
           <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Nossos Valores</h2>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            O que nos guia no dia a dia para servir melhor as igrejas.
+            O que nos guia diariamente para servir melhor as igrejas.
           </p>
         </div>
-
         <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
             <CardContent className="p-6">
@@ -183,7 +272,7 @@ const LandingPage = () => {
                 <Heart className="h-5 w-5 text-pink-600" />
                 <div>
                   <h3 className="font-semibold">Fé e Propósito</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Acreditamos no poder da comunidade e trabalhamos para fortalecer o trabalho das igrejas.</p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Trabalhamos para fortalecer o trabalho das igrejas.</p>
                 </div>
               </div>
             </CardContent>
@@ -193,8 +282,8 @@ const LandingPage = () => {
               <div className="flex items-start gap-3">
                 <Sparkles className="h-5 w-5 text-indigo-600" />
                 <div>
-                  <h3 className="font-semibold">Inovação a Serviço do Reino</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Buscamos soluções tecnológicas para atender às necessidades do ambiente eclesiástico.</p>
+                  <h3 className="font-semibold">Inovação a Serviço</h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Tecnologia aplicada às necessidades do contexto eclesiástico.</p>
                 </div>
               </div>
             </CardContent>
@@ -205,7 +294,7 @@ const LandingPage = () => {
                 <CheckCircle className="h-5 w-5 text-emerald-600" />
                 <div>
                   <h3 className="font-semibold">Parceria e Suporte</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Somos parceiros de cada igreja, com suporte dedicado e relacionamento de confiança.</p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Suporte dedicado e relacionamento de confiança.</p>
                 </div>
               </div>
             </CardContent>
@@ -216,7 +305,7 @@ const LandingPage = () => {
                 <ShieldCheck className="h-5 w-5 text-zinc-600" />
                 <div>
                   <h3 className="font-semibold">Integridade</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Agimos com transparência e honestidade em todas as nossas interações.</p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Transparência e honestidade em todas as interações.</p>
                 </div>
               </div>
             </CardContent>
@@ -224,10 +313,10 @@ const LandingPage = () => {
           <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <Lightbulb className="h-5 w-5 text-yellow-600" />
+                <Rocket className="h-5 w-5 text-violet-600" />
                 <div>
                   <h3 className="font-semibold">Simplicidade</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Ferramentas poderosas e fáceis de usar, para todos os níveis de conhecimento.</p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Ferramentas poderosas e fáceis de usar.</p>
                 </div>
               </div>
             </CardContent>
@@ -236,12 +325,11 @@ const LandingPage = () => {
       </section>
 
       {/* PLANOS */}
-      <section className="container mx-auto px-4 py-12 md:py-16">
+      <section className="container mx-auto responsive-section py-10 md:py-14">
         <div className="max-w-2xl">
           <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Planos de Assinatura</h2>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">Escolha um plano para começar o cadastro da sua igreja.</p>
         </div>
-
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {isLoading ? (
             <Card className="p-6">
@@ -253,7 +341,7 @@ const LandingPage = () => {
             </Card>
           ) : (
             plans.map((plan) => (
-              <Card key={plan.id} className="bg-gradient-to-br from-white/80 to-church-purple-50/60 dark:from-zinc-900/80 dark:to-zinc-800/80 border border-indigo-200 dark:border-zinc-700 shadow-sm">
+              <Card key={plan.id} className="bg-gradient-to-br from-white/80 to-indigo-50/60 dark:from-zinc-900/80 dark:to-zinc-800/80 border border-indigo-200 dark:border-zinc-700 shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-semibold text-zinc-800 dark:text-zinc-100">{plan.nome}</h3>
@@ -277,10 +365,14 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* FOOTER */}
       <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-10">
-        <div className="container mx-auto px-4 py-10 grid gap-8 md:grid-cols-3">
+        <div className="container mx-auto responsive-section py-10 grid gap-8 md:grid-cols-3">
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold">Lumina Sistema de Gestão</h3>
+            <div className="flex items-center gap-2">
+              <img src="/lumina-logo.png" alt="Lumina" className="h-6 w-6 rounded" />
+              <h3 className="text-lg font-semibold">Lumina Sistema de Gestão</h3>
+            </div>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               Tecnologia para iluminar e simplificar a gestão da sua igreja.
             </p>
