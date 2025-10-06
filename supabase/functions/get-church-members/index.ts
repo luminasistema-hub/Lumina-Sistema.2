@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 serve(async (req) => {
@@ -45,21 +46,18 @@ serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   const requestedChurchId: string | null = body?.church_id ?? null;
 
-  // Descobre o membro solicitante (para obter id_igreja e role)
   const { data: me } = await admin
     .from("membros")
     .select("id, id_igreja, funcao")
     .eq("id", userData.user.id)
     .maybeSingle();
 
-  // Se não for membro, verifica se é super_admin
   const { data: sa } = await admin
     .from("super_admins")
     .select("id")
     .eq("id", userData.user.id)
     .maybeSingle();
 
-  // church alvo: a da pessoa, ou a solicitada caso seja super_admin
   const targetChurchId = sa ? (requestedChurchId ?? null) : (me?.id_igreja ?? null);
 
   if (!targetChurchId) {
@@ -69,7 +67,6 @@ serve(async (req) => {
     });
   }
 
-  // Permissões: admins/pastores/integra/líderes/gestao_kids podem listar; super_admin sempre pode
   const allowedRoles = ["admin", "pastor", "integra", "lider_ministerio", "gestao_kids"];
   const canList = !!sa || (me && me.id_igreja === targetChurchId && allowedRoles.includes(me.funcao));
 
