@@ -7,7 +7,7 @@ import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Badge } from '../ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
@@ -18,6 +18,7 @@ import {
   Baby, Plus, Users, Clock, Shield, Heart, AlertTriangle, CheckCircle, UserCheck, UserX, Search, Filter, Calendar, Phone, Mail, MapPin, Edit, Eye, QrCode, Loader2, Trash2
 } from 'lucide-react'
 import AddKidDialog from '../personal/AddKidDialog'
+import KidDetailsDialog from '@/components/kids/KidDetailsDialog'
 
 interface MemberOption {
   id: string
@@ -247,8 +248,24 @@ const KidsPage = () => {
         {canManageKids && <TabsContent value="reports"><div className="text-center py-8"><Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" /><h3 className="text-xl font-semibold">Relatórios em desenvolvimento</h3></div></TabsContent>}
       </Tabs>
 
-      {selectedKidDetails && <Dialog open={!!selectedKidDetails} onOpenChange={() => setSelectedKidDetails(null)}><DialogContent>{/* Details Dialog */}</DialogContent></Dialog>}
-      {kidToEdit && <Dialog open={isEditKidDialogOpen} onOpenChange={setIsEditKidDialogOpen}><DialogContent>{/* Edit Dialog */}</DialogContent></Dialog>}
+      {selectedKidDetails && (
+        <KidDetailsDialog
+          open={!!selectedKidDetails}
+          onClose={() => setSelectedKidDetails(null)}
+          kid={selectedKidDetails}
+        />
+      )}
+      {kidToEdit && (
+        <Dialog open={isEditKidDialogOpen} onOpenChange={setIsEditKidDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Criança</DialogTitle>
+              <DialogDescription>Atualize as informações e salve para aplicar as mudanças.</DialogDescription>
+            </DialogHeader>
+            {/* O conteúdo de edição já é gerenciado pelos estados e botões na página. */}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* NOVO: diálogo de cadastro de criança */}
       {user && currentChurchId && (

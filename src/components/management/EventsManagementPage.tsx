@@ -49,8 +49,9 @@ const EventsManagementPage = () => {
   });
 
   const handleSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['eventsManagement'] });
-    queryClient.invalidateQueries({ queryKey: ['events', currentChurchId, user?.id] });
+    // invalida e refetch com a mesma queryKey ativa, garantindo atualização imediata
+    queryClient.invalidateQueries({ queryKey });
+    queryClient.refetchQueries({ queryKey });
     setCreateOpen(false);
     setEditOpen(false);
   };
