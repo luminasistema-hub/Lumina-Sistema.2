@@ -95,21 +95,8 @@ serve(async (req) => {
       throw authError
     }
 
-    // 3. Atualizar o status do membro para ativo (como admin master)
-    if (authData.user) {
-      const { error: updateError } = await supabaseAdmin
-        .from('membros')
-        .update({ 
-          status: 'ativo',
-          funcao: 'admin'
-        })
-        .eq('id', authData.user.id)
-
-      if (updateError) {
-        console.error('Erro ao atualizar status do admin:', updateError)
-        // Não falha o registro por causa disso, mas loga o erro
-      }
-    }
+    // 3. Não precisa mais atualizar o status, pois já entra como ativo
+    // Removido: atualização de status do membro
 
     return new Response(JSON.stringify({ churchId: newChurchId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
