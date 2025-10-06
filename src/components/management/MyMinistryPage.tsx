@@ -51,43 +51,50 @@ const MyMinistryPage = () => {
 
   const loadMyMinistries = useCallback(async () => {
     if (!user?.id || !currentChurchId) { setMyMinistries([]); return; }
-    // Carrega os ministérios onde o usuário é voluntário
-    const { data: mv } = await supabase
+
+    // 1) IDs de ministérios onde o usuário é voluntário
+    const { data: volRows } = await supabase
       .from('ministerio_voluntarios')
-      .select('ministerio:ministerios(id, nome, descricao, lider_id)')
+      .select('ministerio_id')
       .eq('membro_id', user.id)
       .eq('id_igreja', currentChurchId);
 
-    const volunteerList = (mv || [])
-      .map((row: any) => {
-        const m = row?.ministerio;
-        if (!m || !m.id) return null;
-        return {
-          id: m.id,
-          nome: m.nome,
-          descricao: m.descricao,
-          lider_id: m.lider_id,
-          isLeader: m.lider_id === user.id
-        } as Ministry;
-      })
-      .filter(Boolean) as Ministry[];
+    const ministryIds = Array.from(
+      new Set((volRows || []).map((r: any) => r?.ministerio_id).filter(Boolean))
+    );
 
-    // Carrega também os ministérios onde o usuário é LÍDER (mesmo que não esteja na tabela de voluntários)
+    // 2) Ministérios pelos IDs coletados
+    const { data: ministriesByVolunteer } = ministryIds.length > 0
+      ? await supabase
+          .from('ministerios')
+          .select('id, nome, descricao, lider_id')
+          .in('id', ministryIds)
+      : { data: [] as any[] };
+
+    const volunteerList: Ministry[] = (ministriesByVolunteer || []).map((m: any) => ({
+      id: m.id,
+      nome: m.nome,
+      descricao: m.descricao,
+      lider_id: m.lider_id,
+      isLeader: m.lider_id === user.id
+    }));
+
+    // 3) Ministérios onde o usuário é líder
     const { data: leaderRows } = await supabase
       .from('ministerios')
       .select('id, nome, descricao, lider_id')
       .eq('id_igreja', currentChurchId)
       .eq('lider_id', user.id);
 
-    const leaderList = (leaderRows || []).map((m: any) => ({
+    const leaderList: Ministry[] = (leaderRows || []).map((m: any) => ({
       id: m.id,
       nome: m.nome,
       descricao: m.descricao,
       lider_id: m.lider_id,
       isLeader: true
-    })) as Ministry[];
+    }));
 
-    // Mescla e remove duplicados, priorizando a entrada onde isLeader = true
+    // 4) Mesclar e remover duplicados
     const merged = [...volunteerList, ...leaderList];
     const uniqueMap = new Map<string, Ministry>();
     for (const item of merged) {
@@ -102,7 +109,7 @@ const MyMinistryPage = () => {
     const unique = Array.from(uniqueMap.values());
     setMyMinistries(unique);
 
-    // Se nada selecionado ainda, prioriza um ministério onde o usuário é líder
+    // Seleção inicial
     if (unique.length > 0 && !selectedMinistryId) {
       const leaderFirst = unique.find(m => m.isLeader) || unique[0];
       if (leaderFirst?.id) setSelectedMinistryId(leaderFirst.id);
@@ -127,12 +134,42 @@ const MyMinistryPage = () => {
   }, [currentChurchId]);
 
   const loadVolunteers = useCallback(async (ministryId: string) => {
-    const { data, error } = await supabase
+    // Busca IDs dos membros e suas funções no ministério
+    const { data: volRows, error } = await supabase
       .from('ministerio_voluntarios')
-      .select('membro:membros(id, nome_completo), funcao_no_ministerio')
+      .select('membro_id, funcao_no_ministerio')
       .eq('ministerio_id', ministryId);
+
     if (error) { toast.error('Erro ao carregar voluntários'); return; }
-    setVolunteers((data || []).map((v: any) => ({ id: v.membro.id, nome_completo: v.membro.nome_completo, funcao: v.funcao_no_ministerio })));
+
+    const memberIds = (volRows || []).map((r: any) => r?.membro_id).filter(Boolean);
+
+    if (memberIds.length === 0) {
+      setVolunteers([]);
+      return;
+    }
+
+    // Busca dados dos membros
+    const { data: membersData, error: mErr } = await supabase
+      .from('membros')
+      .select('id, nome_completo')
+      .in('id', memberIds);
+
+    if (mErr) { toast.error('Erro ao carregar dados dos membros'); return; }
+
+    // Monta lista final com função
+    const funcaoById = new Map<string, string | null>();
+    (volRows || []).forEach((r: any) => {
+      if (r?.membro_id) funcaoById.set(r.membro_id, r.funcao_no_ministerio || null);
+    });
+
+    setVolunteers(
+      (membersData || []).map((m: any) => ({
+        id: m.id,
+        nome_completo: m.nome_completo,
+        funcao: funcaoById.get(m.id) || null
+      }))
+    );
   }, []);
 
   const loadRoles = useCallback(async (ministryId: string) => {
