@@ -1,243 +1,102 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../integrations/supabase/client';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Label } from '../components/ui/label';
-import { Badge } from '../components/ui/badge';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Church, Lock, Mail, Eye, EyeOff, User, ArrowLeft, Building } from 'lucide-react';
 
 const RegisterPage = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const churchIdFromUrl = searchParams.get('churchId');
-  const rawChurchNameFromUrl = searchParams.get('churchName');
-  const churchNameFromUrl = rawChurchNameFromUrl === 'undefined' ? '' : rawChurchNameFromUrl;
-  
-  const initialRoleFromUrl = searchParams.get('initialRole') || 'membro';
-
-  const [name, setName] = useState('');
+  const { churchId: routeChurchId } = useParams();
+  const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [churchName, setChurchName] = useState(churchNameFromUrl || ''); 
-  const [isChurchNameLoading, setIsChurchNameLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [name, setName] = useState('');
+  const [church, setChurch] = useState<{ id: string; nome: string } | null>(null);
 
+  // Buscar igreja pela rota; bloquear sem churchId
   useEffect(() => {
-    if (churchNameFromUrl) { 
-      setChurchName(churchNameFromUrl);
-    }
-  }, [churchNameFromUrl]);
-
-  // Buscar nome da igreja quando vier apenas o churchId
-  useEffect(() => {
-    if (churchIdFromUrl && !churchNameFromUrl) {
-      setIsChurchNameLoading(true);
-      supabase
+    const loadChurch = async () => {
+      if (!routeChurchId) {
+        toast.error('Este link de cadastro é inválido. Solicite ao administrador o link correto da sua igreja.');
+        return;
+      }
+      const { data, error } = await supabase
         .from('igrejas')
-        .select('nome')
-        .eq('id', churchIdFromUrl)
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('RegisterPage: Erro ao carregar nome da igreja:', error.message);
-            toast.error('Não foi possível carregar o nome da igreja. Tente novamente.');
-          } else {
-            setChurchName(data?.nome || '');
-          }
-        })
-        .finally(() => setIsChurchNameLoading(false));
-    }
-  }, [churchIdFromUrl, churchNameFromUrl]);
+        .select('id, nome')
+        .eq('id', routeChurchId)
+        .maybeSingle();
+      if (error || !data) {
+        toast.error('Igreja não encontrada. Verifique o link com o administrador.');
+        return;
+      }
+      setChurch({ id: data.id as string, nome: data.nome as string });
+    };
+    loadChurch();
+  }, [routeChurchId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    if (!name || !email || !password || !churchName) {
-      toast.error('Por favor, preencha todos os campos obrigatórios.');
-      setIsLoading(false);
+  const handleSubmit = async () => {
+    if (!church) {
+      toast.error('Não foi possível identificar a igreja deste cadastro.');
       return;
     }
-
-    if (password.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres.');
-      setIsLoading(false);
+    if (!email || !name) {
+      toast.error('Preencha nome e email.');
       return;
     }
-
-    console.log('RegisterPage: Attempting Supabase signUp...');
+    setLoading(true);
+    // Realiza o signup já com associação à igreja
     const { data, error } = await supabase.auth.signUp({
       email,
-      password,
+      password: 'password_temp_123',
       options: {
         data: {
-          full_name: name, 
-          church_name: churchName,
-          initial_role: initialRoleFromUrl,
-          church_id: churchIdFromUrl,
+          full_name: name,
+          church_name: church.nome,
+          initial_role: 'membro',
+          church_id: church.id,
         },
       },
     });
-
+    setLoading(false);
     if (error) {
-      console.error('RegisterPage: Supabase signUp error:', error.message);
       toast.error(error.message);
-    } else if (data.user) {
-      console.log('RegisterPage: Supabase signUp successful, user:', data.user.id);
-      toast.success('Cadastro realizado com sucesso! Você já pode fazer login.');
-      navigate('/login'); 
-    } else {
-      console.error('RegisterPage: Unknown error during signUp.');
-      toast.error('Erro desconhecido no registro.');
+      return;
     }
-    setIsLoading(false);
+    toast.success('Cadastro iniciado! Verifique seu e-mail para confirmar.');
+    navigate('/login');
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-purple-50">
-      <div className="w-full max-w-md">
-        <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur">
-          <CardHeader className="text-center pb-8">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4">
-              <img src="/favicon.ico" alt="Lumina Logo" className="w-10 h-10" />
+    <div className="p-6 max-w-md mx-auto">
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle>
+            Cadastro de Membro {church ? `— ${church.nome}` : ''}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!church && (
+            <div className="text-sm text-red-600">
+              Este cadastro requer um link único da igreja. Solicite ao administrador.
             </div>
-            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Lumina
-            </CardTitle>
-            <CardDescription className="text-base">
-              Crie sua conta para começar
-            </CardDescription>
-            <Badge className="bg-green-100 text-green-800 mx-auto">
-              Sistema em Produção
-            </Badge>
-          </CardHeader>
-          
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome Completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Seu nome completo"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="pl-10 h-12"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="churchName">Nome da Igreja</Label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="churchName"
-                    type="text"
-                    placeholder={churchIdFromUrl ? 'Nome da igreja (preenchido automaticamente)' : 'Nome da sua igreja'}
-                    value={churchName}
-                    onChange={(e) => setChurchName(e.target.value)}
-                    className="pl-10 h-12"
-                    disabled={!!churchIdFromUrl}
-                    required
-                  />
-                </div>
-                {churchIdFromUrl && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Vinculada automaticamente à sua igreja.
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-12"
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Mínimo 6 caracteres"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 h-12"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-              
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 transition-opacity"
-                disabled={isLoading || isChurchNameLoading}
-              >
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Cadastrando...
-                  </div>
-                ) : isChurchNameLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Carregando igreja...
-                  </div>
-                ) : (
-                  'Criar Conta'
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <Link
-                to="/login"
-                className="text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-2 mx-auto"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Já tenho conta - Fazer Login
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="text-center text-sm text-gray-500 mt-6 bg-white/80 p-4 rounded-lg">
-          <p className="flex items-center justify-center gap-2 mb-2">
-            <img src="/favicon.ico" alt="Lumina Icon" className="w-4 h-4" />
-            Lumina - Sistema de Gestão Eclesiástica
-          </p>
-          <p className="text-xs">
-            Todos os novos usuários iniciam como "Membro".
-          </p>
-        </div>
-      </div>
+          )}
+          <div className="space-y-2">
+            <Label>Nome Completo</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
+          </div>
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" />
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={handleSubmit} disabled={loading || !church}>
+              {loading ? 'Enviando...' : 'Cadastrar'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

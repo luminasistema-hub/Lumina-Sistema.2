@@ -269,18 +269,12 @@ const MemberManagementPage = () => {
       toast.error('Nenhuma igreja selecionada.');
       return;
     }
-    const church = getChurchById(currentChurchId);
-    if (!church) {
-      toast.error('Dados da igreja não encontrados.');
-      return;
-    }
     const baseUrl = window.location.origin;
-    const encodedChurchName = encodeURIComponent(church.nome || '');
-    const link = `${baseUrl}/register?churchId=${currentChurchId}&churchName=${encodedChurchName}&initialRole=membro`;
+    const link = `${baseUrl}/register/${currentChurchId}`;
     setGeneratedLink(link);
     setIsGenerateLinkDialogOpen(true);
-    trackEvent('generate_registration_link', { churchId: currentChurchId, churchName: church.nome });
-  }, [currentChurchId, getChurchById]);
+    trackEvent('generate_registration_link', { churchId: currentChurchId });
+  }, [currentChurchId]);
 
   const handleCopyLink = useCallback(() => {
     copy(generatedLink);

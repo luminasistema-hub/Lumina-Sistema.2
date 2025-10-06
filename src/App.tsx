@@ -1,5 +1,5 @@
 // src/App.tsx
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -69,7 +69,7 @@ function App() {
   }, [checkAuth, initializeAuthListener])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-church-blue-50 to-church-purple-50">
+    <BrowserRouter>
       <Routes>
         {/* Landing */}
         <Route
@@ -101,7 +101,7 @@ function App() {
           }
         />
         <Route
-          path="/register"
+          path="/register/:churchId"
           element={
             user ? (
               <Navigate
@@ -177,7 +177,7 @@ function App() {
         {/* catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </div>
+    </BrowserRouter>
   )
 }
 
