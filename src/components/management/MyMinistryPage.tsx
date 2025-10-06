@@ -287,29 +287,24 @@ const MyMinistryPage = () => {
   const handleAddVolunteer = async () => {
     if (!selectedMinistryId || !selectedVolunteerToAdd || !currentChurchId) return;
 
-    // Evita duplicar sem depender de upsert
-    const { data: exists, error: checkErr } = await supabase
-      .from('ministerio_voluntarios')
-      .select('id')
-      .eq('ministerio_id', selectedMinistryId)
-      .eq('membro_id', selectedVolunteerToAdd)
-      .maybeSingle();
+    try {
+      const { error } = await supabase
+        .from('ministerio_voluntarios')
+        .insert({ 
+          ministerio_id: selectedMinistryId, 
+          membro_id: selectedVolunteerToAdd, 
+          id_igreja: currentChurchId 
+        });
 
-    if (checkErr) { toast.error('Erro ao verificar voluntário'); return; }
-    if (exists) {
-      toast.info('Este membro já é voluntário neste ministério.');
+      if (error) throw error;
+
+      toast.success('Voluntário adicionado!');
       setSelectedVolunteerToAdd(null);
-      return;
+      loadVolunteers(selectedMinistryId);
+    } catch (err: any) {
+      console.error('Erro ao adicionar voluntário:', err);
+      toast.error('Erro ao adicionar voluntário: ' + err.message);
     }
-
-    const { error } = await supabase
-      .from('ministerio_voluntarios')
-      .insert({ ministerio_id: selectedMinistryId, membro_id: selectedVolunteerToAdd, id_igreja: currentChurchId });
-
-    if (error) { toast.error('Erro ao adicionar voluntário: ' + error.message); return; }
-    toast.success('Voluntário adicionado!');
-    setSelectedVolunteerToAdd(null);
-    loadVolunteers(selectedMinistryId);
   };
 
   const handleRemoveVolunteer = async (membroId: string) => {
