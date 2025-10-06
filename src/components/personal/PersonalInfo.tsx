@@ -75,6 +75,7 @@ const PersonalInfo = () => {
   const [checkinHistory, setCheckinHistory] = useState<CheckinRecord[]>([]);
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false);
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
+  const hasLoadedRef = useRef(false);
 
   const isFirstAccess = !user?.perfil_completo;
 
@@ -180,7 +181,10 @@ const PersonalInfo = () => {
   }, [userKids]);
 
   useEffect(() => {
-    loadData();
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      loadData();
+    }
   }, [loadData]);
 
   useEffect(() => {

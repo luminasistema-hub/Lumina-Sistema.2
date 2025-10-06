@@ -17,6 +17,7 @@ import { useKidsData, Kid, CheckinRecord } from '@/hooks/useKidsData'
 import { 
   Baby, Plus, Users, Clock, Shield, Heart, AlertTriangle, CheckCircle, UserCheck, UserX, Search, Filter, Calendar, Phone, Mail, MapPin, Edit, Eye, QrCode, Loader2, Trash2
 } from 'lucide-react'
+import AddKidDialog from '../personal/AddKidDialog'
 
 interface MemberOption {
   id: string
@@ -162,6 +163,9 @@ const KidsPage = () => {
   const totalKids = kids.length;
   const activeCheckins = checkinRecords.filter(r => !r.data_checkout).length;
 
+  // NOVO: controle do diálogo de cadastro
+  const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false)
+
   if (!currentChurchId) return <div className="p-6 text-center text-gray-600">Selecione uma igreja para gerenciar o ministério Kids.</div>;
   if (isLoading) return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-pink-500" /><p className="ml-4 text-lg">Carregando...</p></div>;
   if (error) return <div className="p-6 text-center text-red-500">Erro ao carregar dados: {error.message}</div>;
@@ -190,7 +194,15 @@ const KidsPage = () => {
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
             <div className="relative flex-1 lg:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><Input placeholder="Buscar criança..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
             <Select value={filterAge} onValueChange={setFilterAge}><SelectTrigger className="w-full sm:w-48"><Filter className="w-4 h-4 mr-2" /><SelectValue placeholder="Faixa etária" /></SelectTrigger><SelectContent><SelectItem value="all">Todas</SelectItem><SelectItem value="bercario">Berçário (0-3)</SelectItem><SelectItem value="infantil">Infantil (4-6)</SelectItem><SelectItem value="juniores">Juniores (7-10)</SelectItem><SelectItem value="pre-adolescentes">Pré-adolescentes (11+)</SelectItem></SelectContent></Select>
-            {canManageKids && <Dialog><DialogTrigger asChild><Button className="bg-pink-500 hover:bg-pink-600"><Plus className="w-4 h-4 mr-2" />Adicionar</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Cadastrar Nova Criança</DialogTitle><DialogDescription>O cadastro de novas crianças agora é feito através da área pessoal do responsável.</DialogDescription></DialogHeader><Button variant="outline" onClick={() => toast.info('Acesse a área pessoal do membro para cadastrar um filho.')}>Entendi</Button></DialogContent></Dialog>}
+            {canManageKids && (
+              <Button
+                className="bg-pink-500 hover:bg-pink-600"
+                onClick={() => setIsAddKidDialogOpen(true)}
+                disabled={!user || !currentChurchId}
+              >
+                <Plus className="w-4 h-4 mr-2" />Adicionar
+              </Button>
+            )}
           </div>
         </div>
 
@@ -237,6 +249,19 @@ const KidsPage = () => {
 
       {selectedKidDetails && <Dialog open={!!selectedKidDetails} onOpenChange={() => setSelectedKidDetails(null)}><DialogContent>{/* Details Dialog */}</DialogContent></Dialog>}
       {kidToEdit && <Dialog open={isEditKidDialogOpen} onOpenChange={setIsEditKidDialogOpen}><DialogContent>{/* Edit Dialog */}</DialogContent></Dialog>}
+
+      {/* NOVO: diálogo de cadastro de criança */}
+      {user && currentChurchId && (
+        <AddKidDialog
+          isOpen={isAddKidDialogOpen}
+          onClose={() => setIsAddKidDialogOpen(false)}
+          responsibleId={user.id}
+          responsibleName={user.name}
+          responsibleEmail={user.email}
+          churchId={currentChurchId}
+          onKidAdded={() => queryClient.invalidateQueries({ queryKey: ['kidsData', currentChurchId, user.id] })}
+        />
+      )}
     </div>
   );
 }

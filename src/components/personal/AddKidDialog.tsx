@@ -74,7 +74,6 @@ const AddKidDialog: React.FC<AddKidDialogProps> = ({
           nome_crianca: newKidForm.nome_crianca,
           data_nascimento: newKidForm.data_nascimento,
           responsavel_id: responsibleId,
-          email_responsavel: responsibleEmail,
           informacoes_especiais: newKidForm.informacoes_especiais || null,
           alergias: newKidForm.alergias || null,
           medicamentos: newKidForm.medicamentos || null,
