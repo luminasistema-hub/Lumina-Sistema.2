@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../stores/authStore'
-import Sidebar from '../components/layout/Sidebar'
-import Header from '../components/layout/Header'
 import MainLayout from '../components/layout/MainLayout'
 import DashboardHome from '../components/dashboard/DashboardHome'
 import PersonalInfo from '../components/personal/PersonalInfo'
@@ -93,15 +91,14 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar
+    <>
+      <MainLayout
         activeModule={activeModule}
         onModuleSelect={setActiveModule}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <MainLayout>{renderActiveModule()}</MainLayout>
-      </div>
+      >
+        {renderActiveModule()}
+      </MainLayout>
+      
       {showSpecialNotification && (
         <SpecialNotificationDialog
           isOpen={showSpecialNotification}
@@ -112,7 +109,7 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
           }}
         />
       )}
-    </div>
+    </>
   )
 }
 

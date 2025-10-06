@@ -56,7 +56,7 @@ const MainLayout = ({ children, activeModule = "dashboard", onModuleSelect }: Ma
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="flex h-screen bg-gray-50">
       {!isMobile && (
         <Sidebar 
           activeModule={activeModule} 
@@ -64,9 +64,9 @@ const MainLayout = ({ children, activeModule = "dashboard", onModuleSelect }: Ma
         />
       )}
       
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Header onOpenMobileMenu={() => setMobileMenuOpen(true)} />
-        <main className="flex-1 overflow-auto p-4">
+        <main className="flex-1 overflow-y-auto">
           {children}
         </main>
       </div>
