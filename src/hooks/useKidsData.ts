@@ -77,7 +77,7 @@ const fetchKidsData = async (churchId: string | null, userId: string | null, can
 
 export const useKidsData = () => {
   const { user, currentChurchId } = useAuthStore();
-  const canManageKids = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio';
+  const canManageKids = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio' || user?.role === 'gestao_kids';
 
   return useQuery({
     queryKey: ['kidsData', currentChurchId, user?.id],

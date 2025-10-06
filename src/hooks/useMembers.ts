@@ -3,7 +3,7 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuthStore } from '../stores/authStore';
 import { useChurchStore } from '../stores/churchStore';
 
-export type UserRole = 'super_admin' | 'admin' | 'pastor' | 'lider_ministerio' | 'financeiro' | 'voluntario' | 'midia_tecnologia' | 'integra' | 'membro';
+export type UserRole = 'super_admin' | 'admin' | 'pastor' | 'lider_ministerio' | 'financeiro' | 'voluntario' | 'midia_tecnologia' | 'integra' | 'gestao_kids' | 'membro';
 
 export interface MemberProfile {
   id: string;

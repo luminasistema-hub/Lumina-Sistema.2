@@ -26,7 +26,8 @@ import {
   Trash2,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Baby
 } from 'lucide-react'
 
 interface UserManagementProps {}
@@ -208,6 +209,7 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'voluntario': return <Users className="w-4 h-4" />
       case 'midia_tecnologia': return <Headphones className="w-4 h-4" />
       case 'integra': return <Heart className="w-4 h-4" />
+      case 'gestao_kids': return <Baby className="w-4 h-4" />
       case 'membro': return <Users className="w-4 h-4" />
       case 'super_admin': return <Shield className="w-4 h-4" /> 
     }
@@ -222,6 +224,7 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'voluntario': return 'bg-yellow-100 text-yellow-800'
       case 'midia_tecnologia': return 'bg-indigo-100 text-indigo-800'
       case 'integra': return 'bg-pink-100 text-pink-800'
+      case 'gestao_kids': return 'bg-orange-100 text-orange-800'
       case 'membro': return 'bg-gray-100 text-gray-800'
       case 'super_admin': return 'bg-red-200 text-red-900' 
     }
@@ -244,6 +247,7 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'voluntario': return 'Voluntário'
       case 'midia_tecnologia': return 'Mídia e Tecnologia'
       case 'integra': return 'Integração'
+      case 'gestao_kids': return 'Gestão Kids'
       case 'membro': return 'Membro'
       case 'super_admin': return 'Super Administrador' 
     }
@@ -340,6 +344,7 @@ const UserManagement = ({}: UserManagementProps) => {
               <SelectItem value="voluntario">Voluntário</SelectItem>
               <SelectItem value="midia_tecnologia">Mídia e Tecnologia</SelectItem>
               <SelectItem value="integra">Integração</SelectItem>
+              <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
               <SelectItem value="membro">Membro</SelectItem>
             </SelectContent>
           </Select>
@@ -477,6 +482,7 @@ const UserManagement = ({}: UserManagementProps) => {
                   <SelectItem value="pastor">Pastor</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
                   {user?.role === 'super_admin' && <SelectItem value="super_admin">Super Administrador</SelectItem>}
+                  <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
                 </SelectContent>
               </Select>
             </div>

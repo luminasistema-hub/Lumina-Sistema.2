@@ -42,7 +42,8 @@ import {
   DollarSign,
   Headphones,
   Target,
-  Loader2
+  Loader2,
+  Baby
 } from 'lucide-react'
 import { trackEvent } from '../../lib/analytics';
 import copy from 'copy-to-clipboard';
@@ -281,7 +282,7 @@ const MemberManagementPage = () => {
     const icons: Record<UserRole, JSX.Element> = {
       super_admin: <Shield className="w-4 h-4" />, admin: <Shield className="w-4 h-4" />, pastor: <Crown className="w-4 h-4" />,
       lider_ministerio: <UserCheck className="w-4 h-4" />, financeiro: <DollarSign className="w-4 h-4" />, voluntario: <Users className="w-4 h-4" />,
-      midia_tecnologia: <Headphones className="w-4 h-4" />, integra: <Heart className="w-4 h-4" />, membro: <UserIcon className="w-4 h-4" />
+      midia_tecnologia: <Headphones className="w-4 h-4" />, integra: <Heart className="w-4 h-4" />, gestao_kids: <Baby className="w-4 h-4" />, membro: <UserIcon className="w-4 h-4" />
     };
     return icons[role] || <UserIcon className="w-4 h-4" />;
   }, []);
@@ -292,7 +293,7 @@ const MemberManagementPage = () => {
       pastor: 'bg-purple-100 text-purple-800 border-purple-200', lider_ministerio: 'bg-blue-100 text-blue-800 border-blue-200',
       financeiro: 'bg-green-100 text-green-800 border-green-200', voluntario: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       midia_tecnologia: 'bg-indigo-100 text-indigo-800 border-indigo-200', integra: 'bg-pink-100 text-pink-800 border-pink-200',
-      membro: 'bg-gray-100 text-gray-800 border-gray-200'
+      gestao_kids: 'bg-orange-100 text-orange-800 border-orange-200', membro: 'bg-gray-100 text-gray-800 border-gray-200'
     };
     return colors[role] || 'bg-gray-100 text-gray-800 border-gray-200';
   }, []);
@@ -366,6 +367,7 @@ const MemberManagementPage = () => {
                 <SelectItem value="financeiro">Financeiro</SelectItem>
                 <SelectItem value="integra">Integra</SelectItem>
                 <SelectItem value="midia_tecnologia">Mídia/Tecnologia</SelectItem>
+                <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
                 <SelectItem value="super_admin">Super Admin</SelectItem>
               </SelectContent>
             </Select>
@@ -494,6 +496,7 @@ const MemberManagementPage = () => {
                         <SelectItem value="financeiro">Financeiro</SelectItem>
                         <SelectItem value="integra">Integra</SelectItem>
                         <SelectItem value="midia_tecnologia">Mídia/Tecnologia</SelectItem>
+                        <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -738,6 +741,7 @@ const MemberManagementPage = () => {
                     <SelectItem value="financeiro">Financeiro</SelectItem>
                     <SelectItem value="integra">Integra</SelectItem>
                     <SelectItem value="midia_tecnologia">Mídia/Tecnologia</SelectItem>
+                    <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -73,7 +73,7 @@ const moduleCategories: ModuleCategory[] = [
       { id: "ministries", title: "Gestão de Ministério", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
       { id: "financial-panel", title: "Painel Financeiro", icon: <DollarSign className="w-4 h-4" />, roles: ["pastor","admin","financeiro"], status: "complete" },
       { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor", "integra"], status: "complete" },
-      { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio"], status: "complete" },
+      { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","gestao_kids"], status: "complete" },
       { id: "events-management", title: "Gestão de Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
       { id: "devotionals-management", title: "Gestão de Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" }
     ]
@@ -148,7 +148,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   const getRoleLabel = (role: UserRole) => ({
     "super_admin": "Super Admin", "admin": "Admin", "pastor": "Pastor", "lider_ministerio": "Líder",
     "financeiro": "Financeiro", "voluntario": "Voluntário", "midia_tecnologia": "Mídia",
-    "integra": "Integração", "membro": "Membro"
+    "integra": "Integração", "gestao_kids": "Gestão Kids", "membro": "Membro"
   }[role] || "");
 
   const getUserModules = (modules: ModuleItem[]) => {

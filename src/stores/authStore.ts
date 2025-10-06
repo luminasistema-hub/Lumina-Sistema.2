@@ -13,6 +13,7 @@ export type UserRole =
   | 'voluntario'
   | 'midia_tecnologia'
   | 'integra'
+  | 'gestao_kids'
   | 'super_admin'
 
 export interface PersonalInfo {
