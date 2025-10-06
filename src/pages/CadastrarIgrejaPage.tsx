@@ -194,49 +194,26 @@ const CadastrarIgrejaPage = () => {
     }
 
     const fullAddress = `${endereco}, ${numero}${complemento ? ` - ${complemento}` : ''}, ${bairro}, ${cidade} - ${estado}`;
-    let newChurchId: string | null = null;
 
     try {
-      const { data: churchData, error: churchError } = await supabase
-        .from('igrejas')
-        .insert({
-          nome: churchName,
-          cnpj: cnpj.replace(/[^\d]+/g, ''),
-          endereco: fullAddress,
-          telefone_contato: telefoneContato.replace(/[^\d]+/g, ''),
-          email: adminEmail,
-          nome_responsavel: adminName,
-          plano_id: selectedPlan,
-          status: 'active', // Todas as igrejas entram como ativas
-          valor_mensal_assinatura: planDetails.monthlyValue,
-          limite_membros: planDetails.memberLimit,
-          ultimo_pagamento_status: planDetails.monthlyValue === 0 ? 'Confirmado' : 'Pendente',
-        })
-        .select('id, nome')
-        .single();
-
-      if (churchError) throw churchError;
-      newChurchId = churchData.id;
-
-      const { error: authError } = await supabase.auth.signUp({
-        email: adminEmail,
-        password: adminPassword,
-        options: {
-          data: {
-            full_name: adminName,
-            church_id: churchData.id,
-            church_name: churchData.nome,
-            initial_role: 'admin',
-          },
+      const { data, error } = await supabase.functions.invoke('register-church', {
+        body: {
+          adminName,
+          adminEmail,
+          adminPassword,
+          churchName,
+          cnpj,
+          fullAddress,
+          telefoneContato,
+          selectedPlan,
+          planDetails,
         },
       });
 
-      if (authError) {
-        if (newChurchId) {
-          await supabase.from('igrejas').delete().eq('id', newChurchId);
-        }
-        throw authError;
-      }
+      if (error) throw new Error(error.message);
+      if (data.error) throw new Error(data.error);
+
+      const newChurchId = data.churchId;
 
       toast.success('Conta criada! Verifique seu email para confirmar o cadastro.');
       
@@ -257,11 +234,7 @@ const CadastrarIgrejaPage = () => {
 
     } catch (err: any) {
       console.error('FormularioCadastroIgreja: Erro no cadastro:', err);
-      const mensagem = err.message.includes('User already registered')
-        ? 'Este e-mail já está cadastrado.'
-        : err.message.includes('duplicate key value')
-        ? 'O CNPJ informado já está em uso.'
-        : 'Ocorreu um erro ao realizar o cadastro. Tente novamente.';
+      const mensagem = err.message || 'Ocorreu um erro ao realizar o cadastro. Tente novamente.';
       toast.error(mensagem);
     } finally {
       setIsLoading(false);
