@@ -1,119 +1,119 @@
-import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom'; 
-import MainLayout from '../components/layout/MainLayout';
-import DashboardHome from '../components/dashboard/DashboardHome';
-import PersonalInfo from '../components/personal/PersonalInfo';
-import MemberJourney from '../components/personal/MemberJourney';
-import VocationalTest from '../components/personal/VocationalTest';
-import EventsPage from '../components/spiritual/EventsPage';
-import EventsManagementPage from '../components/management/EventsManagementPage';
-import DevotionalsManagementPage from '../components/management/DevotionalsManagementPage';
-import DevotionalsPage from '../components/spiritual/DevotionalsPage';
-import OfferingsPage from '../components/contributions/OfferingsPage';
-import KidsPage from '../components/family/KidsPage';
-import MemberManagementPage from '../components/management/MemberManagementPage';
-import MinistriesPage from '../components/management/MinistriesPage';
-import FinancialPanel from '../components/management/FinancialPanel';
-import SystemSettings from '../components/admin/SystemSettings';
-import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada'; 
-import ProfileCompletionDialog from '../components/personal/ProfileCompletionDialog'; 
-import { useAuthStore } from '../stores/authStore'; 
-import OrderOfServiceEventsPage from '../components/management/OrderOfServiceEventsPage';
-import MyMinistryPage from '../components/management/MyMinistryPage';
-import WhatsappIntegration from '../components/admin/WhatsappIntegration';
-import NotificationManager from '../components/admin/NotificationManager';
+import { useState, useEffect } from 'react'
+import { useAuthStore } from '../stores/authStore'
+import Sidebar from '../components/layout/Sidebar'
+import Header from '../components/layout/Header'
+import MainLayout from '../components/layout/MainLayout'
+import DashboardHome from '../components/dashboard/DashboardHome'
+import PersonalInfo from '../components/personal/PersonalInfo'
+import MemberJourney from '../components/personal/MemberJourney'
+import VocationalTest from '../components/personal/VocationalTest'
+import MyMinistryPage from '../components/management/MyMinistryPage'
+import EventsPage from '../components/spiritual/EventsPage'
+import DevotionalsPage from '../components/spiritual/DevotionalsPage'
+import OfferingsPage from '../components/contributions/OfferingsPage'
+import OrderOfServiceEventsPage from '../components/management/OrderOfServiceEventsPage'
+import MemberManagementPage from '../components/management/MemberManagementPage'
+import MinistriesPage from '../components/management/MinistriesPage'
+import FinancialPanel from '../components/management/FinancialPanel'
+import ConfiguracaoJornada from '../components/management/ConfiguracaoJornada'
+import KidsPage from '../components/family/KidsPage'
+import EventsManagementPage from '../components/management/EventsManagementPage'
+import DevotionalsManagementPage from '../components/management/DevotionalsManagementPage'
+import NotificationManager from '../components/admin/NotificationManager'
+import SystemSettings from '../components/admin/SystemSettings'
+import SpecialNotificationDialog from '@/components/shared/SpecialNotificationDialog'
+import PastorAreaPage from '@/components/pastor/PastorAreaPage'
 
-const DashboardPage = () => {
-  const { user, isLoading } = useAuthStore(); 
-  const location = useLocation(); 
-  // Restaura o último módulo ativo salvo; fallback para 'dashboard'
-  const [activeModule, setActiveModule] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem('lastDashboardModule');
-      return saved || 'dashboard';
-    } catch {
-      return 'dashboard';
-    }
-  });
-  const [showProfileDialog, setShowProfileDialog] = useState(false);
-  // Chave de prompt por usuário (evita reabrir o alerta várias vezes)
-  const promptKey = user?.id ? `profilePromptSeen_${user.id}` : null;
+interface DashboardPageProps {
+  currentChurchId: string
+}
+
+const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
+  const { user } = useAuthStore()
+  const [activeModule, setActiveModule] = useState('dashboard')
+  const [showSpecialNotification, setShowSpecialNotification] = useState(false)
 
   useEffect(() => {
-    if (location.state?.activeModule) {
-      const next = location.state.activeModule;
-      setActiveModule(next);
-      try { localStorage.setItem('lastDashboardModule', next); } catch {}
-      window.history.replaceState({}, document.title); 
+    if (user && !user.perfil_completo) {
+      const timer = setTimeout(() => {
+        setShowSpecialNotification(true)
+      }, 3000) // Aguarda 3 segundos antes de mostrar
+      return () => clearTimeout(timer)
     }
-  }, [location.state]);
+  }, [user])
 
-  useEffect(() => {
-    if (!isLoading && user && !user.perfil_completo && user.role !== 'super_admin') {
-      const seen = promptKey ? localStorage.getItem(promptKey) : null;
-      if (!seen) {
-        setShowProfileDialog(true);
-      }
-    }
-  }, [user, isLoading]);
-
-  const renderModuleContent = () => {
+  const renderActiveModule = () => {
     switch (activeModule) {
-      case 'dashboard': return <DashboardHome />;
-      case 'personal-info': return <PersonalInfo />;
-      case 'member-journey': return <MemberJourney />;
-      case 'vocational-test': return <VocationalTest />;
-      case 'events': return <EventsPage />;
-      case 'events-management': return <EventsManagementPage />;
-      case 'devotionals': return <DevotionalsPage />;
-      case 'devotionals-management': return <DevotionalsManagementPage />;
-      case 'offerings': return <OfferingsPage />;
-      case 'kids-management': return <KidsPage />;
-      case 'member-management': return <MemberManagementPage />;
-      case 'ministries': return <MinistriesPage />;
-      case 'financial-panel': return <FinancialPanel />;
-      case 'journey-config': return <ConfiguracaoJornada />;
-      case 'order-of-service': return <OrderOfServiceEventsPage />;
-      case 'my-ministry': 
-        return <MyMinistryPage />;
-      case 'whatsapp-integration': return <WhatsappIntegration />;
-      case 'system-settings': return <SystemSettings />;
-      case 'notification-management': return <NotificationManager />;
-      default: return <DashboardHome />;
+      case 'dashboard':
+        return <DashboardHome />
+      // Área Pessoal
+      case 'personal-info':
+        return <PersonalInfo />
+      case 'member-journey':
+        return <MemberJourney />
+      case 'vocational-test':
+        return <VocationalTest />
+      case 'my-ministry':
+        return <MyMinistryPage />
+      // Crescimento Espiritual
+      case 'events':
+        return <EventsPage />
+      case 'devotionals':
+        return <DevotionalsPage />
+      // Contribuições
+      case 'offerings':
+        return <OfferingsPage />
+      // Gestão
+      case 'pastor-area':
+        return <PastorAreaPage />
+      case 'order-of-service':
+        return <OrderOfServiceEventsPage />
+      case 'member-management':
+        return <MemberManagementPage />
+      case 'ministries':
+        return <MinistriesPage />
+      case 'financial-panel':
+        return <FinancialPanel />
+      case 'journey-config':
+        return <ConfiguracaoJornada />
+      case 'kids-management':
+        return <KidsPage />
+      case 'events-management':
+        return <EventsManagementPage />
+      case 'devotionals-management':
+        return <DevotionalsManagementPage />
+      // Administração
+      case 'notification-management':
+        return <NotificationManager />
+      case 'system-settings':
+        return <SystemSettings />
+      default:
+        return <DashboardHome />
     }
   }
-
-  const handleModuleSelect = (moduleId: string) => {
-    setActiveModule(moduleId);
-    try { localStorage.setItem('lastDashboardModule', moduleId); } catch {}
-    setShowProfileDialog(false);
-  }
-
-  // Em toda mudança de módulo (incluindo restauração inicial), garantimos persistência
-  useEffect(() => {
-    if (activeModule) {
-      try { localStorage.setItem('lastDashboardModule', activeModule); } catch {}
-    }
-  }, [activeModule])
 
   return (
-    <MainLayout activeModule={activeModule} onModuleSelect={handleModuleSelect}>
-      {renderModuleContent()}
-      {showProfileDialog && (
-        <ProfileCompletionDialog
-          isOpen={showProfileDialog}
-          onClose={() => {
-            if (promptKey) localStorage.setItem(promptKey, 'true');
-            setShowProfileDialog(false);
-          }}
-          onNavigateToProfile={() => {
-              setActiveModule('personal-info');
-              if (promptKey) localStorage.setItem(promptKey, 'true');
-              setShowProfileDialog(false);
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar
+        activeModule={activeModule}
+        onModuleSelect={setActiveModule}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header />
+        <MainLayout>{renderActiveModule()}</MainLayout>
+      </div>
+      {showSpecialNotification && (
+        <SpecialNotificationDialog
+          isOpen={showSpecialNotification}
+          onClose={() => setShowSpecialNotification(false)}
+          onAction={() => {
+            setActiveModule('personal-info')
+            setShowSpecialNotification(false)
           }}
         />
       )}
-    </MainLayout>
+    </div>
   )
 }
-export default DashboardPage;
+
+export default DashboardPage

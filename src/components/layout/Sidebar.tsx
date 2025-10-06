@@ -5,7 +5,8 @@ import { Badge } from "../ui/badge";
 import {
   Users, Calendar, DollarSign, Settings, Church, BookOpen, Heart,
   Baby, GraduationCap, User, Shield, ChevronLeft, ChevronRight,
-  ChevronDown, ChevronUp, Home, Activity, ClipboardList, Link2, MessageSquareText
+  ChevronDown, ChevronUp, Home, Activity, ClipboardList, Link2, MessageSquareText,
+  ClipboardSignature
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -66,6 +67,7 @@ const moduleCategories: ModuleCategory[] = [
     icon: <Users className="w-5 h-5" />,
     defaultOpen: true,
     modules: [
+      { id: "pastor-area", title: "Área do Pastor", icon: <ClipboardSignature className="w-4 h-4" />, roles: ["pastor", "admin"], status: "complete" },
       { id: "order-of-service", title: "Ordem de Culto/Eventos", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin"], status: "complete" },
       { id: "member-management", title: "Gestão de Membros", icon: <Users className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin","integra"], status: "complete" },
       { id: "ministries", title: "Gestão de Ministério", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
