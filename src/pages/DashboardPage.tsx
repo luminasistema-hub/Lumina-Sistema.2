@@ -21,7 +21,7 @@ import EventsManagementPage from '../components/management/EventsManagementPage'
 import DevotionalsManagementPage from '../components/management/DevotionalsManagementPage'
 import NotificationManager from '../components/admin/NotificationManager'
 import SystemSettings from '../components/admin/SystemSettings'
-import SpecialNotificationDialog from '@/components/shared/SpecialNotificationDialog'
+import { SpecialNotificationDialog } from '@/components/shared/SpecialNotificationDialog'
 import PastorAreaPage from '@/components/pastor/PastorAreaPage'
 
 interface DashboardPageProps {
