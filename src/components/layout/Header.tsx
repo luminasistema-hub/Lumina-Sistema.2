@@ -1,4 +1,5 @@
 import { useAuthStore, UserRole } from '../../stores/authStore'
+import { useIsMobile } from '../../hooks/use-mobile'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { 
@@ -50,6 +51,7 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
   const { notifications, unreadCount, markAllAsRead, isLoading } = useNotifications();
   const navigate = useNavigate();
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const unreadNotifications = notifications.filter(n => !n.lido);
 
@@ -115,15 +117,16 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
     <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex-1 max-w-xs md:max-w-md flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="sm:hidden"
-            onClick={onOpenMobileMenu}
-            aria-label="Abrir menu"
-          >
-            <Menu className="w-5 h-5" />
-          </Button>
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenMobileMenu}
+              aria-label="Abrir menu"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+          )}
           
           {user?.role !== 'super_admin' && (
             <div className="relative flex-1 hidden sm:block">
