@@ -8,58 +8,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Phone, QrCode, Link2, CheckCircle, Clock } from 'lucide-react';
-import { Copy, RefreshCcw } from 'lucide-react';
+import { Phone, QrCode, Link2, CheckCircle, Clock, Copy, RefreshCcw, Loader2 } from 'lucide-react';
 import QRCode from 'react-qr-code';
-
-type SessionRow = {
-  id: string;
-  church_id: string;
-  status: 'awaiting_qr' | 'connected' | 'disconnected';
-  phone_number?: string | null;
-  qr_code?: string | null;
-  last_heartbeat?: string | null;
-};
-
-type TemplateRow = { id: string; key: string; content: string };
+import { useWhatsappSession } from '@/hooks/useWhatsappSession';
+import { useWhatsappTemplates } from '@/hooks/useWhatsappTemplates';
 
 const WhatsappIntegration = () => {
   const { user, currentChurchId } = useAuthStore();
-  const [session, setSession] = useState<SessionRow | null>(null);
-  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const { session, isLoading: isLoadingSession, isInitializing, initSession, refetch: refetchSession } = useWhatsappSession();
+  const { templates, isLoading: isLoadingTemplates, saveTemplate, isSaving: isSavingTemplate } = useWhatsappTemplates();
+  
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>('schedule_assigned');
   const [selectedTemplateContent, setSelectedTemplateContent] = useState<string>('');
   const [testPhone, setTestPhone] = useState<string>('');
   const [lastProcessInfo, setLastProcessInfo] = useState<string>('');
 
-  const isLeader = useMemo(() => {
-    return user?.role === 'admin' || user?.role === 'pastor';
-  }, [user?.role]);
+  const isLeader = useMemo(() => user?.role === 'admin' || user?.role === 'pastor', [user?.role]);
 
-  useEffect(() => {
-    if (!currentChurchId) return;
-    const load = async () => {
-      const { data: sessRows } = await supabase
-        .from('whatsapp_sessions')
-        .select('*')
-        .eq('church_id', currentChurchId)
-        .limit(1);
-      const sess = (sessRows || [])[0] || null;
-      setSession(sess);
-
-      const { data: tmplRows } = await supabase
-        .from('whatsapp_templates')
-        .select('id, key, content')
-        .eq('church_id', currentChurchId)
-        .order('key');
-      setTemplates(tmplRows || []);
-      const initial = (tmplRows || []).find(t => t.key === 'schedule_assigned');
-      setSelectedTemplateContent(initial?.content || '');
-    };
-    load();
-  }, [currentChurchId]);
-
-  // Realtime: atualiza sessão quando QR/status mudar
+  // Realtime subscription to update session
   useEffect(() => {
     if (!currentChurchId) return;
     const channel = supabase
@@ -68,10 +34,9 @@ const WhatsappIntegration = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'whatsapp_sessions', filter: `church_id=eq.${currentChurchId}` },
         (payload) => {
-          const row = (payload.new || payload.old) as SessionRow | null;
-          if (row) {
-            setSession(row);
-            if (row.status === 'connected') {
+          if (payload.new) {
+            refetchSession();
+            if ((payload.new as any).status === 'connected' && (payload.old as any)?.status !== 'connected') {
               toast.success('WhatsApp conectado com sucesso!');
             }
           }
@@ -79,88 +44,26 @@ const WhatsappIntegration = () => {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [currentChurchId]);
+  }, [currentChurchId, refetchSession]);
 
+  // Update content when template selection changes
   useEffect(() => {
     const t = templates.find(t => t.key === selectedTemplateKey);
     setSelectedTemplateContent(t?.content || '');
   }, [selectedTemplateKey, templates]);
 
-  useEffect(() => {
-    if (!currentChurchId) return;
-    const interval = setInterval(async () => {
-      const { data, error } = await supabase.functions.invoke('process-whatsapp', { body: {} });
-      if (!error) {
-        setLastProcessInfo(`Processado às ${new Date().toLocaleTimeString('pt-BR')}: ${data?.processed ?? 0} mensagens`);
-      }
-    }, 60000); // 60s
-    return () => clearInterval(interval);
-  }, [currentChurchId]);
-
-  const handleStartLinking = async () => {
-    if (!currentChurchId) return;
-
-    const baseUpdate = {
-      status: 'awaiting_qr' as const,
-      qr_code: null as string | null,
-      last_heartbeat: new Date().toISOString(),
-    };
-
-    // Verifica se já existe sessão para a igreja
-    const { data: existing, error: findErr } = await supabase
-      .from('whatsapp_sessions')
-      .select('id')
-      .eq('church_id', currentChurchId)
-      .limit(1)
-      .maybeSingle();
-
-    if (findErr) {
-      toast.error('Erro ao verificar sessão existente');
-      return;
-    }
-
-    if (existing?.id) {
-      // Atualiza sessão existente
-      const { data, error } = await supabase
-        .from('whatsapp_sessions')
-        .update(baseUpdate)
-        .eq('id', existing.id)
-        .select('*')
-        .single();
-
-      if (error) {
-        toast.error('Erro ao atualizar sessão');
-        return;
-      }
-      setSession(data as SessionRow);
-      toast.success('Sessão atualizada. Aguarde o QR...');
-    } else {
-      // Cria nova sessão
-      const { data, error } = await supabase
-        .from('whatsapp_sessions')
-        .insert({
-          church_id: currentChurchId,
-          ...baseUpdate,
-        })
-        .select('*')
-        .single();
-
-      if (error) {
-        toast.error('Erro ao criar sessão');
-        return;
-      }
-      setSession(data as SessionRow);
-      toast.success('Sessão criada. Aguarde o QR...');
-    }
+  const handleStartLinking = () => {
+    initSession(undefined, {
+      onError: (err: any) => toast.error(`Erro ao iniciar vinculação: ${err.message}`),
+      onSuccess: () => toast.info('Solicitando novo QR Code...'),
+    });
   };
 
-  const handleSaveTemplate = async () => {
-    if (!currentChurchId) return;
-    const { error } = await supabase
-      .from('whatsapp_templates')
-      .upsert({ church_id: currentChurchId, key: selectedTemplateKey, content: selectedTemplateContent }, { onConflict: 'church_id,key' });
-    if (error) { toast.error('Erro ao salvar template'); return; }
-    toast.success('Template atualizado!');
+  const handleSaveTemplate = () => {
+    saveTemplate({ key: selectedTemplateKey, content: selectedTemplateContent }, {
+      onSuccess: () => toast.success('Template atualizado!'),
+      onError: (err: any) => toast.error(`Erro ao salvar: ${err.message}`),
+    });
   };
 
   const handleSendTest = async () => {
@@ -187,24 +90,20 @@ const WhatsappIntegration = () => {
     toast.success('Fila processada!');
   };
 
-  const refreshSession = async () => {
-    if (!currentChurchId) return;
-    const { data: sessRows, error } = await supabase
-      .from('whatsapp_sessions')
-      .select('*')
-      .eq('church_id', currentChurchId)
-      .limit(1);
-    if (!error) {
-      setSession((sessRows || [])[0] || null);
-      toast.success('Sessão atualizada.');
-    }
-  };
-
   const copyQr = async () => {
     if (!session?.qr_code) return;
     await navigator.clipboard.writeText(session.qr_code);
     toast.success('Chave do QR copiada!');
   };
+
+  if (isLoadingSession || isLoadingTemplates) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Carregando dados de integração...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -232,16 +131,18 @@ const WhatsappIntegration = () => {
                 <p className="text-xs text-gray-500">Último sinal: {session.last_heartbeat ? new Date(session.last_heartbeat).toLocaleString('pt-BR') : '—'}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button onClick={handleStartLinking} disabled={!isLeader}>
-                  <Link2 className="w-4 h-4 mr-2" /> Iniciar Vinculação
+                <Button onClick={handleStartLinking} disabled={!isLeader || isInitializing}>
+                  {isInitializing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+                  {isInitializing ? 'Iniciando...' : 'Iniciar Vinculação'}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-gray-600">Nenhuma sessão configurada ainda.</p>
-              <Button onClick={handleStartLinking} disabled={!isLeader}>
-                <Link2 className="w-4 h-4 mr-2" /> Criar Sessão
+              <Button onClick={handleStartLinking} disabled={!isLeader || isInitializing}>
+                {isInitializing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+                {isInitializing ? 'Criando...' : 'Criar Sessão'}
               </Button>
             </div>
           )}
@@ -253,7 +154,7 @@ const WhatsappIntegration = () => {
                 <span>QR Code</span>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={refreshSession}>
+                <Button variant="ghost" size="sm" onClick={() => refetchSession()}>
                   <RefreshCcw className="w-4 h-4 mr-1" /> Atualizar
                 </Button>
                 <Button variant="ghost" size="sm" onClick={copyQr} disabled={!session?.qr_code}>
@@ -264,7 +165,6 @@ const WhatsappIntegration = () => {
             {session?.status === 'awaiting_qr' && session?.qr_code ? (
               <div className="mt-3 flex flex-col items-center gap-2">
                 <div className="bg-white p-2 rounded">
-                  {console.log("Rendering QR Code with value:", session.qr_code)}
                   <QRCode value={session.qr_code} size={192} />
                 </div>
                 <p className="text-xs text-gray-500 text-center">
@@ -305,7 +205,10 @@ const WhatsappIntegration = () => {
               className="min-h-[120px]"
             />
             <div className="flex justify-end">
-              <Button variant="outline" onClick={handleSaveTemplate}>Salvar Template</Button>
+              <Button variant="outline" onClick={handleSaveTemplate} disabled={isSavingTemplate}>
+                {isSavingTemplate ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                {isSavingTemplate ? 'Salvando...' : 'Salvar Template'}
+              </Button>
             </div>
             <p className="text-xs text-gray-500">
               Variáveis: use chaves duplas, por exemplo:
