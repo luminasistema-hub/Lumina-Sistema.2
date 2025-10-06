@@ -11,7 +11,6 @@ import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
 import EADPortalPage from './pages/EADPortalPage'
 import { useEffect } from 'react'
-import { SpeedInsights } from "@vercel/speed-insights/react"
 
 // ----------------------------
 // ProtectedRoute genérico
@@ -171,8 +170,6 @@ function App() {
         {/* catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-
-      <SpeedInsights />
     </div>
   )
 }
