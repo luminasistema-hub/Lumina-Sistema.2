@@ -6,27 +6,28 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { EventItem } from "./EditEventDialog";
 
 export function CreateEventDialog({
-  igrejaId,
   open,
   onClose,
   onCreated,
+  igrejaId,
 }: {
-  igrejaId: string;
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  igrejaId: string;
 }) {
   const [nome, setNome] = useState("");
   const [dataHora, setDataHora] = useState("");
   const [local, setLocal] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [tipo, setTipo] = useState<"Culto" | "Conferência" | "Retiro" | "Evangelismo" | "Casamento" | "Funeral" | "Outro">("Culto");
-  const [status, setStatus] = useState<"Planejado" | "Confirmado" | "Em Andamento" | "Finalizado" | "Cancelado">("Planejado");
-  const [capacidadeMaxima, setCapacidadeMaxima] = useState<string>("");
-  const [valorInscricao, setValorInscricao] = useState<string>("");
-  const [linkExterno, setLinkExterno] = useState<string>("");
+  const [tipo, setTipo] = useState<EventItem["tipo"]>("Culto");
+  const [status, setStatus] = useState<EventItem["status"]>("Planejado");
+  const [capacidadeMaxima, setCapacidadeMaxima] = useState("");
+  const [valorInscricao, setValorInscricao] = useState("");
+  const [linkExterno, setLinkExterno] = useState("");
   const [inscricoesAbertas, setInscricoesAbertas] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -41,7 +42,7 @@ export function CreateEventDialog({
       nome,
       data_hora: new Date(dataHora).toISOString(),
       local,
-      descricao: descricao || "",
+      descricao,
       tipo,
       status,
       capacidade_maxima: capacidadeMaxima ? Number(capacidadeMaxima) : null,
@@ -51,16 +52,35 @@ export function CreateEventDialog({
     };
 
     const { error } = await supabase.from("eventos").insert(payload);
-    setSaving(false);
 
     if (error) {
+      setSaving(false);
       toast.error("Erro ao criar evento: " + error.message);
       return;
     }
 
-    toast.success("Evento criado com sucesso!");
+    // Criar notificação para a igreja
+    const { error: notificationError } = await supabase.from('notificacoes').insert({
+      id_igreja: igrejaId,
+      user_id: null, // Para todos na igreja
+      tipo: 'NOVO_EVENTO',
+      titulo: `Novo Evento: ${nome}`,
+      descricao: `Não perca! O evento "${nome}" acontecerá em ${new Date(dataHora).toLocaleDateString('pt-BR')}.`,
+      link: '/dashboard?module=events'
+    });
+
+    if (notificationError) {
+      toast.warning("Evento criado, mas houve um erro ao enviar a notificação.");
+    }
+
+    setSaving(false);
+    toast.success("Evento criado e notificação enviada!");
     onCreated();
     onClose();
+    resetForm();
+  };
+
+  const resetForm = () => {
     setNome("");
     setDataHora("");
     setLocal("");
@@ -69,8 +89,8 @@ export function CreateEventDialog({
     setStatus("Planejado");
     setCapacidadeMaxima("");
     setValorInscricao("");
-    setInscricoesAbertas(true);
     setLinkExterno("");
+    setInscricoesAbertas(true);
   };
 
   return (
@@ -82,7 +102,7 @@ export function CreateEventDialog({
         <div className="space-y-3">
           <div className="space-y-2">
             <Label htmlFor="nome">Nome do evento</Label>
-            <Input id="nome" placeholder="Ex.: Culto de Domingo" value={nome} onChange={(e) => setNome(e.target.value)} />
+            <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} />
           </div>
 
           <div className="space-y-2">
@@ -92,19 +112,19 @@ export function CreateEventDialog({
 
           <div className="space-y-2">
             <Label htmlFor="local">Local</Label>
-            <Input id="local" placeholder="Ex.: Auditório Principal" value={local} onChange={(e) => setLocal(e.target.value)} />
+            <Input id="local" value={local} onChange={(e) => setLocal(e.target.value)} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="descricao">Descrição</Label>
-            <Input id="descricao" placeholder="Detalhes do evento (opcional)" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+            <Input id="descricao" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Tipo</Label>
-              <Select value={tipo} onValueChange={(v) => setTipo(v as any)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <Select value={tipo} onValueChange={(v) => setTipo(v as EventItem["tipo"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Culto">Culto</SelectItem>
                   <SelectItem value="Conferência">Conferência</SelectItem>
@@ -118,8 +138,8 @@ export function CreateEventDialog({
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <Select value={status} onValueChange={(v) => setStatus(v as EventItem["status"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Planejado">Planejado</SelectItem>
                   <SelectItem value="Confirmado">Confirmado</SelectItem>
@@ -133,7 +153,7 @@ export function CreateEventDialog({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="capacidade">Capacidade Máxima (opcional)</Label>
+              <Label htmlFor="capacidade">Capacidade Máxima</Label>
               <Input id="capacidade" type="number" min={0} value={capacidadeMaxima} onChange={(e) => setCapacidadeMaxima(e.target.value)} />
             </div>
             <div className="space-y-2">
@@ -157,7 +177,6 @@ export function CreateEventDialog({
               <Label htmlFor="linkExterno">Link externo (pagamento/inscrição)</Label>
               <Input
                 id="linkExterno"
-                placeholder="https://exemplo.com/pagamento"
                 value={linkExterno}
                 onChange={(e) => setLinkExterno(e.target.value)}
               />
@@ -165,7 +184,7 @@ export function CreateEventDialog({
           )}
 
           <Button onClick={handleCreate} className="w-full" disabled={saving}>
-            {saving ? "Salvando..." : "Salvar Evento"}
+            {saving ? "Criando..." : "Criar Evento"}
           </Button>
         </div>
       </DialogContent>
