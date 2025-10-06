@@ -222,6 +222,7 @@ export const useJourneyData = () => {
           .insert({
             id_membro: user.id,
             id_passo: passoId,
+            id_igreja: currentChurchId,
             ...progressData,
           });
         if (error) throw error;
