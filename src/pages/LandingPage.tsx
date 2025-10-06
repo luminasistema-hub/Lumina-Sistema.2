@@ -3,9 +3,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
 import {
   LayoutDashboard,
@@ -19,6 +16,13 @@ import {
   ArrowRight,
   Sparkles,
   PhoneCall,
+  Mail,
+  Globe,
+  Building2,
+  FileText,
+  CheckCircle,
+  Lightbulb,
+  Target,
 } from "lucide-react";
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 
@@ -44,19 +48,11 @@ const Stat = ({ value, label }: { value: string; label: string }) => (
 );
 
 const LandingPage = () => {
-  const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
-  const [mensagem, setMensagem] = useState("");
   const { plans, isLoading } = useSubscriptionPlans();
 
-  const handleContatoWhatsApp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nome.trim() || !email.trim() || !mensagem.trim()) {
-      toast.error("Preencha nome, e-mail e mensagem.");
-      return;
-    }
-    const texto = `Olá! Sou ${nome} (${email}).%0A%0A${mensagem}%0A%0AEnviado pelo site.`;
+  const handleContatoWhatsApp = () => {
     const telefone = "5563984861923";
+    const texto = `Olá! Gostaria de falar com a Lumina Sistema de Gestão.`;
     const url = `https://wa.me/${telefone}?text=${encodeURIComponent(texto)}`;
     window.open(url, "_blank");
     toast.success("Abrindo WhatsApp...");
@@ -70,14 +66,14 @@ const LandingPage = () => {
           <div className="mx-auto max-w-4xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/60 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700 backdrop-blur">
               <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Novo • Integração WhatsApp com fila por igreja</span>
+              <span>Nova identidade • Lumina Sistema de Gestão</span>
             </div>
 
             <h1 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight">
-              Organize sua igreja em um só lugar
+              Lumina Sistema de Gestão
             </h1>
             <p className="mt-4 text-zinc-600 dark:text-zinc-400 text-base md:text-lg">
-              Ministérios, escalas, Kids check-in/out, devocionais, cursos EAD, doações com recibo e WhatsApp — tudo com segurança e RLS por igreja.
+              Tecnologia para iluminar e simplificar a gestão da sua igreja — com segurança por igreja (RLS), WhatsApp integrado e ferramentas completas para líderes e membros.
             </p>
 
             <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
@@ -90,11 +86,9 @@ const LandingPage = () => {
               <Button asChild variant="outline" size="lg" className="border-indigo-500 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-zinc-800">
                 <Link to="/register">Criar conta</Link>
               </Button>
-              <Button asChild variant="ghost" size="lg" className="sm:ml-2 text-indigo-600 hover:text-indigo-700">
-                <a href="#contato">
-                  Contato
-                  <PhoneCall className="ml-2 h-4 w-4" />
-                </a>
+              <Button variant="ghost" size="lg" className="sm:ml-2 text-indigo-600 hover:text-indigo-700" onClick={handleContatoWhatsApp}>
+                Falar no WhatsApp
+                <PhoneCall className="ml-2 h-4 w-4" />
               </Button>
             </div>
 
@@ -128,13 +122,120 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* SOBRE NÓS / MISSÃO / VISÃO */}
+      <section className="container mx-auto px-4 py-12 md:py-16">
+        <div className="grid lg:grid-cols-3 gap-6">
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+            <CardContent className="p-6">
+              <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Sobre Nós</h2>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Bem-vindo à Lumina Sistema de Gestão, a plataforma criada para iluminar e simplificar a administração da sua igreja.
+                Entendemos que a gestão de uma comunidade de fé envolve dedicação, tempo e organização.
+                Por isso, desenvolvemos uma ferramenta completa e intuitiva, pensada para que líderes e equipes possam focar no que realmente importa:
+                o cuidado com as pessoas e a expansão do ministério.
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+            <CardContent className="p-6">
+              <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Nossa Missão</h2>
+              <div className="flex items-start gap-3">
+                <Lightbulb className="h-5 w-5 text-indigo-600" />
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  Empoderar igrejas com tecnologia inovadora e acessível, simplificando a gestão administrativa
+                  para que possam dedicar mais tempo e energia à sua missão espiritual e ao cuidado de seus membros.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+            <CardContent className="p-6">
+              <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Nossa Visão</h2>
+              <div className="flex items-start gap-3">
+                <Target className="h-5 w-5 text-emerald-600" />
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  Ser a principal plataforma de gestão para igrejas no Brasil, reconhecida pela excelência, usabilidade
+                  e pelo impacto positivo na organização e crescimento das comunidades de fé que servimos.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* VALORES */}
+      <section className="container mx-auto px-4 py-12 md:py-16">
+        <div className="max-w-2xl">
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Nossos Valores</h2>
+          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+            O que nos guia no dia a dia para servir melhor as igrejas.
+          </p>
+        </div>
+
+        <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <Heart className="h-5 w-5 text-pink-600" />
+                <div>
+                  <h3 className="font-semibold">Fé e Propósito</h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Acreditamos no poder da comunidade e trabalhamos para fortalecer o trabalho das igrejas.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-indigo-600" />
+                <div>
+                  <h3 className="font-semibold">Inovação a Serviço do Reino</h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Buscamos soluções tecnológicas para atender às necessidades do ambiente eclesiástico.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-emerald-600" />
+                <div>
+                  <h3 className="font-semibold">Parceria e Suporte</h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Somos parceiros de cada igreja, com suporte dedicado e relacionamento de confiança.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="h-5 w-5 text-zinc-600" />
+                <div>
+                  <h3 className="font-semibold">Integridade</h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Agimos com transparência e honestidade em todas as nossas interações.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/90 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-700">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <Lightbulb className="h-5 w-5 text-yellow-600" />
+                <div>
+                  <h3 className="font-semibold">Simplicidade</h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Ferramentas poderosas e fáceis de usar, para todos os níveis de conhecimento.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       {/* PLANOS */}
       <section className="container mx-auto px-4 py-12 md:py-16">
         <div className="max-w-2xl">
           <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Planos de Assinatura</h2>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Escolha um plano para começar o cadastro da sua igreja.
-          </p>
+          <p className="mt-2 text-zinc-600 dark:text-zinc-400">Escolha um plano para começar o cadastro da sua igreja.</p>
         </div>
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -172,41 +273,72 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CONTATO */}
-      <section id="contato" className="border-t border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/40 backdrop-blur-sm">
+      {/* CONTATO E DADOS EMPRESARIAIS */}
+      <section className="border-t border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/40 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-12 md:py-16">
           <div className="max-w-3xl">
-            <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Fale conosco</h2>
+            <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Contato Comercial — Lumina Sistema de Gestão</h2>
             <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-              Envie sua mensagem e fale direto no nosso WhatsApp. Responderemos o quanto antes.
+              Fale conosco para conhecer a Lumina e tirar dúvidas. Responderemos o quanto antes.
             </p>
           </div>
-          <div className="mt-6">
+          <div className="mt-6 grid md:grid-cols-2 gap-5">
             <Card className="bg-white/80 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700">
-              <CardContent className="p-6">
-                <form className="grid md:grid-cols-2 gap-4" onSubmit={handleContatoWhatsApp}>
-                  <div className="space-y-2">
-                    <Label htmlFor="nome">Nome</Label>
-                    <Input id="nome" placeholder="Seu nome" value={nome} onChange={(e) => setNome(e.target.value)} />
+              <CardContent className="p-6 space-y-3">
+                <div className="flex items-center gap-3">
+                  <PhoneCall className="h-5 w-5 text-emerald-600" />
+                  <div>
+                    <div className="text-sm text-zinc-500">Telefone/WhatsApp</div>
+                    <a href="https://wa.me/5563984861923" target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      +55 63 98486-1923
+                    </a>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">E-mail</Label>
-                    <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Mail className="h-5 w-5 text-indigo-600" />
+                  <div>
+                    <div className="text-sm text-zinc-500">E-mail</div>
+                    <a href="mailto:Luminasistema@gmail.com.br" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      Luminasistema@gmail.com.br
+                    </a>
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="mensagem">Mensagem</Label>
-                    <Textarea id="mensagem" placeholder="Como podemos ajudar?" value={mensagem} onChange={(e) => setMensagem(e.target.value)} className="min-h-[120px]" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Globe className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <div className="text-sm text-zinc-500">Website</div>
+                    <a href="https://www.luminasistema.com.br" target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      www.luminasistema.com.br
+                    </a>
                   </div>
-                  <div className="md:col-span-2">
-                    <Button type="submit" className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700">
-                      Falar no WhatsApp
-                      <MessageSquare className="ml-2 h-4 w-4" />
-                    </Button>
-                    <p className="text-xs text-zinc-500 mt-2">
-                      Enviaremos sua mensagem para o WhatsApp +55 63 98486-1923 automaticamente.
-                    </p>
+                </div>
+                <Button onClick={handleContatoWhatsApp} className="mt-2 bg-emerald-600 hover:bg-emerald-700">
+                  Falar no WhatsApp
+                  <MessageSquare className="ml-2 h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700">
+              <CardContent className="p-6 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5 text-zinc-700" />
+                  <div>
+                    <div className="text-sm text-zinc-500">Nome Empresarial</div>
+                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      49.023.921 INOVA SIMPLES (I.S.)
+                    </div>
                   </div>
-                </form>
+                </div>
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-zinc-700" />
+                  <div>
+                    <div className="text-sm text-zinc-500">CNPJ</div>
+                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      49.023.921/0001-69
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -216,7 +348,7 @@ const LandingPage = () => {
       <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-10">
         <div className="container mx-auto px-4 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            © {new Date().getFullYear()} Connect Vida. Todos os direitos reservados.
+            © {new Date().getFullYear()} Lumina Sistema de Gestão. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-4 text-sm">
             <Link to="/login" className="text-indigo-600 hover:underline">Entrar</Link>
