@@ -6,19 +6,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Esta é uma URL de placeholder para o serviço de WhatsApp.
-// Em um projeto real, isso seria uma variável de ambiente.
-const WHATSAPP_API_URL = 'http://localhost:3001/sessions/start';
-
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { churchId } = await req.json();
+    // 1. Validar input do cliente
+    const body = await req.json();
+    const churchId = body.churchId;
     if (!churchId) {
-      throw new Error('churchId é obrigatório.');
+      return new Response(JSON.stringify({ error: 'O ID da igreja (churchId) é obrigatório.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, // Bad Request
+      });
+    }
+
+    // 2. Validar configuração do servidor (variáveis de ambiente)
+    const WHATSAPP_API_URL = Deno.env.get('WHATSAPP_API_URL');
+    if (!WHATSAPP_API_URL) {
+      console.error('A variável de ambiente WHATSAPP_API_URL não está configurada.');
+      return new Response(JSON.stringify({ error: 'Serviço de WhatsApp não configurado no servidor.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500, // Internal Server Error
+      });
     }
 
     const supabaseAdmin = createClient(
@@ -26,9 +38,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Chamar a API externa do WhatsApp para obter o QR code
-    // Em um cenário real, a API de WhatsApp pode precisar de autenticação.
-    const response = await fetch(WHATSAPP_API_URL, {
+    // 3. Chamar a API externa do WhatsApp para obter o QR code
+    const response = await fetch(`${WHATSAPP_API_URL}/sessions/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: `church-${churchId}` }),
@@ -37,15 +48,15 @@ serve(async (req) => {
     if (!response.ok) {
       const errorBody = await response.text();
       console.error('Erro da API de WhatsApp:', errorBody);
-      throw new Error(`Falha ao iniciar sessão do WhatsApp: ${response.statusText}`);
+      throw new Error(`Falha ao comunicar com a API de WhatsApp: ${response.statusText}`);
     }
 
     const { qr } = await response.json();
     if (!qr) {
-      throw new Error('A API de WhatsApp não retornou um QR code.');
+      throw new Error('A API de WhatsApp não retornou um QR code válido.');
     }
 
-    // 2. Salvar/Atualizar a sessão no Supabase com o novo QR code
+    // 4. Salvar/Atualizar a sessão no Supabase com o novo QR code
     const { data: session, error: upsertError } = await supabaseAdmin
       .from('whatsapp_sessions')
       .upsert(
@@ -61,6 +72,7 @@ serve(async (req) => {
       .single();
 
     if (upsertError) {
+      console.error('Erro ao salvar sessão no Supabase:', upsertError);
       throw upsertError;
     }
 
@@ -70,9 +82,10 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    console.error('Erro inesperado na Edge Function init-whatsapp-session:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
+      status: 500, // Internal Server Error
     });
   }
 })
