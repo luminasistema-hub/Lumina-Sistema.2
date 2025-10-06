@@ -45,6 +45,7 @@ import {
   Loader2,
   Baby
 } from 'lucide-react'
+import { Progress } from '../ui/progress'
 import { trackEvent } from '../../lib/analytics';
 import copy from 'copy-to-clipboard';
 import { useMembers, MemberProfile } from '@/hooks/useMembers';
@@ -73,6 +74,14 @@ const MemberManagementPage = () => {
   const [filterMinistry, setFilterMinistry] = useState('all')
   const [filterBirthday, setFilterBirthday] = useState('all')
   const [filterWedding, setFilterWedding] = useState('all')
+  // Dados extras para o popup
+  const [memberExtra, setMemberExtra] = useState<{
+    loading: boolean;
+    journey: null | { total: number; completed: number; percent: number; levels: number };
+    vocational: null | { recommendation: string; date?: string };
+    kids: Array<{ id: string; nome: string; idade: number }>;
+    ministries: Array<{ id: string; nome: string; funcao?: string }>;
+  }>({ loading: false, journey: null, vocational: null, kids: [], ministries: [] });
 
   const canManageMembers = useMemo(() => {
     return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
@@ -278,6 +287,126 @@ const MemberManagementPage = () => {
     toast.success('Link copiado para a área de transferência!');
     trackEvent('copy_registration_link', { churchId: currentChurchId });
   }, [generatedLink, currentChurchId]);
+
+  const loadSelectedMemberExtra = useCallback(async () => {
+    if (!selectedMember || !currentChurchId) return;
+    setMemberExtra(prev => ({ ...prev, loading: true }));
+    // Carregar cônjuge (para filhos), filhos, teste vocacional, ministérios e jornada
+    try {
+      // 1) Informações pessoais (para conjuge_id)
+      const { data: personal } = await supabase
+        .from('informacoes_pessoais')
+        .select('conjuge_id')
+        .eq('membro_id', selectedMember.id)
+        .maybeSingle();
+      const spouseId = personal?.conjuge_id as string | undefined;
+
+      // 2) Filhos
+      const responsibleIds = spouseId ? [selectedMember.id, spouseId] : [selectedMember.id];
+      const { data: kidsData } = await supabase
+        .from('criancas')
+        .select('id, nome_crianca, data_nascimento')
+        .eq('id_igreja', currentChurchId)
+        .in('responsavel_id', responsibleIds)
+        .order('nome_crianca');
+      const kids = (kidsData || []).map(k => ({
+        id: k.id as string,
+        nome: k.nome_crianca as string,
+        idade: Math.max(
+          0,
+          Math.floor((new Date().getTime() - new Date(k.data_nascimento as string).getTime()) / 31557600000)
+        ),
+      }));
+
+      // 3) Teste vocacional (último)
+      const { data: tests } = await supabase
+        .from('testes_vocacionais')
+        .select('ministerio_recomendado, data_teste, is_ultimo')
+        .eq('membro_id', selectedMember.id)
+        .order('data_teste', { ascending: false })
+        .limit(1);
+      const lastTest = tests && tests[0]
+        ? { recommendation: tests[0].ministerio_recomendado as string, date: tests[0].data_teste as string }
+        : null;
+
+      // 4) Ministérios em que atua
+      const { data: vols } = await supabase
+        .from('ministerio_voluntarios')
+        .select('ministerio_id, funcao_no_ministerio')
+        .eq('id_igreja', currentChurchId)
+        .eq('membro_id', selectedMember.id);
+      const ministerioIds = (vols || []).map(v => v.ministerio_id as string);
+      let ministries: Array<{ id: string; nome: string; funcao?: string }> = [];
+      if (ministerioIds.length > 0) {
+        const { data: mins } = await supabase
+          .from('ministerios')
+          .select('id, nome')
+          .eq('id_igreja', currentChurchId)
+          .in('id', ministerioIds);
+        ministries = (mins || []).map(m => {
+          const match = (vols || []).find(v => v.ministerio_id === m.id);
+          return { id: m.id as string, nome: m.nome as string, funcao: match?.funcao_no_ministerio as string | undefined };
+        });
+      }
+
+      // 5) Jornada (progresso)
+      const { data: trilha } = await supabase
+        .from('trilhas_crescimento')
+        .select('id')
+        .eq('id_igreja', currentChurchId)
+        .eq('is_ativa', true)
+        .maybeSingle();
+      let journey: null | { total: number; completed: number; percent: number; levels: number } = null;
+      if (trilha?.id) {
+        const { data: etapas } = await supabase
+          .from('etapas_trilha')
+          .select('id')
+          .eq('id_trilha', trilha.id);
+        const etapaIds = (etapas || []).map(e => e.id as string);
+        if (etapaIds.length > 0) {
+          const { data: passos } = await supabase
+            .from('passos_etapa')
+            .select('id, id_etapa')
+            .in('id_etapa', etapaIds);
+          const passoIds = (passos || []).map(p => p.id as string);
+          let completed = 0;
+          let levels = 0;
+          if (passoIds.length > 0) {
+            const { data: progresso } = await supabase
+              .from('progresso_membros')
+              .select('id, id_passo')
+              .eq('id_membro', selectedMember.id)
+              .in('id_passo', passoIds);
+            const completedIds = new Set((progresso || []).map(p => p.id_passo as string));
+            completed = (passos || []).filter(p => completedIds.has(p.id as string)).length;
+            // níveis (etapas) concluídos quando todos os passos da etapa estão completos
+            const passosPorEtapa = new Map<string, string[]>();
+            (passos || []).forEach(p => {
+              const list = passosPorEtapa.get(p.id_etapa as string) || [];
+              list.push(p.id as string);
+              passosPorEtapa.set(p.id_etapa as string, list);
+            });
+            passosPorEtapa.forEach(list => {
+              if (list.every(id => completedIds.has(id))) levels += 1;
+            });
+          }
+          const total = (passos || []).length;
+          const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+          journey = { total, completed, percent, levels };
+        }
+      }
+
+      setMemberExtra({ loading: false, journey, vocational: lastTest, kids, ministries });
+    } catch {
+      setMemberExtra({ loading: false, journey: null, vocational: null, kids: [], ministries: [] });
+    }
+  }, [selectedMember, currentChurchId]);
+
+  useEffect(() => {
+    if (selectedMember) {
+      loadSelectedMemberExtra();
+    }
+  }, [selectedMember, loadSelectedMemberExtra]);
 
   const getRoleIcon = useCallback((role: UserRole) => {
     const icons: Record<UserRole, JSX.Element> = {
@@ -549,10 +678,10 @@ const MemberManagementPage = () => {
                       {member.status}
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm text-gray-600 mb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-gray-600 mb-3">
                     <div className="flex items-center gap-2">
                       <Mail className="w-4 h-4" />
-                      <span>{member.email}</span>
+                      <span className="break-all">{member.email}</span>
                     </div>
                     {member.telefone && (
                       <div className="flex items-center gap-2">
@@ -663,12 +792,6 @@ const MemberManagementPage = () => {
                     <div className="text-sm">{selectedMember.profissao}</div>
                   </div>
                 )}
-                {selectedMember.ministerio_recomendado && (
-                  <div>
-                    <Label>Ministério Recomendado</Label>
-                    <div className="text-sm">{selectedMember.ministerio_recomendado}</div>
-                  </div>
-                )}
                 {selectedMember.endereco && (
                   <div className="md:col-span-2">
                     <Label>Endereço</Label>
@@ -676,6 +799,87 @@ const MemberManagementPage = () => {
                   </div>
                 )}
               </div>
+
+              {/* Jornada */}
+              <div className="p-3 rounded-lg border bg-white">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <h4 className="font-medium">Jornada</h4>
+                </div>
+                {memberExtra.loading ? (
+                  <div className="text-sm text-gray-500">Carregando...</div>
+                ) : memberExtra.journey ? (
+                  <div className="space-y-2">
+                    <Progress value={memberExtra.journey.percent} />
+                    <div className="text-xs text-gray-600">
+                      {memberExtra.journey.completed} de {memberExtra.journey.total} passos concluídos • {memberExtra.journey.percent}% • {memberExtra.journey.levels} etapa(s) concluída(s)
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">Sem trilha ativa ou sem progresso.</div>
+                )}
+              </div>
+
+              {/* Teste vocacional */}
+              <div className="p-3 rounded-lg border bg-white">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4 text-purple-600" />
+                  <h4 className="font-medium">Teste Vocacional</h4>
+                </div>
+                {memberExtra.loading ? (
+                  <div className="text-sm text-gray-500">Carregando...</div>
+                ) : memberExtra.vocational ? (
+                  <div className="text-sm">
+                    Ministério recomendado: <span className="font-medium">{memberExtra.vocational.recommendation}</span>
+                    {memberExtra.vocational.date && (
+                      <span className="text-gray-500"> • {new Date(memberExtra.vocational.date).toLocaleDateString('pt-BR')}</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">Sem teste registrado.</div>
+                )}
+              </div>
+
+              {/* Filhos */}
+              <div className="p-3 rounded-lg border bg-white">
+                <div className="flex items-center gap-2 mb-2">
+                  <Baby className="w-4 h-4 text-pink-600" />
+                  <h4 className="font-medium">Filhos</h4>
+                </div>
+                {memberExtra.loading ? (
+                  <div className="text-sm text-gray-500">Carregando...</div>
+                ) : memberExtra.kids.length > 0 ? (
+                  <ul className="text-sm text-gray-800 list-disc pl-5">
+                    {memberExtra.kids.map(k => (
+                      <li key={k.id}>{k.nome} — {k.idade} anos</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-500">Nenhum filho cadastrado.</div>
+                )}
+              </div>
+
+              {/* Ministérios */}
+              <div className="p-3 rounded-lg border bg-white">
+                <div className="flex items-center gap-2 mb-2">
+                  <Church className="w-4 h-4 text-indigo-600" />
+                  <h4 className="font-medium">Ministérios</h4>
+                </div>
+                {memberExtra.loading ? (
+                  <div className="text-sm text-gray-500">Carregando...</div>
+                ) : memberExtra.ministries.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {memberExtra.ministries.map(m => (
+                      <Badge key={m.id} variant="outline">
+                        {m.nome}{m.funcao ? ` — ${m.funcao}` : ''}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">Sem vinculação a ministérios.</div>
+                )}
+              </div>
+
               <div className="flex justify-end gap-2">
                 {(canManageMembers || selectedMember.id === user?.id) && (
                   <Button variant="outline" onClick={() => handleOpenEditMemberDialog(selectedMember)}>
