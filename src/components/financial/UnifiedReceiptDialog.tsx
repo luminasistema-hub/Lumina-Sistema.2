@@ -4,6 +4,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Church } from '@/stores/churchStore'
@@ -75,6 +76,7 @@ export const UnifiedReceiptDialog = ({
       <DialogContent className="max-w-3xl p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle>Recibo de Doação</DialogTitle>
+          <DialogDescription>Visualize, imprima e marque a emissão do recibo.</DialogDescription>
         </DialogHeader>
         <div className="max-h-[70vh] overflow-y-auto px-6">
           <ReceiptGenerator data={receiptData} onDownload={handleDownloadPdf} />

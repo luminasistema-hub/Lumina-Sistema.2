@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -67,6 +67,7 @@ export default function UpgradePlanDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Atualizar plano da igreja</DialogTitle>
+          <DialogDescription>Selecione um novo plano e confirme a atualização.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

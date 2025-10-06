@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,6 +98,7 @@ export function CreateEventDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Criar Novo Evento</DialogTitle>
+          <DialogDescription>Preencha os campos para cadastrar um novo evento na igreja.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">

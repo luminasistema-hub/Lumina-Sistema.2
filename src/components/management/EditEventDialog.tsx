@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,6 +106,7 @@ export function EditEventDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar Evento</DialogTitle>
+          <DialogDescription>Atualize as informações do evento e salve suas alterações.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">

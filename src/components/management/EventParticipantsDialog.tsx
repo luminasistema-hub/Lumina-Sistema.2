@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
@@ -128,6 +128,7 @@ export function EventParticipantsDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Inscritos {eventName ? `- ${eventName}` : ""}</DialogTitle>
+          <DialogDescription>Lista de participantes do evento com opção de impressão.</DialogDescription>
         </DialogHeader>
 
         <div className="flex justify-between items-center mb-2">

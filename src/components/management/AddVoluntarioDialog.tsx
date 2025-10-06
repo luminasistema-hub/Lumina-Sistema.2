@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -87,6 +87,7 @@ export default function AddVoluntarioDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Adicionar Voluntário</DialogTitle>
+          <DialogDescription>Selecione um membro da igreja para adicioná-lo ao ministério.</DialogDescription>
         </DialogHeader>
 
         {loading ? (
