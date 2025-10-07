@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Copy, QrCode, Link as LinkIcon } from 'lucide-react';
 import copy from 'copy-to-clipboard';
 import { supabase } from '@/integrations/supabase/client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Props = {
   open: boolean;
@@ -29,7 +30,18 @@ const GeneratePaymentLinkDialog: React.FC<Props> = ({ open, onOpenChange, church
   const [pixImageBase64, setPixImageBase64] = useState<string | null>(null);
   const [pixBrCode, setPixBrCode] = useState<string | null>(null);
 
+  // Novo: provedor e dados de cliente para ASAAS
+  const [provider, setProvider] = useState<'abacatepay' | 'asaas'>('abacatepay');
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerTaxId, setCustomerTaxId] = useState('');
+  const [customerCellphone, setCustomerCellphone] = useState('');
+
   const handleGenerateLink = async () => {
+    if (provider === 'asaas') {
+      toast.info('Checkout por link via ASAAS não está disponível neste diálogo. Utilize o QRCode Pix.');
+      return;
+    }
     if (!church || !payerEmail) {
       toast.error('Informe o email do pagador.');
       return;
@@ -68,25 +80,46 @@ const GeneratePaymentLinkDialog: React.FC<Props> = ({ open, onOpenChange, church
     setIsLoading(true);
     try {
       const metadata = { externalId: church?.id ?? 'sem-igreja' };
-      const { data, error } = await supabase.functions.invoke('create-abacatepay-pixqrcode', {
-        body: {
-          amount: amountNumber,
-          description: pixDescription || `Assinatura Connect Vida - ${church?.nome || 'Igreja'}`,
-          expiresIn: 3600, // 1 hora
-          metadata,
-        },
-      });
-
-      if (error) throw error;
-
-      const res = data as any;
-      const qrData = res?.data;
-      if (!qrData) {
-        throw new Error('Resposta inesperada do provedor de pagamentos.');
+      if (provider === 'abacatepay') {
+        const { data, error } = await supabase.functions.invoke('create-abacatepay-pixqrcode', {
+          body: {
+            amount: amountNumber,
+            description: pixDescription || `Assinatura Connect Vida - ${church?.nome || 'Igreja'}`,
+            expiresIn: 3600, // 1 hora
+            metadata,
+          },
+        });
+        if (error) throw error;
+        const res = data as any;
+        const qrData = res?.data;
+        if (!qrData) throw new Error('Resposta inesperada do provedor de pagamentos.');
+        setPixImageBase64(qrData.brCodeBase64 || null);
+        setPixBrCode(qrData.brCode || null);
+      } else {
+        // ASAAS requer dados de cliente completos
+        if (!customerName || !customerEmail || !customerTaxId || !customerCellphone) {
+          throw new Error('Para ASAAS, informe nome, email, CPF/CNPJ e celular do cliente.');
+        }
+        const { data, error } = await supabase.functions.invoke('create-asaas-pixqrcode', {
+          body: {
+            amount: amountNumber,
+            description: pixDescription || `Assinatura Connect Vida - ${church?.nome || 'Igreja'}`,
+            customer: {
+              name: customerName,
+              email: customerEmail,
+              taxId: customerTaxId,
+              cellphone: customerCellphone,
+            },
+            metadata,
+          },
+        });
+        if (error) throw error;
+        const res = data as any;
+        const qrData = res?.data;
+        if (!qrData) throw new Error('Resposta inesperada do provedor de pagamentos (ASAAS).');
+        setPixImageBase64(qrData.brCodeBase64 || null);
+        setPixBrCode(qrData.brCode || null);
       }
-
-      setPixImageBase64(qrData.brCodeBase64 || null);
-      setPixBrCode(qrData.brCode || null);
       toast.success('QRCode Pix gerado!');
     } catch (err: any) {
       console.error('Erro ao gerar QRCode Pix:', err);
@@ -114,37 +147,55 @@ const GeneratePaymentLinkDialog: React.FC<Props> = ({ open, onOpenChange, church
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Pagamentos (Abacate PAY)</DialogTitle>
+          <DialogTitle>Pagamentos (Abacate PAY / ASAAS)</DialogTitle>
           <DialogDescription>
-            Gere um Link de Checkout ou um QRCode Pix para receber a assinatura.
+            Gere um Link de Checkout (Abacate PAY) ou um QRCode Pix (Abacate PAY ou ASAAS).
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6">
+          {/* Seletor de provedor */}
           <div className="space-y-2">
-            <Label htmlFor="payerEmail">Email do Pagador (Checkout)</Label>
-            <div className="flex gap-2">
-              <Input
-                id="payerEmail"
-                placeholder="cliente@exemplo.com"
-                value={payerEmail}
-                onChange={(e) => setPayerEmail(e.target.value)}
-              />
-              <Button onClick={handleGenerateLink} disabled={isLoading}>
-                <LinkIcon className="w-4 h-4 mr-2" />
-                Gerar Link
-              </Button>
-            </div>
-            {paymentLink && (
-              <div className="mt-2 space-y-2">
-                <Input readOnly value={paymentLink} />
-                <Button variant="outline" size="sm" onClick={copyLink}>
-                  Copiar Link
-                </Button>
-              </div>
-            )}
+            <Label>Provedor de Pagamento</Label>
+            <Select value={provider} onValueChange={(v) => setProvider(v as 'abacatepay' | 'asaas')}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o provedor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="abacatepay">Abacate PAY</SelectItem>
+                <SelectItem value="asaas">ASAAS (API Oficial)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
+          {/* Checkout Link - somente Abacate PAY */}
+          {provider === 'abacatepay' && (
+            <div className="space-y-2">
+              <Label htmlFor="payerEmail">Email do Pagador (Checkout)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="payerEmail"
+                  placeholder="cliente@exemplo.com"
+                  value={payerEmail}
+                  onChange={(e) => setPayerEmail(e.target.value)}
+                />
+                <Button onClick={handleGenerateLink} disabled={isLoading}>
+                  <LinkIcon className="w-4 h-4 mr-2" />
+                  Gerar Link
+                </Button>
+              </div>
+              {paymentLink && (
+                <div className="mt-2 space-y-2">
+                  <Input readOnly value={paymentLink} />
+                  <Button variant="outline" size="sm" onClick={copyLink}>
+                    Copiar Link
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* QRCode Pix */}
           <div className="space-y-2">
             <Label>QRCode Pix</Label>
             <div className="grid sm:grid-cols-2 gap-3">
@@ -167,6 +218,49 @@ const GeneratePaymentLinkDialog: React.FC<Props> = ({ open, onOpenChange, church
                   maxLength={140}
                 />
               </div>
+
+              {/* Campos de cliente para ASAAS */}
+              {provider === 'asaas' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerName">Nome do Cliente</Label>
+                    <Input
+                      id="customerName"
+                      placeholder="Nome completo"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerEmail">Email do Cliente</Label>
+                    <Input
+                      id="customerEmail"
+                      placeholder="cliente@exemplo.com"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerTaxId">CPF/CNPJ</Label>
+                    <Input
+                      id="customerTaxId"
+                      placeholder="Apenas números"
+                      value={customerTaxId}
+                      onChange={(e) => setCustomerTaxId(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerCellphone">Celular</Label>
+                    <Input
+                      id="customerCellphone"
+                      placeholder="(DD) 9XXXX-XXXX"
+                      value={customerCellphone}
+                      onChange={(e) => setCustomerCellphone(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="sm:col-span-2">
                 <Button onClick={handleGeneratePix} disabled={isLoading} className="w-full">
                   <QrCode className="w-4 h-4 mr-2" />

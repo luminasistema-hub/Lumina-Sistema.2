@@ -25,6 +25,7 @@ const PaymentIntegrationSettings = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Abacate PAY */}
         <div className="space-y-2">
           <Label>URL do Webhook</Label>
           <div className="flex items-center gap-2">
@@ -40,16 +41,31 @@ const PaymentIntegrationSettings = () => {
 
         <div className="space-y-2">
           <Label>Segredos da Abacate PAY</Label>
-          <p className="text-sm text-muted-foreground">
-            Defina os segredos nas Edge Functions:
-          </p>
           <ul className="text-sm list-disc pl-6 space-y-1 text-muted-foreground">
-            <li>ABACATEPAY_API_URL</li>
+            <li>ABACATEPAY_API_URL (opcional, padrão https://api.abacatepay.com/v1)</li>
             <li>ABACATEPAY_API_KEY</li>
             <li>ABACATEPAY_WEBHOOK_SECRET (opcional para validar assinatura)</li>
           </ul>
+        </div>
+
+        {/* ASAAS */}
+        <div className="space-y-2 pt-4 border-t">
+          <CardTitle className="text-base">Integração ASAAS (API Oficial)</CardTitle>
+          <CardDescription>
+            Para habilitar PIX via ASAAS, configure os segredos e, se desejar, use o ambiente de sandbox.
+          </CardDescription>
+          <ul className="text-sm list-disc pl-6 space-y-1 text-muted-foreground">
+            <li>ASAAS_API_URL: 
+              <span className="ml-1">https://api.asaas.com/v3 (produção) ou https://sandbox.asaas.com/api/v3 (sandbox)</span>
+            </li>
+            <li>ASAAS_API_TOKEN: sua token de acesso ASAAS</li>
+          </ul>
           <p className="text-xs text-muted-foreground">
-            Vá em Supabase → Edge Functions → Manage Secrets e adicione as chaves.
+            Defina estes segredos em Supabase → Edge Functions → Manage Secrets. 
+            O QRCode Pix será gerado via função create-asaas-pixqrcode.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Observação: a ASAAS exige cliente vinculado ao pagamento. Informe nome, email, CPF/CNPJ e celular no diálogo ao gerar o PIX.
           </p>
         </div>
       </CardContent>
