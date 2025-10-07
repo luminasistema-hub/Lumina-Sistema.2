@@ -373,11 +373,11 @@ const CoursesPage = () => {
   const activeCourses = useMemo(() => courses.filter(c => c.status === 'Ativo'), [courses])
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">Cursos EAD 🎓</h1>
-        <p className="text-blue-100 text-lg">
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-4 md:p-6 text-white">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Cursos EAD 🎓</h1>
+        <p className="text-blue-100 text-base md:text-lg">
           Plataforma completa de ensino à distância
         </p>
       </div>
@@ -385,7 +385,7 @@ const CoursesPage = () => {
       {/* Navigation Tabs */}
       <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as typeof viewMode)}>
         <div className="flex items-center justify-between">
-          <TabsList>
+          <TabsList className="max-w-full overflow-x-auto">
             <TabsTrigger value="student">Meus Cursos</TabsTrigger>
             {canTeach && <TabsTrigger value="teacher">Cursos que Ensino</TabsTrigger>}
             {canManageCourses && <TabsTrigger value="admin">Administração</TabsTrigger>}
@@ -511,14 +511,14 @@ const CoursesPage = () => {
           )}
         </div>
 
-        <TabsContent value="student" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <TabsContent value="student" className="space-y-4 md:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {activeCourses.map((course) => (
               <Card key={course.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-lg mb-2">{course.nome}</CardTitle>
+                      <CardTitle className="text-base md:text-lg mb-2">{course.nome}</CardTitle>
                       <div className="flex gap-2 mb-2">
                         <Badge className={getCategoryColor(course.categoria)}>
                           {course.categoria}

@@ -47,12 +47,12 @@ const MinisteriosPage = () => {
 
   return (
     <MainLayout activeModule="ministries">
-      <div className="p-6">
+      <div className="p-3 md:p-6">
         {/* Título da Página */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Ministérios</h1>
-            <p className="text-gray-500">Gerencie os departamentos da igreja</p>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-800">Ministérios</h1>
+            <p className="text-gray-500 text-sm md:text-base">Gerencie os departamentos da igreja</p>
           </div>
           <Button className="bg-blue-600 hover:bg-blue-700 text-white">
             + Novo Ministério

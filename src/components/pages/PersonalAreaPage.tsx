@@ -53,7 +53,7 @@ const PersonalAreaPage = ({ activeModule, onBack }: PersonalAreaPageProps) => {
 
   // Module selection screen (fallback)
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -61,18 +61,18 @@ const PersonalAreaPage = ({ activeModule, onBack }: PersonalAreaPageProps) => {
         </Button>
       </div>
 
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">Área Pessoal 👤</h1>
-        <p className="text-blue-100 text-lg">
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-4 md:p-6 text-white">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Área Pessoal 👤</h1>
+        <p className="text-blue-100 text-base md:text-lg">
           Gerencie suas informações pessoais e acompanhe sua jornada espiritual
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {modules.map((module) => (
           <div
             key={module.id}
-            className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer"
+            className="bg-white rounded-lg border border-gray-200 p-4 md:p-6 hover:shadow-lg transition-shadow cursor-pointer"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
