@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Voluntario } from "./VoluntarioCard";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,10 +29,12 @@ export const VoluntarioDetailsModal = ({ voluntario, open, onOpenChange }: Props
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Gerenciar {voluntario.email}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            Papel atual: {voluntario.papel}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Papel atual: {voluntario.papel}</p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={tornarLider}>
               Definir como Líder

@@ -2,7 +2,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button"; 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog"; 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "../ui/dialog"; 
 import { Users, Plus, Upload, ClipboardList, Loader2 } from "lucide-react"; 
 import { useState } from 'react';
 
@@ -62,7 +62,9 @@ const EventManagementModal = ({ demand, ministry, volunteers }: EventManagementM
           <ClipboardList className="w-5 h-5" /> 
           Gerenciar Demanda: {demand.titulo}
         </DialogTitle>
-        <p className="text-sm text-gray-500 mt-1">Ministério: {ministry.nome}</p>
+        <DialogDescription className="text-sm text-muted-foreground mt-1">
+          Ministério: {ministry.nome}
+        </DialogDescription>
       </DialogHeader>
 
       <div className="grid md:grid-cols-2 gap-6 py-4">
