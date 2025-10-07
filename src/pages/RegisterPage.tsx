@@ -13,7 +13,7 @@ const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [church, setChurch] = useState<{ id: string; nome: string } | null>(null);
+  const [password, setPassword] = useState('');
 
   // Buscar igreja pela rota; bloquear sem churchId
   useEffect(() => {
@@ -62,15 +62,26 @@ const RegisterPage = () => {
       toast.error('Não foi possível identificar a igreja deste cadastro.');
       return;
     }
-    if (!email || !name) {
-      toast.error('Preencha nome e email.');
+    if (!name || !email || !password) {
+      toast.error('Preencha nome, email e senha.');
+      return;
+    }
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!emailOk) {
+      toast.error('Informe um e-mail válido.');
+      return;
+    }
+    const hasLetter = /[A-Za-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    if (password.length < 8 || !hasLetter || !hasNumber) {
+      toast.error('A senha deve ter pelo menos 8 caracteres, com letras e números.');
       return;
     }
     setLoading(true);
     // Realiza o signup já com associação à igreja
     const { data, error } = await supabase.auth.signUp({
       email,
-      password: 'password_temp_123',
+      password,
       options: {
         data: {
           full_name: name,
@@ -109,10 +120,20 @@ const RegisterPage = () => {
           </div>
           <div className="space-y-2">
             <Label>Email</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" />
+            <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" />
+          </div>
+          <div className="space-y-2">
+            <Label>Senha</Label>
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Crie uma senha (min. 8 caracteres)"
+            />
           </div>
           <div className="flex justify-end">
-            <Button onClick={handleSubmit} disabled={loading || !church}>
+            <Button onClick={handleSubmit} disabled={loading || !church || !email || !password}>
               {loading ? 'Enviando...' : 'Cadastrar'}
             </Button>
           </div>
