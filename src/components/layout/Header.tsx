@@ -24,6 +24,7 @@ import { useNotifications } from '@/hooks/useNotifications'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
+import NotificationDialog from '@/components/notifications/NotificationDialog'
 
 type HeaderProps = {
   onOpenMobileMenu?: () => void;
@@ -44,19 +45,18 @@ const NotificationItem = ({ notification, onClick }: { notification: any, onClic
 const Header = ({ onOpenMobileMenu }: HeaderProps) => {
   const { user, logout } = useAuthStore()
   // removido modo escuro
-  const { notifications, unreadCount, markAllAsRead, isLoading } = useNotifications();
+  const { notifications, unreadCount, markAllAsRead, markOneAsRead, isLoading } = useNotifications();
   const navigate = useNavigate();
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
   const isMobile = useIsMobile();
 
   const unreadNotifications = notifications.filter(n => !n.lido);
 
   const handleNotificationClick = (notification: any) => {
-    if (notification.link) {
-      navigate(notification.link);
-    }
-    // Fecha o popover após o clique
-    setPopoverOpen(false);
+    setSelectedNotification(notification);
+    setDialogOpen(true);
   }
 
   const handleMarkAllAsRead = () => {

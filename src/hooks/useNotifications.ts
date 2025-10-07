@@ -49,6 +49,25 @@ export const useNotifications = () => {
     },
   });
 
+  const markOneAsReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user?.id) return;
+      const target = notifications.find(n => n.id === id);
+      if (!target) return;
+      // Evita marcar como lida notificações da igreja (user_id nulo)
+      if (target.user_id !== user.id) return;
+      const { error } = await supabase
+        .from('notificacoes')
+        .update({ lida: true })
+        .eq('id', id)
+        .eq('user_id', user.id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   useEffect(() => {
     if (!user?.id || !currentChurchId) return;
 
@@ -74,5 +93,5 @@ export const useNotifications = () => {
     };
   }, [user?.id, currentChurchId, queryClient, queryKey]);
 
-  return { notifications, isLoading, unreadCount, markAllAsRead: markAsReadMutation.mutate };
+  return { notifications, isLoading, unreadCount, markAllAsRead: markAsReadMutation.mutate, markOneAsRead: markOneAsReadMutation.mutate };
 };
