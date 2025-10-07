@@ -14,6 +14,7 @@ const RegisterPage = () => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [church, setChurch] = useState<{ id: string; nome: string } | null>(null);
 
   // Buscar igreja pela rota; bloquear sem churchId
   useEffect(() => {
