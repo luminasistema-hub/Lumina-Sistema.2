@@ -98,7 +98,7 @@ const LandingPage = () => {
         <div className="container mx-auto responsive-section py-3 flex items-center justify-between">
           <a href="#hero" className="flex items-center gap-3">
             {/* Corrige distorção da logo: altura fixa, largura automática */}
-            <img src="/lumina-logo.png" alt="Lumina" className="h-8 w-auto" />
+            <img src="/lumina-symbol.png" alt="Lumina" className="h-8 w-auto object-contain" />
             <span className="font-semibold tracking-tight">Lumina Sistema de Gestão</span>
           </a>
           <nav className="hidden md:flex items-center gap-6 text-sm">
@@ -422,7 +422,7 @@ const LandingPage = () => {
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg bg-primary-foreground/10 flex items-center justify-center">
-                <img src="/lumina-logo.png" alt="Lumina" className="h-6 w-auto" />
+                <img src="/lumina-symbol.png" alt="Lumina" className="h-6 w-6 object-contain" />
               </div>
               <h3 className="text-lg font-semibold">Lumina Sistema de Gestão</h3>
             </div>
