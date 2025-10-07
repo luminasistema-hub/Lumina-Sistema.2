@@ -69,7 +69,8 @@ const LandingPage = () => {
     const telefone = "5563984861923";
     const texto = `Olá! Gostaria de falar com a Lumina Sistema de Gestão.`;
     const url = `https://wa.me/${telefone}?text=${encodeURIComponent(texto)}`;
-    window.open(url, "_blank");
+    const win = window.open(url, "_blank");
+    win?.opener = null;
     toast.success("Abrindo WhatsApp...");
   };
 
@@ -98,7 +99,7 @@ const LandingPage = () => {
         <div className="container mx-auto responsive-section py-3 flex items-center justify-between">
           <a href="#hero" className="flex items-center gap-3">
             {/* Corrige distorção da logo: altura fixa, largura automática */}
-            <img src="/lumina-symbol.png" alt="Lumina" className="h-8 w-auto object-contain" />
+            <img src="/lumina-symbol.png" alt="Lumina" className="h-8 w-auto object-contain" decoding="async" />
             <span className="font-semibold tracking-tight">Lumina Sistema de Gestão</span>
           </a>
           <nav className="hidden md:flex items-center gap-6 text-sm">
@@ -107,12 +108,18 @@ const LandingPage = () => {
             <a href="#plans" className="text-muted-foreground hover:text-primary">Planos</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" className="text-sky-600 hover:text-sky-700">
+            <Button
+              asChild
+              variant="ghost"
+              className="text-sky-600 hover:text-sky-700"
+            >
               <Link to="/login">Entrar</Link>
             </Button>
             <Button
               onClick={handleContatoWhatsApp}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-4"
+              aria-label="Abrir conversa no WhatsApp"
+              title="Abrir conversa no WhatsApp"
+              className="bg-[#25D366] hover:bg-[#1ebe57] text-black rounded-full px-4 border-0"
             >
               <span className="relative inline-flex items-center">
                 <span className="mr-2 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
@@ -155,6 +162,8 @@ const LandingPage = () => {
               <Button
                 size="lg"
                 className="rounded-full px-6 bg-[#25D366] text-black hover:bg-[#1ebe57] border-0 shadow-md"
+                aria-label="Falar no WhatsApp"
+                title="Falar no WhatsApp"
                 onClick={handleContatoWhatsApp}
               >
                 <MessageSquare className="mr-2 h-4 w-4" />
@@ -422,7 +431,7 @@ const LandingPage = () => {
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg bg-primary-foreground/10 flex items-center justify-center">
-                <img src="/lumina-symbol.png" alt="Lumina" className="h-6 w-6 object-contain" />
+                <img src="/lumina-symbol.png" alt="Lumina" className="h-6 w-6 object-contain" decoding="async" />
               </div>
               <h3 className="text-lg font-semibold">Lumina Sistema de Gestão</h3>
             </div>
@@ -465,7 +474,12 @@ const LandingPage = () => {
               </div>
             </div>
             <div className="pt-1">
-              <Button onClick={handleContatoWhatsApp} className="rounded-full">
+              <Button
+                onClick={handleContatoWhatsApp}
+                aria-label="Falar no WhatsApp"
+                title="Falar no WhatsApp"
+                className="rounded-full bg-[#25D366] text-black hover:bg-[#1ebe57] border-0"
+              >
                 Falar no WhatsApp
                 <PhoneCall className="ml-2 h-4 w-4" />
               </Button>
