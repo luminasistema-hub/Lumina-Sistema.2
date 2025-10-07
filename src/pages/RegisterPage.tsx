@@ -22,16 +22,19 @@ const RegisterPage = () => {
         toast.error('Este link de cadastro é inválido. Solicite ao administrador o link correto da sua igreja.');
         return;
       }
-      const { data, error } = await supabase
-        .from('igrejas')
-        .select('id, nome')
-        .eq('id', routeChurchId)
-        .maybeSingle();
-      if (error || !data) {
+      const { data, error } = await supabase.functions.invoke(
+        'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/get-church-public',
+        { body: { churchId: routeChurchId } }
+      );
+      if (error) {
         toast.error('Igreja não encontrada. Verifique o link com o administrador.');
         return;
       }
-      setChurch({ id: data.id as string, nome: data.nome as string });
+      if (data?.id && data?.nome) {
+        setChurch({ id: data.id as string, nome: data.nome as string });
+      } else {
+        toast.error('Igreja não encontrada. Verifique o link com o administrador.');
+      }
     };
     loadChurch();
   }, [routeChurchId]);
