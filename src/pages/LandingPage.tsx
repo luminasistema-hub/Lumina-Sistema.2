@@ -3,7 +3,6 @@ import { useMemo as useReactMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "@/components/ui/sonner";
 import {
   LayoutDashboard,
   Users,
@@ -11,7 +10,6 @@ import {
   Baby,
   BookOpen,
   HandCoins,
-  MessageSquare,
   ShieldCheck,
   ArrowRight,
   Sparkles,
@@ -36,15 +34,15 @@ import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 
 type FeatureProps = { icon: any; title: string; desc: string; color?: string };
 const Feature = ({ icon: Icon, title, desc, color = "bg-primary" }: FeatureProps) => (
-  <Card className="h-full border bg-card text-card-foreground shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5">
-    <CardContent className="p-6">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-primary-foreground ${color} shadow-sm`}>
-          <Icon className="h-5 w-5" />
+  <Card className="h-full border bg-card text-card-foreground shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 rounded-xl">
+    <CardContent className="p-7 lg:p-8">
+      <div className="flex items-center gap-4 mb-4">
+        <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground ${color} shadow-sm`}>
+          <Icon className="h-6 w-6" />
         </div>
-        <h3 className="font-semibold">{title}</h3>
+        <h3 className="font-semibold text-base md:text-lg">{title}</h3>
       </div>
-      <p className="text-sm text-muted-foreground">{desc}</p>
+      <p className="text-sm md:text-[15px] text-muted-foreground leading-relaxed">{desc}</p>
     </CardContent>
   </Card>
 );
@@ -65,14 +63,7 @@ const StatCard = ({ icon: Icon, label }: { icon: any; label: string }) => (
 const LandingPage = () => {
   const { plans, isLoading } = useSubscriptionPlans();
 
-  const handleContatoWhatsApp = () => {
-    const telefone = "5563984861923";
-    const texto = `Olá! Gostaria de falar com a Lumina Sistema de Gestão.`;
-    const url = `https://wa.me/${telefone}?text=${encodeURIComponent(texto)}`;
-    const win = window.open(url, "_blank");
-    if (win) win.opener = null;
-    toast.success("Abrindo WhatsApp...");
-  };
+  // Removido: CTA de WhatsApp
 
   const sortedByPrice = useReactMemo(() => {
     if (!plans?.length) return [];
@@ -115,17 +106,6 @@ const LandingPage = () => {
             >
               <Link to="/login">Entrar</Link>
             </Button>
-            <Button
-              onClick={handleContatoWhatsApp}
-              aria-label="Abrir conversa no WhatsApp"
-              title="Abrir conversa no WhatsApp"
-              className="bg-[#25D366] hover:bg-[#1ebe57] text-black rounded-full px-4 border-0"
-            >
-              <span className="relative inline-flex items-center">
-                <span className="mr-2 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
-                WhatsApp
-              </span>
-            </Button>
           </div>
         </div>
       </header>
@@ -159,16 +139,6 @@ const LandingPage = () => {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button
-                size="lg"
-                className="rounded-full px-6 bg-[#25D366] text-black hover:bg-[#1ebe57] border-0 shadow-md"
-                aria-label="Falar no WhatsApp"
-                title="Falar no WhatsApp"
-                onClick={handleContatoWhatsApp}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Falar no WhatsApp
-              </Button>
             </div>
 
             <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
@@ -183,9 +153,9 @@ const LandingPage = () => {
       {/* TRUST / SEGURANÇA — fundo branco */}
       <section aria-label="Confiança e Segurança" className="container mx-auto responsive-section py-16 md:py-24">
         <div className="grid sm:grid-cols-3 gap-6">
-          <Card className="border">
-            <CardContent className="p-5 flex items-start gap-3">
-              <ShieldCheck className="h-5 w-5 text-primary" />
+          <Card className="border rounded-xl shadow-sm">
+            <CardContent className="p-7 lg:p-8 flex items-start gap-4">
+              <ShieldCheck className="h-6 w-6 text-primary" />
               <div>
                 <h3 className="font-semibold">Segurança por Igreja (RLS)</h3>
                 <p className="text-xs text-muted-foreground">
@@ -194,9 +164,9 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="border">
-            <CardContent className="p-5 flex items-start gap-3">
-              <LockKeyhole className="h-5 w-5 text-primary" />
+          <Card className="border rounded-xl shadow-sm">
+            <CardContent className="p-7 lg:p-8 flex items-start gap-4">
+              <LockKeyhole className="h-6 w-6 text-primary" />
               <div>
                 <h3 className="font-semibold">Auth Supabase</h3>
                 <p className="text-xs text-muted-foreground">
@@ -205,9 +175,9 @@ const LandingPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="border">
-            <CardContent className="p-5 flex items-start gap-3">
-              <ServerCog className="h-5 w-5 text-primary" />
+          <Card className="border rounded-xl shadow-sm">
+            <CardContent className="p-7 lg:p-8 flex items-start gap-4">
+              <ServerCog className="h-6 w-6 text-primary" />
               <div>
                 <h3 className="font-semibold">Infraestrutura Confiável</h3>
                 <p className="text-xs text-muted-foreground">
@@ -233,7 +203,6 @@ const LandingPage = () => {
           <Feature icon={Baby} title="Kids Check-in/Out" desc="Check-in com código de segurança e histórico de presença por criança." color="bg-rose-600" />
           <Feature icon={BookOpen} title="Devocionais e Cursos" desc="Publique devocionais e organize trilhas/cursos com módulos e aulas." color="bg-violet-600" />
           <Feature icon={HandCoins} title="Doações e Recibos" desc="Registre ofertas e emita recibos; acompanhe transações e relatórios." color="bg-amber-600" />
-          <Feature icon={MessageSquare} title="WhatsApp Integrado" desc="Templates por igreja e fila automática para escala, kids e recibos." color="bg-green-600" />
           <Feature icon={LayoutDashboard} title="Dashboard por Função" desc="Painéis para admin/pastor e membros com métricas e atalhos." color="bg-indigo-600" />
           <Feature icon={ShieldCheck} title="Segurança por Igreja" desc="Supabase Auth + RLS: cada igreja vê apenas seus dados." color="bg-fuchsia-600" />
         </div>
@@ -472,17 +441,6 @@ const LandingPage = () => {
                 <div className="text-primary-foreground/80">CNPJ</div>
                 <div className="font-medium">49.023.921/0001-69</div>
               </div>
-            </div>
-            <div className="pt-1">
-              <Button
-                onClick={handleContatoWhatsApp}
-                aria-label="Falar no WhatsApp"
-                title="Falar no WhatsApp"
-                className="rounded-full bg-[#25D366] text-black hover:bg-[#1ebe57] border-0"
-              >
-                Falar no WhatsApp
-                <PhoneCall className="ml-2 h-4 w-4" />
-              </Button>
             </div>
           </div>
         </div>
