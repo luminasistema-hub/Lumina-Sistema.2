@@ -109,44 +109,72 @@ export const useAddMemberToGroup = () => {
   })
 }
 
-export const useMyGrowthGroups = () => {
-  // Busca grupos onde o usuário é membro ou líder
+export const useGroupLeaders = (groupId: string | null) => {
+  const { currentChurchId } = useAuthStore()
   return useQuery({
-    queryKey: ['gc-my-groups'],
+    queryKey: ['gc-group-leaders', groupId, currentChurchId],
+    enabled: !!groupId && !!currentChurchId,
+    queryFn: async (): Promise<{ membro_id: string }[]> => {
+      const { data, error } = await supabase
+        .from('gc_group_leaders')
+        .select('membro_id')
+        .eq('group_id', groupId!)
+        .eq('id_igreja', currentChurchId!)
+      if (error) throw new Error(error.message)
+      return (data || []) as { membro_id: string }[]
+    }
+  })
+}
+
+export const useGroupMembers = (groupId: string | null) => {
+  const { currentChurchId } = useAuthStore()
+  return useQuery({
+    queryKey: ['gc-group-members', groupId, currentChurchId],
+    enabled: !!groupId && !!currentChurchId,
+    queryFn: async (): Promise<{ membro_id: string }[]> => {
+      const { data, error } = await supabase
+        .from('gc_group_members')
+        .select('membro_id')
+        .eq('group_id', groupId!)
+        .eq('id_igreja', currentChurchId!)
+      if (error) throw new Error(error.message)
+      return (data || []) as { membro_id: string }[]
+    }
+  })
+}
+
+export const useMyGrowthGroups = () => {
+  const { user } = useAuthStore()
+  const userId = user?.id || null
+
+  return useQuery({
+    queryKey: ['gc-my-groups', userId],
+    enabled: !!userId,
     queryFn: async (): Promise<GrowthGroup[]> => {
-      // 1) Grupos onde sou membro
-      const { data: asMember, error: errMember } = await supabase
+      const uid = userId!
+
+      const { data: memberRows, error: errMemberRows } = await supabase
+        .from('gc_group_members')
+        .select('group_id')
+        .eq('membro_id', uid)
+      if (errMemberRows) throw new Error(errMemberRows.message)
+
+      const { data: leaderRows, error: errLeaderRows } = await supabase
+        .from('gc_group_leaders')
+        .select('group_id')
+        .eq('membro_id', uid)
+      if (errLeaderRows) throw new Error(errLeaderRows.message)
+
+      const groupIds = Array.from(new Set([...(memberRows || []).map(r => r.group_id), ...(leaderRows || []).map(r => r.group_id)]))
+      if (groupIds.length === 0) return []
+
+      const { data: groups, error } = await supabase
         .from('gc_groups')
         .select('id, id_igreja, nome, descricao, meeting_day, meeting_time, meeting_location, contact_phone, created_at, updated_at')
-        .in(
-          'id',
-          (
-            await supabase
-              .from('gc_group_members')
-              .select('group_id')
-              .eq('membro_id', (await supabase.auth.getUser()).data.user?.id || '')
-          ).data?.map((r: any) => r.group_id) || ['00000000-0000-0000-0000-000000000000']
-        )
-      if (errMember) throw new Error(errMember.message)
+        .in('id', groupIds)
+      if (error) throw new Error(error.message)
 
-      // 2) Grupos onde sou líder
-      const { data: asLeader, error: errLeader } = await supabase
-        .from('gc_groups')
-        .select('id, id_igreja, nome, descricao, meeting_day, meeting_time, meeting_location, contact_phone, created_at, updated_at')
-        .in(
-          'id',
-          (
-            await supabase
-              .from('gc_group_leaders')
-              .select('group_id')
-              .eq('membro_id', (await supabase.auth.getUser()).data.user?.id || '')
-          ).data?.map((r: any) => r.group_id) || ['00000000-0000-0000-0000-000000000000']
-        )
-      if (errLeader) throw new Error(errLeader.message)
-
-      const all = [...(asMember || []), ...(asLeader || [])] as GrowthGroup[]
-      const unique = new Map(all.map(g => [g.id, g]))
-      return Array.from(unique.values())
+      return (groups || []) as GrowthGroup[]
     },
     refetchOnWindowFocus: false
   })

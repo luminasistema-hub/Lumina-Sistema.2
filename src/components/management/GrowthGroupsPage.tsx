@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Calendar, Clock, MapPin, Phone, PlusCircle, Users } from 'lucide-react'
+import { useGroupLeaders, useGroupMembers } from '@/hooks/useGrowthGroups'
 
 const weekdays = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 
@@ -29,6 +30,8 @@ const GrowthGroupsPage: React.FC = () => {
   const [editOpen, setEditOpen] = useState<string | null>(null)
   const [leaderDialog, setLeaderDialog] = useState<string | null>(null)
   const [memberDialog, setMemberDialog] = useState<string | null>(null)
+  const [leaderListDialog, setLeaderListDialog] = useState<string | null>(null)
+  const [memberListDialog, setMemberListDialog] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     nome: '',
@@ -205,6 +208,8 @@ const GrowthGroupsPage: React.FC = () => {
                         <Button variant="outline" size="sm" onClick={() => setLeaderDialog(g.id)}>Adicionar Líder</Button>
                       )}
                       <Button variant="secondary" size="sm" onClick={() => setMemberDialog(g.id)}>Adicionar Membro</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setLeaderListDialog(g.id)}>Ver líderes</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setMemberListDialog(g.id)}>Ver membros</Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -316,6 +321,66 @@ const GrowthGroupsPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Ver líderes do grupo */}
+      <Dialog open={!!leaderListDialog} onOpenChange={(v) => !v && setLeaderListDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Líderes do grupo</DialogTitle>
+            <DialogDescription>Lista de líderes vinculados a este grupo.</DialogDescription>
+          </DialogHeader>
+          {leaderListDialog && (
+            <LeadersList groupId={leaderListDialog} membersList={membersList || []} />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Ver membros do grupo */}
+      <Dialog open={!!memberListDialog} onOpenChange={(v) => !v && setMemberListDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Membros do grupo</DialogTitle>
+            <DialogDescription>Lista de participantes vinculados a este grupo.</DialogDescription>
+          </DialogHeader>
+          {memberListDialog && (
+            <MembersList groupId={memberListDialog} membersList={membersList || []} />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+const LeadersList: React.FC<{ groupId: string; membersList: any[] }> = ({ groupId, membersList }) => {
+  const { data } = useGroupLeaders(groupId)
+  const ids = (data || []).map(r => r.membro_id)
+  const items = membersList.filter(m => ids.includes(m.id))
+  return (
+    <div className="space-y-2">
+      {items.length === 0 && <p className="text-sm text-muted-foreground">Nenhum líder cadastrado.</p>}
+      {items.map(m => (
+        <div key={m.id} className="flex items-center justify-between rounded-md border p-2">
+          <span className="text-sm">{m.nome_completo || m.email}</span>
+          <span className="text-xs text-muted-foreground">{m.funcao}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const MembersList: React.FC<{ groupId: string; membersList: any[] }> = ({ groupId, membersList }) => {
+  const { data } = useGroupMembers(groupId)
+  const ids = (data || []).map(r => r.membro_id)
+  const items = membersList.filter(m => ids.includes(m.id))
+  return (
+    <div className="space-y-2">
+      {items.length === 0 && <p className="text-sm text-muted-foreground">Nenhum membro cadastrado.</p>}
+      {items.map(m => (
+        <div key={m.id} className="flex items-center justify-between rounded-md border p-2">
+          <span className="text-sm">{m.nome_completo || m.email}</span>
+          <span className="text-xs text-muted-foreground">{m.funcao}</span>
+        </div>
+      ))}
     </div>
   )
 }
