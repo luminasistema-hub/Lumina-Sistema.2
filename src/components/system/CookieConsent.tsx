@@ -62,8 +62,8 @@ const CookieConsent: React.FC = () => {
     <>
       {showBanner && (
         <div className="fixed inset-x-0 bottom-0 z-50 p-2 md:p-3">
-          <Card className="mx-auto max-w-xl p-2 md:p-3 shadow-lg border bg-background">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <Card className="mx-auto max-w-[92vw] sm:max-w-xl md:max-w-2xl p-2 md:p-3 shadow-lg border bg-background">
+            <div className="flex flex-col gap-3">
               <div className="space-y-1">
                 <h2 className="text-sm md:text-base font-semibold">
                   Política de Privacidade e Cookies – Lumina Sistema de Gestão
@@ -78,10 +78,16 @@ const CookieConsent: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <Button variant="outline" onClick={() => setPrefsOpen(true)}>Gerenciar preferências</Button>
-                <Button variant="secondary" onClick={rejectAnalytics}>Continuar sem análise</Button>
-                <Button onClick={acceptAll}>Aceitar todos</Button>
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:items-center sm:justify-start">
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => setPrefsOpen(true)}>
+                  Gerenciar preferências
+                </Button>
+                <Button variant="secondary" className="w-full sm:w-auto" onClick={rejectAnalytics}>
+                  Continuar sem análise
+                </Button>
+                <Button className="w-full sm:w-auto" onClick={acceptAll}>
+                  Aceitar todos
+                </Button>
               </div>
             </div>
           </Card>
