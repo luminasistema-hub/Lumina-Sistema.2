@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { useLoadingProtection } from '@/hooks/useLoadingProtection';
 import { Calendar, User, Tag, Pencil, Trash2, Star, Plus } from 'lucide-react';
 
 type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado';
@@ -39,16 +38,12 @@ const DevotionalsManagementPage = () => {
   const { currentChurchId, user } = useAuthStore();
   const qc = useQueryClient();
 
-  const [devotionals, setDevotionals] = useState<Devotional[]>([]);
-  const [filteredDevotionals, setFilteredDevotionals] = useState<Devotional[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedDevotional, setSelectedDevotional] = useState<Devotional | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const { protectedFetch, debouncedFetch, cleanup } = useLoadingProtection();
   const channelRef = useRef<any>(null);
 
   const canManage = user?.role === 'admin' || user?.role === 'pastor';
@@ -59,88 +54,53 @@ const DevotionalsManagementPage = () => {
     categoryFilter: string,
     searchTerm: string
   ) => {
-    return protectedFetch(
-      async () => {
-        let query = supabase
-          .from('devocionais')
-          .select('*')
-          .eq('id_igreja', churchId)
-          .order('data_publicacao', { ascending: false });
+    let query = supabase
+      .from('devocionais')
+      .select('*')
+      .eq('id_igreja', churchId)
+      .order('data_publicacao', { ascending: false });
 
-        if (statusFilter !== 'all') {
-          query = query.eq('status', statusFilter);
-        }
+    if (statusFilter !== 'all') {
+      query = query.eq('status', statusFilter);
+    }
+    if (categoryFilter !== 'all') {
+      query = query.eq('categoria', categoryFilter);
+    }
+    if (searchTerm) {
+      query = query.ilike('titulo', `%${searchTerm}%`);
+    }
 
-        if (categoryFilter !== 'all') {
-          query = query.eq('categoria', categoryFilter);
-        }
-
-        if (searchTerm) {
-          query = query.ilike('titulo', `%${searchTerm}%`);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        return data as Devotional[];
-      },
-      (data) => {
-        setDevotionals(data);
-        setFilteredDevotionals(data);
-      },
-      (error: any) => {
-        toast.error('Erro ao carregar devocionais: ' + error.message);
-        setDevotionals([]);
-        setFilteredDevotionals([]);
-      },
-      () => {
-        setLoading(false);
-      }
-    );
+    const { data, error } = await query;
+    if (error) throw error;
+    return data as Devotional[];
   };
 
   useEffect(() => {
-    setLoading(true);
-    debouncedFetch(
-      () => fetchDevotionals(currentChurchId!, statusFilter, categoryFilter, searchTerm),
-      undefined,
-      undefined,
-      () => setLoading(false)
-    );
-    
-    // Realtime subscription com proteção única
     if (channelRef.current) {
       try { supabase.removeChannel(channelRef.current); } catch {}
       channelRef.current = null;
     }
-    
     if (currentChurchId) {
       const channel = supabase
         .channel(`devotionals-management-${currentChurchId}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'devocionais', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { 
-            debouncedFetch(
-              () => fetchDevotionals(currentChurchId!, statusFilter, categoryFilter, searchTerm),
-              undefined,
-              undefined,
-              () => setLoading(false)
-            );
+          () => {
+            // Apenas invalidar; React Query decide o refetch
+            useQueryClient().invalidateQueries({ queryKey });
           }
         )
         .subscribe();
       channelRef.current = channel;
     }
-    
     return () => {
       if (channelRef.current) {
         try { supabase.removeChannel(channelRef.current); } catch {}
         channelRef.current = null;
       }
-      cleanup();
     };
-  }, [currentChurchId, statusFilter, categoryFilter, searchTerm]);
+  }, [currentChurchId, queryKey]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Devotional | null>(null);
@@ -352,7 +312,7 @@ const DevotionalsManagementPage = () => {
       {error && <div className="p-8 text-center text-red-500">Erro ao carregar: {(error as any).message}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {(devotionals || []).map((d) => (
+        {(devotionalsData || []).map((d) => (
           <Card key={d.id} className="border hover:shadow-sm transition">
             {d.imagem_capa && (
               <img src={d.imagem_capa} alt={d.titulo} className="h-40 w-full object-cover rounded-t-lg" />
