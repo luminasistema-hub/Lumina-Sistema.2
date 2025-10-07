@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardContent } from '../ui/card';
-import { Users, Calendar, BookOpen, DollarSign, Heart, TrendingUp } from 'lucide-react';
+import { Users, Calendar, DollarSign, Heart, TrendingUp } from 'lucide-react';
 import { useDashboardStats } from '../../hooks/useDashboardStats';
 import { Skeleton } from '../ui/skeleton';
 import { useJourneyData } from '../../hooks/useJourneyData';
@@ -60,14 +60,7 @@ const DashboardStatsGrid = () => {
           color: 'text-green-600',
           bgColor: 'bg-green-50',
         },
-        {
-          title: 'Cursos em Andamento',
-          value: statsData?.activeCourses?.toString() || '0',
-          change: 'inscrições ativas',
-          icon: <BookOpen className="w-5 h-5" />,
-          color: 'text-purple-600',
-          bgColor: 'bg-purple-50',
-        },
+        // card de cursos removido
         ...(isFinancialRole
           ? [
               {
@@ -91,14 +84,7 @@ const DashboardStatsGrid = () => {
           color: 'text-green-600',
           bgColor: 'bg-green-50',
         },
-        {
-          title: 'Cursos em Andamento',
-          value: statsData?.activeCourses?.toString() || '0',
-          change: 'inscrições ativas',
-          icon: <BookOpen className="w-5 h-5" />,
-          color: 'text-purple-600',
-          bgColor: 'bg-purple-50',
-        },
+        // card de cursos removido
       ];
 
   return (

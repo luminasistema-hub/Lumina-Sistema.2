@@ -34,7 +34,7 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white print-area">
-      <Card className="border-2 border-gray-300">
+      <Card className="border-2 border-gray-300 print-card">
         <CardHeader className="text-center pb-6">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-gray-900">{data.igreja.nome}</h1>
@@ -128,12 +128,15 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
       </Card>
 
       <style>{`
+        /* Usa a página inteira e controla a margem via padding da área de impressão */
         @page {
           size: A4;
-          margin: 12mm;
+          margin: 0;
         }
-        
         @media print {
+          body {
+            margin: 0;
+          }
           body * {
             visibility: hidden;
           }
@@ -143,10 +146,14 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
             print-color-adjust: exact;
           }
           .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+            position: fixed;
+            inset: 0;
+            width: auto;
+            padding: 12mm; /* margem interna controlada para não cortar nada */
+          }
+          .print-card {
+            break-inside: avoid;
+            page-break-inside: avoid;
           }
         }
       `}</style>
