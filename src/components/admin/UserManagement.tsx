@@ -187,9 +187,10 @@ const UserManagement = ({}: UserManagementProps) => {
       }
 
       toast.success('Usuário excluído com sucesso.')
-      // Atualize a lista local (por exemplo, refetch do React Query ou estado local)
-      // Se estiver usando TanStack Query:
-      // queryClient.invalidateQueries({ queryKey: ['users'] })
+      // Recarrega a lista de usuários após exclusão
+      if (currentChurchId) {
+        await loadUsers(currentChurchId)
+      }
     } finally {
       toast.dismiss(t)
     }
@@ -450,9 +451,7 @@ const UserManagement = ({}: UserManagementProps) => {
                       size="sm" 
                       className="text-red-600"
                       onClick={() => {
-                        if (confirm('Tem certeza que deseja remover este usuário?')) {
-                          deleteUser(u.id)
-                        }
+                        handleDeleteUser(u.id)
                       }}
                     >
                       <Trash2 className="w-4 h-4" />
