@@ -202,7 +202,7 @@ const PastorAreaPage = () => {
                         <SelectContent>
                           <SelectItem value="anotacao">Anotação</SelectItem>
                           <SelectItem value="esboco_sermao">Esboço de Sermão</SelectItem>
-                          <SelectItem value="documento_pdf">Documento (PDF)</SelectItem>
+                          {/* Upload de PDF desativado */}
                         </SelectContent>
                       </Select>
                     </div>
