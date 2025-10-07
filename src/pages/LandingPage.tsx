@@ -70,7 +70,7 @@ const LandingPage = () => {
     const texto = `Olá! Gostaria de falar com a Lumina Sistema de Gestão.`;
     const url = `https://wa.me/${telefone}?text=${encodeURIComponent(texto)}`;
     const win = window.open(url, "_blank");
-    win?.opener = null;
+    if (win) win.opener = null;
     toast.success("Abrindo WhatsApp...");
   };
 
