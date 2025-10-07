@@ -40,7 +40,8 @@ const moduleCategories: ModuleCategory[] = [
       { id: "personal-info", title: "Informações Pessoais", icon: <User className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
       { id: "member-journey", title: "Jornada do Membro", icon: <GraduationCap className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
       { id: "vocational-test", title: "Teste Vocacional", icon: <Heart className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
-      { id: "my-ministry", title: "Meu Ministério", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","voluntario"], status: "complete" }
+      { id: "my-ministry", title: "Meu Ministério", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","voluntario"], status: "complete" },
+      { id: "my-gc", title: "Meu GC", icon: <Users className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra","gestao_kids"], status: "complete" }
     ]
   },
   {
@@ -71,6 +72,7 @@ const moduleCategories: ModuleCategory[] = [
       { id: "order-of-service", title: "Ordem de Culto/Eventos", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin"], status: "complete" },
       { id: "member-management", title: "Gestão de Membros", icon: <Users className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin","integra"], status: "complete" },
       { id: "ministries", title: "Gestão de Ministério", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
+      { id: "growth-groups", title: "Grupos de Crescimento (GC)", icon: <Users className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" },
       { id: "financial-panel", title: "Painel Financeiro", icon: <DollarSign className="w-4 h-4" />, roles: ["pastor","admin","financeiro"], status: "complete" },
       { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor", "integra"], status: "complete" },
       { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","gestao_kids"], status: "complete" },

@@ -18,6 +18,8 @@ const ConfiguracaoJornada = lazy(() => import('../components/management/Configur
 const KidsPage = lazy(() => import('../components/family/KidsPage'))
 const EventsManagementPage = lazy(() => import('../components/management/EventsManagementPage'))
 const DevotionalsManagementPage = lazy(() => import('../components/management/DevotionalsManagementPage'))
+const GrowthGroupsPage = lazy(() => import('../components/management/GrowthGroupsPage'))
+const MyGrowthGroup = lazy(() => import('../components/personal/MyGrowthGroup'))
 const NotificationManager = lazy(() => import('../components/admin/NotificationManager'))
 const SystemSettings = lazy(() => import('../components/admin/SystemSettings'))
 import { SpecialNotificationDialog } from '@/components/shared/SpecialNotificationDialog'
@@ -71,6 +73,8 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
         return <MemberManagementPage />
       case 'ministries':
         return <MinistriesPage />
+      case 'growth-groups':
+        return <GrowthGroupsPage />
       case 'financial-panel':
         return <FinancialPanel />
       case 'journey-config':
