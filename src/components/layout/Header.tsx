@@ -57,6 +57,7 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
   const handleNotificationClick = (notification: any) => {
     setSelectedNotification(notification);
     setDialogOpen(true);
+    setPopoverOpen(false);
   }
 
   const handleMarkAllAsRead = () => {

@@ -28,6 +28,7 @@ import {
   Shield,
   Clock8,
   Zap,
+  MessageSquare,
 } from "lucide-react";
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
 // Removido visual com gradientes para aderir ao visual sólido da marca
@@ -63,7 +64,13 @@ const StatCard = ({ icon: Icon, label }: { icon: any; label: string }) => (
 const LandingPage = () => {
   const { plans, isLoading } = useSubscriptionPlans();
 
-  // Removido: CTA de WhatsApp
+  const handleContatoWhatsApp = () => {
+    const telefone = "5563984861923";
+    const texto = "Olá! Gostaria de falar com a Lumina Sistema de Gestão.";
+    const url = `https://wa.me/${telefone}?text=${encodeURIComponent(texto)}`;
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (win) win.opener = null;
+  };
 
   const sortedByPrice = useReactMemo(() => {
     if (!plans?.length) return [];
@@ -106,6 +113,17 @@ const LandingPage = () => {
             >
               <Link to="/login">Entrar</Link>
             </Button>
+            <Button
+              onClick={handleContatoWhatsApp}
+              aria-label="Abrir conversa no WhatsApp"
+              title="Abrir conversa no WhatsApp"
+              className="bg-[#25D366] hover:bg-[#1ebe57] text-black rounded-full px-4 border-0"
+            >
+              <span className="relative inline-flex items-center">
+                <span className="mr-2 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
+                WhatsApp
+              </span>
+            </Button>
           </div>
         </div>
       </header>
@@ -138,6 +156,16 @@ const LandingPage = () => {
                   Entrar na Plataforma
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
+              </Button>
+              <Button
+                size="lg"
+                className="rounded-full px-6 bg-[#25D366] text-black hover:bg-[#1ebe57] border-0 shadow-md"
+                aria-label="Falar no WhatsApp"
+                title="Falar no WhatsApp"
+                onClick={handleContatoWhatsApp}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Falar no WhatsApp
               </Button>
             </div>
 
