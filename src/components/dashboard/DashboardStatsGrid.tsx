@@ -32,8 +32,18 @@ const DashboardStatsGrid = () => {
   const isAdminOrPastor = user.role === 'admin' || user.role === 'pastor';
   const isFinancialRole = user.role === 'admin' || user.role === 'pastor' || user.role === 'financeiro';
 
+  const journeyStat = {
+    title: 'Jornada Espiritual',
+    value: `${Math.round(overallProgress || 0)}%`,
+    change: `${Math.round(overallProgress || 0)}% de progresso`,
+    icon: <TrendingUp className="w-5 h-5" />,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+  };
+
   const stats = isAdminOrPastor
     ? [
+        journeyStat,
         {
           title: 'Membros Ativos',
           value: statsData?.activeMembers?.toString() || '0',
@@ -63,7 +73,7 @@ const DashboardStatsGrid = () => {
               {
                 title: 'Ofertas do Mês',
                 value: `R$ ${statsData?.totalMonthlyOfferings?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`,
-                change: 'confirmadas este mês',
+                change: 'suas ofertas confirmadas este mês',
                 icon: <DollarSign className="w-5 h-5" />,
                 color: 'text-orange-600',
                 bgColor: 'bg-orange-50',
@@ -72,6 +82,7 @@ const DashboardStatsGrid = () => {
           : []),
       ]
     : [
+        journeyStat,
         {
           title: 'Próximos Eventos',
           value: statsData?.upcomingEvents?.toString() || '0',
@@ -88,18 +99,6 @@ const DashboardStatsGrid = () => {
           color: 'text-purple-600',
           bgColor: 'bg-purple-50',
         },
-        ...(totalSteps > 0
-          ? [
-              {
-                title: 'Jornada Espiritual',
-                value: `${Math.round(overallProgress || 0)}%`,
-                change: `${Math.round(overallProgress || 0)} de progresso`,
-                icon: <TrendingUp className="w-5 h-5" />,
-                color: 'text-orange-600',
-                bgColor: 'bg-orange-50',
-              },
-            ]
-          : []),
       ];
 
   return (

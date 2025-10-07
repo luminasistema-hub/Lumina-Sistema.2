@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 
 const fetchDashboardStats = async (churchId: string | null, _userId: string | null) => {
-  if (!churchId) return null;
+  if (!churchId || !_userId) return null;
 
   // 1. Membros Ativos
   const { count: activeMembers, error: membersError } = await supabase
@@ -30,7 +30,7 @@ const fetchDashboardStats = async (churchId: string | null, _userId: string | nu
     .in('id_curso', (await supabase.from('cursos').select('id').eq('id_igreja', churchId)).data?.map(c => c.id) || []);
   if (coursesError) throw new Error(`Cursos: ${coursesError.message}`);
 
-  // 4. Ofertas do Mês
+  // 4. Ofertas do Mês (apenas do membro logado)
   const now = new Date();
   const start = format(startOfMonth(now), 'yyyy-MM-dd');
   const end = format(endOfMonth(now), 'yyyy-MM-dd');
@@ -38,9 +38,10 @@ const fetchDashboardStats = async (churchId: string | null, _userId: string | nu
   const { data: monthlyOfferings, error: offeringsError } = await supabase
     .from('transacoes_financeiras')
     .select('valor')
-    .eq('id_igreja', churchId)
     .eq('tipo', 'Entrada')
     .eq('status', 'Confirmado')
+    .eq('membro_id', _userId)
+    .eq('id_igreja', churchId)
     .gte('data_transacao', start)
     .lte('data_transacao', end);
   if (offeringsError) throw new Error(`Ofertas: ${offeringsError.message}`);
