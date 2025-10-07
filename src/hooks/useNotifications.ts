@@ -1,3 +1,4 @@
+lida) e filtrar apenas notificações diretas do usuário ao marcar como lidas.">
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -26,25 +27,22 @@ export const useNotifications = () => {
     enabled: !!user?.id && !!currentChurchId,
   });
 
-  const unreadCount = notifications.filter(n => !n.lido).length;
+  const unreadCount = notifications.filter(n => !n.lida).length;
 
   const markAsReadMutation = useMutation({
     mutationFn: async () => {
       if (!user?.id) return;
-      const unreadIds = notifications.filter(n => !n.lido).map(n => n.id);
+      const unreadIds = notifications
+        .filter(n => !n.lida && n.user_id === user.id)
+        .map(n => n.id);
       if (unreadIds.length === 0) return;
 
       const { error } = await supabase
         .from('notificacoes')
-        .update({ lido: true })
+        .update({ lida: true })
         .in('id', unreadIds)
-        .eq('user_id', user.id); // Apenas marca como lido as que são para o usuário
+        .eq('user_id', user.id);
       
-      // Para notificações broadcast (user_id is null), precisamos de uma abordagem diferente
-      // Por simplicidade, vamos focar em marcar as notificações diretas como lidas.
-      // A lógica de "lido" para broadcast é mais complexa (ex: tabela de leitura por usuário).
-      // Por agora, vamos invalidar e refetch.
-
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
