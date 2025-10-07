@@ -80,7 +80,7 @@ serve(async (req) => {
   const { data: members, error: mErr } = await admin
     .from("membros")
     .select(`
-      id, id_igreja, funcao, perfil_completo, nome_completo, status, created_at, email, ultimo_teste_data, ministerio_recomendado,
+      id, id_igreja, funcao, perfil_completo, nome_completo, status, created_at, email, ultimo_teste_data, ministerio_recomendado, extra_permissoes,
       informacoes_pessoais:informacoes_pessoais!membro_id (
         telefone, endereco, data_nascimento, estado_civil, profissao, conjuge_id, data_casamento, pais_cristaos, tempo_igreja,
         batizado, data_batismo, participa_ministerio, ministerio_anterior, experiencia_anterior, data_conversao,

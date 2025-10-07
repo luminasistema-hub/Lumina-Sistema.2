@@ -158,7 +158,9 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
         // Mostrar apenas se tiver acesso por role ou vínculo (líder/voluntário) com algum ministério
         return hasMyMinistryAccess;
       }
-      return module.roles.includes(user.role);
+      const byRole = module.roles.includes(user.role);
+      const byExtra = Array.isArray(user.extraPermissions) && user.extraPermissions.includes(module.id);
+      return byRole || byExtra;
     });
   };
 

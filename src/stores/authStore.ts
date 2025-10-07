@@ -37,6 +37,7 @@ interface User {
   created_at: string
   perfil_completo: boolean
   personalInfo?: PersonalInfo | null
+  extraPermissions?: string[]
 }
 
 export type { User }
@@ -169,6 +170,7 @@ export const useAuthStore = create<AuthState>()(
                   created_at: profile.created_at,
                   perfil_completo: profile.perfil_completo,
                   permissions: {},
+                  extraPermissions: Array.isArray(profile.extra_permissoes) ? profile.extra_permissoes : [],
                   personalInfo,
                 },
                 currentChurchId: profile.id_igreja,
@@ -198,6 +200,7 @@ export const useAuthStore = create<AuthState>()(
                     created_at: sa.created_at || new Date().toISOString(),
                     perfil_completo: true,
                     permissions: {},
+                    extraPermissions: [],
                     personalInfo: null,
                   },
                   currentChurchId: null,

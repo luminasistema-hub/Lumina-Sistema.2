@@ -29,6 +29,8 @@ import {
   XCircle,
   Baby
 } from 'lucide-react'
+import { Checkbox } from '../ui/checkbox'
+import { AVAILABLE_PERMISSIONS } from '@/constants/permissions'
 
 interface UserManagementProps {}
 
@@ -56,7 +58,7 @@ const UserManagement = ({}: UserManagementProps) => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
-  const [editUser, setEditUser] = useState<Partial<User>>({})
+  const [editUser, setEditUser] = useState<Partial<User>>({ extraPermissions: [] })
 
   useEffect(() => {
     if (currentChurchId) {
@@ -111,6 +113,7 @@ const UserManagement = ({}: UserManagementProps) => {
       created_at: member.created_at,
       perfil_completo: member.perfil_completo,
       ministry: member.ministerio_recomendado,
+      extraPermissions: Array.isArray(member.extra_permissoes) ? member.extra_permissoes : [],
     }));
     setUsers(usersData);
     setFilteredUsers(usersData);
@@ -131,6 +134,7 @@ const UserManagement = ({}: UserManagementProps) => {
         nome_completo: editUser.name, 
         ministerio_recomendado: editUser.ministry, 
         status: editUser.status,
+        extra_permissoes: Array.isArray(editUser.extraPermissions) ? editUser.extraPermissions : [],
       })
       .eq('id', selectedUser.id);
 
@@ -465,9 +469,6 @@ const UserManagement = ({}: UserManagementProps) => {
                 <SelectContent>
                   <SelectItem value="membro">Membro</SelectItem>
                   <SelectItem value="voluntario">Voluntário</SelectItem>
-                  <SelectItem value="integra">Integração</SelectItem>
-                  <SelectItem value="midia_tecnologia">Mídia e Tecnologia</SelectItem>
-                  <SelectItem value="financeiro">Financeiro</SelectItem>
                   <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
                   <SelectItem value="pastor">Pastor</SelectItem>
                   <SelectItem value="admin">Administrador</SelectItem>
@@ -498,6 +499,30 @@ const UserManagement = ({}: UserManagementProps) => {
                 onChange={(e) => setEditUser({...editUser, ministry: e.target.value})}
                 placeholder="Nome do ministério recomendado"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Permissões Extras</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {AVAILABLE_PERMISSIONS.map((perm) => {
+                  const checked = (editUser.extraPermissions || []).includes(perm.id);
+                  return (
+                    <label key={perm.id} className="flex items-center gap-2 p-2 border rounded-md">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(val) => {
+                          const curr = new Set(editUser.extraPermissions || []);
+                          if (val) curr.add(perm.id);
+                          else curr.delete(perm.id);
+                          setEditUser({ ...editUser, extraPermissions: Array.from(curr) });
+                        }}
+                      />
+                      <span className="text-sm">{perm.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-gray-500">Estas permissões liberam acesso extra a módulos independentemente do papel principal.</p>
             </div>
 
             <div className="flex justify-end gap-2">
