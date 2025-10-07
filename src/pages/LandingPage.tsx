@@ -143,7 +143,7 @@ const LandingPage = () => {
 
             <p className="mt-5 text-primary-foreground/90 text-base md:text-lg">
               Tecnologia para iluminar e simplificar a gestão da sua igreja —
-              com segurança por igreja (RLS), WhatsApp integrado e ferramentas completas para líderes e membros.
+              com segurança por igreja (RLS) e ferramentas completas para líderes e membros.
             </p>
 
             <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
