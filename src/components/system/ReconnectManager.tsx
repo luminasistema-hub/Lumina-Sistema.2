@@ -22,7 +22,7 @@ const ReconnectManager = () => {
         await queryClient.invalidateQueries();
         await queryClient.refetchQueries({ type: 'active' });
 
-        toast.success('Conexão recuperada. Dados atualizados.');
+        // Reconexão silenciosa: sem toast
       } finally {
         isRunning = false;
       }
