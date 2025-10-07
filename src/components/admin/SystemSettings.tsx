@@ -350,7 +350,7 @@ const SystemSettings = () => {
                 {canManage && (
                   <Button onClick={() => setUpgradeOpen(true)}>
                     <ArrowUpRight className="w-4 h-4 mr-2" />
-                    Upgrade de Plano
+                    Solicitar Upgrade de Plano
                   </Button>
                 )}
                 {plan.link_pagamento_assinatura && (

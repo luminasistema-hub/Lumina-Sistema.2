@@ -10,6 +10,8 @@ import { useChurchStore } from '../../stores/churchStore';
 import { useAuthStore } from '../../stores/authStore';
 import { Key, Mail, RefreshCw, Loader2, Users, Shield, AlertTriangle, Save, Server, Cpu, HardDrive, Wifi, Database, Trash2 } from 'lucide-react';
 import PaymentIntegrationSettings from './PaymentIntegrationSettings';
+import BillingNotificationPortal from './BillingNotificationPortal';
+import type { Church } from '@/stores/churchStore';
 
 interface AdminToolsTabProps {
   churches: Church[];
@@ -209,6 +211,9 @@ const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch 
         <h1 className="text-3xl font-bold">Ferramentas de Administração 🛠️</h1>
         <p className="opacity-90 mt-1">Utilitários para gerenciar igrejas e usuários.</p>
       </div>
+
+      {/* Portal de Notificações entre Super Admin e Admin das igrejas */}
+      <BillingNotificationPortal churches={churches} />
 
       <Card>
         <CardHeader>

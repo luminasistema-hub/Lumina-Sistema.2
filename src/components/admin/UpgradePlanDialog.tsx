@@ -7,6 +7,7 @@ import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans'
 import { supabase } from '@/integrations/supabase/client'
 import { toast } from 'sonner'
 import { Badge } from '../ui/badge'
+import { useAuthStore } from '@/stores/authStore'
 
 type Props = {
   open: boolean
@@ -25,6 +26,7 @@ export default function UpgradePlanDialog({
 }: Props) {
   const { plans, isLoading } = useSubscriptionPlans()
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(currentPlanId)
+  const { user } = useAuthStore()
 
   const selectedPlan = useMemo(
     () => plans.find((p) => p.id === selectedPlanId),
@@ -42,23 +44,24 @@ export default function UpgradePlanDialog({
       return
     }
 
+    // Cria uma solicitação de mudança de plano para aprovação do Super Admin
     const { error } = await supabase
-      .from('igrejas')
-      .update({
-        plano_id: chosen.id,
-        limite_membros: chosen.limite_membros,
-        valor_mensal_assinatura: chosen.preco_mensal,
+      .from('plan_change_requests')
+      .insert({
+        church_id: churchId,
+        requested_plan_id: chosen.id,
+        requested_by: user?.id,
+        status: 'pending',
+        note: null,
       })
-      .eq('id', churchId)
 
     if (error) {
       console.error('UpgradePlanDialog: erro ao atualizar plano:', error.message)
-      toast.error('Falha ao atualizar o plano.')
+      toast.error('Falha ao enviar a solicitação de upgrade.')
       return
     }
 
-    toast.success('Plano atualizado com sucesso!')
-    onUpgraded?.()
+    toast.success('Solicitação de upgrade enviada! Aguarde confirmação do Super Admin.')
     onOpenChange(false)
   }
 
@@ -66,8 +69,8 @@ export default function UpgradePlanDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Atualizar plano da igreja</DialogTitle>
-          <DialogDescription>Selecione um novo plano e confirme a atualização.</DialogDescription>
+          <DialogTitle>Solicitar upgrade de plano</DialogTitle>
+          <DialogDescription>Selecione um novo plano e envie para aprovação do Super Admin.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -112,7 +115,7 @@ export default function UpgradePlanDialog({
             Cancelar
           </Button>
           <Button onClick={handleConfirm} disabled={!selectedPlanId}>
-            Confirmar upgrade
+            Enviar solicitação
           </Button>
         </DialogFooter>
       </DialogContent>
