@@ -28,6 +28,7 @@ interface Event {
   capacidade_maxima?: number; inscricoes_abertas: boolean; valor_inscricao?: number;
   status: 'Planejado' | 'Confirmado' | 'Em Andamento' | 'Finalizado' | 'Cancelado';
   participantes_count: number; is_registered?: boolean;
+  link_externo?: string; // novo campo para link de inscrição externa
 }
 
 const fetchEvents = async (churchId: string | null, userId: string | null) => {
@@ -137,6 +138,20 @@ const EventsPage = () => {
     },
   });
   
+  // Novo handler: abre link externo se evento for pago; caso contrário, realiza inscrição interna
+  const handleInscricaoClick = (event: Event) => {
+    const price = Number(event.valor_inscricao || 0);
+    if (price > 0) {
+      if (event.link_externo) {
+        window.open(event.link_externo, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error('Link de inscrição não configurado para este evento.');
+      }
+      return;
+    }
+    registerMutation.mutate(event);
+  };
+  
   const getStatusColor = (status: Event['status']) => ({
     'Planejado': 'bg-yellow-100 text-yellow-800', 'Confirmado': 'bg-green-100 text-green-800',
     'Em Andamento': 'bg-blue-100 text-blue-800', 'Finalizado': 'bg-gray-200 text-gray-800',
@@ -237,7 +252,7 @@ const EventsPage = () => {
                       (<Button 
                           size="sm" 
                           className="bg-green-600 hover:bg-green-700" 
-                          onClick={() => registerMutation.mutate(event)} 
+                          onClick={() => handleInscricaoClick(event)} 
                           disabled={!event.inscricoes_abertas || event.participantes_count >= (event.capacidade_maxima || Infinity) || registerMutation.isPending}
                         >
                           {registerMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}
