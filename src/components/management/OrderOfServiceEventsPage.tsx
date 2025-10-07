@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuthStore } from "@/stores/authStore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,16 +20,10 @@ type Evento = {
 
 const OrderOfServiceEventsPage = () => {
   const { currentChurchId } = useAuthStore();
-  const [events, setEvents] = useState<Evento[]>([]);
-  const [loading, setLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Evento | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data: eventsData = [], isLoading, refetch } = useEvents(currentChurchId);
-  useEffect(() => {
-    setEvents(eventsData);
-    setLoading(isLoading);
-  }, [eventsData, isLoading]);
+  const { data: eventsData, isLoading, refetch } = useEvents(currentChurchId);
 
   const openEvent = (ev: Evento) => {
     setSelectedEvent(ev);
@@ -57,10 +50,10 @@ const OrderOfServiceEventsPage = () => {
         <Button variant="outline" onClick={() => refetch()}>Atualizar</Button>
       </div>
 
-      {loading && <div className="p-6 text-center text-muted-foreground">Carregando eventos...</div>}
+      {isLoading && <div className="p-6 text-center text-muted-foreground">Carregando eventos...</div>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {events.map((ev) => (
+        {(eventsData ?? []).map((ev) => (
           <Card key={ev.id} className="hover:shadow-md transition cursor-pointer" onClick={() => openEvent(ev)}>
             <CardHeader>
               <CardTitle className="text-lg">{ev.nome}</CardTitle>
