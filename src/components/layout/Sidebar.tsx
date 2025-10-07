@@ -6,11 +6,12 @@ import {
   Users, Calendar, DollarSign, Settings, Church, BookOpen, Heart,
   Baby, GraduationCap, User, Shield, ChevronLeft, ChevronRight,
   ChevronDown, ChevronUp, Home, Activity, ClipboardList, Link2, MessageSquareText,
-  ClipboardSignature
+  ClipboardSignature, X
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // 🔹 Tipos de módulos
 interface ModuleItem {
@@ -29,75 +30,14 @@ interface ModuleCategory {
   defaultOpen?: boolean;
 }
 
-// 🔹 Definição das categorias
-const moduleCategories: ModuleCategory[] = [
-  {
-    id: "personal",
-    title: "Área Pessoal",
-    icon: <User className="w-5 h-5" />,
-    defaultOpen: true,
-    modules: [
-      { id: "personal-info", title: "Informações Pessoais", icon: <User className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
-      { id: "member-journey", title: "Jornada do Membro", icon: <GraduationCap className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
-      { id: "vocational-test", title: "Teste Vocacional", icon: <Heart className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
-      { id: "my-ministry", title: "Meu Ministério", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","voluntario"], status: "complete" },
-      { id: "my-gc", title: "Meu GC", icon: <Users className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra","gestao_kids"], status: "complete" }
-    ]
-  },
-  {
-    id: "spiritual",
-    title: "Crescimento Espiritual",
-    icon: <BookOpen className="w-5 h-5" />,
-    defaultOpen: true,
-    modules: [
-      { id: "events", title: "Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
-      { id: "devotionals", title: "Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" }
-    ]
-  },
-  {
-    id: "contributions",
-    title: "Contribuições",
-    icon: <DollarSign className="w-5 h-5" />,
-    modules: [
-      { id: "offerings", title: "Ofertas e Doações", icon: <DollarSign className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" }
-    ]
-  },
-  {
-    id: "management",
-    title: "Gestão",
-    icon: <Users className="w-5 h-5" />,
-    defaultOpen: true,
-    modules: [
-      { id: "pastor-area", title: "Área do Pastor", icon: <ClipboardSignature className="w-4 h-4" />, roles: ["pastor", "admin"], status: "complete" },
-      { id: "order-of-service", title: "Ordem de Culto/Eventos", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin"], status: "complete" },
-      { id: "member-management", title: "Gestão de Membros", icon: <Users className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin","integra"], status: "complete" },
-      { id: "ministries", title: "Gestão de Ministério", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
-      { id: "growth-groups", title: "Grupos de Crescimento (GC)", icon: <Users className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio","gc_lider"], status: "complete" },
-      { id: "financial-panel", title: "Painel Financeiro", icon: <DollarSign className="w-4 h-4" />, roles: ["pastor","admin","financeiro"], status: "complete" },
-      { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor", "integra"], status: "complete" },
-      { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","gestao_kids"], status: "complete" },
-      { id: "events-management", title: "Gestão de Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
-      { id: "devotionals-management", title: "Gestão de Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" }
-    ]
-  },
-  {
-    id: "administration",
-    title: "Administração",
-    icon: <Settings className="w-5 h-5" />,
-    modules: [
-      { id: "notification-management", title: "Gestão de Notificações", icon: <MessageSquareText className="w-4 h-4" />, roles: ["admin", "pastor"], status: "basic" },
-      { id: "system-settings", title: "Configurações", icon: <Settings className="w-4 h-4" />, roles: ["admin"], status: "basic" },
-    ]
-  }
-];
-
 // 🔹 Props da Sidebar
 interface SidebarProps {
   activeModule?: string;
   onModuleSelect?: (moduleId: string) => void;
+  onClose?: () => void; // fecha sheet no mobile
 }
 
-const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) => {
+const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["personal","management","spiritual"]);
   const { user, currentChurchId } = useAuthStore();
@@ -105,15 +45,15 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   const [hasMyGCAccess, setHasMyGCAccess] = useState(false);
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(true);
   const navigate = useNavigate();
+  const isMobileView = useIsMobile();
 
   useEffect(() => {
-    // Em telas pequenas, manter expandido para garantir legibilidade
-    if (window.innerWidth < 768) {
+    // Em telas pequenas, manter expandido e iniciar submenu master fechado
+    if (isMobileView) {
       setIsCollapsed(false);
-      // Menu master pode iniciar fechado para não ocupar muito espaço
       setIsMasterMenuOpen(false);
     }
-  }, []);
+  }, [isMobileView]);
 
   useEffect(() => {
     let mounted = true;
@@ -170,8 +110,10 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   const handleModuleClick = (moduleId: string) => {
     if (moduleId === "master-admin") {
       navigate("/master-admin");
+      if (isMobileView) onClose?.();
     } else {
       onModuleSelect?.(moduleId);
+      if (isMobileView) onClose?.();
     }
   };
 
@@ -182,15 +124,75 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
     "gc_membro": "Membro GC", "gc_lider": "Líder GC"
   }[role] || "");
 
+  // 🔹 Tipos e categorias (movidos abaixo para manter igual)
+  const moduleCategories: ModuleCategory[] = [
+    {
+      id: "personal",
+      title: "Área Pessoal",
+      icon: <User className="w-5 h-5" />,
+      defaultOpen: true,
+      modules: [
+        { id: "personal-info", title: "Informações Pessoais", icon: <User className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+        { id: "member-journey", title: "Jornada do Membro", icon: <GraduationCap className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+        { id: "vocational-test", title: "Teste Vocacional", icon: <Heart className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+        { id: "my-ministry", title: "Meu Ministério", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","voluntario"], status: "complete" },
+        { id: "my-gc", title: "Meu GC", icon: <Users className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra","gestao_kids"], status: "complete" }
+      ]
+    },
+    {
+      id: "spiritual",
+      title: "Crescimento Espiritual",
+      icon: <BookOpen className="w-5 h-5" />,
+      defaultOpen: true,
+      modules: [
+        { id: "events", title: "Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+        { id: "devotionals", title: "Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" }
+      ]
+    },
+    {
+      id: "contributions",
+      title: "Contribuições",
+      icon: <DollarSign className="w-5 h-5" />,
+      modules: [
+        { id: "offerings", title: "Ofertas e Doações", icon: <DollarSign className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" }
+      ]
+    },
+    {
+      id: "management",
+      title: "Gestão",
+      icon: <Users className="w-5 h-5" />,
+      defaultOpen: true,
+      modules: [
+        { id: "pastor-area", title: "Área do Pastor", icon: <ClipboardSignature className="w-4 h-4" />, roles: ["pastor", "admin"], status: "complete" },
+        { id: "order-of-service", title: "Ordem de Culto/Eventos", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin"], status: "complete" },
+        { id: "member-management", title: "Gestão de Membros", icon: <Users className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin","integra"], status: "complete" },
+        { id: "ministries", title: "Gestão de Ministério", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
+        { id: "growth-groups", title: "Grupos de Crescimento (GC)", icon: <Users className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio","gc_lider"], status: "complete" },
+        { id: "financial-panel", title: "Painel Financeiro", icon: <DollarSign className="w-4 h-4" />, roles: ["pastor","admin","financeiro"], status: "complete" },
+        { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor", "integra"], status: "complete" },
+        { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","gestao_kids"], status: "complete" },
+        { id: "events-management", title: "Gestão de Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
+        { id: "devotionals-management", title: "Gestão de Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" }
+      ]
+    },
+    {
+      id: "administration",
+      title: "Administração",
+      icon: <Settings className="w-5 h-5" />,
+      modules: [
+        { id: "notification-management", title: "Gestão de Notificações", icon: <MessageSquareText className="w-4 h-4" />, roles: ["admin", "pastor"], status: "basic" },
+        { id: "system-settings", title: "Configurações", icon: <Settings className="w-4 h-4" />, roles: ["admin"], status: "basic" },
+      ]
+    }
+  ];
+
   const getUserModules = (modules: ModuleItem[]) => {
     if (!user) return [];
     return modules.filter(module => {
       if (module.id === "my-ministry") {
-        // Mostrar apenas se tiver acesso por role ou vínculo (líder/voluntário) com algum ministério
         return hasMyMinistryAccess;
       }
       if (module.id === "my-gc") {
-        // Mostrar apenas se o usuário for integrante (membro/líder) de algum GC da igreja atual
         return hasMyGCAccess;
       }
       const byRole = module.roles.includes(user.role);
@@ -215,22 +217,40 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   return (
     <div className={cn(
       "h-screen bg-white border-r flex flex-col transition-all duration-300 overflow-x-hidden min-w-0",
-      isCollapsed ? "w-16" : "w-72 md:w-72 w-64"
+      isCollapsed ? "w-16" : "w-72"
     )}>
       {/* Cabeçalho */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
         {!isCollapsed && (
-          <div className="flex items-center gap-3">
-            <img src="/favicon.ico" alt="Lumina Logo" className="h-8 w-8" />
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/favicon.ico" alt="Lumina Logo" className="h-8 w-8 shrink-0" />
             <div className="min-w-0">
               <h1 className="font-bold truncate">Lumina</h1>
               <p className="text-xs text-gray-500 truncate">Sistema de Gestão</p>
             </div>
           </div>
         )}
-        <Button variant="ghost" size="sm" onClick={() => setIsCollapsed(!isCollapsed)} className="h-8 w-8 p-0">
-          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </Button>
+        {isMobileView ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onClose?.()}
+            className="h-8 w-8 p-0"
+            aria-label="Fechar menu"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="h-8 w-8 p-0"
+            aria-label={isCollapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </Button>
+        )}
       </div>
 
       {/* Usuário logado */}
@@ -255,10 +275,10 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
         <div className="px-4 mb-4">
           <Button
             variant={activeModule === "dashboard" ? "secondary" : "ghost"}
-            className="w-full justify-start"
+            className="w-full justify-start py-3 text-base md:py-2 md:text-sm"
             onClick={() => handleModuleClick("dashboard")}
           >
-            <Home className="w-4 h-4" />
+            <Home className="w-5 h-5 md:w-4 md:h-4" />
             {!isCollapsed && <span className="ml-3 truncate">Dashboard</span>}
           </Button>
         </div>
@@ -268,10 +288,10 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
           <div className="px-4 mb-2">
             <Button
               variant={activeModule === "master-admin" ? "secondary" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => navigate("/master-admin")}
+              className="w-full justify-start py-3 text-base md:py-2 md:text-sm"
+              onClick={() => handleModuleClick("master-admin")}
             >
-              <Shield className="w-4 h-4" />
+              <Shield className="w-5 h-5 md:w-4 md:h-4" />
               {!isCollapsed && <span className="ml-3">Painel Master</span>}
             </Button>
 
@@ -280,63 +300,63 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
               <>
                 <Button
                   variant="ghost"
-                  className="w-full justify-between mt-1"
+                  className="w-full justify-between mt-1 py-3 text-base md:py-2 md:text-sm"
                   onClick={() => setIsMasterMenuOpen((v) => !v)}
                 >
                   <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4" />
-                    <span>Módulos do Painel Master</span>
+                    <Shield className="w-5 h-5 md:w-4 md:h-4" />
+                    <span className="truncate">Módulos do Painel Master</span>
                   </div>
-                  {isMasterMenuOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  {isMasterMenuOpen ? <ChevronUp className="w-5 h-5 md:w-4 md:h-4" /> : <ChevronDown className="w-5 h-5 md:w-4 md:h-4" />}
                 </Button>
                 {isMasterMenuOpen && (
                   <div className="px-2 ml-6 space-y-1">
                     <Button
                       variant="ghost"
-                      className="w-full justify-start text-sm truncate"
-                      onClick={() => navigate("/master-admin?tab=overview")}
+                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                      onClick={() => { navigate("/master-admin?tab=overview"); if (isMobileView) onClose?.(); }}
                     >
-                      <Activity className="w-4 h-4" />
+                      <Activity className="w-5 h-5 md:w-4 md:h-4" />
                       <span className="ml-2">Visão Geral</span>
                     </Button>
                     <Button
                       variant="ghost"
-                      className="w-full justify-start text-sm truncate"
-                      onClick={() => navigate("/master-admin?tab=churches")}
+                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                      onClick={() => { navigate("/master-admin?tab=churches"); if (isMobileView) onClose?.(); }}
                     >
-                      <Church className="w-4 h-4" />
+                      <Church className="w-5 h-5 md:w-4 md:h-4" />
                       <span className="ml-2">Igrejas</span>
                     </Button>
                     <Button
                       variant="ghost"
-                      className="w-full justify-start text-sm truncate"
-                      onClick={() => navigate("/master-admin?tab=plans")}
+                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                      onClick={() => { navigate("/master-admin?tab=plans"); if (isMobileView) onClose?.(); }}
                     >
-                      <ClipboardList className="w-4 h-4" />
+                      <ClipboardList className="w-5 h-5 md:w-4 md:h-4" />
                       <span className="ml-2">Planos</span>
                     </Button>
                     <Button
                       variant="ghost"
-                      className="w-full justify-start text-sm truncate"
-                      onClick={() => navigate("/master-admin?tab=database")}
+                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                      onClick={() => { navigate("/master-admin?tab=database"); if (isMobileView) onClose?.(); }}
                     >
-                      <Link2 className="w-4 h-4" />
+                      <Link2 className="w-5 h-5 md:w-4 md:h-4" />
                       <span className="ml-2">Banco de Dados</span>
                     </Button>
                     <Button
                       variant="ghost"
-                      className="w-full justify-start text-sm truncate"
-                      onClick={() => navigate("/master-admin?tab=tools")}
+                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                      onClick={() => { navigate("/master-admin?tab=tools"); if (isMobileView) onClose?.(); }}
                     >
-                      <Settings className="w-4 h-4" />
+                      <Settings className="w-5 h-5 md:w-4 md:h-4" />
                       <span className="ml-2">Ferramentas Admin</span>
                     </Button>
                     <Button
                       variant="ghost"
-                      className="w-full justify-start text-sm truncate"
-                      onClick={() => navigate("/master-admin?tab=reports")}
+                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                      onClick={() => { navigate("/master-admin?tab=reports"); if (isMobileView) onClose?.(); }}
                     >
-                      <ClipboardList className="w-4 h-4" />
+                      <ClipboardList className="w-5 h-5 md:w-4 md:h-4" />
                       <span className="ml-2">Relatórios SaaS</span>
                     </Button>
                   </div>
@@ -357,33 +377,33 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
                 {!isCollapsed && (
                   <Button
                     variant="ghost"
-                    className="w-full justify-between px-4 py-2"
+                    className="w-full justify-between px-4 py-3 md:py-2"
                     onClick={() => toggleCategory(category.id)}
                   >
                     <div className="flex items-center gap-3">
                       {category.icon}
                       <span className="truncate">{category.title}</span>
                     </div>
-                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    {isExpanded ? <ChevronUp className="w-5 h-5 md:w-4 md:h-4" /> : <ChevronDown className="w-5 h-5 md:w-4 md:h-4" />}
                   </Button>
                 )}
                 {(isCollapsed || isExpanded) && (
                   <div className={cn("space-y-1", isCollapsed ? "px-2" : "px-4 ml-2")}>
-                     {userModules.map((module) => (
-                       <Button
-                         key={module.id}
-                         variant={activeModule === module.id ? "secondary" : "ghost"}
-                         className="w-full justify-start text-sm truncate py-2"
-                         onClick={() => handleModuleClick(module.id)}
-                         title={isCollapsed ? module.title : undefined}
-                       >
-                         <div className="flex items-center gap-2 w-full min-w-0">
-                           {module.icon}
-                           {!isCollapsed && <span className="ml-1 flex-1 truncate">{module.title}</span>}
-                         </div>
-                       </Button>
-                     ))}
-                   </div>
+                    {userModules.map((module) => (
+                      <Button
+                        key={module.id}
+                        variant={activeModule === module.id ? "secondary" : "ghost"}
+                        className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                        onClick={() => handleModuleClick(module.id)}
+                        title={isCollapsed ? module.title : undefined}
+                      >
+                        <div className="flex items-center gap-2 w-full min-w-0">
+                          {module.icon}
+                          {!isCollapsed && <span className="ml-1 flex-1 truncate">{module.title}</span>}
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
                 )}
               </div>
             );

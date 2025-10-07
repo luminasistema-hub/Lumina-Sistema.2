@@ -95,7 +95,8 @@ const MainLayout = ({ children, activeModule = "dashboard", onModuleSelect }: Ma
               onModuleSelect={(id) => {
                 handleModuleSelect(id);
                 setMobileMenuOpen(false);
-              }} 
+              }}
+              onClose={() => setMobileMenuOpen(false)}
             />
           </SheetContent>
         </Sheet>
