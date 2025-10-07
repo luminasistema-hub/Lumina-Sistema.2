@@ -22,9 +22,21 @@ const MainLayout = ({ children, activeModule = "dashboard", onModuleSelect }: Ma
   const [specialNotification, setSpecialNotification] = useState<any>(null);
 
   useEffect(() => {
+    if (!user?.id) return;
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const lastShownStr = localStorage.getItem(`specialPopupLastShown_${user.id}`);
+    const now = Date.now();
+    if (lastShownStr) {
+      const lastShown = parseInt(lastShownStr, 10);
+      if (!Number.isNaN(lastShown) && now - lastShown < THIRTY_DAYS_MS) {
+        // Dentro da janela de 30 dias: não mostrar o popup
+        return;
+      }
+    }
+
     const specialTypes = ['ANIVERSARIO', 'ANIVERSARIO_CASAMENTO', 'NOVA_ESCALA'];
-    const unreadSpecial = notifications.find(n => 
-      !n.lido && 
+    const unreadSpecial = notifications.find(n =>
+      !n.lido &&
       specialTypes.includes(n.tipo) &&
       !localStorage.getItem(`specialNotificationShown_${n.id}`)
     );
@@ -32,13 +44,17 @@ const MainLayout = ({ children, activeModule = "dashboard", onModuleSelect }: Ma
     if (unreadSpecial) {
       setSpecialNotification(unreadSpecial);
     }
-  }, [notifications]);
+  }, [notifications, user]);
 
   const handleCloseSpecialNotification = async () => {
     if (!specialNotification) return;
 
     // Marca como vista no localStorage para não mostrar de novo na mesma sessão
     localStorage.setItem(`specialNotificationShown_${specialNotification.id}`, 'true');
+    // Registra o último momento que este usuário viu o popup (limite de 30 dias)
+    if (user?.id) {
+      localStorage.setItem(`specialPopupLastShown_${user.id}`, String(Date.now()));
+    }
     
     // Marca como lida no banco de dados
     if (specialNotification.user_id === user?.id) {
