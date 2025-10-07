@@ -14,6 +14,7 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage'
 import PasswordResetPage from './pages/PasswordResetPage'
 import NewPasswordPage from './pages/NewPasswordPage'
 import { useEffect } from 'react'
+import CookieConsent from './components/system/CookieConsent'
 
 // ----------------------------
 // ProtectedRoute genérico
@@ -71,115 +72,118 @@ function App() {
   }, [checkAuth, initializeAuthListener])
 
   return (
-    <Routes>
-      {/* Landing */}
-      <Route
-        path="/"
-        element={
-          user ? (
-            <Navigate
-              to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
-              replace
-            />
-          ) : (
-            <LandingPage />
-          )
-        }
-      />
+    <>
+      <CookieConsent />
+      <Routes>
+        {/* Landing */}
+        <Route
+          path="/"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <LandingPage />
+            )
+          }
+        />
 
-      {/* Login & Registro comuns */}
-      <Route
-        path="/login"
-        element={
-          user ? (
-            <Navigate
-              to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
-              replace
-            />
-          ) : (
-            <LoginPage />
-          )
-        }
-      />
-      <Route path="/recuperar-senha" element={<PasswordResetPage />} />
-      <Route path="/nova-senha" element={<NewPasswordPage />} />
-      <Route
-        path="/register/:churchId"
-        element={
-          user ? (
-            <Navigate
-              to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
-              replace
-            />
-          ) : (
-            <RegisterPage />
-          )
-        }
-      />
-      <Route
-        path="/cadastrar-igreja"
-        element={
-          <CadastrarIgrejaPage />
-        }
-      />
-      <Route
-        path="/payment-success"
-        element={
-          <PaymentSuccessPage />
-        }
-      />
+        {/* Login & Registro comuns */}
+        <Route
+          path="/login"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <LoginPage />
+            )
+          }
+        />
+        <Route path="/recuperar-senha" element={<PasswordResetPage />} />
+        <Route path="/nova-senha" element={<NewPasswordPage />} />
+        <Route
+          path="/register/:churchId"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <RegisterPage />
+            )
+          }
+        />
+        <Route
+          path="/cadastrar-igreja"
+          element={
+            <CadastrarIgrejaPage />
+          }
+        />
+        <Route
+          path="/payment-success"
+          element={
+            <PaymentSuccessPage />
+          }
+        />
 
-      {/* Login & registro de super admin */}
-      <Route
-        path="/master-admin-login"
-        element={
-          user?.role === 'super_admin' ? (
-            <Navigate to="/master-admin" replace />
-          ) : (
-            <MasterAdminLoginPage />
-          )
-        }
-      />
-      <Route
-        path="/super-admin-register"
-        element={
-          user?.role === 'super_admin' ? (
-            <Navigate to="/master-admin" replace />
-          ) : (
-            <SuperAdminRegisterPage />
-          )
-        }
-      />
+        {/* Login & registro de super admin */}
+        <Route
+          path="/master-admin-login"
+          element={
+            user?.role === 'super_admin' ? (
+              <Navigate to="/master-admin" replace />
+            ) : (
+              <MasterAdminLoginPage />
+            )
+          }
+        />
+        <Route
+          path="/super-admin-register"
+          element={
+            user?.role === 'super_admin' ? (
+              <Navigate to="/master-admin" replace />
+            ) : (
+              <SuperAdminRegisterPage />
+            )
+          }
+        />
 
-      {/* Rotas protegidas */}
-      <Route
-        path="/master-admin"
-        element={
-          <ProtectedRoute onlySuperAdmin>
-            <MasterAdminPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute requireTenant>
-            <DashboardPage currentChurchId={currentChurchId!} />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/ead"
-        element={
-          <ProtectedRoute requireTenant>
-            <EADPortalPage />
-          </ProtectedRoute>
-        }
-      />
+        {/* Rotas protegidas */}
+        <Route
+          path="/master-admin"
+          element={
+            <ProtectedRoute onlySuperAdmin>
+              <MasterAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute requireTenant>
+              <DashboardPage currentChurchId={currentChurchId!} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ead"
+          element={
+            <ProtectedRoute requireTenant>
+              <EADPortalPage />
+            </ProtectedRoute>
+          }
+        />
 
-      {/* catch all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* catch all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 
