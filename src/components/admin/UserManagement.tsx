@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from 'sonner'
 import { User, UserRole, useAuthStore } from '../../stores/authStore' 
 import { useChurchStore } from '../../stores/churchStore' 
-import { supabase } from '../../integrations/supabase/client'
+import { supabase } from '@/integrations/supabase/client'
 import { 
   Users, 
   UserCheck, 
@@ -163,6 +163,36 @@ const UserManagement = ({}: UserManagementProps) => {
     setEditUser({});
     toast.success('Usuário atualizado com sucesso!');
     loadUsers(currentChurchId);
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    const confirm = window.confirm('Tem certeza que deseja excluir este usuário? Essa ação é irreversível.')
+    if (!confirm) return
+
+    // Feedback visual
+    const t = toast.loading('Excluindo usuário...')
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId },
+      })
+
+      if (error) {
+        console.error('Error deleting user:', error.message)
+        toast.error(`Erro ao excluir: ${error.message}`)
+        return
+      }
+      if (!(data as any)?.success) {
+        toast.error('Erro ao excluir usuário (sem sucesso).')
+        return
+      }
+
+      toast.success('Usuário excluído com sucesso.')
+      // Atualize a lista local (por exemplo, refetch do React Query ou estado local)
+      // Se estiver usando TanStack Query:
+      // queryClient.invalidateQueries({ queryKey: ['users'] })
+    } finally {
+      toast.dismiss(t)
+    }
   };
 
   const deleteUser = async (userId: string) => {
