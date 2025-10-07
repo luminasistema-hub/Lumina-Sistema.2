@@ -18,6 +18,7 @@ import AdminToolsTab from '../components/master-admin/AdminToolsTab'
 import SaaSReportsTab from '../components/master-admin/SaaSReportsTab'
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
 import SubscriptionPlanManagement from '../components/master-admin/SubscriptionPlanManagement'
+import MasterAdminUpgradeRequestsAlert from '../components/master-admin/MasterAdminUpgradeRequestsAlert'
 import { supabase } from '../integrations/supabase/client'
 
 const MasterAdminPage = () => {
@@ -125,6 +126,8 @@ const MasterAdminPage = () => {
             Gerencie todas as igrejas e suas assinaturas
           </p>
         </div>
+
+        <MasterAdminUpgradeRequestsAlert onViewRequests={() => setActiveTab('plans')} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-6">
