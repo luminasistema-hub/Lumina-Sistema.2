@@ -145,7 +145,7 @@ const LandingPage = () => {
               <Button
                 asChild
                 size="lg"
-                className="rounded-full px-6 shadow-md bg-white text-primary hover:bg-white/90 hover:text-primary"
+                className="rounded-full px-6 shadow-md bg-white text-blue-700 hover:text-blue-800 hover:bg-white/90 border border-white/30"
               >
                 <Link to="/login">
                   Entrar na Plataforma
