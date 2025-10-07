@@ -102,44 +102,80 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="p-6 max-w-md mx-auto">
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle>
-            Cadastro de Membro {church ? `— ${church.nome}` : ''}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!church && (
-            <div className="text-sm text-red-600">
-              Este cadastro requer um link único da igreja. Solicite ao administrador.
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="w-full max-w-md">
+        <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur">
+          <CardHeader className="text-center pb-6">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+              <img src="/favicon.ico" alt="Lumina Logo" className="w-10 h-10" />
             </div>
-          )}
-          <div className="space-y-2">
-            <Label>Nome Completo</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" />
-          </div>
-          <div className="space-y-2">
-            <Label>Senha</Label>
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Crie uma senha (min. 8 caracteres)"
-            />
-          </div>
-          <div className="flex justify-end">
-            <Button onClick={handleSubmit} disabled={loading || !church || !email || !password}>
-              {loading ? 'Enviando...' : 'Cadastrar'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Lumina
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Cadastro de Membro {church ? `— ${church.nome}` : ''}
+            </p>
+          </CardHeader>
+
+          <CardContent className="space-y-5">
+            {!church && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-md">
+                Este cadastro requer um link único da igreja. Solicite ao administrador.
+              </div>
+            )}
+
+            <form
+              className="space-y-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}
+            >
+              <div className="space-y-2">
+                <Label>Nome Completo</Label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Seu nome"
+                  className="h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  className="h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Senha</Label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Crie uma senha (min. 8 caracteres)"
+                  className="h-12"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 transition-opacity"
+                disabled={loading || !church || !email || !password}
+              >
+                {loading ? 'Enviando...' : 'Cadastrar'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
