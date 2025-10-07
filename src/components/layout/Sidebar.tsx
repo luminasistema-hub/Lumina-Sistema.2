@@ -107,9 +107,10 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Colapsa a sidebar por padrão em telas pequenas
+    // Em telas pequenas, manter expandido para garantir legibilidade
     if (window.innerWidth < 768) {
-      setIsCollapsed(true);
+      setIsCollapsed(false);
+      // Menu master pode iniciar fechado para não ocupar muito espaço
       setIsMasterMenuOpen(false);
     }
   }, []);
@@ -214,7 +215,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   return (
     <div className={cn(
       "h-screen bg-white border-r flex flex-col transition-all duration-300 overflow-x-hidden min-w-0",
-      isCollapsed ? "w-16" : "w-72"
+      isCollapsed ? "w-16" : "w-72 md:w-72 w-64"
     )}>
       {/* Cabeçalho */}
       <div className="flex items-center justify-between p-4 border-b">
@@ -351,39 +352,38 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
             const userModules = getUserModules(category.modules);
             if (userModules.length === 0) return null;
             const isExpanded = expandedCategories.includes(category.id);
-
             return (
               <div key={category.id}>
                 {!isCollapsed && (
                   <Button
                     variant="ghost"
-                    className="w-full justify-between px-4"
+                    className="w-full justify-between px-4 py-2"
                     onClick={() => toggleCategory(category.id)}
                   >
                     <div className="flex items-center gap-3">
                       {category.icon}
-                      <span>{category.title}</span>
+                      <span className="truncate">{category.title}</span>
                     </div>
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
                 )}
                 {(isCollapsed || isExpanded) && (
-                  <div className={cn("space-y-1", isCollapsed ? "px-2" : "px-4 ml-4")}>
-                    {userModules.map((module) => (
-                      <Button
-                        key={module.id}
-                        variant={activeModule === module.id ? "secondary" : "ghost"}
-                        className="w-full justify-start text-sm truncate"
-                        onClick={() => handleModuleClick(module.id)}
-                        title={isCollapsed ? module.title : undefined}
-                      >
-                        <div className="flex items-center gap-2 w-full min-w-0">
-                          {module.icon}
-                          {!isCollapsed && <span className="ml-1 flex-1 truncate">{module.title}</span>}
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
+                  <div className={cn("space-y-1", isCollapsed ? "px-2" : "px-4 ml-2")}>
+                     {userModules.map((module) => (
+                       <Button
+                         key={module.id}
+                         variant={activeModule === module.id ? "secondary" : "ghost"}
+                         className="w-full justify-start text-sm truncate py-2"
+                         onClick={() => handleModuleClick(module.id)}
+                         title={isCollapsed ? module.title : undefined}
+                       >
+                         <div className="flex items-center gap-2 w-full min-w-0">
+                           {module.icon}
+                           {!isCollapsed && <span className="ml-1 flex-1 truncate">{module.title}</span>}
+                         </div>
+                       </Button>
+                     ))}
+                   </div>
                 )}
               </div>
             );
