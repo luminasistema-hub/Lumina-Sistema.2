@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { useCultos } from "@/hooks/useCultos";
+import { useMinistryKanbanDemandas } from "@/hooks/useMinistryKanbanDemandas";
 
 interface Demand {
   id: string;
@@ -23,40 +25,25 @@ interface Props {
 }
 
 export default function MinistryKanban({ ministerioId }: Props) {
-  const [cultos, setCultos] = useState<Culto[]>([]);
+  const { data: cultosData = [], isLoading: cultosLoading } = useCultos();
+  const { data: demandasData = [], isLoading: demandasLoading, refetch } = useMinistryKanbanDemandas(ministerioId);
   const [demandas, setDemandas] = useState<Demand[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cultos = cultosData;
+  const loading = cultosLoading || demandasLoading;
 
   useEffect(() => {
-    loadData();
-  }, [ministerioId]);
-
-  async function loadData() {
-    setLoading(true);
-
-    // Buscar cultos
-    const { data: cultosData } = await supabase
-      .from("cultos")
-      .select("id, titulo, data")
-      .order("data", { ascending: true });
-
-    // Buscar demandas
-    const { data: demandasData } = await supabase
-      .from("demandas_ministerios")
-      .select("id, titulo, descricao, status, culto_id")
-      .eq("ministerio_id", ministerioId);
-
-    if (cultosData) setCultos(cultosData);
-    if (demandasData) setDemandas(demandasData);
-
-    setLoading(false);
-  }
+    setDemandas(demandasData as any);
+  }, [demandasData]);
 
   async function updateDemandStatus(id: string, status: string) {
     await supabase
       .from("demandas_ministerios")
       .update({ status })
       .eq("id", id);
+    
+    // Atualiza local e revalida server
+    setDemandas((prev) => prev.map((d) => d.id === id ? { ...d, status: status as any } : d));
+    refetch();
   }
 
   function onDragEnd(result: any) {

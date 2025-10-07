@@ -7,6 +7,7 @@ import { Calendar, MapPin, FileText } from "lucide-react";
 import EventProgramModal from "./EventProgramModal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useEvents } from "@/hooks/useEvents";
 
 type Evento = {
   id: string;
@@ -25,26 +26,11 @@ const OrderOfServiceEventsPage = () => {
   const [selectedEvent, setSelectedEvent] = useState<Evento | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const loadEvents = async () => {
-    if (!currentChurchId) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("eventos")
-      .select("id, nome, descricao, data_hora, local, status, tipo")
-      .eq("id_igreja", currentChurchId)
-      .order("data_hora", { ascending: true });
-
-    if (error) {
-      console.error(error);
-    }
-    setEvents((data || []) as Evento[]);
-    setLoading(false);
-  };
-
+  const { data: eventsData = [], isLoading, refetch } = useEvents(currentChurchId);
   useEffect(() => {
-    loadEvents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChurchId]);
+    setEvents(eventsData);
+    setLoading(isLoading);
+  }, [eventsData, isLoading]);
 
   const openEvent = (ev: Evento) => {
     setSelectedEvent(ev);
@@ -68,7 +54,7 @@ const OrderOfServiceEventsPage = () => {
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Ordem de Culto/Eventos</h1>
-        <Button variant="outline" onClick={loadEvents}>Atualizar</Button>
+        <Button variant="outline" onClick={() => refetch()}>Atualizar</Button>
       </div>
 
       {loading && <div className="p-6 text-center text-muted-foreground">Carregando eventos...</div>}

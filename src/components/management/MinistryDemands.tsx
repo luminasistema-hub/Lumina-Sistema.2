@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import React from "react";
+import { useMinistryDemands } from "@/hooks/useMinistryDemands";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface DemandaMinisterio {
@@ -21,32 +21,7 @@ interface DemandaMinisterio {
 }
 
 const MinistryDemands: React.FC<{ ministryId: string }> = ({ ministryId }) => {
-  const [demandas, setDemandas] = useState<DemandaMinisterio[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchDemandas = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("demandas_ministerios")
-        .select(
-          `
-          *,
-          culto:cultos ( id, titulo, data )
-        `
-        )
-        .eq("ministerio_id", ministryId);
-
-      if (error) {
-        console.error("Erro ao buscar demandas:", error);
-      } else {
-        setDemandas(data || []);
-      }
-      setLoading(false);
-    };
-
-    fetchDemandas();
-  }, [ministryId]);
+  const { data: demandas = [], isLoading: loading } = useMinistryDemands(ministryId);
 
   if (loading) return <p>Carregando demandas...</p>;
 

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Users, Clock, Plus } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
-import { supabase } from '@/integrations/supabase/client';
+import { useMinistrySchedules } from '@/hooks/useMinistrySchedules';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -15,37 +15,7 @@ interface MinistrySchedulesProps {
 
 const MinistrySchedules: React.FC<MinistrySchedulesProps> = ({ ministerioId }) => {
   const { user, currentChurchId } = useAuthStore();
-  const [schedules, setSchedules] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadSchedules = async () => {
-    if (!currentChurchId) return;
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('escalas_servico')
-        .select(`
-          *,
-          evento:eventos(nome, data_hora),
-          voluntarios:escala_voluntarios!inner(*, membro:membros(nome_completo, email))
-        `)
-        .eq('ministerio_id', ministerioId)
-        .eq('id_igreja', currentChurchId)
-        .order('data_servico', { ascending: true });
-
-      if (error) throw error;
-      setSchedules(data || []);
-    } catch (error: any) {
-      toast.error('Erro ao carregar escalas: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSchedules();
-  }, [ministerioId, currentChurchId]);
+  const { data: schedules = [], isLoading: loading } = useMinistrySchedules(ministerioId, currentChurchId);
 
   if (loading) {
     return (
