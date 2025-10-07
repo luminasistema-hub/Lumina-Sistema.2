@@ -72,7 +72,7 @@ const moduleCategories: ModuleCategory[] = [
       { id: "order-of-service", title: "Ordem de Culto/Eventos", icon: <ClipboardList className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin"], status: "complete" },
       { id: "member-management", title: "Gestão de Membros", icon: <Users className="w-4 h-4" />, roles: ["lider_ministerio","pastor","admin","integra"], status: "complete" },
       { id: "ministries", title: "Gestão de Ministério", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
-      { id: "growth-groups", title: "Grupos de Crescimento (GC)", icon: <Users className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" },
+      { id: "growth-groups", title: "Grupos de Crescimento (GC)", icon: <Users className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio","gc_lider"], status: "complete" },
       { id: "financial-panel", title: "Painel Financeiro", icon: <DollarSign className="w-4 h-4" />, roles: ["pastor","admin","financeiro"], status: "complete" },
       { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor", "integra"], status: "complete" },
       { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","gestao_kids"], status: "complete" },
@@ -168,7 +168,8 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   const getRoleLabel = (role: UserRole) => ({
     "super_admin": "Super Admin", "admin": "Admin", "pastor": "Pastor", "lider_ministerio": "Líder",
     "financeiro": "Financeiro", "voluntario": "Voluntário", "midia_tecnologia": "Mídia",
-    "integra": "Integração", "gestao_kids": "Gestão Kids", "membro": "Membro"
+    "integra": "Integração", "gestao_kids": "Gestão Kids", "membro": "Membro",
+    "gc_membro": "Membro GC", "gc_lider": "Líder GC"
   }[role] || "");
 
   const getUserModules = (modules: ModuleItem[]) => {
@@ -191,6 +192,13 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   const getUserCategories = () => {
     return moduleCategories.filter(category => getUserModules(category.modules).length > 0);
   };
+
+  // Atualiza lista de roles do item 'Meu GC' para incluir os novos papéis
+  moduleCategories[0].modules = moduleCategories[0].modules.map(m => 
+    m.id === "my-gc" 
+      ? { ...m, roles: [...m.roles, "gc_membro", "gc_lider"] as UserRole[] }
+      : m
+  );
 
   if (!user) return null;
 

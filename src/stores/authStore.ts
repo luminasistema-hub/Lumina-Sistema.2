@@ -15,6 +15,8 @@ export type UserRole =
   | 'integra'
   | 'gestao_kids'
   | 'super_admin'
+  | 'gc_membro'
+  | 'gc_lider'
 
 export interface PersonalInfo {
   data_nascimento?: string | null

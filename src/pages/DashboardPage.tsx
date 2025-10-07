@@ -56,6 +56,8 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
         return <VocationalTest />
       case 'my-ministry':
         return <MyMinistryPage />
+      case 'my-gc':
+        return <MyGrowthGroup />
       // Crescimento Espiritual
       case 'events':
         return <EventsPage />

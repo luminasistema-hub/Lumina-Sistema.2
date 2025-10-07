@@ -236,6 +236,8 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'gestao_kids': return <Baby className="w-4 h-4" />
       case 'membro': return <Users className="w-4 h-4" />
       case 'super_admin': return <Shield className="w-4 h-4" /> 
+      case 'gc_membro': return <Users className="w-4 h-4" />
+      case 'gc_lider': return <UserCheck className="w-4 h-4" />
     }
   }
 
@@ -251,6 +253,8 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'gestao_kids': return 'bg-orange-100 text-orange-800'
       case 'membro': return 'bg-gray-100 text-gray-800'
       case 'super_admin': return 'bg-red-200 text-red-900' 
+      case 'gc_membro': return 'bg-teal-100 text-teal-800'
+      case 'gc_lider': return 'bg-cyan-100 text-cyan-800'
     }
   }
 
@@ -274,6 +278,8 @@ const UserManagement = ({}: UserManagementProps) => {
       case 'gestao_kids': return 'Gestão Kids'
       case 'membro': return 'Membro'
       case 'super_admin': return 'Super Administrador' 
+      case 'gc_membro': return 'Membro de GC'
+      case 'gc_lider': return 'Líder de GC'
     }
   }
 
@@ -370,6 +376,8 @@ const UserManagement = ({}: UserManagementProps) => {
               <SelectItem value="integra">Integração</SelectItem>
               <SelectItem value="gestao_kids">Gestão Kids</SelectItem>
               <SelectItem value="membro">Membro</SelectItem>
+              <SelectItem value="gc_membro">Membro de GC</SelectItem>
+              <SelectItem value="gc_lider">Líder de GC</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -498,6 +506,8 @@ const UserManagement = ({}: UserManagementProps) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="membro">Membro</SelectItem>
+                  <SelectItem value="gc_membro">Membro de GC</SelectItem>
+                  <SelectItem value="gc_lider">Líder de GC</SelectItem>
                   <SelectItem value="voluntario">Voluntário</SelectItem>
                   <SelectItem value="lider_ministerio">Líder de Ministério</SelectItem>
                   <SelectItem value="pastor">Pastor</SelectItem>
