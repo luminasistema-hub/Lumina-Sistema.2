@@ -149,12 +149,19 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
             position: fixed;
             inset: 0;
             width: auto;
-            padding: 12mm; /* margem interna controlada para não cortar nada */
+            padding: 12mm; /* margem interna controlada */
+            display: flex;
+            justify-content: center; /* centraliza horizontalmente */
+            align-items: flex-start; /* mantém no topo da página */
           }
-          .print-card {
-            break-inside: avoid;
-            page-break-inside: avoid;
-          }
+           .print-card {
+             break-inside: avoid;
+             page-break-inside: avoid;
+             width: 100%;
+             max-width: 180mm; /* limita ao espaço útil da página A4 com padding */
+             margin: 0 auto;   /* garante centralização do próprio card */
+             box-shadow: none; /* remove sombras na impressão */
+           }
         }
       `}</style>
     </div>
