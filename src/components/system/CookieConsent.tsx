@@ -61,8 +61,8 @@ const CookieConsent: React.FC = () => {
   return (
     <>
       {showBanner && (
-        <div className="fixed inset-x-0 bottom-0 z-50 p-3 md:p-4">
-          <Card className="mx-auto max-w-4xl p-3 md:p-4 shadow-lg border bg-background">
+        <div className="fixed inset-x-0 bottom-0 z-50 p-2 md:p-3">
+          <Card className="mx-auto max-w-xl p-2 md:p-3 shadow-lg border bg-background">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div className="space-y-1">
                 <h2 className="text-sm md:text-base font-semibold">
@@ -90,7 +90,7 @@ const CookieConsent: React.FC = () => {
 
       {/* Preferências de cookies */}
       <Dialog open={prefsOpen} onOpenChange={setPrefsOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Preferências de Cookies</DialogTitle>
             <DialogDescription>Você pode ajustar quais cookies não essenciais deseja permitir.</DialogDescription>
@@ -124,12 +124,12 @@ const CookieConsent: React.FC = () => {
 
       {/* Política de Privacidade e Cookies */}
       <Dialog open={policyOpen} onOpenChange={setPolicyOpen}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Política de Privacidade e Cookies – Lumina Sistema de Gestão</DialogTitle>
             <DialogDescription>Data da última atualização: 07 de outubro de 2025</DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-2">
+          <ScrollArea className="max-h-[50vh] pr-2">
             <div className="space-y-4 text-sm">
               <p>
                 A sua privacidade é fundamental para nós. Esta Política de Privacidade e Cookies descreve como a Lumina

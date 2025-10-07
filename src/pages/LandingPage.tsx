@@ -131,8 +131,8 @@ const LandingPage = () => {
       </header>
 
       {/* HERO sólido com a cor primária da marca */}
-      <section id="hero" className="relative z-10 overflow-hidden bg-primary text-primary-foreground">
-        <div className="container mx-auto responsive-section pt-12 md:pt-16 pb-10">
+      <section id="hero" aria-label="Apresentação" className="relative z-10 overflow-hidden bg-primary text-primary-foreground">
+        <div className="container mx-auto responsive-section pt-16 md:pt-24 pb-14">
           <div className="mx-auto max-w-4xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-primary-foreground/10 border-primary-foreground/20">
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
@@ -181,8 +181,8 @@ const LandingPage = () => {
       </section>
 
       {/* TRUST / SEGURANÇA — fundo branco */}
-      <section className="container mx-auto responsive-section py-10 md:py-12">
-        <div className="grid sm:grid-cols-3 gap-4">
+      <section aria-label="Confiança e Segurança" className="container mx-auto responsive-section py-16 md:py-24">
+        <div className="grid sm:grid-cols-3 gap-6">
           <Card className="border">
             <CardContent className="p-5 flex items-start gap-3">
               <ShieldCheck className="h-5 w-5 text-primary" />
@@ -220,14 +220,14 @@ const LandingPage = () => {
       </section>
 
       {/* FEATURES — fundo branco */}
-      <section id="features" className="container mx-auto responsive-section py-10 md:py-14">
+      <section id="features" aria-label="Funcionalidades" className="container mx-auto responsive-section py-16 md:py-24">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight">
             Tudo o que sua igreja precisa
           </h2>
         </div>
 
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <Feature icon={Users} title="Gestão de Ministérios" desc="Cadastre ministérios, líderes e voluntários; gerencie funções e demandas." color="bg-primary" />
           <Feature icon={CalendarCheck2} title="Escalas de Serviço" desc="Crie escalas por evento e ministério; confirme presença e visualize atribuições." color="bg-emerald-600" />
           <Feature icon={Baby} title="Kids Check-in/Out" desc="Check-in com código de segurança e histórico de presença por criança." color="bg-rose-600" />
@@ -242,7 +242,7 @@ const LandingPage = () => {
       {/* REMOVIDO: Vitrine de Telas */}
 
       {/* SOBRE / MISSÃO / VISÃO — fundo branco */}
-      <section id="about" className="container mx-auto responsive-section py-10 md:py-14">
+      <section id="about" aria-label="Sobre a Lumina, Missão e Visão" className="container mx-auto responsive-section py-16 md:py-24">
         <div className="grid lg:grid-cols-3 gap-6">
           <Card className="border">
             <CardContent className="p-6">
@@ -282,14 +282,14 @@ const LandingPage = () => {
       </section>
 
       {/* VALORES — fundo branco */}
-      <section className="container mx-auto responsive-section py-10 md:py-14">
+      <section aria-label="Valores da empresa" className="container mx-auto responsive-section py-16 md:py-24">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight">Nossos Valores</h2>
           <p className="mt-2 text-muted-foreground">
             O que nos guia no dia a dia para servir melhor as igrejas.
           </p>
         </div>
-        <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="border shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
@@ -359,7 +359,7 @@ const LandingPage = () => {
       </section>
 
       {/* PLANOS — fundo branco */}
-      <section id="plans" className="container mx-auto responsive-section py-10 md:py-16">
+      <section id="plans" aria-label="Planos de assinatura" className="container mx-auto responsive-section py-16 md:py-24">
         <div className="max-w-2xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-background border-border">
             <span className="h-2 w-2 rounded-full bg-primary" />
@@ -369,7 +369,7 @@ const LandingPage = () => {
           <p className="mt-2 text-muted-foreground">Escolha um plano para começar o cadastro da sua igreja.</p>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {isLoading ? (
             <Card className="p-6">
               <CardContent className="p-0">Carregando planos...</CardContent>
@@ -427,7 +427,7 @@ const LandingPage = () => {
 
       {/* FOOTER — sólido na cor da marca */}
       <footer className="border-t bg-primary text-primary-foreground">
-        <div className="container mx-auto responsive-section py-10 grid gap-8 md:grid-cols-3">
+        <div className="container mx-auto responsive-section py-12 grid gap-8 md:grid-cols-3">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-lg bg-primary-foreground/10 flex items-center justify-center">
