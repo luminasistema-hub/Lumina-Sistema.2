@@ -20,6 +20,7 @@ import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSys
 import SubscriptionPlanManagement from '../components/master-admin/SubscriptionPlanManagement'
 import MasterAdminUpgradeRequestsAlert from '../components/master-admin/MasterAdminUpgradeRequestsAlert'
 import { supabase } from '../integrations/supabase/client'
+import { useSearchParams } from 'react-router-dom'
 
 const MasterAdminPage = () => {
   const { user } = useAuthStore()
@@ -71,6 +72,20 @@ const MasterAdminPage = () => {
     };
     fetchChurchesAndMetrics();
   }, [loadChurches]);
+
+  // Lê a aba da URL (?tab=) ao entrar na página
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const tab = searchParams.get('tab') || 'overview';
+    if (tab !== activeTab) setActiveTab(tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Atualiza a URL quando a aba muda
+  const handleChangeTab = (value: string) => {
+    setActiveTab(value);
+    setSearchParams({ tab: value }, { replace: true });
+  };
 
   if (user?.role !== 'super_admin') {
     return (
@@ -129,14 +144,14 @@ const MasterAdminPage = () => {
 
         <MasterAdminUpgradeRequestsAlert onViewRequests={() => setActiveTab('plans')} />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="churches">Igrejas</TabsTrigger>
-            <TabsTrigger value="plans">Planos</TabsTrigger>
-            <TabsTrigger value="database">Banco de Dados</TabsTrigger>
-            <TabsTrigger value="tools">Ferramentas Admin</TabsTrigger>
-            <TabsTrigger value="reports">Relatórios SaaS</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={handleChangeTab}>
+          <TabsList className="w-full flex overflow-x-auto gap-2 p-1 md:p-0">
+            <TabsTrigger value="overview" className="whitespace-nowrap">Visão Geral</TabsTrigger>
+            <TabsTrigger value="churches" className="whitespace-nowrap">Igrejas</TabsTrigger>
+            <TabsTrigger value="plans" className="whitespace-nowrap">Planos</TabsTrigger>
+            <TabsTrigger value="database" className="whitespace-nowrap">Banco de Dados</TabsTrigger>
+            <TabsTrigger value="tools" className="whitespace-nowrap">Ferramentas Admin</TabsTrigger>
+            <TabsTrigger value="reports" className="whitespace-nowrap">Relatórios SaaS</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">

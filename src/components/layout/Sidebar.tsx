@@ -103,7 +103,16 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   const { user, currentChurchId } = useAuthStore();
   const [hasMyMinistryAccess, setHasMyMinistryAccess] = useState(false);
   const [hasMyGCAccess, setHasMyGCAccess] = useState(false);
+  const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Colapsa a sidebar por padrão em telas pequenas
+    if (window.innerWidth < 768) {
+      setIsCollapsed(true);
+      setIsMasterMenuOpen(false);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -255,15 +264,84 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
 
         {/* Painel Master só para super_admin */}
         {user?.role === "super_admin" && (
-          <div className="px-4 mb-4">
+          <div className="px-4 mb-2">
             <Button
               variant={activeModule === "master-admin" ? "secondary" : "ghost"}
               className="w-full justify-start"
-              onClick={() => handleModuleClick("master-admin")}
+              onClick={() => navigate("/master-admin")}
             >
               <Shield className="w-4 h-4" />
               {!isCollapsed && <span className="ml-3">Painel Master</span>}
             </Button>
+
+            {/* Submenu com módulos do Painel Master */}
+            {!isCollapsed && (
+              <>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between mt-1"
+                  onClick={() => setIsMasterMenuOpen((v) => !v)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    <span>Módulos do Painel Master</span>
+                  </div>
+                  {isMasterMenuOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </Button>
+                {isMasterMenuOpen && (
+                  <div className="px-2 ml-6 space-y-1">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm truncate"
+                      onClick={() => navigate("/master-admin?tab=overview")}
+                    >
+                      <Activity className="w-4 h-4" />
+                      <span className="ml-2">Visão Geral</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm truncate"
+                      onClick={() => navigate("/master-admin?tab=churches")}
+                    >
+                      <Church className="w-4 h-4" />
+                      <span className="ml-2">Igrejas</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm truncate"
+                      onClick={() => navigate("/master-admin?tab=plans")}
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      <span className="ml-2">Planos</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm truncate"
+                      onClick={() => navigate("/master-admin?tab=database")}
+                    >
+                      <Link2 className="w-4 h-4" />
+                      <span className="ml-2">Banco de Dados</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm truncate"
+                      onClick={() => navigate("/master-admin?tab=tools")}
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span className="ml-2">Ferramentas Admin</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm truncate"
+                      onClick={() => navigate("/master-admin?tab=reports")}
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      <span className="ml-2">Relatórios SaaS</span>
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
