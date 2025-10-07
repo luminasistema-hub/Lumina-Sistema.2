@@ -154,8 +154,7 @@ const LandingPage = () => {
               </Button>
               <Button
                 size="lg"
-                variant="outline"
-                className="rounded-full px-6 border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10"
+                className="rounded-full px-6 bg-[#25D366] text-black hover:bg-[#1ebe57] border-0 shadow-md"
                 onClick={handleContatoWhatsApp}
               >
                 <MessageSquare className="mr-2 h-4 w-4" />
