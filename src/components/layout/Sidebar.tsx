@@ -102,13 +102,17 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["personal","management","spiritual"]);
   const { user, currentChurchId } = useAuthStore();
   const [hasMyMinistryAccess, setHasMyMinistryAccess] = useState(false);
+  const [hasMyGCAccess, setHasMyGCAccess] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
     const checkAccess = async () => {
       if (!user || !currentChurchId) {
-        if (mounted) setHasMyMinistryAccess(false);
+        if (mounted) {
+          setHasMyMinistryAccess(false);
+          setHasMyGCAccess(false);
+        }
         return;
       }
       // Se a role já for líder/voluntário, libera diretamente
@@ -127,6 +131,20 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
         .eq("membro_id", user.id);
       const hasAccess = byRole || (leaderCount || 0) > 0 || (volunteerCount || 0) > 0;
       if (mounted) setHasMyMinistryAccess(hasAccess);
+
+      // Verifica participação em GC (membro ou líder) na igreja atual
+      const { count: gcMemberCount } = await supabase
+        .from("gc_group_members")
+        .select("id", { count: "exact", head: true })
+        .eq("id_igreja", currentChurchId)
+        .eq("membro_id", user.id);
+      const { count: gcLeaderCount } = await supabase
+        .from("gc_group_leaders")
+        .select("id", { count: "exact", head: true })
+        .eq("id_igreja", currentChurchId)
+        .eq("membro_id", user.id);
+      const hasGC = (gcMemberCount || 0) > 0 || (gcLeaderCount || 0) > 0;
+      if (mounted) setHasMyGCAccess(hasGC);
     };
     checkAccess();
     return () => { mounted = false; };
@@ -159,6 +177,10 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect }: SidebarProps) =
       if (module.id === "my-ministry") {
         // Mostrar apenas se tiver acesso por role ou vínculo (líder/voluntário) com algum ministério
         return hasMyMinistryAccess;
+      }
+      if (module.id === "my-gc") {
+        // Mostrar apenas se o usuário for integrante (membro/líder) de algum GC da igreja atual
+        return hasMyGCAccess;
       }
       const byRole = module.roles.includes(user.role);
       const byExtra = Array.isArray(user.extraPermissions) && user.extraPermissions.includes(module.id);
