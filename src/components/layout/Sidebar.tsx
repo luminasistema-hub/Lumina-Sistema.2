@@ -6,7 +6,7 @@ import {
   Users, Calendar, DollarSign, Settings, Church, BookOpen, Heart,
   Baby, GraduationCap, User, Shield, ChevronLeft, ChevronRight,
   ChevronDown, ChevronUp, Home, Activity, ClipboardList, Link2, MessageSquareText,
-  ClipboardSignature, X
+  ClipboardSignature, X, Menu
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -246,9 +246,9 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
             size="sm"
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="h-8 w-8 p-0"
-            aria-label={isCollapsed ? "Expandir menu" : "Recolher menu"}
+            aria-label={isCollapsed ? "Abrir menu" : "Fechar menu"}
           >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            <Menu className="w-4 h-4" />
           </Button>
         )}
       </div>
