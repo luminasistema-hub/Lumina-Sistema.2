@@ -11,6 +11,8 @@ import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
 import EADPortalPage from './pages/EADPortalPage'
 import PaymentSuccessPage from './pages/PaymentSuccessPage'
+import PasswordResetPage from './pages/PasswordResetPage'
+import NewPasswordPage from './pages/NewPasswordPage'
 import { useEffect } from 'react'
 
 // ----------------------------
@@ -99,6 +101,8 @@ function App() {
           )
         }
       />
+      <Route path="/recuperar-senha" element={<PasswordResetPage />} />
+      <Route path="/nova-senha" element={<NewPasswordPage />} />
       <Route
         path="/register/:churchId"
         element={
