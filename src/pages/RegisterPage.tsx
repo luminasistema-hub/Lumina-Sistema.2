@@ -22,16 +22,34 @@ const RegisterPage = () => {
         toast.error('Este link de cadastro é inválido. Solicite ao administrador o link correto da sua igreja.');
         return;
       }
-      const { data, error } = await supabase.functions.invoke(
-        'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/get-church-public',
-        { body: { churchId: routeChurchId } }
-      );
-      if (error) {
-        toast.error('Igreja não encontrada. Verifique o link com o administrador.');
-        return;
+
+      // Primeiro: usar invoke com o NOME da função (forma suportada pelo cliente)
+      const { data, error } = await supabase.functions.invoke('get-church-public', {
+        body: { churchId: routeChurchId }
+      });
+
+      // Fallback com fetch manual caso o invoke falhe por algum motivo de CORS/infra
+      let churchPayload = data as any;
+      if (error || !churchPayload?.id) {
+        try {
+          const resp = await fetch('https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/get-church-public', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // Passa credenciais públicas para Supabase Functions
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ''}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+            },
+            body: JSON.stringify({ churchId: routeChurchId })
+          });
+          if (resp.ok) {
+            churchPayload = await resp.json();
+          }
+        } catch {}
       }
-      if (data?.id && data?.nome) {
-        setChurch({ id: data.id as string, nome: data.nome as string });
+
+      if (churchPayload?.id && churchPayload?.nome) {
+        setChurch({ id: churchPayload.id as string, nome: churchPayload.nome as string });
       } else {
         toast.error('Igreja não encontrada. Verifique o link com o administrador.');
       }
