@@ -32,31 +32,31 @@ import {
   Zap,
 } from "lucide-react";
 import { useSubscriptionPlans } from "@/hooks/useSubscriptionPlans";
-import FloatingShapes from "@/components/visual/FloatingShapes";
+// Removido visual com gradientes para aderir ao visual sólido da marca
 
-type FeatureProps = { icon: any; title: string; desc: string; accent?: string };
-const Feature = ({ icon: Icon, title, desc, accent = "from-sky-500 to-indigo-500" }: FeatureProps) => (
-  <Card className="h-full border border-zinc-200/70 dark:border-zinc-800/70 bg-white/80 dark:bg-zinc-900/70 backdrop-blur-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgb(0,0,0,0.08)] transition-transform hover:-translate-y-0.5">
+type FeatureProps = { icon: any; title: string; desc: string; color?: string };
+const Feature = ({ icon: Icon, title, desc, color = "bg-primary" }: FeatureProps) => (
+  <Card className="h-full border bg-card text-card-foreground shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5">
     <CardContent className="p-6">
       <div className="flex items-center gap-3 mb-3">
-        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-white bg-gradient-to-br ${accent} shadow-sm`}>
+        <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-primary-foreground ${color} shadow-sm`}>
           <Icon className="h-5 w-5" />
         </div>
-        <h3 className="font-semibold text-zinc-900/90 dark:text-zinc-100">{title}</h3>
+        <h3 className="font-semibold">{title}</h3>
       </div>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">{desc}</p>
+      <p className="text-sm text-muted-foreground">{desc}</p>
     </CardContent>
   </Card>
 );
 
 const StatCard = ({ icon: Icon, label }: { icon: any; label: string }) => (
-  <Card className="border border-white/60 dark:border-white/5 bg-white/70 dark:bg-white/5 backdrop-blur-md">
+  <Card className="border bg-card text-card-foreground">
     <CardContent className="p-5">
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-sky-500/15 to-emerald-500/15 flex items-center justify-center">
-          <Icon className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+          <Icon className="h-4 w-4 text-primary" />
         </div>
-        <span className="text-sm font-medium text-zinc-800 dark:text-zinc-100">{label}</span>
+        <span className="text-sm font-medium">{label}</span>
       </div>
     </CardContent>
   </Card>
@@ -92,9 +92,9 @@ const LandingPage = () => {
     n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
 
   return (
-    <div className="relative min-h-screen text-zinc-900 dark:text-zinc-100 transition-colors">
+    <div className="relative min-h-screen transition-colors">
       {/* Header fixo com navegação (fundo branco) */}
-      <header className="sticky top-0 z-30 border-b border-white/20 dark:border-zinc-800/60 bg-white/80 dark:bg-zinc-900/70 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
         <div className="container mx-auto responsive-section py-3 flex items-center justify-between">
           <a href="#hero" className="flex items-center gap-3">
             {/* Corrige distorção da logo: altura fixa, largura automática */}
@@ -102,9 +102,9 @@ const LandingPage = () => {
             <span className="font-semibold tracking-tight">Lumina Sistema de Gestão</span>
           </a>
           <nav className="hidden md:flex items-center gap-6 text-sm">
-            <a href="#features" className="text-zinc-700 dark:text-zinc-300 hover:text-sky-600">Funcionalidades</a>
-            <a href="#about" className="text-zinc-700 dark:text-zinc-300 hover:text-sky-600">Sobre Nós</a>
-            <a href="#plans" className="text-zinc-700 dark:text-zinc-300 hover:text-sky-600">Planos</a>
+            <a href="#features" className="text-muted-foreground hover:text-primary">Funcionalidades</a>
+            <a href="#about" className="text-muted-foreground hover:text-primary">Sobre Nós</a>
+            <a href="#plans" className="text-muted-foreground hover:text-primary">Planos</a>
           </nav>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" className="text-sky-600 hover:text-sky-700">
@@ -123,36 +123,26 @@ const LandingPage = () => {
         </div>
       </header>
 
-      {/* HERO com fundo azul (apenas aqui) */}
-      <section id="hero" className="relative z-10 overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-[#0f172a] via-[#0b2b5a] to-[#1e1b4b]" />
-        <div className="absolute inset-0 -z-10 pointer-events-none">
-          <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-sky-500/20 blur-3xl" />
-          <div className="absolute -bottom-24 -right-24 h-[28rem] w-[28rem] rounded-full bg-indigo-500/20 blur-3xl" />
-        </div>
-        <FloatingShapes />
-
+      {/* HERO sólido com a cor primária da marca */}
+      <section id="hero" className="relative z-10 overflow-hidden bg-primary text-primary-foreground">
         <div className="container mx-auto responsive-section pt-12 md:pt-16 pb-10">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 dark:bg-zinc-800/60 border-white/40 dark:border-zinc-700 backdrop-blur">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-primary-foreground/10 border-primary-foreground/20">
+              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
               <span>Nova Identidade • Lumina Sistema de Gestão</span>
             </div>
 
-            <h1 className="mt-5 text-[2rem] md:text-6xl font-extrabold leading-tight tracking-tight text-white">
-              <span className="bg-gradient-to-r from-sky-400 to-emerald-400 bg-clip-text text-transparent">
-                Lumina
-              </span>{" "}
-              Sistema de Gestão
+            <h1 className="mt-5 text-[2rem] md:text-6xl font-extrabold leading-tight tracking-tight">
+              Lumina Sistema de Gestão
             </h1>
 
-            <p className="mt-5 text-zinc-100/80 text-base md:text-lg">
-              Tecnologia para <span className="text-sky-300 font-semibold">iluminar</span> e simplificar a gestão da sua igreja —
+            <p className="mt-5 text-primary-foreground/90 text-base md:text-lg">
+              Tecnologia para iluminar e simplificar a gestão da sua igreja —
               com segurança por igreja (RLS), WhatsApp integrado e ferramentas completas para líderes e membros.
             </p>
 
             <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild size="lg" className="rounded-full px-6 bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 shadow-md">
+              <Button asChild size="lg" className="rounded-full px-6 shadow-md">
                 <Link to="/login">
                   Entrar na Plataforma
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -161,7 +151,7 @@ const LandingPage = () => {
               <Button
                 size="lg"
                 variant="outline"
-                className="rounded-full px-6 border-emerald-500/40 text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10"
+                className="rounded-full px-6 border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10"
                 onClick={handleContatoWhatsApp}
               >
                 <MessageSquare className="mr-2 h-4 w-4" />
@@ -181,34 +171,34 @@ const LandingPage = () => {
       {/* TRUST / SEGURANÇA — fundo branco */}
       <section className="container mx-auto responsive-section py-10 md:py-12">
         <div className="grid sm:grid-cols-3 gap-4">
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70">
+          <Card className="border">
             <CardContent className="p-5 flex items-start gap-3">
-              <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              <ShieldCheck className="h-5 w-5 text-primary" />
               <div>
                 <h3 className="font-semibold">Segurança por Igreja (RLS)</h3>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                <p className="text-xs text-muted-foreground">
                   Cada igreja acessa apenas seus dados com políticas robustas no banco.
                 </p>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70">
+          <Card className="border">
             <CardContent className="p-5 flex items-start gap-3">
-              <LockKeyhole className="h-5 w-5 text-sky-600" />
+              <LockKeyhole className="h-5 w-5 text-primary" />
               <div>
                 <h3 className="font-semibold">Auth Supabase</h3>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                <p className="text-xs text-muted-foreground">
                   Autenticação moderna, monitoramento de sessão e redirecionamentos automáticos.
                 </p>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70">
+          <Card className="border">
             <CardContent className="p-5 flex items-start gap-3">
-              <ServerCog className="h-5 w-5 text-indigo-600" />
+              <ServerCog className="h-5 w-5 text-primary" />
               <div>
                 <h3 className="font-semibold">Infraestrutura Confiável</h3>
-                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                <p className="text-xs text-muted-foreground">
                   Caching, Edge Functions e integrações estáveis para alto desempenho.
                 </p>
               </div>
@@ -220,20 +210,20 @@ const LandingPage = () => {
       {/* FEATURES — fundo branco */}
       <section id="features" className="container mx-auto responsive-section py-10 md:py-14">
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight">
             Tudo o que sua igreja precisa
           </h2>
         </div>
 
         <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          <Feature icon={Users} title="Gestão de Ministérios" desc="Cadastre ministérios, líderes e voluntários; gerencie funções e demandas." accent="from-sky-500 to-indigo-500" />
-          <Feature icon={CalendarCheck2} title="Escalas de Serviço" desc="Crie escalas por evento e ministério; confirme presença e visualize atribuições." accent="from-emerald-500 to-teal-500" />
-          <Feature icon={Baby} title="Kids Check-in/Out" desc="Check-in com código de segurança e histórico de presença por criança." accent="from-rose-500 to-pink-500" />
-          <Feature icon={BookOpen} title="Devocionais e Cursos" desc="Publique devocionais e organize trilhas/cursos com módulos e aulas." accent="from-violet-500 to-purple-500" />
-          <Feature icon={HandCoins} title="Doações e Recibos" desc="Registre ofertas e emita recibos; acompanhe transações e relatórios." accent="from-amber-500 to-orange-500" />
-          <Feature icon={MessageSquare} title="WhatsApp Integrado" desc="Templates por igreja e fila automática para escala, kids e recibos." accent="from-emerald-500 to-green-500" />
-          <Feature icon={LayoutDashboard} title="Dashboard por Função" desc="Painéis para admin/pastor e membros com métricas e atalhos." accent="from-blue-500 to-indigo-500" />
-          <Feature icon={ShieldCheck} title="Segurança por Igreja" desc="Supabase Auth + RLS: cada igreja vê apenas seus dados." accent="from-fuchsia-500 to-pink-500" />
+          <Feature icon={Users} title="Gestão de Ministérios" desc="Cadastre ministérios, líderes e voluntários; gerencie funções e demandas." color="bg-primary" />
+          <Feature icon={CalendarCheck2} title="Escalas de Serviço" desc="Crie escalas por evento e ministério; confirme presença e visualize atribuições." color="bg-emerald-600" />
+          <Feature icon={Baby} title="Kids Check-in/Out" desc="Check-in com código de segurança e histórico de presença por criança." color="bg-rose-600" />
+          <Feature icon={BookOpen} title="Devocionais e Cursos" desc="Publique devocionais e organize trilhas/cursos com módulos e aulas." color="bg-violet-600" />
+          <Feature icon={HandCoins} title="Doações e Recibos" desc="Registre ofertas e emita recibos; acompanhe transações e relatórios." color="bg-amber-600" />
+          <Feature icon={MessageSquare} title="WhatsApp Integrado" desc="Templates por igreja e fila automática para escala, kids e recibos." color="bg-green-600" />
+          <Feature icon={LayoutDashboard} title="Dashboard por Função" desc="Painéis para admin/pastor e membros com métricas e atalhos." color="bg-indigo-600" />
+          <Feature icon={ShieldCheck} title="Segurança por Igreja" desc="Supabase Auth + RLS: cada igreja vê apenas seus dados." color="bg-fuchsia-600" />
         </div>
       </section>
 
@@ -242,34 +232,34 @@ const LandingPage = () => {
       {/* SOBRE / MISSÃO / VISÃO — fundo branco */}
       <section id="about" className="container mx-auto responsive-section py-10 md:py-14">
         <div className="grid lg:grid-cols-3 gap-6">
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70">
+          <Card className="border">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Sobre Nós</h2>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 A plataforma criada para iluminar e simplificar a administração da sua igreja.
                 Ferramentas completas e intuitivas para que líderes e equipes foquem no que importa:
                 o cuidado com as pessoas e a expansão do ministério.
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70">
+          <Card className="border">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Nossa Missão</h2>
               <div className="flex items-start gap-3">
-                <Lightbulb className="h-5 w-5 text-amber-600" />
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                <Lightbulb className="h-5 w-5 text-primary" />
+                <p className="text-sm text-muted-foreground">
                   Empoderar igrejas com tecnologia acessível, simplificando a gestão para dedicar mais tempo
                   à missão espiritual e ao cuidado dos membros.
                 </p>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70">
+          <Card className="border">
             <CardContent className="p-6">
               <h2 className="text-xl md:text-2xl font-semibold tracking-tight mb-2">Nossa Visão</h2>
               <div className="flex items-start gap-3">
-                <Target className="h-5 w-5 text-emerald-600" />
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                <Target className="h-5 w-5 text-primary" />
+                <p className="text-sm text-muted-foreground">
                   Ser a principal plataforma de gestão para igrejas no Brasil, reconhecida pela excelência,
                   usabilidade e impacto positivo nas comunidades de fé.
                 </p>
@@ -283,72 +273,72 @@ const LandingPage = () => {
       <section className="container mx-auto responsive-section py-10 md:py-14">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight">Nossos Valores</h2>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-muted-foreground">
             O que nos guia no dia a dia para servir melhor as igrejas.
           </p>
         </div>
         <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow">
+          <Card className="border shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-rose-500/15 flex items-center justify-center">
-                  <Heart className="h-5 w-5 text-rose-500" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Heart className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Fé e Propósito</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Trabalhamos para fortalecer o trabalho das igrejas.</p>
+                  <p className="text-sm text-muted-foreground">Trabalhamos para fortalecer o trabalho das igrejas.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow">
+          <Card className="border shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-amber-500/15 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-amber-500" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Inovação a Serviço</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Tecnologia aplicada às necessidades do contexto eclesiástico.</p>
+                  <p className="text-sm text-muted-foreground">Tecnologia aplicada às necessidades do contexto eclesiástico.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow">
+          <Card className="border shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                  <CheckCircle className="h-5 w-5 text-emerald-600" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <CheckCircle className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Parceria e Suporte</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Suporte dedicado e relacionamento de confiança.</p>
+                  <p className="text-sm text-muted-foreground">Suporte dedicado e relacionamento de confiança.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow">
+          <Card className="border shadow">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-violet-500/15 flex items-center justify-center">
-                  <ShieldCheck className="h-5 w-5 text-violet-600" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Integridade</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Transparência e honestidade em todas as interações.</p>
+                  <p className="text-sm text-muted-foreground">Transparência e honestidade em todas as interações.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-700/70 shadow sm:col-span-2 lg:col-span-1">
+          <Card className="border shadow sm:col-span-2 lg:col-span-1">
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-fuchsia-500/15 flex items-center justify-center">
-                  <Rocket className="h-5 w-5 text-fuchsia-600" />
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Rocket className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Simplicidade</h3>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Ferramentas poderosas e fáceis de usar.</p>
+                  <p className="text-sm text-muted-foreground">Ferramentas poderosas e fáceis de usar.</p>
                 </div>
               </div>
             </CardContent>
@@ -359,12 +349,12 @@ const LandingPage = () => {
       {/* PLANOS — fundo branco */}
       <section id="plans" className="container mx-auto responsive-section py-10 md:py-16">
         <div className="max-w-2xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-white/70 dark:bg-zinc-800/60 border-white/40 dark:border-zinc-700">
-            <span className="h-2 w-2 rounded-full bg-sky-400" />
+          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-background border-border">
+            <span className="h-2 w-2 rounded-full bg-primary" />
             <span>Planos Flexíveis</span>
           </div>
           <h2 className="mt-3 text-2xl md:text-4xl font-extrabold tracking-tight">Planos de Assinatura</h2>
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">Escolha um plano para começar o cadastro da sua igreja.</p>
+          <p className="mt-2 text-muted-foreground">Escolha um plano para começar o cadastro da sua igreja.</p>
         </div>
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -383,15 +373,15 @@ const LandingPage = () => {
               return (
                 <Card
                   key={plan.id}
-                  className={`relative bg-white dark:bg-zinc-900 border shadow-sm transition-all ${
+                  className={`relative border shadow-sm transition-all ${
                     isPopular
-                      ? "border-sky-400/60 ring-2 ring-sky-300/40"
-                      : "border-zinc-200/70 dark:border-zinc-700/70"
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-border"
                   }`}
                 >
                   {isPopular && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="rounded-full bg-sky-600 text-white text-[10px] px-2 py-1 shadow">
+                      <span className="rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-1 shadow">
                         Mais Popular
                       </span>
                     </div>
@@ -399,20 +389,20 @@ const LandingPage = () => {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 opacity-80" />
-                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{plan.nome}</h3>
+                        <div className="h-8 w-8 rounded-xl bg-primary opacity-90" />
+                        <h3 className="font-semibold">{plan.nome}</h3>
                       </div>
-                      <Badge className="bg-primary/10 text-primary border border-primary/20">
+                      <Badge className="bg-primary text-primary-foreground">
                         {formatBRL(price)}/mês
                       </Badge>
                     </div>
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">{plan.descricao}</p>
-                    <ul className="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 mb-4">
+                    <p className="text-sm text-muted-foreground mb-3">{plan.descricao}</p>
+                    <ul className="text-sm text-muted-foreground space-y-1 mb-4">
                       <li>Até {plan.limite_membros} membros</li>
                       <li>{plan.limite_quizes_por_etapa} quizzes por etapa</li>
                       <li>{plan.limite_armazenamento_mb} MB de armazenamento</li>
                     </ul>
-                    <Button asChild className={`w-full ${isPopular ? "bg-sky-600 hover:bg-sky-700" : "bg-indigo-600 hover:bg-indigo-700"} shadow-md`}>
+                    <Button asChild className="w-full shadow-md">
                       <Link to={`/cadastrar-igreja?plano=${plan.id}`}>Escolher este plano</Link>
                     </Button>
                   </CardContent>
@@ -423,56 +413,56 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* FOOTER — mantém estilo próprio escuro */}
-      <footer className="border-t border-white/10 bg-[#0b1220] text-zinc-300">
+      {/* FOOTER — sólido na cor da marca */}
+      <footer className="border-t bg-primary text-primary-foreground">
         <div className="container mx-auto responsive-section py-10 grid gap-8 md:grid-cols-3">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-sky-500/15 flex items-center justify-center">
+              <div className="h-9 w-9 rounded-lg bg-primary-foreground/10 flex items-center justify-center">
                 <img src="/lumina-logo.png" alt="Lumina" className="h-6 w-auto" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Lumina Sistema de Gestão</h3>
+              <h3 className="text-lg font-semibold">Lumina Sistema de Gestão</h3>
             </div>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-primary-foreground/80">
               Tecnologia para iluminar e simplificar a gestão da sua igreja.
             </p>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-primary-foreground/70">
               © {new Date().getFullYear()} Lumina. Todos os direitos reservados.
             </p>
           </div>
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-white">Contato</h4>
+            <h4 className="text-sm font-medium">Contato</h4>
             <div className="flex items-center gap-3">
-              <PhoneCall className="h-4 w-4 text-emerald-400" />
-              <a href="https://wa.me/5563984861923" target="_blank" rel="noreferrer" className="text-sm hover:text-white">+55 63 98486-1923</a>
+              <PhoneCall className="h-4 w-4 text-primary-foreground/80" />
+              <a href="https://wa.me/5563984861923" target="_blank" rel="noreferrer" className="text-sm hover:text-primary-foreground">+55 63 98486-1923</a>
             </div>
             <div className="flex items-center gap-3">
-              <Mail className="h-4 w-4 text-sky-400" />
-              <a href="mailto:Luminasistema@gmail.com.br" className="text-sm hover:text-white">Luminasistema@gmail.com.br</a>
+              <Mail className="h-4 w-4 text-primary-foreground/80" />
+              <a href="mailto:Luminasistema@gmail.com.br" className="text-sm hover:text-primary-foreground">Luminasistema@gmail.com.br</a>
             </div>
             <div className="flex items-center gap-3">
-              <Globe className="h-4 w-4 text-violet-400" />
-              <a href="https://www.luminasistema.com.br" target="_blank" rel="noreferrer" className="text-sm hover:text-white">www.luminasistema.com.br</a>
+              <Globe className="h-4 w-4 text-primary-foreground/80" />
+              <a href="https://www.luminasistema.com.br" target="_blank" rel="noreferrer" className="text-sm hover:text-primary-foreground">www.luminasistema.com.br</a>
             </div>
           </div>
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-white">Dados Empresariais</h4>
+            <h4 className="text-sm font-medium">Dados Empresariais</h4>
             <div className="flex items-center gap-3">
-              <Building2 className="h-4 w-4 text-zinc-400" />
+              <Building2 className="h-4 w-4 text-primary-foreground/80" />
               <div className="text-sm">
-                <div className="text-zinc-400">Nome Empresarial</div>
-                <div className="font-medium text-white">49.023.921 INOVA SIMPLES (I.S.)</div>
+                <div className="text-primary-foreground/80">Nome Empresarial</div>
+                <div className="font-medium">49.023.921 INOVA SIMPLES (I.S.)</div>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <FileText className="h-4 w-4 text-zinc-400" />
+              <FileText className="h-4 w-4 text-primary-foreground/80" />
               <div className="text-sm">
-                <div className="text-zinc-400">CNPJ</div>
-                <div className="font-medium text-white">49.023.921/0001-69</div>
+                <div className="text-primary-foreground/80">CNPJ</div>
+                <div className="font-medium">49.023.921/0001-69</div>
               </div>
             </div>
             <div className="pt-1">
-              <Button onClick={handleContatoWhatsApp} className="bg-emerald-600 hover:bg-emerald-700 rounded-full">
+              <Button onClick={handleContatoWhatsApp} className="rounded-full">
                 Falar no WhatsApp
                 <PhoneCall className="ml-2 h-4 w-4" />
               </Button>
