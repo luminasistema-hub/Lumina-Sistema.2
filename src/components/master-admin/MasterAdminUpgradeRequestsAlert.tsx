@@ -5,7 +5,7 @@ import { Bell, Building2, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 type Props = {
   onViewRequests?: () => void;
