@@ -46,7 +46,7 @@ serve(async (req) => {
       currency: 'BRL',
       description: `Assinatura Connect Vida - ${church.nome}`,
       customer_email: payerEmail,
-      success_url: `${callbackBase}/payment-success`,
+      success_url: `${callbackBase}/payment-success?church_id=${church.id}`,
       cancel_url: `${callbackBase}/payment-cancel`,
       external_reference: church.id,
       recurrence: { interval: 1, interval_type: 'month' }

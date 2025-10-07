@@ -1,104 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Key, Save, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { supabase } from '../../integrations/supabase/client';
+import { Copy, Link as LinkIcon } from 'lucide-react';
+import copy from 'copy-to-clipboard';
+
+const WEBHOOK_URL = 'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/abacatepay-webhook';
 
 const PaymentIntegrationSettings = () => {
-  const [accessToken, setAccessToken] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    const fetchToken = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('configuracoes_sistema')
-          .select('valor')
-          .eq('chave', 'MERCADOPAGO_ACCESS_TOKEN');
-
-        if (error && error.code !== '42P01') throw error; // Ignore table not found error initially
-        if (data && data.length > 0) {
-          setAccessToken(data[0].valor || '');
-        } else {
-          setAccessToken(''); // Handle case where token is not yet set
-        }
-      } catch (error: any) {
-        console.error('Error fetching payment token:', error);
-        if (error.code !== 'PGRST116') { // Don't show error if it's just '0 rows'
-          toast.error('Erro ao carregar a chave da API de pagamento.');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchToken();
-  }, []);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('configuracoes_sistema')
-        .update({ valor: accessToken, updated_at: new Date().toISOString() })
-        .eq('chave', 'MERCADOPAGO_ACCESS_TOKEN');
-
-      if (error) throw error;
-      toast.success('Chave de API do Mercado Pago salva com sucesso!');
-    } catch (error: any) {
-      console.error('Error saving payment token:', error);
-      toast.error('Erro ao salvar a chave da API: ' + error.message);
-    } finally {
-      setIsSaving(false);
-    }
+  const handleCopy = () => {
+    copy(WEBHOOK_URL);
   };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Key className="w-5 h-5 text-green-500" />
-          Integração de Pagamento (Mercado Pago)
+          <LinkIcon className="w-5 h-5 text-green-500" />
+          Integração de Pagamento (Abacate PAY)
         </CardTitle>
         <CardDescription>
-          Configure a chave de API para processar as assinaturas.
+          Configure o webhook da Abacate PAY para receber confirmações de pagamento e atualizar a assinatura automaticamente.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
+        <div className="space-y-2">
+          <Label>URL do Webhook</Label>
           <div className="flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Carregando configuração...</span>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="mp-token">Mercado Pago - Access Token</Label>
-              <Input
-                id="mp-token"
-                type="password"
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                placeholder="Cole sua chave de produção aqui"
-              />
-              <p className="text-xs text-gray-500">
-                Sua chave é armazenada de forma segura e nunca será exposta no lado do cliente.
-              </p>
-            </div>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              Salvar Chave
+            <Input value={WEBHOOK_URL} readOnly className="bg-gray-100" />
+            <Button variant="outline" size="icon" onClick={handleCopy}>
+              <Copy className="w-4 h-4" />
             </Button>
-          </>
-        )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Cole esta URL no painel da Abacate PAY como destino de webhooks (eventos de pagamento/assinatura).
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Segredos da Abacate PAY</Label>
+          <p className="text-sm text-muted-foreground">
+            Defina os segredos nas Edge Functions:
+          </p>
+          <ul className="text-sm list-disc pl-6 space-y-1 text-muted-foreground">
+            <li>ABACATEPAY_API_URL</li>
+            <li>ABACATEPAY_API_KEY</li>
+            <li>ABACATEPAY_WEBHOOK_SECRET (opcional para validar assinatura)</li>
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            Vá em Supabase → Edge Functions → Manage Secrets e adicione as chaves.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

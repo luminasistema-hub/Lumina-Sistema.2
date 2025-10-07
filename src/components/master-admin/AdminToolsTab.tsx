@@ -20,6 +20,7 @@ interface AdminToolsTabProps {
 
 const AdminToolsTab: React.FC<AdminToolsTabProps> = ({ churches, onUpdateChurch }) => {
   const { user } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedChurchId, setSelectedChurchId] = useState<string>('');
   const [churchAdmins, setChurchAdmins] = useState<Array<{ id: string; email: string; name: string }>>([]);
   const [selectedAdminEmail, setSelectedAdminEmail] = useState<string>('');

@@ -36,18 +36,18 @@ const GeneratePaymentLinkDialog: React.FC<GeneratePaymentLinkDialogProps> = ({ i
     }
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-mercadopago-subscription', {
+      const { data, error } = await supabase.functions.invoke('create-abacatepay-checkout', {
         body: { churchId: church.id, payerEmail },
       });
 
       if (error) throw error;
 
-      setPaymentLink(data.paymentLink);
-      onLinkGenerated(church.id, data.paymentLink);
-      toast.success('Link de assinatura gerado com sucesso!');
+      setPaymentLink(data.checkoutUrl);
+      onLinkGenerated(church.id, data.checkoutUrl);
+      toast.success('Link de checkout gerado com sucesso!');
     } catch (error: any) {
       console.error('Error generating payment link:', error);
-      toast.error('Falha ao gerar o link de pagamento.', { description: error.message });
+      toast.error('Falha ao gerar o link de checkout.', { description: error.message });
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +64,7 @@ const GeneratePaymentLinkDialog: React.FC<GeneratePaymentLinkDialogProps> = ({ i
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Gerar Link de Assinatura (Mercado Pago)</DialogTitle>
+          <DialogTitle>Gerar Link de Assinatura (Abacate PAY)</DialogTitle>
           <DialogDescription>
             Gere um link de pagamento recorrente para a igreja "{church?.name}".
           </DialogDescription>
