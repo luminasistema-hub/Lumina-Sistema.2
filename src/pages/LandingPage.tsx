@@ -142,7 +142,11 @@ const LandingPage = () => {
             </p>
 
             <div className="mt-7 flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild size="lg" className="rounded-full px-6 shadow-md">
+              <Button
+                asChild
+                size="lg"
+                className="rounded-full px-6 shadow-md bg-white text-primary hover:bg-white/90 hover:text-primary"
+              >
                 <Link to="/login">
                   Entrar na Plataforma
                   <ArrowRight className="ml-2 h-4 w-4" />
