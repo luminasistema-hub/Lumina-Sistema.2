@@ -80,6 +80,10 @@ export const ReceiptDialog = ({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Recibo de Doação</DialogTitle>
+          <DialogDescription>Detalhes do recibo e ações de impressão</DialogDescription>
+        </DialogHeader>
         <div id="receipt-content" className="p-8">
           <div className="header">
             <h1 className="text-2xl font-bold">{church.name}</h1>
