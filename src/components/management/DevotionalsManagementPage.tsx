@@ -48,6 +48,12 @@ const DevotionalsManagementPage = () => {
 
   const canManage = user?.role === 'admin' || user?.role === 'pastor';
 
+  // Defina o queryKey antes de qualquer uso (incluindo em useEffect)
+  const queryKey = useMemo(
+    () => ['devos-mgmt', currentChurchId, { statusFilter, categoryFilter, searchTerm }],
+    [currentChurchId, statusFilter, categoryFilter, searchTerm]
+  );
+
   const fetchDevotionals = async (
     churchId: string,
     statusFilter: string,
@@ -88,7 +94,7 @@ const DevotionalsManagementPage = () => {
           { event: '*', schema: 'public', table: 'devocionais', filter: `id_igreja=eq.${currentChurchId}` },
           () => {
             // Apenas invalidar; React Query decide o refetch
-            useQueryClient().invalidateQueries({ queryKey });
+            qc.invalidateQueries({ queryKey });
           }
         )
         .subscribe();
@@ -117,7 +123,7 @@ const DevotionalsManagementPage = () => {
     featured: false,
   });
 
-  const queryKey = useMemo(() => ['devos-mgmt', currentChurchId, { statusFilter, categoryFilter, searchTerm }], [currentChurchId, statusFilter, categoryFilter, searchTerm]);
+  // queryKey já foi definido acima
 
   const { data: devotionalsData, isLoading, error } = useQuery({
     queryKey,
