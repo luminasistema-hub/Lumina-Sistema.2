@@ -5,7 +5,6 @@ import { Badge } from '../ui/badge'
 import { 
   LogOut,
   Bell,
-  Search,
   User,
   UserCheck,
   Crown,
@@ -21,7 +20,7 @@ import {
   Loader2,
   CheckCheck,
 } from 'lucide-react'
-import { Input } from '../ui/input'
+// removed search input
 import { useState } from 'react' 
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -128,63 +127,26 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
             </Button>
           )}
           
-          {user?.role !== 'super_admin' && (
-            <div className="relative flex-1 hidden sm:block">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Pesquisar módulos, membros..."
-                className="pl-10 bg-gray-50 border-0 focus:bg-white"
-              />
-            </div>
-          )}
+          {/* barra de pesquisa removida */}
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
-          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className="relative flex">
-                <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs flex items-center justify-center text-white">
-                    {unreadCount}
-                  </span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 p-0">
-              <div className="p-3 border-b flex justify-between items-center">
-                <h4 className="font-medium text-md">Notificações</h4>
-                {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" onClick={handleMarkAllAsRead} className="text-xs h-auto py-1 px-2">
-                    <CheckCheck className="w-3 h-3 mr-1" />
-                    Marcar como lidas
-                  </Button>
-                )}
-              </div>
-              <div className="max-h-96 overflow-y-auto">
-                {isLoading ? (
-                  <div className="flex items-center justify-center p-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
-                  </div>
-                ) : unreadNotifications.length > 0 ? (
-                  unreadNotifications.map(n => <NotificationItem key={n.id} notification={n} onClick={() => handleNotificationClick(n)} />)
-                ) : (
-                  <p className="text-center text-sm text-gray-500 p-8">Nenhuma notificação nova.</p>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
+          <Button variant="ghost" size="sm" disabled className="relative flex opacity-50 cursor-not-allowed" aria-disabled="true" title="Função desabilitada">
+            <Bell className="w-5 h-5" />
+          </Button>
 
           <Button 
             variant="ghost" 
             size="sm"
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className="hidden md:flex"
+            disabled
+            className="hidden md:flex opacity-50 cursor-not-allowed"
+            aria-disabled="true"
+            title="Função desabilitada"
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </Button>
 
-          <Button variant="ghost" size="sm" className="hidden md:flex">
+          <Button variant="ghost" size="sm" disabled className="hidden md:flex opacity-50 cursor-not-allowed" aria-disabled="true" title="Função desabilitada">
             <Settings className="w-5 h-5" />
           </Button>
 
