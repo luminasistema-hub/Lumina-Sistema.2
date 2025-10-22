@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -58,6 +58,8 @@ const ChildChurchesPage = () => {
   const [creating, setCreating] = useState(false);
   const [openDashboard, setOpenDashboard] = useState(false);
   const [selectedChild, setSelectedChild] = useState<ChildItem | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const isLoadingRef = useRef(false);
 
   const form = useForm<ChildFormValues>({
     resolver: zodResolver(childFormSchema),
@@ -79,72 +81,97 @@ const ChildChurchesPage = () => {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    
-    await loadChurchStore(); // Garante que o store está atualizado
-
-    const mother = getChurchById(currentChurchId);
-    if (!mother) {
-      toast.error('Erro ao carregar igreja atual.');
-      setLoading(false);
-      return;
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
+    const firstLoad = children.length === 0;
+    if (firstLoad) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
     }
+    try {
+      await loadChurchStore(); // Garante que o store está atualizado
 
-    const { data: motherData, error: motherErr } = await supabase
-      .from('igrejas')
-      .select('parent_church_id')
-      .eq('id', currentChurchId)
-      .maybeSingle();
+      const mother = getChurchById(currentChurchId);
+      if (!mother) {
+        toast.error('Erro ao carregar igreja atual.');
+        return;
+      }
 
-    if (motherErr) {
-      toast.error('Erro ao verificar hierarquia da igreja.');
-      setLoading(false);
-      return;
+      const { data: motherData, error: motherErr } = await supabase
+        .from('igrejas')
+        .select('parent_church_id')
+        .eq('id', currentChurchId)
+        .maybeSingle();
+
+      if (motherErr) {
+        toast.error('Erro ao verificar hierarquia da igreja.');
+        return;
+      }
+
+      const isChild = !!motherData?.parent_church_id;
+      setParentInfo({ isChild, motherId: motherData?.parent_church_id || null });
+
+      // Lista igrejas filhas
+      const { data: childs, error: childErr } = await supabase
+        .from('igrejas')
+        .select('id, nome, created_at, compartilha_escolas_da_mae, compartilha_eventos_da_mae, compartilha_jornada_da_mae, compartilha_devocionais_da_mae')
+        .eq('parent_church_id', currentChurchId)
+        .order('nome');
+
+      if (childErr) {
+        toast.error('Erro ao carregar igrejas filhas.');
+        setChildren([]);
+        return;
+      }
+
+      // Coletar métricas de forma paralela
+      const items: ChildItem[] = [];
+      if (childs && childs.length > 0) {
+        const metricsPromises = childs.map(async (ch) => {
+          const [membersCount, leadersCount, ministriesCount] = await Promise.all([
+            supabase.from('membros').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id),
+            supabase.from('membros').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id).in('funcao', ['admin', 'pastor', 'lider']),
+            supabase.from('ministerios').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id)
+          ]);
+
+          return {
+            id: ch.id,
+            nome: ch.nome,
+            created_at: ch.created_at,
+            metrics: {
+              members: membersCount.count || 0,
+              leaders: leadersCount.count || 0,
+              ministries: ministriesCount.count || 0
+            },
+            compartilha_escolas_da_mae: ch.compartilha_escolas_da_mae,
+            compartilha_eventos_da_mae: ch.compartilha_eventos_da_mae,
+            compartilha_jornada_da_mae: ch.compartilha_jornada_da_mae,
+            compartilha_devocionais_da_mae: ch.compartilha_devocionais_da_mae,
+          } as ChildItem;
+        });
+        const results = await Promise.all(metricsPromises);
+        items.push(...results);
+      }
+
+      setChildren(items);
+    } catch (error) {
+      console.error('Erro ao carregar dados das igrejas filhas:', error);
+      toast.error('Erro ao carregar dados das igrejas filhas.');
+    } finally {
+      if (firstLoad) {
+        setLoading(false);
+      }
+      setIsRefreshing(false);
+      isLoadingRef.current = false;
     }
-
-    const isChild = !!motherData?.parent_church_id;
-    setParentInfo({ isChild, motherId: motherData?.parent_church_id || null });
-
-    // Lista igrejas filhas
-    const { data: childs, error: childErr } = await supabase
-      .from('igrejas')
-      .select('id, nome, created_at, compartilha_escolas_da_mae, compartilha_eventos_da_mae, compartilha_jornada_da_mae, compartilha_devocionais_da_mae')
-      .eq('parent_church_id', currentChurchId)
-      .order('nome');
-
-    if (childErr) {
-      toast.error('Erro ao carregar igrejas filhas.');
-      setChildren([]);
-      setLoading(false);
-      return;
-    }
-
-    // Coletar métricas para cada filha
-    const items: ChildItem[] = [];
-    for (const ch of (childs || [])) {
-      const { count: members } = await supabase.from('membros').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id);
-      const { count: leaders } = await supabase.from('membros').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id).in('funcao', ['admin', 'pastor', 'lider']);
-      const { count: ministries } = await supabase.from('ministerios').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id);
-
-      items.push({
-        id: ch.id,
-        nome: ch.nome,
-        created_at: ch.created_at,
-        metrics: { members: members || 0, leaders: leaders || 0, ministries: ministries || 0 },
-        compartilha_escolas_da_mae: ch.compartilha_escolas_da_mae,
-        compartilha_eventos_da_mae: ch.compartilha_eventos_da_mae,
-        compartilha_jornada_da_mae: ch.compartilha_jornada_da_mae,
-        compartilha_devocionais_da_mae: ch.compartilha_devocionais_da_mae,
-      });
-    }
-
-    setChildren(items);
-    setLoading(false);
-  }, [currentChurchId, getChurchById, loadChurchStore]);
+  }, [currentChurchId, getChurchById, loadChurchStore, children.length]);
 
   useEffect(() => {
+    // Executa quando a igreja atual muda; função estável impede loop
     loadPageData();
-  }, [loadPageData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentChurchId]);
 
   const handleCreate = async (values: ChildFormValues) => {
     if (!currentChurchId) return toast.error('Nenhuma igreja selecionada.');
@@ -257,8 +284,9 @@ const ChildChurchesPage = () => {
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2"><Church className="w-5 h-5 text-primary" />Igrejas Filhas ({children.length})</CardTitle>
+          {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
         </CardHeader>
         <CardContent className="space-y-4">
           {children.length === 0 ? (
