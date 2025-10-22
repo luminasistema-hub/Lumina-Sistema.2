@@ -8,11 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Users, UserPlus, UserX, CheckCircle, XCircle, Plus, MapPin } from 'lucide-react';
+import { Calendar, Users, UserPlus, UserX, CheckCircle, XCircle, Plus, MapPin, Loader2 } from 'lucide-react';
 import MinistryRolesManager from '@/components/management/MinistryRolesManager';
+import { useMinistries, MemberOption } from '@/hooks/useMinistries';
+import { useMinistryVolunteers } from '@/hooks/useMinistryVolunteers';
+import { useMyMinistry } from '@/hooks/useMyMinistry';
+import { useQueryClient } from '@tanstack/react-query';
 
-type Ministry = { id: string; nome: string; descricao: string; lider_id: string | null; isLeader: boolean; };
-type MemberOption = { id: string; nome_completo: string; funcao?: string | null; };
 type ScheduleRow = {
   id: string;
   data_servico: string;
@@ -29,19 +31,24 @@ type AssignmentRow = {
 
 const MyMinistryPage = () => {
   const { user, currentChurchId } = useAuthStore();
-  const [myMinistries, setMyMinistries] = useState<Ministry[]>([]);
+  const queryClient = useQueryClient();
   const [selectedMinistryId, setSelectedMinistryId] = useState<string | null>(null);
-  const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
-  const [volunteers, setVolunteers] = useState<MemberOption[]>([]);
-  const [ministryRoles, setMinistryRoles] = useState<{ id: string; nome: string }[]>([]);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [eventOptions, setEventOptions] = useState<{ id: string; nome: string; data_hora?: string; local?: string | null }[]>([]);
   const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
   const [newScheduleEventId, setNewScheduleEventId] = useState<string | null>(null);
   const [newScheduleDate, setNewScheduleDate] = useState<string>('');
   const [newScheduleNotes, setNewScheduleNotes] = useState<string>('');
 
+  const { myMinistriesQuery, myAssignmentsQuery, confirmPresence } = useMyMinistry(selectedMinistryId);
+  const { data: myMinistries = [], isLoading: isLoadingMyMinistries } = myMinistriesQuery;
+  const { data: assignments = [], isLoading: isLoadingAssignments } = myAssignmentsQuery;
+
+  const { data: ministriesPageData, isLoading: isLoadingPageData } = useMinistries();
+  const { members: memberOptions = [] } = ministriesPageData || {};
+
+  const { data: volunteers = [], isLoading: isLoadingVolunteers } = useMinistryVolunteers(selectedMinistryId);
+  
   const selectedMinistry = useMemo(
     () => myMinistries.find(m => m.id === selectedMinistryId) || null,
     [myMinistries, selectedMinistryId]
@@ -49,82 +56,15 @@ const MyMinistryPage = () => {
 
   const isLeader = !!selectedMinistry?.isLeader;
 
-  const loadMyMinistries = useCallback(async () => {
-    if (!user?.id || !currentChurchId) { setMyMinistries([]); return; }
-
-    // 1) IDs de ministérios onde o usuário é voluntário
-    const { data: volRows } = await supabase
-      .from('ministerio_voluntarios')
-      .select('ministerio_id')
-      .eq('membro_id', user.id)
-      .eq('id_igreja', currentChurchId);
-
-    const ministryIds = Array.from(
-      new Set((volRows || []).map((r: any) => r?.ministerio_id).filter(Boolean))
-    );
-
-    // 2) Ministérios pelos IDs coletados
-    const { data: ministriesByVolunteer } = ministryIds.length > 0
-      ? await supabase
-          .from('ministerios')
-          .select('id, nome, descricao, lider_id')
-          .in('id', ministryIds)
-      : { data: [] as any[] };
-
-    const volunteerList: Ministry[] = (ministriesByVolunteer || []).map((m: any) => ({
-      id: m.id,
-      nome: m.nome,
-      descricao: m.descricao,
-      lider_id: m.lider_id,
-      isLeader: m.lider_id === user.id
-    }));
-
-    // 3) Ministérios onde o usuário é líder
-    const { data: leaderRows } = await supabase
-      .from('ministerios')
-      .select('id, nome, descricao, lider_id')
-      .eq('id_igreja', currentChurchId)
-      .eq('lider_id', user.id);
-
-    const leaderList: Ministry[] = (leaderRows || []).map((m: any) => ({
-      id: m.id,
-      nome: m.nome,
-      descricao: m.descricao,
-      lider_id: m.lider_id,
-      isLeader: true
-    }));
-
-    // 4) Mesclar e remover duplicados
-    const merged = [...volunteerList, ...leaderList];
-    const uniqueMap = new Map<string, Ministry>();
-    for (const item of merged) {
-      if (!item || !item.id) continue;
-      if (!uniqueMap.has(item.id)) {
-        uniqueMap.set(item.id, item);
-      } else {
-        const existing = uniqueMap.get(item.id)!;
-        uniqueMap.set(item.id, { ...existing, ...item, isLeader: existing.isLeader || item.isLeader });
-      }
+  useEffect(() => {
+    if (!selectedMinistryId && myMinistries.length > 0) {
+      const leaderFirst = myMinistries.find(m => m.isLeader) || myMinistries[0];
+      setSelectedMinistryId(leaderFirst.id);
     }
-    const unique = Array.from(uniqueMap.values());
-    setMyMinistries(unique);
+  }, [myMinistries, selectedMinistryId]);
 
-    // Seleção inicial
-    if (unique.length > 0 && !selectedMinistryId) {
-      const leaderFirst = unique.find(m => m.isLeader) || unique[0];
-      if (leaderFirst?.id) setSelectedMinistryId(leaderFirst.id);
-    }
-  }, [user?.id, currentChurchId, selectedMinistryId]);
-
-  const loadMembersAndEvents = useCallback(async () => {
+  const loadEvents = useCallback(async () => {
     if (!currentChurchId) return;
-    const { data: members } = await supabase
-      .from('membros')
-      .select('id, nome_completo')
-      .eq('id_igreja', currentChurchId)
-      .eq('status', 'ativo')
-      .order('nome_completo');
-    setMemberOptions(members || []);
     const { data: events } = await supabase
       .from('eventos')
       .select('id, nome, data_hora, local')
@@ -132,55 +72,6 @@ const MyMinistryPage = () => {
       .order('data_hora', { ascending: false });
     setEventOptions(events || []);
   }, [currentChurchId]);
-
-  const loadVolunteers = useCallback(async (ministryId: string) => {
-    // Busca IDs dos membros e suas funções no ministério
-    const { data: volRows, error } = await supabase
-      .from('ministerio_voluntarios')
-      .select('membro_id, funcao_no_ministerio')
-      .eq('ministerio_id', ministryId);
-
-    if (error) { toast.error('Erro ao carregar voluntários'); return; }
-
-    const memberIds = (volRows || []).map((r: any) => r?.membro_id).filter(Boolean);
-
-    if (memberIds.length === 0) {
-      setVolunteers([]);
-      return;
-    }
-
-    // Busca dados dos membros
-    const { data: membersData, error: mErr } = await supabase
-      .from('membros')
-      .select('id, nome_completo')
-      .in('id', memberIds);
-
-    if (mErr) { toast.error('Erro ao carregar dados dos membros'); return; }
-
-    // Monta lista final com função
-    const funcaoById = new Map<string, string | null>();
-    (volRows || []).forEach((r: any) => {
-      if (r?.membro_id) funcaoById.set(r.membro_id, r.funcao_no_ministerio || null);
-    });
-
-    setVolunteers(
-      (membersData || []).map((m: any) => ({
-        id: m.id,
-        nome_completo: m.nome_completo,
-        funcao: funcaoById.get(m.id) || null
-      }))
-    );
-  }, []);
-
-  const loadRoles = useCallback(async (ministryId: string) => {
-    const { data, error } = await supabase
-      .from('ministerio_funcoes')
-      .select('id, nome')
-      .eq('ministerio_id', ministryId)
-      .order('nome');
-    if (error) { toast.error('Erro ao carregar funções'); return; }
-    setMinistryRoles((data || []) as { id: string; nome: string }[]);
-  }, []);
 
   const loadSchedules = useCallback(async (ministryId: string) => {
     const { data: esRows, error } = await supabase
@@ -194,22 +85,18 @@ const MyMinistryPage = () => {
     const scheduleIds = (esRows || []).map((s: any) => s.id);
     if (scheduleIds.length === 0) { setSchedules([]); return; }
 
-    const { data: evRows, error: evErr } = await supabase
+    const { data: evRows } = await supabase
       .from('escala_voluntarios')
       .select('escala_id, membro_id')
       .in('escala_id', scheduleIds);
 
-    if (evErr) { toast.error('Erro ao carregar voluntários das escalas'); }
-
     const memberIds = Array.from(new Set((evRows || []).map((r: any) => r?.membro_id).filter(Boolean)));
     let membersMap = new Map<string, { id: string; nome_completo: string; email?: string }>();
     if (memberIds.length > 0) {
-      const { data: memRows, error: memErr } = await supabase
+      const { data: memRows } = await supabase
         .from('membros')
         .select('id, nome_completo, email')
         .in('id', memberIds);
-
-      if (memErr) { toast.error('Erro ao carregar dados dos membros'); }
       (memRows || []).forEach((m: any) => {
         if (m?.id) membersMap.set(m.id, { id: m.id, nome_completo: m.nome_completo, email: m.email });
       });
@@ -236,41 +123,14 @@ const MyMinistryPage = () => {
     setSchedules(mapped);
   }, []);
 
-  const loadMyAssignments = useCallback(async (ministryId: string) => {
-    if (!user?.id) { setAssignments([]); return; }
-    // Buscar escalas do ministério nas quais o usuário está na escala_voluntarios
-    const { data, error } = await supabase
-      .from('escala_voluntarios')
-      .select(`
-        escala_id,
-        status_confirmacao,
-        escala:escalas_servico(id, data_servico, evento:eventos(nome), ministerio_id)
-      `)
-      .eq('membro_id', user.id);
-    if (error) { toast.error('Erro ao carregar suas escalas'); setAssignments([]); return; }
-    const rows = (data || [])
-      .filter((r: any) => r.escala?.ministerio_id === ministryId)
-      .map((r: any) => ({
-        escala_id: r.escala_id,
-        status_confirmacao: r.status_confirmacao,
-        data_servico: r.escala?.data_servico,
-        evento_nome: r.escala?.evento?.nome || null
-      })) as AssignmentRow[];
-    setAssignments(rows);
-  }, [user?.id]);
-
   useEffect(() => {
-    loadMyMinistries();
-    loadMembersAndEvents();
-  }, [loadMyMinistries, loadMembersAndEvents]);
+    loadEvents();
+  }, [loadEvents]);
 
   useEffect(() => {
     if (!selectedMinistryId) return;
-    loadVolunteers(selectedMinistryId);
     loadSchedules(selectedMinistryId);
-    loadMyAssignments(selectedMinistryId);
-    loadRoles(selectedMinistryId);
-  }, [selectedMinistryId, loadVolunteers, loadSchedules, loadMyAssignments, loadRoles]);
+  }, [selectedMinistryId, loadSchedules]);
 
   const selectedEvent = useMemo(
     () => eventOptions.find(e => e.id === newScheduleEventId),
@@ -287,36 +147,44 @@ const MyMinistryPage = () => {
   const handleAddVolunteer = async () => {
     if (!selectedMinistryId || !selectedVolunteerToAdd || !currentChurchId) return;
 
-    try {
-      const { error } = await supabase
-        .from('ministerio_voluntarios')
-        .insert({ 
-          ministerio_id: selectedMinistryId, 
-          membro_id: selectedVolunteerToAdd, 
-          id_igreja: currentChurchId 
-        });
+    const promise = supabase
+      .from('ministerio_voluntarios')
+      .insert({ 
+        ministerio_id: selectedMinistryId, 
+        membro_id: selectedVolunteerToAdd, 
+        id_igreja: currentChurchId 
+      });
 
-      if (error) throw error;
-
-      toast.success('Voluntário adicionado!');
-      setSelectedVolunteerToAdd(null);
-      loadVolunteers(selectedMinistryId);
-    } catch (err: any) {
-      console.error('Erro ao adicionar voluntário:', err);
-      toast.error('Erro ao adicionar voluntário: ' + err.message);
-    }
+    toast.promise(promise, {
+      loading: 'Adicionando voluntário...',
+      success: () => {
+        setSelectedVolunteerToAdd(null);
+        queryClient.invalidateQueries({ queryKey: ['ministryVolunteers', selectedMinistryId] });
+        return 'Voluntário adicionado!';
+      },
+      error: (err: any) => `Erro ao adicionar voluntário: ${err.message}`,
+    });
   };
 
   const handleRemoveVolunteer = async (membroId: string) => {
     if (!selectedMinistryId) return;
-    const { error } = await supabase
+    const vol = volunteers.find(v => v.id === membroId);
+    if (!vol) return;
+
+    const promise = supabase
       .from('ministerio_voluntarios')
       .delete()
       .eq('ministerio_id', selectedMinistryId)
       .eq('membro_id', membroId);
-    if (error) { toast.error('Erro ao remover voluntário'); return; }
-    toast.success('Voluntário removido!');
-    loadVolunteers(selectedMinistryId);
+      
+    toast.promise(promise, {
+      loading: 'Removendo voluntário...',
+      success: () => {
+        queryClient.invalidateQueries({ queryKey: ['ministryVolunteers', selectedMinistryId] });
+        return 'Voluntário removido!';
+      },
+      error: (err: any) => `Erro ao remover voluntário: ${err.message}`,
+    });
   };
 
   const handleChangeVolunteerRole = async (membroId: string, newRole: string) => {
@@ -329,7 +197,7 @@ const MyMinistryPage = () => {
       .eq('membro_id', membroId);
     if (error) { toast.error('Erro ao atualizar função'); return; }
     toast.success('Função atualizada!');
-    loadVolunteers(selectedMinistryId);
+    queryClient.invalidateQueries({ queryKey: ['ministryVolunteers', selectedMinistryId] });
   };
 
   const handleCreateSchedule = async (date: string, notes: string) => {
@@ -356,7 +224,7 @@ const MyMinistryPage = () => {
     if (error) { toast.error('Erro ao atribuir voluntário: ' + error.message); return; }
     toast.success('Voluntário atribuído à escala!');
     loadSchedules(selectedMinistryId!);
-    if (membroId === user?.id) loadMyAssignments(selectedMinistryId!);
+    if (membroId === user?.id) queryClient.invalidateQueries({ queryKey: ['myAssignments', user?.id, selectedMinistryId] });
   };
 
   const handleRemoveVolunteerFromSchedule = async (escalaId: string, membroId: string) => {
@@ -368,20 +236,11 @@ const MyMinistryPage = () => {
     if (error) { toast.error('Erro ao remover da escala'); return; }
     toast.success('Voluntário removido da escala!');
     loadSchedules(selectedMinistryId!);
-    if (membroId === user?.id) loadMyAssignments(selectedMinistryId!);
+    if (membroId === user?.id) queryClient.invalidateQueries({ queryKey: ['myAssignments', user?.id, selectedMinistryId] });
   };
 
   const handleConfirmPresence = async (escalaId: string, confirm: boolean) => {
-    if (!user?.id) return;
-    const status = confirm ? 'Confirmado' : 'Recusado';
-    const { error } = await supabase
-      .from('escala_voluntarios')
-      .update({ status_confirmacao: status })
-      .eq('escala_id', escalaId)
-      .eq('membro_id', user.id);
-    if (error) { toast.error('Erro ao atualizar presença'); return; }
-    toast.success(confirm ? 'Presença confirmada!' : 'Presença recusada.');
-    loadMyAssignments(selectedMinistryId!);
+    await confirmPresence({ escalaId, confirm });
   };
 
   if (!user) {
@@ -390,6 +249,10 @@ const MyMinistryPage = () => {
 
   if (!currentChurchId) {
     return <div className="p-6 text-center text-gray-600">Selecione uma igreja para continuar.</div>;
+  }
+
+  if (isLoadingMyMinistries) {
+    return <div className="flex items-center justify-center h-[60vh]"><Loader2 className="w-10 h-10 text-purple-600 animate-spin" /><p className="ml-4 text-lg">Carregando seus ministérios...</p></div>;
   }
 
   return (
@@ -426,7 +289,6 @@ const MyMinistryPage = () => {
           <MinistryRolesManager
             ministryId={selectedMinistry.id}
             churchId={currentChurchId!}
-            onRolesChanged={(roles) => setMinistryRoles(roles.map(r => ({ id: r.id, nome: r.nome })))}
           />
 
           <Card>
@@ -449,34 +311,19 @@ const MyMinistryPage = () => {
               </div>
 
               <div className="space-y-2">
-                {volunteers.map((v, idx) => (
+                {isLoadingVolunteers ? <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" /> : volunteers.map((v, idx) => (
                   <div key={v.id || `vol-${idx}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium truncate">{v.nome_completo}</span>
-                      <Badge variant="outline" className="truncate max-w-[160px]">{v.funcao || 'voluntario'}</Badge>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Select
-                        value={(v.funcao || 'voluntario')}
-                        onValueChange={(val) => handleChangeVolunteerRole(v.id, val)}
-                      >
-                        <SelectTrigger className="w-40 truncate">
-                          <SelectValue placeholder="Definir função" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="voluntario">voluntario</SelectItem>
-                          {ministryRoles.map(r => (
-                            <SelectItem key={r.id} value={r.nome}>{r.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                       <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleRemoveVolunteer(v.id)}>
                         <UserX className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
                 ))}
-                {volunteers.length === 0 && (
+                {!isLoadingVolunteers && volunteers.length === 0 && (
                   <p className="text-center text-gray-500">Nenhum voluntário neste ministério ainda.</p>
                 )}
               </div>
@@ -602,7 +449,7 @@ const MyMinistryPage = () => {
         <Card>
           <CardHeader><CardTitle>Minhas Escalas</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            {assignments.length > 0 ? assignments.map(a => (
+            {isLoadingAssignments ? <Loader2 className="mx-auto my-4 h-6 w-6 animate-spin" /> : assignments.length > 0 ? assignments.map(a => (
               <div key={a.escala_id} className="border rounded-lg p-3 flex items-center justify-between">
                 <div>
                   <p className="font-semibold">{a.evento_nome || 'Escala'}</p>

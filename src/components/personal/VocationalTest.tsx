@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -167,80 +167,83 @@ const ministryData = {
   }
 }
 
+const fetchPreviousTest = async (userId: string | null) => {
+  if (!userId) return null;
+
+  const { data, error } = await supabase
+    .from('testes_vocacionais')
+    .select('*')
+    .eq('membro_id', userId)
+    .eq('is_ultimo', true)
+    .maybeSingle();
+
+  if (error) {
+    console.error('VocationalTest: Error loading previous test:', error);
+    toast.error('Erro ao carregar teste vocacional anterior.');
+    throw error;
+  }
+  return data;
+};
+
+const calculateResultsFromAnswers = (answers: Record<number, number>): MinistryResult[] => {
+  const ministryScores: Record<string, number> = {
+    midia: 0, louvor: 0, diaconato: 0, integracao: 0,
+    ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
+  };
+  questions.forEach((q) => {
+    ministryScores[q.ministry] += answers[q.id] ?? (answers as any)[`q${q.id}`] ?? 0;
+  });
+
+  const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
+    const score = ministryScores[ministryKey];
+    const maxScore = 25; // 5 questions * 5 points
+    const percentage = (score / maxScore) * 100;
+    
+    return {
+      ...(ministryData as any)[ministryKey],
+      score,
+      percentage: Math.round(percentage)
+    };
+  });
+
+  calculatedResults.sort((a, b) => b.score - a.score);
+  return calculatedResults;
+};
+
 const VocationalTest = () => {
   const { user, currentChurchId } = useAuthStore() 
   const queryClient = useQueryClient()
   const [currentStep, setCurrentStep] = useState<'intro' | 'test' | 'results'>('intro')
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<number, number>>({})
-  const [results, setResults] = useState<MinistryResult[]>([])
-  const [topMinistry, setTopMinistry] = useState<MinistryResult | null>(null)
-
-  const fetchPreviousTest = async () => {
-    if (!user?.id) return null
-
-    const { data, error } = await supabase
-      .from('testes_vocacionais')
-      .select('*')
-      .eq('membro_id', user.id)
-      .eq('is_ultimo', true)
-      .maybeSingle()
-
-    if (error) {
-      console.error('VocationalTest: Error loading previous test:', error)
-      toast.error('Erro ao carregar teste vocacional anterior.')
-      throw error
-    }
-    return data
-  }
-
+  
   const { data: previousTest, isLoading: isLoadingResults } = useQuery({
     queryKey: ['vocationalTest', user?.id],
-    queryFn: fetchPreviousTest,
+    queryFn: () => fetchPreviousTest(user?.id),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    onSuccess: (data) => {
-      if (data) {
-        const respostas = data.respostas || {}
-        const ministryScores: Record<string, number> = {
-          midia: 0, louvor: 0, diaconato: 0, integracao: 0,
-          ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
-        }
-        questions.forEach((q) => {
-          const v = typeof respostas[`q${q.id}`] === 'number' ? respostas[`q${q.id}`] : 0
-          ministryScores[q.ministry] += v
-        })
+  });
 
-        const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
-          const score = ministryScores[ministryKey]
-          const maxScore = 25
-          const percentage = (score / maxScore) * 100
-          
-          return {
-            ...ministryData[ministryKey as keyof typeof ministryData],
-            score,
-            percentage: Math.round(percentage)
-          }
-        })
+  const { results, topMinistry } = useMemo(() => {
+    if (!previousTest) return { results: [], topMinistry: null };
+    const calculated = calculateResultsFromAnswers(previousTest.respostas || {});
+    return { results: calculated, topMinistry: calculated[0] || null };
+  }, [previousTest]);
 
-        calculatedResults.sort((a, b) => b.score - a.score)
-        setResults(calculatedResults)
-        setTopMinistry(calculatedResults[0])
-        setCurrentStep('results')
-      }
-    },
-  })
+  useEffect(() => {
+    if (previousTest) {
+      setCurrentStep('results');
+    }
+  }, [previousTest]);
 
   const saveTestMutation = useMutation({
-    mutationFn: async (recommendedName: string) => {
+    mutationFn: async (newAnswers: Record<number, number>) => {
       if (!user || !currentChurchId) {
         throw new Error('Usuário ou igreja não identificados.')
       }
 
-      const respostas: Record<string, number> = {}
-      questions.forEach((q) => {
-        respostas[`q${q.id}`] = answers[q.id] ?? 0
-      })
+      const calculatedResults = calculateResultsFromAnswers(newAnswers);
+      const recommendedName = calculatedResults[0]?.name ?? 'N/A';
 
       await supabase
         .from('testes_vocacionais')
@@ -254,7 +257,7 @@ const VocationalTest = () => {
           id_igreja: currentChurchId,
           is_ultimo: true,
           data_teste: new Date().toISOString(),
-          respostas,
+          respostas: newAnswers,
           ministerio_recomendado: recommendedName,
         }])
 
@@ -263,31 +266,6 @@ const VocationalTest = () => {
     onSuccess: () => {
       toast.success('Teste vocacional concluído e resultados salvos!')
       queryClient.invalidateQueries({ queryKey: ['vocationalTest', user?.id] })
-      
-      const ministryScores: Record<string, number> = {
-        midia: 0, louvor: 0, diaconato: 0, integracao: 0,
-        ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
-      }
-      questions.forEach((q) => {
-        ministryScores[q.ministry] += answers[q.id] ?? 0
-      })
-
-      const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
-        const score = ministryScores[ministryKey]
-        const maxScore = 25
-        const percentage = (score / maxScore) * 100
-        
-        return {
-          ...ministryData[ministryKey as keyof typeof ministryData],
-          score,
-          percentage: Math.round(percentage)
-        }
-      })
-
-      calculatedResults.sort((a, b) => b.score - a.score)
-      setResults(calculatedResults)
-      setTopMinistry(calculatedResults[0])
-      setCurrentStep('results')
     },
     onError: (error) => {
       console.error('VocationalTest: Error saving test results:', error)
@@ -299,26 +277,15 @@ const VocationalTest = () => {
     setAnswers(prev => ({ ...prev, [questionId]: parseInt(value) }))
   }
 
-  const calculateAndSaveResults = () => {
-    const ministryScores: Record<string, number> = {
-      midia: 0, louvor: 0, diaconato: 0, integracao: 0,
-      ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
-    }
-    questions.forEach((q) => {
-      ministryScores[q.ministry] += answers[q.id] ?? 0
-    })
-
-    const topKey = Object.keys(ministryScores).sort((a, b) => ministryScores[b] - ministryScores[a])[0]
-    const recommendedName = (ministryData as any)[topKey]?.name ?? topKey
-
-    saveTestMutation.mutate(recommendedName)
+  const finishTest = async () => {
+    await saveTestMutation.mutateAsync(answers);
   }
 
   const nextQuestion = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1)
     } else {
-      calculateAndSaveResults()
+      finishTest()
     }
   }
 
@@ -332,8 +299,7 @@ const VocationalTest = () => {
     setCurrentStep('intro')
     setCurrentQuestion(0)
     setAnswers({})
-    setResults([])
-    setTopMinistry(null)
+    queryClient.setQueryData(['vocationalTest', user?.id], null);
   }
 
   const progress = ((currentQuestion + 1) / questions.length) * 100

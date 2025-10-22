@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import DescricaoFormatada from '../utils/DescricaoFormatada';
 import JourneyActionDialog from './JourneyActionDialog';
-import { useJourneyData, PassoEtapa } from '../../hooks/useJourneyData';
+import { useJourneyData } from '../../hooks/useJourneyData';
 import LockedEtapaOverlay from './LockedEtapaOverlay';
 
 const MemberJourney = () => {
@@ -103,7 +103,7 @@ const MemberJourney = () => {
 
   const handleCompleteAndClose = async (passoId: string, quizDetails?: any) => {
     setIsActionDialogOpen(false);
-    await markPassoCompleted(passoId, quizDetails);
+    await markPassoCompleted({ passoId, quizDetails });
   };
 
   if (!currentChurchId) {
