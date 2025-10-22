@@ -6,7 +6,6 @@ import { Toaster } from 'sonner'
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import App from './App.tsx'
 import './index.css'
-import ReconnectManager from './components/system/ReconnectManager'
 
 // Limpa cache do navegador ao iniciar
 if ('caches' in window) {
@@ -31,10 +30,11 @@ Object.keys(sessionStorage).forEach(key => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutos
-      cacheTime: 1000 * 60 * 10, // 10 minutos
-      refetchOnWindowFocus: true,    // revalidar ao voltar para a aba
-      refetchOnReconnect: true,      // revalidar ao reconectar a internet
+      staleTime: 1000 * 60 * 2, // 2 minutos para dados serem considerados "velhos"
+      gcTime: 1000 * 60 * 15, // 15 minutos para o cache ser limpo se não usado
+      refetchOnWindowFocus: true,    // **CHAVE**: revalida ao voltar para a aba
+      refetchOnReconnect: true,      // **CHAVE**: revalida ao reconectar a internet
+      retry: 1, // Tenta novamente 1 vez em caso de erro
     },
   },
 })
@@ -46,7 +46,6 @@ createRoot(document.getElementById('root')!).render(
         <App />
         <SpeedInsights />
         <Toaster />
-        <ReconnectManager />
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,
