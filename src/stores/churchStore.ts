@@ -47,6 +47,11 @@ export interface Church {
   share_devocionais_to_children?: boolean;
   share_eventos_to_children?: boolean;
   share_trilha_to_children?: boolean;
+  // Novas configs por igreja filha
+  compartilha_escolas_da_mae?: boolean;
+  compartilha_eventos_da_mae?: boolean;
+  compartilha_jornada_da_mae?: boolean;
+  compartilha_devocionais_da_mae?: boolean;
 }
 
 interface ChurchState {
@@ -130,6 +135,10 @@ export const useChurchStore = create<ChurchState>()(
           share_devocionais_to_children: c.share_devocionais_to_children ?? false,
           share_eventos_to_children: c.share_eventos_to_children ?? false,
           share_trilha_to_children: c.share_trilha_to_children ?? false,
+          compartilha_escolas_da_mae: c.compartilha_escolas_da_mae ?? true,
+          compartilha_eventos_da_mae: c.compartilha_eventos_da_mae ?? true,
+          compartilha_jornada_da_mae: c.compartilha_jornada_da_mae ?? true,
+          compartilha_devocionais_da_mae: c.compartilha_devocionais_da_mae ?? true,
         })) as Church[], isLoadingChurches: false, lastLoadedAt: Date.now() });
       },
 
@@ -209,6 +218,11 @@ export const useChurchStore = create<ChurchState>()(
         if (updates.share_devocionais_to_children !== undefined) updatePayload.share_devocionais_to_children = updates.share_devocionais_to_children;
         if (updates.share_eventos_to_children !== undefined) updatePayload.share_eventos_to_children = updates.share_eventos_to_children;
         if (updates.share_trilha_to_children !== undefined) updatePayload.share_trilha_to_children = updates.share_trilha_to_children;
+        // Novas configs por igreja filha
+        if (updates.compartilha_escolas_da_mae !== undefined) updatePayload.compartilha_escolas_da_mae = updates.compartilha_escolas_da_mae;
+        if (updates.compartilha_eventos_da_mae !== undefined) updatePayload.compartilha_eventos_da_mae = updates.compartilha_eventos_da_mae;
+        if (updates.compartilha_jornada_da_mae !== undefined) updatePayload.compartilha_jornada_da_mae = updates.compartilha_jornada_da_mae;
+        if (updates.compartilha_devocionais_da_mae !== undefined) updatePayload.compartilha_devocionais_da_mae = updates.compartilha_devocionais_da_mae;
 
         const { data, error } = await supabase
           .from('igrejas')
@@ -253,6 +267,10 @@ export const useChurchStore = create<ChurchState>()(
           share_devocionais_to_children: data.share_devocionais_to_children ?? false,
           share_eventos_to_children: data.share_eventos_to_children ?? false,
           share_trilha_to_children: data.share_trilha_to_children ?? false,
+          compartilha_escolas_da_mae: data.compartilha_escolas_da_mae ?? true,
+          compartilha_eventos_da_mae: data.compartilha_eventos_da_mae ?? true,
+          compartilha_jornada_da_mae: data.compartilha_jornada_da_mae ?? true,
+          compartilha_devocionais_da_mae: data.compartilha_devocionais_da_mae ?? true,
         };
 
         set((state) => ({
