@@ -92,7 +92,7 @@ const DevotionalDetailView = ({ devotionalId, onLike, onComment, onClose }: any)
         </div>
 
         <div 
-          className="prose prose-lg max-w-none"
+          className="prose prose-lg max-w-none whitespace-pre-wrap"
           dangerouslySetInnerHTML={{ __html: devotional.conteudo }}
         />
 
