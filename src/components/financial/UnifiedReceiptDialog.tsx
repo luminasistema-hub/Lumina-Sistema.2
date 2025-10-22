@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Church } from '@/stores/churchStore'
 import ReceiptGenerator from './ReceiptGenerator'
-import { X } from 'lucide-react'
+import { X, CheckCircle } from 'lucide-react'
 
 interface FinancialTransaction {
   id: string
@@ -44,7 +44,6 @@ export const UnifiedReceiptDialog = ({
   if (!transaction) return null
 
   const handleDownloadPdf = () => {
-    // Usa a impressora do navegador; o usuário pode escolher "Salvar como PDF"
     window.print()
   }
 
@@ -67,32 +66,50 @@ export const UnifiedReceiptDialog = ({
   const handleMarkAsIssued = () => {
     if (onMarkAsIssued) {
       onMarkAsIssued(transaction.id)
+      onOpenChange(false)
     }
-    onOpenChange(false)
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl p-0">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle>Recibo de Doação</DialogTitle>
-          <DialogDescription>Visualize, imprima e marque a emissão do recibo.</DialogDescription>
+      <DialogContent className="max-w-3xl p-0 max-h-[95vh] overflow-hidden flex flex-col">
+        <DialogHeader className="p-6 pb-4 flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            Recibo de Doação
+            {transaction.recibo_emitido && (
+              <span className="inline-flex items-center gap-1 text-sm font-normal text-green-600 bg-green-50 px-2 py-1 rounded">
+                <CheckCircle className="w-4 h-4" />
+                Emitido
+              </span>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {transaction.recibo_emitido 
+              ? 'Este recibo já foi emitido anteriormente. Você pode visualizar e imprimir novamente.'
+              : 'Visualize, imprima e marque a emissão do recibo.'
+            }
+          </DialogDescription>
         </DialogHeader>
-        <div className="max-h-[70vh] overflow-y-auto px-6">
+        
+        <div className="flex-1 overflow-y-auto px-6 pb-4">
           <ReceiptGenerator data={receiptData} onDownload={handleDownloadPdf} />
         </div>
-        <DialogFooter className="bg-slate-50 p-4 border-t print:hidden">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            <X className="mr-2 h-4 w-4" /> Fechar
-          </Button>
-          {canManage && !transaction.recibo_emitido && onMarkAsIssued && (
-            <Button
-              onClick={handleMarkAsIssued}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              Marcar como Emitido e Fechar
+        
+        <DialogFooter className="bg-slate-50 p-4 border-t print:hidden flex-shrink-0">
+          <div className="flex items-center justify-between w-full">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              <X className="mr-2 h-4 w-4" /> Fechar
             </Button>
-          )}
+            {canManage && !transaction.recibo_emitido && onMarkAsIssued && (
+              <Button
+                onClick={handleMarkAsIssued}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Marcar como Emitido
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

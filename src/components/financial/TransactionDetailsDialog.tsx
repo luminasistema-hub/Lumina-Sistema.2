@@ -2,7 +2,21 @@ import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Separator } from '../ui/separator'
-import { Calendar, CreditCard, Building, FileText, ArrowUpRight, ArrowDownRight, CheckCircle, Clock } from 'lucide-react'
+import { Badge } from '../ui/badge'
+import { 
+  Calendar, 
+  CreditCard, 
+  Building, 
+  FileText, 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  CheckCircle, 
+  Clock,
+  User,
+  Receipt,
+  DollarSign,
+  MessageSquare
+} from 'lucide-react'
 
 interface FinancialTransaction {
   id: string
@@ -42,16 +56,18 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
 }) => {
   if (!transaction) return null
 
-  const statusBadgeClasses =
-    transaction.status === 'Confirmado'
-      ? 'bg-blue-100 text-blue-800'
-      : transaction.status === 'Pendente'
-      ? 'bg-yellow-100 text-yellow-800'
-      : 'bg-red-100 text-red-800'
+  const statusConfig = {
+    'Confirmado': { color: 'bg-green-100 text-green-800', icon: CheckCircle },
+    'Pendente': { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+    'Cancelado': { color: 'bg-red-100 text-red-800', icon: Clock }
+  }
+
+  const statusInfo = statusConfig[transaction.status]
+  const StatusIcon = statusInfo.icon
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {transaction.tipo === 'Entrada' ? (
@@ -61,76 +77,159 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
             )}
             Detalhes da Transação
           </DialogTitle>
-          <DialogDescription className="text-sm">
-            Visualize os dados e emita o recibo quando aplicável
+          <DialogDescription>
+            Informações completas sobre esta transação financeira
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-6 py-4">
+          {/* Badges de Status */}
           <div className="flex flex-wrap gap-2">
-            <span className={`px-2 py-1 rounded ${transaction.tipo === 'Entrada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            <Badge className={transaction.tipo === 'Entrada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
               {transaction.tipo}
-            </span>
-            <span className="px-2 py-1 rounded border">{transaction.categoria}</span>
+            </Badge>
+            <Badge variant="outline">{transaction.categoria}</Badge>
             {transaction.subcategoria && (
-              <span className="px-2 py-1 rounded border text-xs">{transaction.subcategoria}</span>
+              <Badge variant="outline" className="text-xs">{transaction.subcategoria}</Badge>
             )}
-            <span className={`px-2 py-1 rounded ${statusBadgeClasses} flex items-center gap-1`}>
-              {transaction.status === 'Confirmado' && <CheckCircle className="w-3 h-3" />}
-              {transaction.status === 'Pendente' && <Clock className="w-3 h-3" />}
+            <Badge className={`${statusInfo.color} flex items-center gap-1`}>
+              <StatusIcon className="w-3 h-3" />
               {transaction.status}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              {new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}
-            </div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              {transaction.metodo_pagamento}
-            </div>
-            <div className="flex items-center gap-2">
-              <Building className="w-4 h-4" />
-              {transaction.responsavel}
-            </div>
-            {transaction.numero_documento && (
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                {transaction.numero_documento}
-              </div>
+            </Badge>
+            {transaction.recibo_emitido && (
+              <Badge className="bg-blue-100 text-blue-800 flex items-center gap-1">
+                <Receipt className="w-3 h-3" />
+                Recibo Emitido
+              </Badge>
             )}
           </div>
 
           <Separator />
 
-          <div className="space-y-2">
-            <p className="font-medium text-gray-900">Descrição</p>
-            <p className="text-gray-700">{transaction.descricao}</p>
+          {/* Valor em Destaque */}
+          <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2">Valor da Transação</p>
+            <p className={`text-4xl font-bold ${transaction.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
+              {transaction.tipo === 'Entrada' ? '+' : '-'} R$ {transaction.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
           </div>
 
-          {transaction.centro_custo && (
-            <p className="text-sm text-blue-600">📊 Centro de Custo: {transaction.centro_custo}</p>
-          )}
-          {transaction.observacoes && (
-            <p className="text-sm text-gray-700">💬 {transaction.observacoes}</p>
-          )}
-          {transaction.aprovado_por && transaction.data_aprovacao && (
-            <p className="text-xs text-green-600">
-              ✅ Aprovado por {transaction.aprovado_por} em {new Date(transaction.data_aprovacao).toLocaleDateString('pt-BR')}
-            </p>
-          )}
+          <Separator />
 
-          <div className="flex justify-between pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-            <div className="flex items-center gap-2">
-              {transaction.tipo === 'Entrada' && onReceipt && (
-                <Button variant="outline" onClick={() => onReceipt(transaction)}>
-                  Emitir/Ver Recibo
-                </Button>
+          {/* Informações Principais */}
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-gray-500 mb-1">Descrição</p>
+              <p className="text-base font-semibold">{transaction.descricao}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-start gap-3">
+                <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Data da Transação</p>
+                  <p className="text-base">{new Date(transaction.data_transacao).toLocaleDateString('pt-BR', { 
+                    day: '2-digit', 
+                    month: 'long', 
+                    year: 'numeric' 
+                  })}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <CreditCard className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Método de Pagamento</p>
+                  <p className="text-base">{transaction.metodo_pagamento}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <User className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Responsável</p>
+                  <p className="text-base">{transaction.responsavel}</p>
+                </div>
+              </div>
+
+              {transaction.membro_nome && (
+                <div className="flex items-start gap-3">
+                  <User className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Membro</p>
+                    <p className="text-base">{transaction.membro_nome}</p>
+                  </div>
+                </div>
+              )}
+
+              {transaction.numero_documento && (
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Número do Documento</p>
+                    <p className="text-base">{transaction.numero_documento}</p>
+                  </div>
+                </div>
+              )}
+
+              {transaction.centro_custo && (
+                <div className="flex items-start gap-3">
+                  <Building className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Centro de Custo</p>
+                    <p className="text-base">{transaction.centro_custo}</p>
+                  </div>
+                </div>
               )}
             </div>
+          </div>
+
+          {/* Observações */}
+          {transaction.observacoes && (
+            <>
+              <Separator />
+              <div className="flex items-start gap-3">
+                <MessageSquare className="w-5 h-5 text-gray-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-500 mb-1">Observações</p>
+                  <p className="text-base text-gray-700 whitespace-pre-wrap">{transaction.observacoes}</p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Informações de Aprovação */}
+          {transaction.aprovado_por && transaction.data_aprovacao && (
+            <>
+              <Separator />
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-green-800 mb-1">Aprovação</p>
+                <p className="text-sm text-green-700">
+                  Aprovado por <span className="font-semibold">{transaction.aprovado_por}</span> em{' '}
+                  {new Date(transaction.data_aprovacao).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* Ações */}
+          <Separator />
+          <div className="flex justify-between items-center pt-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Fechar
+            </Button>
+            {transaction.tipo === 'Entrada' && onReceipt && (
+              <Button onClick={() => onReceipt(transaction)} className="bg-blue-600 hover:bg-blue-700">
+                <Receipt className="w-4 h-4 mr-2" />
+                {transaction.recibo_emitido ? 'Ver Recibo' : 'Emitir Recibo'}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
