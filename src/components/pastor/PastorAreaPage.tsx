@@ -255,7 +255,7 @@ const PastorAreaPage = () => {
                           {typeMap[item.tipo].icon}
                         </div>
                         <CardDescription>
-                          Criado por {item.pastor_name} em {format(new Date(item.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          Criado por {item.pastor_nome} em {format(new Date(item.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="flex flex-wrap gap-2">
@@ -302,7 +302,7 @@ const PastorAreaPage = () => {
           <DialogHeader>
             <DialogTitle>{itemToView?.titulo}</DialogTitle>
             <DialogDescription>
-              Criado por {itemToView?.pastor_name} em {itemToView && format(new Date(itemToView.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              Criado por {itemToView?.pastor_nome} em {itemToView && format(new Date(itemToView.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto py-4 prose prose-sm max-w-none dark:prose-invert">
