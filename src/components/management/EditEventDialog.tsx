@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Switch } from "@/components/ui/switch";
 
 export interface EventItem {
   id: string;
@@ -21,8 +20,8 @@ export interface EventItem {
   valor_inscricao?: number | null;
   status: 'Planejado' | 'Confirmado' | 'Em Andamento' | 'Finalizado' | 'Cancelado';
   link_externo?: string | null;
-  // new field: whether this event is shared with child churches
   compartilhar_com_filhas?: boolean | null;
+  visibilidade?: 'privada' | 'publica' | null;
 }
 
 export function EditEventDialog({
@@ -48,7 +47,7 @@ export function EditEventDialog({
   const [inscricoesAbertas, setInscricoesAbertas] = useState(event.inscricoes_abertas);
   const [saving, setSaving] = useState(false);
   const [paidType, setPaidType] = useState<'gratuito' | 'pago'>(event.valor_inscricao && event.valor_inscricao > 0 ? 'pago' : 'gratuito');
-  const [shareWithChildren, setShareWithChildren] = useState<boolean>(event.compartilhar_com_filhas ?? false);
+  const [visibilidade, setVisibilidade] = useState<'privada' | 'publica'>(event.visibilidade ?? 'privada');
 
   useEffect(() => {
     if (!event) return;
@@ -63,7 +62,7 @@ export function EditEventDialog({
     setLinkExterno(event.link_externo || "");
     setInscricoesAbertas(event.inscricoes_abertas);
     setPaidType(event.valor_inscricao && event.valor_inscricao > 0 ? 'pago' : 'gratuito');
-    setShareWithChildren(event.compartilhar_com_filhas ?? false);
+    setVisibilidade(event.visibilidade ?? 'privada');
 
     // Converter ISO para datetime-local exibível
     try {
@@ -93,8 +92,8 @@ export function EditEventDialog({
       valor_inscricao: paidType === 'pago' ? (valorInscricao ? Number(valorInscricao) : 0) : 0,
       inscricoes_abertas: inscricoesAbertas,
       link_externo: paidType === 'pago' && Number(valorInscricao) > 0 ? (linkExterno || null) : null,
-      // persist sharing preference
-      compartilhar_com_filhas: shareWithChildren,
+      visibilidade: visibilidade,
+      compartilhar_com_filhas: visibilidade === 'publica',
     };
 
     const { error } = await supabase.from("eventos").update(payload).eq("id", event.id);
@@ -216,13 +215,18 @@ export function EditEventDialog({
             </div>
           )}
 
-          {/* Share with child churches toggle */}
-          <div className="p-3 border rounded-md flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Compartilhar com igrejas filhas</Label>
-              <p className="text-xs text-gray-600">Se ativado, este evento aparecerá para igrejas filhas (quando permitido pela preferência da mãe).</p>
-            </div>
-            <Switch checked={shareWithChildren} onCheckedChange={(v) => setShareWithChildren(Boolean(v))} aria-label="Compartilhar evento com igrejas filhas" />
+          <div className="space-y-2">
+            <Label>Visibilidade do Evento</Label>
+            <Select value={visibilidade} onValueChange={(v) => setVisibilidade(v as 'privada' | 'publica')}>
+              <SelectTrigger>
+                <SelectValue placeholder="Defina a visibilidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="privada">Privado (apenas para sua igreja)</SelectItem>
+                <SelectItem value="publica">Público (para todas as igrejas)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-600">Eventos públicos são visíveis por membros de todas as igrejas da plataforma.</p>
           </div>
 
           <Button onClick={handleUpdate} className="w-full" disabled={saving}>

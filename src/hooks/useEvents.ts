@@ -18,63 +18,85 @@ export interface Event {
   valor_inscricao?: number;
   link_externo?: string;
   compartilhar_com_filhas?: boolean;
+  visibilidade?: 'privada' | 'publica';
   participantes_count: number;
   is_registered: boolean;
 }
 
-const fetchEvents = async (churchId: string | null): Promise<Event[]> => {
-  if (!churchId) return [];
-  try {
-    const { data, error } = await supabase.rpc('get_eventos_para_igreja_com_participacao', {
-      id_igreja_atual: churchId,
-    });
-    if (error) throw error;
-    const items: Event[] = (data || []).map((e: any) => ({
-      id: e.evento_id,
-      id_igreja: e.id_igreja,
-      nome: e.nome,
-      data_hora: e.data_hora,
-      local: e.local ?? '',
-      descricao: e.descricao ?? '',
-      tipo: (e.tipo || 'Outro') as Event['tipo'],
-      capacidade_maxima: e.capacidade_maxima ?? undefined,
-      inscricoes_abertas: Boolean(e.inscricoes_abertas),
-      valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
-      status: (e.status || 'Planejado') as Event['status'],
-      participantes_count: Number(e.participantes_count || 0),
-      is_registered: Boolean(e.is_registered),
-      link_externo: e.link_externo ?? undefined,
-      compartilhar_com_filhas: e.compartilhar_com_filhas,
-    }));
-    items.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
-    return items;
-  } catch (rpcErr: any) {
-    toast.error(`Falha ao carregar eventos compartilhados: ${rpcErr?.message || 'erro RPC'}. Exibindo apenas eventos da sua igreja.`);
-    const { data: ownEvents, error: ownErr } = await supabase
-      .from('eventos')
-      .select('*')
-      .eq('id_igreja', churchId)
-      .order('data_hora', { ascending: true });
-    if (ownErr) throw ownErr;
-    const items: Event[] = (ownEvents || []).map((e: any) => ({
-      id: e.id,
-      id_igreja: e.id_igreja,
-      nome: e.nome,
-      data_hora: e.data_hora,
-      local: e.local ?? '',
-      descricao: e.descricao ?? '',
-      tipo: (e.tipo || 'Outro') as Event['tipo'],
-      capacidade_maxima: e.capacidade_maxima ?? undefined,
-      inscricoes_abertas: Boolean(e.inscricoes_abertas),
-      valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
-      status: (e.status || 'Planejado') as Event['status'],
-      participantes_count: 0,
-      is_registered: false,
-      link_externo: e.link_externo ?? undefined,
-      compartilhar_com_filhas: e.compartilhar_com_filhas,
-    }));
-    return items;
+const fetchEvents = async (churchId: string | null, userId: string | null): Promise<Event[]> => {
+  if (!churchId || !userId) return [];
+
+  // 1. Pega os eventos da igreja atual e os compartilhados pela mãe (via RPC)
+  const { data: rpcData, error: rpcError } = await supabase.rpc('get_eventos_para_igreja_com_participacao', {
+    id_igreja_atual: churchId,
+  });
+
+  if (rpcError) {
+    toast.error(`Falha ao carregar eventos: ${rpcError.message}`);
+    return [];
   }
+
+  // 2. Pega todos os eventos públicos, que não são da igreja atual (para não duplicar)
+  const { data: publicData, error: publicError } = await supabase
+    .from('eventos')
+    .select('*, participantes:evento_participantes(count), inscricoes:evento_participantes!inner(membro_id)')
+    .eq('visibilidade', 'publica')
+    .neq('id_igreja', churchId);
+
+  if (publicError) {
+    toast.warning(`Falha ao carregar eventos públicos: ${publicError.message}`);
+  }
+
+  // Mapeia os resultados do RPC
+  const rpcEvents: Event[] = (rpcData || []).map((e: any) => ({
+    id: e.evento_id,
+    id_igreja: e.id_igreja,
+    nome: e.nome,
+    data_hora: e.data_hora,
+    local: e.local ?? '',
+    descricao: e.descricao ?? '',
+    tipo: (e.tipo || 'Outro') as Event['tipo'],
+    capacidade_maxima: e.capacidade_maxima ?? undefined,
+    inscricoes_abertas: Boolean(e.inscricoes_abertas),
+    valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
+    status: (e.status || 'Planejado') as Event['status'],
+    participantes_count: Number(e.participantes_count || 0),
+    is_registered: Boolean(e.is_registered),
+    link_externo: e.link_externo ?? undefined,
+    compartilhar_com_filhas: e.compartilhar_com_filhas,
+    visibilidade: e.visibilidade ?? 'privada',
+  }));
+
+  // Mapeia os eventos públicos
+  const publicEvents: Event[] = (publicData || []).map((e: any) => ({
+    id: e.id,
+    id_igreja: e.id_igreja,
+    nome: e.nome,
+    data_hora: e.data_hora,
+    local: e.local ?? '',
+    descricao: e.descricao ?? '',
+    tipo: (e.tipo || 'Outro') as Event['tipo'],
+    capacidade_maxima: e.capacidade_maxima ?? undefined,
+    inscricoes_abertas: Boolean(e.inscricoes_abertas),
+    valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
+    status: (e.status || 'Planejado') as Event['status'],
+    participantes_count: e.participantes[0]?.count || 0,
+    is_registered: e.inscricoes.some((i: any) => i.membro_id === userId),
+    link_externo: e.link_externo ?? undefined,
+    compartilhar_com_filhas: e.compartilhar_com_filhas,
+    visibilidade: e.visibilidade ?? 'privada',
+  }));
+
+  // Combina e remove duplicados
+  const allEvents = new Map<string, Event>();
+  [...rpcEvents, ...publicEvents].forEach(event => {
+    allEvents.set(event.id, event);
+  });
+
+  const combinedList = Array.from(allEvents.values());
+  combinedList.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
+
+  return combinedList;
 };
 
 export const useEvents = () => {
@@ -85,68 +107,38 @@ export const useEvents = () => {
   useEffect(() => {
     if (!currentChurchId) return;
 
-    const setupRealtime = async () => {
-      const { data: churchRow } = await supabase
-        .from('igrejas')
-        .select('parent_church_id')
-        .eq('id', currentChurchId)
-        .maybeSingle();
-      const parentIdLocal = churchRow?.parent_church_id ?? null;
-
-      const channel = supabase
-        .channel(`public-events-hook-${currentChurchId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
-          () => queryClient.invalidateQueries({ queryKey })
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
-          () => queryClient.invalidateQueries({ queryKey })
-        );
-
-      if (parentIdLocal) {
-        channel
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${parentIdLocal}` },
-            () => queryClient.invalidateQueries({ queryKey })
-          )
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${parentIdLocal}` },
-            () => queryClient.invalidateQueries({ queryKey })
-          );
-      }
-
-      channel.subscribe();
+    const channel = supabase
+      .channel(`public-events-hook-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'eventos' },
+        () => queryClient.invalidateQueries({ queryKey })
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'evento_participantes' },
+        () => queryClient.invalidateQueries({ queryKey })
+      )
+      .subscribe();
       
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    };
-
-    const unsubscribe = setupRealtime();
-
     return () => {
-      unsubscribe.then(cleanup => cleanup && cleanup());
+      supabase.removeChannel(channel);
     };
   }, [currentChurchId, queryClient, queryKey]);
 
   const { data: events = [], isLoading } = useQuery({
     queryKey,
-    queryFn: () => fetchEvents(currentChurchId),
-    enabled: !!currentChurchId,
+    queryFn: () => fetchEvents(currentChurchId, user?.id || null),
+    enabled: !!currentChurchId && !!user?.id,
   });
 
   const registerMutation = useMutation({
     mutationFn: async (event: Event) => {
-      if (!user?.id || !currentChurchId) throw new Error('Você precisa estar logado para se inscrever.');
+      if (!user?.id || !event.id_igreja) throw new Error('Você precisa estar logado para se inscrever.');
       if (event.participantes_count >= (event.capacidade_maxima || Infinity)) throw new Error('Capacidade máxima atingida.');
       
       const { error } = await supabase.from('evento_participantes').insert({
-          evento_id: event.id, membro_id: user.id, id_igreja: currentChurchId
+          evento_id: event.id, membro_id: user.id, id_igreja: event.id_igreja
       });
       if (error) throw error;
     },
@@ -175,5 +167,5 @@ export const useEvents = () => {
     },
   });
 
-  return { events, isLoading, registerMutation, unregisterMutation, queryKey };
+  return { events, isLoading, registerMutation, unregisterMutation, queryClient };
 };

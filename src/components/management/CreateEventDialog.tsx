@@ -1,14 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EventItem } from "./EditEventDialog";
-import { useChurchStore } from "@/stores/churchStore";
 
 export function CreateEventDialog({
   open,
@@ -33,13 +31,7 @@ export function CreateEventDialog({
   const [inscricoesAbertas, setInscricoesAbertas] = useState(true);
   const [saving, setSaving] = useState(false);
   const [paidType, setPaidType] = useState<'gratuito' | 'pago'>('gratuito');
-  const churchStore = useChurchStore();
-  const [shareWithChildren, setShareWithChildren] = useState(false);
-
-  useEffect(() => {
-    const church = churchStore.getChurchById(igrejaId);
-    setShareWithChildren(church?.share_eventos_to_children ?? false);
-  }, [igrejaId, churchStore.churches]);
+  const [visibilidade, setVisibilidade] = useState<'privada' | 'publica'>('privada');
 
   const handleCreate = async () => {
     if (!nome || !dataHora || !local) {
@@ -59,7 +51,9 @@ export function CreateEventDialog({
       valor_inscricao: paidType === 'pago' ? (valorInscricao ? Number(valorInscricao) : 0) : 0,
       inscricoes_abertas: inscricoesAbertas,
       link_externo: paidType === 'pago' && Number(valorInscricao) > 0 ? (linkExterno || null) : null,
-      compartilhar_com_filhas: shareWithChildren,
+      visibilidade: visibilidade,
+      // O campo 'compartilhar_com_filhas' será controlado pela visibilidade 'publica'
+      compartilhar_com_filhas: visibilidade === 'publica',
     };
 
     const { error } = await supabase.from("eventos").insert(payload);
@@ -73,7 +67,7 @@ export function CreateEventDialog({
     // Criar notificação para a igreja
     const { error: notificationError } = await supabase.from('notificacoes').insert({
       id_igreja: igrejaId,
-      user_id: null, // Para todos na igreja
+      membro_id: null, // Para todos na igreja
       tipo: 'NOVO_EVENTO',
       titulo: `Novo Evento: ${nome}`,
       descricao: `Não perca! O evento "${nome}" acontecerá em ${new Date(dataHora).toLocaleDateString('pt-BR')}.`,
@@ -102,6 +96,7 @@ export function CreateEventDialog({
     setValorInscricao("");
     setLinkExterno("");
     setInscricoesAbertas(true);
+    setVisibilidade("privada");
   };
 
   return (
@@ -210,12 +205,18 @@ export function CreateEventDialog({
             </div>
           )}
 
-          <div className="p-3 border rounded-md flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Compartilhar com igrejas filhas</Label>
-              <p className="text-xs text-gray-600">Se ativado, este evento aparecerá para igrejas filhas.</p>
-            </div>
-            <Switch checked={shareWithChildren} onCheckedChange={setShareWithChildren} aria-label="Compartilhar evento com igrejas filhas" />
+          <div className="space-y-2">
+            <Label>Visibilidade do Evento</Label>
+            <Select value={visibilidade} onValueChange={(v) => setVisibilidade(v as 'privada' | 'publica')}>
+              <SelectTrigger>
+                <SelectValue placeholder="Defina a visibilidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="privada">Privado (apenas para sua igreja)</SelectItem>
+                <SelectItem value="publica">Público (para todas as igrejas)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-600">Eventos públicos são visíveis por membros de todas as igrejas da plataforma.</p>
           </div>
 
           <Button onClick={handleCreate} className="w-full" disabled={saving}>
