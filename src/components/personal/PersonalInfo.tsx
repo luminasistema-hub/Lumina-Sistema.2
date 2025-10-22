@@ -21,7 +21,8 @@ import {
   Trash2,
   UserCheck,
   BookOpen,
-  Shield
+  Shield,
+  Loader2
 } from 'lucide-react'
 import { Progress } from '../ui/progress'
 import { useNavigate } from 'react-router-dom' 
@@ -29,6 +30,7 @@ import AddKidDialog from './AddKidDialog';
 import PersonalStatusCards from './PersonalStatusCards';
 import { Badge } from '../ui/badge'
 import { useUserEnrollments, SchoolEnrollment } from '../../hooks/useSchools';
+import { usePersonalInfo } from '../../hooks/usePersonalInfo'
 
 // Interfaces para tipagem dos dados
 interface PersonalInfoData {
@@ -76,23 +78,61 @@ const PersonalInfo = () => {
     experienciaAnterior: '', dataConversao: '', diasDisponiveis: [],
     horariosDisponiveis: ''
   })
-  const [latestVocationalTest, setLatestVocationalTest] = useState<VocationalTestResult | null>(null);
   const [userKids, setUserKids] = useState<Kid[]>([]);
   const [checkinHistory, setCheckinHistory] = useState<CheckinRecord[]>([]);
-  const [myMinistries, setMyMinistries] = useState<MinistryVolunteer[]>([]);
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false);
-  const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
-  const hasLoadedRef = useRef(false);
   const { data: myEnrollments } = useUserEnrollments();
 
   const isFirstAccess = !user?.perfil_completo;
 
-  const loadKids = useCallback(async (spouseId: string | null) => {
+  const { 
+    data: personalData, 
+    isLoading: isLoadingPersonalInfo, 
+    error: personalInfoError 
+  } = usePersonalInfo();
+
+  const { 
+    myMinistries = [], 
+    latestVocationalTest = null, 
+    memberOptions = [] 
+  } = personalData || {};
+
+  useEffect(() => {
+    if (personalData) {
+      const { personalInfo, conjugeNome } = personalData;
+      if (personalInfo) {
+        setFormData(prev => ({
+          ...prev,
+          nomeCompleto: user.name,
+          email: user.email,
+          telefone: personalInfo.telefone || '',
+          endereco: personalInfo.endereco || '',
+          profissao: personalInfo.profissao || '',
+          dataNascimento: personalInfo.data_nascimento || '',
+          estadoCivil: personalInfo.estado_civil || '',
+          conjugeId: personalInfo.conjuge_id || null,
+          dataCasamento: personalInfo.data_casamento || '',
+          paisCristaos: personalInfo.pais_cristaos || '',
+          tempoIgreja: personalInfo.tempo_igreja || '',
+          batizado: personalInfo.batizado || false,
+          dataBatismo: personalInfo.data_batismo || '',
+          participaMinisterio: personalInfo.participa_ministerio || false,
+          ministerioAtual: personalInfo.ministerio_anterior || '',
+          dataConversao: personalInfo.data_conversao || '',
+          diasDisponiveis: personalInfo.dias_disponiveis || [],
+          horariosDisponiveis: personalInfo.horarios_disponiveis || '',
+          conjugeNome: conjugeNome,
+        }));
+      }
+    }
+  }, [personalData, user]);
+
+  const loadKids = useCallback(async () => {
     if (!user || !currentChurchId) return;
 
     const responsibleIds = [user.id];
-    if (spouseId) {
-      responsibleIds.push(spouseId);
+    if (formData.conjugeId) {
+      responsibleIds.push(formData.conjugeId);
     }
 
     const { data: kidsData, error: kidsError } = await supabase
@@ -112,79 +152,11 @@ const PersonalInfo = () => {
       idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000)
     }));
     setUserKids(formattedKids);
-  }, [user, currentChurchId]);
+  }, [user, currentChurchId, formData.conjugeId]);
 
-  const loadData = useCallback(async () => {
-    if (!user || !currentChurchId) return;
-
-    // Carregar informações pessoais
-    const { data: personalInfo, error: personalInfoError } = await supabase
-      .from('informacoes_pessoais')
-      .select('*')
-      .eq('membro_id', user.id)
-      .maybeSingle();
-    if (personalInfoError) toast.error('Erro ao carregar informações pessoais.');
-    
-    if (personalInfo) {
-      setFormData(prev => ({
-        ...prev,
-        nomeCompleto: user.name,
-        email: user.email,
-        telefone: personalInfo.telefone || '',
-        endereco: personalInfo.endereco || '',
-        profissao: personalInfo.profissao || '',
-        dataNascimento: personalInfo.data_nascimento || '',
-        estadoCivil: personalInfo.estado_civil || '',
-        conjugeId: personalInfo.conjuge_id || null,
-        dataCasamento: personalInfo.data_casamento || '',
-        paisCristaos: personalInfo.pais_cristaos || '',
-        tempoIgreja: personalInfo.tempo_igreja || '',
-        batizado: personalInfo.batizado || false,
-        dataBatismo: personalInfo.data_batismo || '',
-        participaMinisterio: personalInfo.participa_ministerio || false,
-        ministerioAtual: personalInfo.ministerio_anterior || '',
-        dataConversao: personalInfo.data_conversao || '',
-        diasDisponiveis: personalInfo.dias_disponiveis || [],
-        horariosDisponiveis: personalInfo.horarios_disponiveis || '',
-      }));
-
-      if (personalInfo.conjuge_id) {
-        const { data: spouse } = await supabase
-          .from('membros')
-          .select('nome_completo')
-          .eq('id', personalInfo.conjuge_id)
-          .maybeSingle();
-        if (spouse?.nome_completo) {
-          setFormData(prev => ({ ...prev, conjugeNome: spouse.nome_completo }));
-        }
-      }
-    }
-
-    // Carregar ministérios do usuário
-    const { data: ministriesData, error: ministriesError } = await supabase
-      .from('ministerio_voluntarios')
-      .select('ministerios(id, nome)')
-      .eq('membro_id', user.id);
-    if (ministriesError) toast.error('Erro ao carregar ministérios.');
-    else setMyMinistries(ministriesData || []);
-
-    // Carregar teste vocacional
-    const { data: tests } = await supabase
-      .from('testes_vocacionais')
-      .select('id, data_teste, ministerio_recomendado, is_ultimo')
-      .eq('membro_id', user.id)
-      .order('data_teste', { ascending: false });
-    if (tests?.length) {
-      setLatestVocationalTest(tests.find(t => t.is_ultimo) || tests[0]);
-    }
-
-    // Carregar membros para seleção de cônjuge
-    const { data: members } = await supabase.from('membros').select('id, nome_completo, email')
-      .eq('id_igreja', currentChurchId).eq('status', 'ativo').neq('id', user.id)
-      .order('nome_completo');
-    setMemberOptions(members as MemberOption[] || []);
-
-  }, [user, currentChurchId]);
+  useEffect(() => {
+    loadKids();
+  }, [loadKids]);
 
   const loadCheckinHistory = useCallback(async () => {
     if (userKids.length === 0) {
@@ -209,20 +181,10 @@ const PersonalInfo = () => {
   }, [userKids]);
 
   useEffect(() => {
-    if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      loadData();
-    }
-  }, [loadData]);
-
-  useEffect(() => {
-    // Carrega os filhos na montagem inicial e sempre que o cônjuge mudar
-    loadKids(formData.conjugeId);
-  }, [formData.conjugeId, loadKids]);
-
-  useEffect(() => {
     if (userKids.length > 0) {
       loadCheckinHistory();
+    } else {
+      setCheckinHistory([]);
     }
   }, [userKids, loadCheckinHistory]);
 
@@ -282,7 +244,7 @@ const PersonalInfo = () => {
       toast.error(`Falha ao remover: ${error.message}`);
       return;
     }
-    await loadData();
+    await loadKids();
     toast.dismiss(loadingId);
     toast.success('Criança removida!');
   };
@@ -463,7 +425,7 @@ const PersonalInfo = () => {
           </div>
         </form>
         {user && currentChurchId && (
-          <AddKidDialog isOpen={isAddKidDialogOpen} onClose={() => setIsAddKidDialogOpen(false)} responsibleId={user.id} responsibleName={user.name} responsibleEmail={user.email} churchId={currentChurchId} onKidAdded={loadData} />
+          <AddKidDialog isOpen={isAddKidDialogOpen} onClose={() => setIsAddKidDialogOpen(false)} responsibleId={user.id} responsibleName={user.name} responsibleEmail={user.email} churchId={currentChurchId} onKidAdded={loadKids} />
         )}
       </div>
     )
@@ -476,6 +438,23 @@ const PersonalInfo = () => {
       <dd className="mt-1 text-sm leading-6 text-gray-800 font-medium sm:col-span-2 sm:mt-0">{value || 'Não informado'}</dd>
     </div>
   );
+
+  if (isLoadingPersonalInfo) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  if (personalInfoError) {
+    return (
+      <div className="p-6 text-center text-red-500 bg-red-50 rounded-lg">
+        <p className="font-bold">Ocorreu um erro</p>
+        <p>{personalInfoError.message}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -545,7 +524,7 @@ const PersonalInfo = () => {
                     <li key={enrollment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                       <div>
                         <p className="font-medium">{enrollment.escolas?.nome}</p>
-                        <p className="text-sm text-gray-600">Status: <Badge variant="outline" className="text-xs">{enrollment.status}</Badge></p>
+                        <div className="text-sm text-gray-600">Status: <Badge variant="outline" className="text-xs">{enrollment.status}</Badge></div>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => navigate(`/escolas/${enrollment.escola_id}`)}>Ver</Button>
                     </li>
