@@ -56,6 +56,8 @@ const ChildChurchesPage = () => {
     cnpj: '',
     panel_password: ''
   });
+  const [openDashboard, setOpenDashboard] = useState(false);
+  const [selectedChild, setSelectedChild] = useState<ChildItem | null>(null);
   const canManage = useMemo(() => user?.role === 'admin' || user?.role === 'pastor', [user?.role]);
 
   const load = useCallback(async () => {
@@ -321,7 +323,10 @@ const ChildChurchesPage = () => {
                       <Badge variant="outline">Ministérios: {c.metrics.ministries}</Badge>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setCurrentChurchId(c.id)}>
+                      <Button variant="outline" size="sm" onClick={() => {
+                        setSelectedChild(c);
+                        setOpenDashboard(true);
+                      }}>
                         <Eye className="w-4 h-4 mr-1" /> Ir para painel
                       </Button>
                     </div>
@@ -332,6 +337,14 @@ const ChildChurchesPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Painel da Igreja Filha */}
+      <ChildChurchDashboardDialog
+        churchId={selectedChild?.id || ''}
+        churchName={selectedChild?.nome || 'Igreja Filha'}
+        open={openDashboard}
+        onOpenChange={(o) => setOpenDashboard(o)}
+      />
     </div>
   );
 };
