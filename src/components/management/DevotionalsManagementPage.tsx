@@ -13,6 +13,7 @@ import { Calendar, User, Tag, Pencil, Trash2, Star, Plus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useChurchStore } from '@/stores/churchStore';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado';
 type DevotionalCategory = 'Diário' | 'Semanal' | 'Especial' | 'Temático';
