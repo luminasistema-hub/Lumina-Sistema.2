@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -28,6 +28,7 @@ import {
   Headphones,
   DollarSign
 } from 'lucide-react'
+import { useLoadingProtection } from '../../hooks/useLoadingProtection'
 
 interface Question {
   id: number
@@ -56,8 +57,7 @@ const VocationalTest = () => {
   const [topMinistry, setTopMinistry] = useState<MinistryResult | null>(null)
   const [hasPreviousTest, setHasPreviousTest] = useState(false)
   const [isLoadingResults, setIsLoadingResults] = useState(true)
-  const isFetchingRef = useRef(false)
-  const timeoutRef = useRef<number | null>(null)
+  const { protectedFetch, cleanup } = useLoadingProtection({ timeoutMs: 8000 })
 
   const questions: Question[] = [
     { id: 1, text: "Tenho facilidade com equipamentos eletrônicos e tecnologia", ministry: "midia" },
@@ -264,120 +264,103 @@ const VocationalTest = () => {
   }
 
   useEffect(() => {
-    const loadPreviousTest = async () => {
-      // Evita reentradas concorrentes
-      if (isFetchingRef.current) return
-      isFetchingRef.current = true
-      // Timeout de segurança para nunca travar a UI
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current)
-      }
-      timeoutRef.current = window.setTimeout(() => {
-        setIsLoadingResults(false)
-      }, 8000)
-
+    const loadPreviousTest = () => {
       if (!user?.id) {
         setIsLoadingResults(false)
-        isFetchingRef.current = false
-        if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
         return
       }
 
-      // Hidratar de cache local para exibir de imediato
-      try {
-        const cached = localStorage.getItem(`vt_results_${user.id}`)
-        if (cached) {
-          const parsed = JSON.parse(cached)
-          if (parsed?.results?.length) {
-            setResults(parsed.results)
-            setTopMinistry(parsed.topMinistry || parsed.results[0] || null)
-            setHasPreviousTest(true)
-            setCurrentStep('results')
-            setIsLoadingResults(false)
-          }
-        }
-      } catch {}
-
-      console.log('VocationalTest: Loading previous test results for user:', user.id);
-      const { data, error } = await supabase
-        .from('testes_vocacionais')
-        .select('*')
-        .eq('membro_id', user.id)
-        .eq('is_ultimo', true)
-        .maybeSingle(); 
-
-      if (error) {
-        console.error('VocationalTest: Error loading previous test:', error);
-        toast.error('Erro ao carregar teste vocacional anterior.');
-        setIsLoadingResults(false)
-        isFetchingRef.current = false
-        if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-        return
-      }
-
-      if (data) {
-        console.log('VocationalTest: Previous test found:', data);
-        setHasPreviousTest(true);
-        
-        // Calcula as pontuações a partir do JSON de respostas
-        const respostas = (data as any)?.respostas || {};
-        const ministryScores: Record<string, number> = {
-          midia: 0,
-          louvor: 0,
-          diaconato: 0,
-          integracao: 0,
-          ensino: 0,
-          kids: 0,
-          organizacao: 0,
-          acao_social: 0,
-        };
-        questions.forEach((q) => {
-          const v = typeof respostas[`q${q.id}`] === 'number' ? respostas[`q${q.id}`] : 0;
-          ministryScores[q.ministry] += v;
-        });
-
-        const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
-          const score = ministryScores[ministryKey];
-          const maxScore = 25; 
-          const percentage = (score / maxScore) * 100;
-          
-          return {
-            ...ministryData[ministryKey as keyof typeof ministryData],
-            score,
-            percentage: Math.round(percentage)
-          };
-        });
-
-        calculatedResults.sort((a, b) => b.score - a.score);
-        setResults(calculatedResults);
-        setTopMinistry(calculatedResults[0]);
-        setCurrentStep('results');
-        // Atualiza cache local
+      const fetchFn = async () => {
+        // Hidratar de cache local para exibir de imediato
         try {
-          localStorage.setItem(`vt_results_${user.id}`, JSON.stringify({
-            results: calculatedResults,
-            topMinistry: calculatedResults[0],
-            ts: Date.now()
-          }))
+          const cached = localStorage.getItem(`vt_results_${user.id}`)
+          if (cached) {
+            const parsed = JSON.parse(cached)
+            if (parsed?.results?.length) {
+              setResults(parsed.results)
+              setTopMinistry(parsed.topMinistry || parsed.results[0] || null)
+              setHasPreviousTest(true)
+              setCurrentStep('results')
+            }
+          }
         } catch {}
-      } else {
-        console.log('VocationalTest: No previous test found.');
-        setHasPreviousTest(false);
+
+        console.log('VocationalTest: Loading previous test results for user:', user.id)
+        const { data, error } = await supabase
+          .from('testes_vocacionais')
+          .select('*')
+          .eq('membro_id', user.id)
+          .eq('is_ultimo', true)
+          .maybeSingle()
+
+        if (error) {
+          console.error('VocationalTest: Error loading previous test:', error)
+          toast.error('Erro ao carregar teste vocacional anterior.')
+          throw error
+        }
+        return data
       }
-      setIsLoadingResults(false)
-      isFetchingRef.current = false
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
-    };
+
+      const onSuccess = (data: any) => {
+        if (data) {
+          console.log('VocationalTest: Previous test found:', data)
+          setHasPreviousTest(true)
+          
+          const respostas = data.respostas || {}
+          const ministryScores: Record<string, number> = {
+            midia: 0, louvor: 0, diaconato: 0, integracao: 0,
+            ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
+          }
+          questions.forEach((q) => {
+            const v = typeof respostas[`q${q.id}`] === 'number' ? respostas[`q${q.id}`] : 0
+            ministryScores[q.ministry] += v
+          })
+
+          const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
+            const score = ministryScores[ministryKey]
+            const maxScore = 25
+            const percentage = (score / maxScore) * 100
+            
+            return {
+              ...ministryData[ministryKey as keyof typeof ministryData],
+              score,
+              percentage: Math.round(percentage)
+            }
+          })
+
+          calculatedResults.sort((a, b) => b.score - a.score)
+          setResults(calculatedResults)
+          setTopMinistry(calculatedResults[0])
+          setCurrentStep('results')
+          
+          try {
+            localStorage.setItem(`vt_results_${user.id}`, JSON.stringify({
+              results: calculatedResults,
+              topMinistry: calculatedResults[0],
+              ts: Date.now()
+            }))
+          } catch {}
+        } else {
+          console.log('VocationalTest: No previous test found.')
+          setHasPreviousTest(false)
+        }
+      }
+
+      protectedFetch(fetchFn, onSuccess, undefined, () => {
+        setIsLoadingResults(false)
+      })
+    }
 
     if (user?.id) {
-      loadPreviousTest();
+      loadPreviousTest()
     } else {
       setIsLoadingResults(false)
     }
-  }, [user?.id]);
+
+    return () => {
+      cleanup()
+    }
+  }, [user?.id, protectedFetch, cleanup, questions, ministryData])
 
   const handleAnswerChange = (questionId: number, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: parseInt(value) }))
@@ -390,7 +373,7 @@ const VocationalTest = () => {
     }
 
     console.log('Calculating vocational test results and saving to Supabase...');
-    
+
     // Monta respostas em JSON e calcula pontuações por ministério
     const respostas: Record<string, number> = {};
     questions.forEach((q) => {
@@ -409,7 +392,7 @@ const VocationalTest = () => {
     questions.forEach((q) => {
       ministryScores[q.ministry] += respostas[`q${q.id}`];
     });
-    
+
     // Ministério recomendado (maior pontuação)
     const topKey = Object.keys(ministryScores).sort((a, b) => ministryScores[b] - ministryScores[a])[0];
     const recommendedName = (ministryData as any)[topKey]?.name ?? topKey;
@@ -441,7 +424,7 @@ const VocationalTest = () => {
     }
 
     console.log('VocationalTest: Test results saved to Supabase:', data);
-    
+
     const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
       const score = ministryScores[ministryKey];
       const maxScore = 25; 
