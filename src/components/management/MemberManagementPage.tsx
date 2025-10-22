@@ -733,7 +733,7 @@ const MemberManagementPage = () => {
                   <Button variant="outline" size="sm" onClick={() => setSelectedMember(member)}>
                     <Eye className="w-4 h-4 mr-2" />Ver Perfil
                   </Button>
-                  {(canApprove && member.status === 'pendente') && (
+                  {(canApprove && member.status !== 'ativo') && (
                     <Button
                       variant="outline"
                       size="sm"
