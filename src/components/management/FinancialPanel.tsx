@@ -9,12 +9,13 @@ import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Badge } from '../ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
 import { UnifiedReceiptDialog } from '../financial/UnifiedReceiptDialog'
 import BudgetManagement from '../financial/BudgetManagement'
+import ReportViewerDialog from '../financial/ReportViewerDialog'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { 
   PieChart,
@@ -35,7 +36,9 @@ import {
   Calendar,
   User,
   CreditCard,
-  AlertCircle
+  AlertCircle,
+  Settings,
+  Download
 } from 'lucide-react'
 import TransactionDetailsDialog from '../financial/TransactionDetailsDialog'
 
@@ -62,6 +65,19 @@ interface FinancialTransaction {
   id_igreja: string
 }
 
+interface FinancialGoal {
+  id: string
+  id_igreja: string
+  nome: string
+  valor_meta: number
+  valor_atual: number
+  data_inicio: string
+  data_limite?: string
+  categoria?: string
+  descricao?: string
+  status: 'Ativo' | 'Concluído' | 'Cancelado'
+}
+
 const PAGE_SIZE = 10
 
 const FinancialPanel = () => {
@@ -80,10 +96,19 @@ const FinancialPanel = () => {
   
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
   const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false)
+  const [isChurchSettingsOpen, setIsChurchSettingsOpen] = useState(false)
+  const [isAddGoalOpen, setIsAddGoalOpen] = useState(false)
+  const [isEditGoalOpen, setIsEditGoalOpen] = useState(false)
+  const [goalToEdit, setGoalToEdit] = useState<FinancialGoal | null>(null)
   const [transactionToEdit, setTransactionToEdit] = useState<FinancialTransaction | null>(null)
   const [receiptTransaction, setReceiptTransaction] = useState<FinancialTransaction | null>(null)
   const [detailsTransaction, setDetailsTransaction] = useState<FinancialTransaction | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [selectedReport, setSelectedReport] = useState<any>(null)
+  const [reportPeriod, setReportPeriod] = useState({
+    inicio: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    fim: new Date().toISOString().split('T')[0]
+  })
 
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
@@ -103,10 +128,21 @@ const FinancialPanel = () => {
     status: 'Confirmado' as 'Pendente' | 'Confirmado' | 'Cancelado'
   })
 
+  const [newGoal, setNewGoal] = useState({
+    nome: '',
+    valor_meta: 0,
+    data_inicio: new Date().toISOString().split('T')[0],
+    data_limite: '',
+    categoria: '',
+    descricao: ''
+  })
+
   const categoriesEntrada = ['Dízimos', 'Ofertas', 'Doações Especiais', 'Eventos', 'Vendas', 'Outros']
   const categoriesSaida = ['Pessoal', 'Manutenção', 'Utilidades', 'Ministérios', 'Eventos', 'Equipamentos', 'Outros']
   const allCategories = useMemo(() => Array.from(new Set([...categoriesEntrada, ...categoriesSaida])), [])
   const metodosPagamento = ['PIX', 'Dinheiro', 'Cartão Débito', 'Cartão Crédito', 'Transferência', 'Cheque', 'Boleto']
+
+  const currentChurch = churchStore.getChurchById(currentChurchId!)
 
   // Query para membros
   const { data: members = [] } = useQuery({
@@ -202,6 +238,23 @@ const FinancialPanel = () => {
       }
     },
     enabled: !!currentChurchId && viewMode === 'dashboard',
+    staleTime: 60 * 1000,
+  })
+
+  // Query para metas financeiras
+  const { data: goals = [] } = useQuery({
+    queryKey: ['financial-goals', currentChurchId],
+    queryFn: async () => {
+      if (!currentChurchId) return []
+      const { data, error } = await supabase
+        .from('metas_financeiras')
+        .select('*')
+        .eq('id_igreja', currentChurchId)
+        .order('data_inicio', { ascending: false })
+      if (error) throw error
+      return data as FinancialGoal[]
+    },
+    enabled: !!currentChurchId && viewMode === 'goals',
     staleTime: 60 * 1000,
   })
 
@@ -331,6 +384,63 @@ const FinancialPanel = () => {
     onError: (error: any) => toast.error(`Erro: ${error.message}`)
   })
 
+  const updateChurchInfoMutation = useMutation({
+    mutationFn: async (updates: any) => {
+      if (!currentChurchId) throw new Error('Igreja não selecionada')
+      await churchStore.updateChurch(currentChurchId, updates)
+    },
+    onSuccess: () => {
+      toast.success('Informações da igreja atualizadas!')
+      setIsChurchSettingsOpen(false)
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const addGoalMutation = useMutation({
+    mutationFn: async (goal: any) => {
+      const { error } = await supabase.from('metas_financeiras').insert({
+        ...goal,
+        id_igreja: currentChurchId,
+        valor_atual: 0,
+        status: 'Ativo'
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Meta criada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['financial-goals'] })
+      setIsAddGoalOpen(false)
+      resetGoalForm()
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const updateGoalMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string, data: any }) => {
+      const { error } = await supabase.from('metas_financeiras').update(data).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Meta atualizada!')
+      queryClient.invalidateQueries({ queryKey: ['financial-goals'] })
+      setIsEditGoalOpen(false)
+      setGoalToEdit(null)
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const deleteGoalMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('metas_financeiras').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Meta removida!')
+      queryClient.invalidateQueries({ queryKey: ['financial-goals'] })
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
   const resetNewTransactionForm = () => {
     setNewTransaction({
       tipo: 'Entrada',
@@ -349,6 +459,17 @@ const FinancialPanel = () => {
     })
   }
 
+  const resetGoalForm = () => {
+    setNewGoal({
+      nome: '',
+      valor_meta: 0,
+      data_inicio: new Date().toISOString().split('T')[0],
+      data_limite: '',
+      categoria: '',
+      descricao: ''
+    })
+  }
+
   const handleAddTransaction = () => {
     if (!newTransaction.categoria || !newTransaction.descricao || newTransaction.valor <= 0) {
       toast.error('Preencha todos os campos obrigatórios')
@@ -360,6 +481,19 @@ const FinancialPanel = () => {
   const handleEditTransaction = () => {
     if (!transactionToEdit) return
     updateTransactionMutation.mutate({ id: transactionToEdit.id, data: transactionToEdit })
+  }
+
+  const handleAddGoal = () => {
+    if (!newGoal.nome || newGoal.valor_meta <= 0) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+    addGoalMutation.mutate(newGoal)
+  }
+
+  const handleEditGoal = () => {
+    if (!goalToEdit) return
+    updateGoalMutation.mutate({ id: goalToEdit.id, data: goalToEdit })
   }
 
   const openDetails = (transaction: FinancialTransaction) => {
@@ -375,7 +509,68 @@ const FinancialPanel = () => {
     setReceiptTransaction(transaction)
   }
 
-  const currentChurch = churchStore.getChurchById(currentChurchId!)
+  const generateReport = async () => {
+    if (!currentChurchId) return
+    
+    const { data: transactionsData, error } = await supabase
+      .from('transacoes_financeiras')
+      .select('*')
+      .eq('id_igreja', currentChurchId)
+      .eq('status', 'Confirmado')
+      .gte('data_transacao', reportPeriod.inicio)
+      .lte('data_transacao', reportPeriod.fim)
+    
+    if (error) {
+      toast.error('Erro ao gerar relatório')
+      return
+    }
+
+    const entradas = transactionsData.filter(t => t.tipo === 'Entrada')
+    const saidas = transactionsData.filter(t => t.tipo === 'Saída')
+    
+    const totalEntradas = entradas.reduce((sum, t) => sum + t.valor, 0)
+    const totalSaidas = saidas.reduce((sum, t) => sum + t.valor, 0)
+    
+    const categoriasEntrada = entradas.reduce((acc, t) => {
+      const existing = acc.find(c => c.categoria === t.categoria)
+      if (existing) {
+        existing.valor += t.valor
+      } else {
+        acc.push({ categoria: t.categoria, valor: t.valor })
+      }
+      return acc
+    }, [] as Array<{categoria: string, valor: number}>)
+    
+    const categoriasSaida = saidas.reduce((acc, t) => {
+      const existing = acc.find(c => c.categoria === t.categoria)
+      if (existing) {
+        existing.valor += t.valor
+      } else {
+        acc.push({ categoria: t.categoria, valor: t.valor })
+      }
+      return acc
+    }, [] as Array<{categoria: string, valor: number}>)
+
+    const report = {
+      id: Date.now().toString(),
+      tipo: 'Personalizado',
+      periodo_inicio: reportPeriod.inicio,
+      periodo_fim: reportPeriod.fim,
+      gerado_por: user?.name || 'Sistema',
+      data_geracao: new Date().toISOString(),
+      dados: {
+        total_entradas: totalEntradas,
+        total_saidas: totalSaidas,
+        saldo_periodo: totalEntradas - totalSaidas,
+        categorias_entrada: categoriasEntrada,
+        categorias_saida: categoriasSaida,
+        maior_entrada: entradas.sort((a, b) => b.valor - a.valor)[0] || null,
+        maior_saida: saidas.sort((a, b) => b.valor - a.valor)[0] || null
+      }
+    }
+
+    setSelectedReport(report)
+  }
 
   if (!currentChurchId) {
     return <div className="p-6 text-center text-gray-600">Selecione uma igreja para gerenciar o painel financeiro.</div>
@@ -385,11 +580,23 @@ const FinancialPanel = () => {
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Painel Financeiro</h1>
-        {canManageFinancial && viewMode === 'transactions' && (
-          <Button onClick={() => setIsAddTransactionOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Nova Transação
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canManageFinancial && (
+            <Button variant="outline" onClick={() => setIsChurchSettingsOpen(true)}>
+              <Settings className="w-4 h-4 mr-2" /> Configurações
+            </Button>
+          )}
+          {canManageFinancial && viewMode === 'transactions' && (
+            <Button onClick={() => setIsAddTransactionOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Nova Transação
+            </Button>
+          )}
+          {canManageFinancial && viewMode === 'goals' && (
+            <Button onClick={() => setIsAddGoalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Nova Meta
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="space-y-4">
@@ -397,8 +604,8 @@ const FinancialPanel = () => {
           <TabsTrigger value="dashboard"><PieChart className="w-4 h-4 mr-2" />Dashboard</TabsTrigger>
           <TabsTrigger value="transactions"><BarChart3 className="w-4 h-4 mr-2" />Transações</TabsTrigger>
           <TabsTrigger value="budget"><Calculator className="w-4 h-4 mr-2" />Orçamento</TabsTrigger>
-          <TabsTrigger value="goals" disabled><Target className="w-4 h-4 mr-2" />Metas</TabsTrigger>
-          <TabsTrigger value="reports" disabled><FileText className="w-4 h-4 mr-2" />Relatórios</TabsTrigger>
+          <TabsTrigger value="goals"><Target className="w-4 h-4 mr-2" />Metas</TabsTrigger>
+          <TabsTrigger value="reports"><FileText className="w-4 h-4 mr-2" />Relatórios</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
@@ -688,22 +895,243 @@ const FinancialPanel = () => {
           <BudgetManagement />
         </TabsContent>
         
-        <TabsContent value="goals">
-          <Card className="p-8 text-center">
-            <Target className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-600 mb-2">Metas Financeiras</p>
-            <p className="text-sm text-gray-500">Em breve você poderá criar e acompanhar metas financeiras</p>
-          </Card>
+        <TabsContent value="goals" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {goals.map((goal) => {
+              const percentage = goal.valor_meta > 0 ? (goal.valor_atual / goal.valor_meta) * 100 : 0
+              const isCompleted = percentage >= 100
+              const isExpired = goal.data_limite && new Date(goal.data_limite) < new Date()
+              
+              return (
+                <Card key={goal.id} className={isCompleted ? 'border-green-500' : isExpired ? 'border-red-500' : ''}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{goal.nome}</CardTitle>
+                        {goal.categoria && <p className="text-sm text-gray-500">{goal.categoria}</p>}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          setGoalToEdit(goal)
+                          setIsEditGoalOpen(true)
+                        }}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          if (confirm('Tem certeza que deseja excluir esta meta?')) {
+                            deleteGoalMutation.mutate(goal.id)
+                          }
+                        }}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {goal.descricao && (
+                      <p className="text-sm text-gray-600">{goal.descricao}</p>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Arrecadado:</span>
+                        <span className="font-semibold text-green-600">
+                          R$ {goal.valor_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Meta:</span>
+                        <span className="font-semibold">
+                          R$ {goal.valor_meta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Faltam:</span>
+                        <span className="font-semibold text-orange-600">
+                          R$ {Math.max(0, goal.valor_meta - goal.valor_atual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>{percentage.toFixed(1)}%</span>
+                        {goal.data_limite && (
+                          <span>Prazo: {new Date(goal.data_limite).toLocaleDateString('pt-BR')}</span>
+                        )}
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${
+                            isCompleted ? 'bg-green-500' : 
+                            isExpired ? 'bg-red-500' : 
+                            percentage > 70 ? 'bg-yellow-500' : 'bg-blue-500'
+                          }`}
+                          style={{ width: `${Math.min(percentage, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {isCompleted && (
+                      <Badge className="w-full justify-center bg-green-500">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Meta Atingida!
+                      </Badge>
+                    )}
+                    {isExpired && !isCompleted && (
+                      <Badge variant="destructive" className="w-full justify-center">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Prazo Expirado
+                      </Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {goals.length === 0 && (
+            <Card className="p-8 text-center">
+              <Target className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-600 mb-2">Nenhuma meta financeira cadastrada</p>
+              <p className="text-sm text-gray-500 mb-4">Crie metas para acompanhar arrecadações específicas</p>
+              <Button onClick={() => setIsAddGoalOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Criar Primeira Meta
+              </Button>
+            </Card>
+          )}
         </TabsContent>
         
-        <TabsContent value="reports">
-          <Card className="p-8 text-center">
-            <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-600 mb-2">Relatórios Financeiros</p>
-            <p className="text-sm text-gray-500">Em breve você poderá gerar relatórios detalhados</p>
+        <TabsContent value="reports" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gerar Relatório Financeiro</CardTitle>
+              <DialogDescription>
+                Selecione o período para gerar um relatório detalhado das movimentações financeiras
+              </DialogDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Data Início</Label>
+                  <Input 
+                    type="date" 
+                    value={reportPeriod.inicio}
+                    onChange={(e) => setReportPeriod({...reportPeriod, inicio: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data Fim</Label>
+                  <Input 
+                    type="date" 
+                    value={reportPeriod.fim}
+                    onChange={(e) => setReportPeriod({...reportPeriod, fim: e.target.value})}
+                  />
+                </div>
+              </div>
+              <Button onClick={generateReport} className="w-full">
+                <Download className="w-4 h-4 mr-2" />
+                Gerar Relatório
+              </Button>
+            </CardContent>
           </Card>
+
+          {selectedReport && (
+            <ReportViewerDialog
+              isOpen={!!selectedReport}
+              onOpenChange={() => setSelectedReport(null)}
+              report={selectedReport}
+            />
+          )}
         </TabsContent>
       </Tabs>
+
+      {/* Dialog de Configurações da Igreja */}
+      <Dialog open={isChurchSettingsOpen} onOpenChange={setIsChurchSettingsOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Configurações da Igreja</DialogTitle>
+            <DialogDescription>
+              Configure as informações que aparecerão nos recibos e documentos financeiros
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome da Igreja</Label>
+              <Input 
+                value={currentChurch?.name || ''} 
+                onChange={(e) => {
+                  if (currentChurch) {
+                    churchStore.updateChurch(currentChurch.id, { name: e.target.value })
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>CNPJ</Label>
+              <Input 
+                value={currentChurch?.cnpj || ''} 
+                onChange={(e) => {
+                  if (currentChurch) {
+                    churchStore.updateChurch(currentChurch.id, { cnpj: e.target.value })
+                  }
+                }}
+                placeholder="00.000.000/0000-00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Endereço Completo</Label>
+              <Input 
+                value={currentChurch?.address || ''} 
+                onChange={(e) => {
+                  if (currentChurch) {
+                    churchStore.updateChurch(currentChurch.id, { address: e.target.value })
+                  }
+                }}
+                placeholder="Rua, número, bairro, cidade - UF"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input 
+                  value={currentChurch?.contactPhone || ''} 
+                  onChange={(e) => {
+                    if (currentChurch) {
+                      churchStore.updateChurch(currentChurch.id, { contactPhone: e.target.value })
+                    }
+                  }}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input 
+                  type="email"
+                  value={currentChurch?.contactEmail || ''} 
+                  onChange={(e) => {
+                    if (currentChurch) {
+                      churchStore.updateChurch(currentChurch.id, { contactEmail: e.target.value })
+                    }
+                  }}
+                  placeholder="contato@igreja.com"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsChurchSettingsOpen(false)}>
+                Fechar
+              </Button>
+              <Button onClick={() => {
+                toast.success('Configurações salvas!')
+                setIsChurchSettingsOpen(false)
+              }}>
+                Salvar Configurações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog para adicionar transação */}
       <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
@@ -911,6 +1339,154 @@ const FinancialPanel = () => {
                 </Button>
                 <Button onClick={handleEditTransaction} disabled={updateTransactionMutation.isPending}>
                   {updateTransactionMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    'Salvar Alterações'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para adicionar meta */}
+      <Dialog open={isAddGoalOpen} onOpenChange={setIsAddGoalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Nova Meta Financeira</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome da Meta *</Label>
+              <Input 
+                value={newGoal.nome} 
+                onChange={(e) => setNewGoal({...newGoal, nome: e.target.value})} 
+                placeholder="Ex: Reforma do Templo"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Valor da Meta *</Label>
+              <Input 
+                type="number" 
+                step="0.01" 
+                value={newGoal.valor_meta} 
+                onChange={(e) => setNewGoal({...newGoal, valor_meta: parseFloat(e.target.value) || 0})} 
+                placeholder="0,00"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Data Início</Label>
+                <Input 
+                  type="date" 
+                  value={newGoal.data_inicio} 
+                  onChange={(e) => setNewGoal({...newGoal, data_inicio: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Data Limite (opcional)</Label>
+                <Input 
+                  type="date" 
+                  value={newGoal.data_limite} 
+                  onChange={(e) => setNewGoal({...newGoal, data_limite: e.target.value})} 
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria (opcional)</Label>
+              <Input 
+                value={newGoal.categoria} 
+                onChange={(e) => setNewGoal({...newGoal, categoria: e.target.value})} 
+                placeholder="Ex: Infraestrutura"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Descrição</Label>
+              <Textarea 
+                value={newGoal.descricao} 
+                onChange={(e) => setNewGoal({...newGoal, descricao: e.target.value})} 
+                rows={3} 
+                placeholder="Descreva o objetivo desta meta"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => {
+                setIsAddGoalOpen(false)
+                resetGoalForm()
+              }}>
+                Cancelar
+              </Button>
+              <Button onClick={handleAddGoal} disabled={addGoalMutation.isPending}>
+                {addGoalMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Criar Meta'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar meta */}
+      <Dialog open={isEditGoalOpen} onOpenChange={setIsEditGoalOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Meta Financeira</DialogTitle></DialogHeader>
+          {goalToEdit && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nome da Meta</Label>
+                <Input 
+                  value={goalToEdit.nome} 
+                  onChange={(e) => setGoalToEdit({...goalToEdit, nome: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Valor da Meta</Label>
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  value={goalToEdit.valor_meta} 
+                  onChange={(e) => setGoalToEdit({...goalToEdit, valor_meta: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Valor Atual</Label>
+                <Input 
+                  type="number" 
+                  step="0.01" 
+                  value={goalToEdit.valor_atual} 
+                  onChange={(e) => setGoalToEdit({...goalToEdit, valor_atual: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select 
+                  value={goalToEdit.status} 
+                  onValueChange={(v: any) => setGoalToEdit({...goalToEdit, status: v})}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ativo">Ativo</SelectItem>
+                    <SelectItem value="Concluído">Concluído</SelectItem>
+                    <SelectItem value="Cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => {
+                  setIsEditGoalOpen(false)
+                  setGoalToEdit(null)
+                }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleEditGoal} disabled={updateGoalMutation.isPending}>
+                  {updateGoalMutation.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Salvando...
