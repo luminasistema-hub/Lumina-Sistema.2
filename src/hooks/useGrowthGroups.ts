@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
@@ -23,6 +23,9 @@ export const useChurchGrowthGroups = () => {
   return useQuery({
     queryKey: ['gc-groups', currentChurchId],
     enabled: !!currentChurchId,
+    staleTime: 1000 * 60 * 15, // 15 minutos
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
     queryFn: async (): Promise<GrowthGroup[]> => {
       const { data, error } = await supabase
         .from('gc_groups')
@@ -157,6 +160,8 @@ export const useGroupLeaders = (groupId: string | null) => {
   return useQuery({
     queryKey: ['gc-group-leaders', groupId],
     enabled: !!groupId,
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
     queryFn: async (): Promise<MemberProfile[]> => {
       const { data, error } = await supabase
         .from('gc_group_leaders')
@@ -172,6 +177,8 @@ export const useGroupMembers = (groupId: string | null) => {
   return useQuery({
     queryKey: ['gc-group-members', groupId],
     enabled: !!groupId,
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
     queryFn: async (): Promise<MemberProfile[]> => {
       const { data, error } = await supabase
         .from('gc_group_members')
@@ -186,30 +193,14 @@ export const useGroupMembers = (groupId: string | null) => {
 export const useMyGrowthGroups = () => {
   const { user } = useAuthStore()
   const userId = user?.id || null
-  const queryClient = useQueryClient()
   const queryKey = useMemo(() => ['gc-my-groups', userId], [userId]);
-
-  useEffect(() => {
-    if (!userId) return;
-
-    const channel = supabase
-      .channel(`my-growth-groups-changes-${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'gc_group_members', filter: `membro_id=eq.${userId}` }, () => {
-        queryClient.invalidateQueries({ queryKey });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'gc_group_leaders', filter: `membro_id=eq.${userId}` }, () => {
-        queryClient.invalidateQueries({ queryKey });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, queryClient, queryKey]);
 
   return useQuery({
     queryKey,
     enabled: !!userId,
+    staleTime: 1000 * 60 * 15, // 15 minutos
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
     queryFn: async (): Promise<GrowthGroup[]> => {
       const uid = userId!
 
@@ -235,7 +226,6 @@ export const useMyGrowthGroups = () => {
       if (error) throw new Error(error.message)
 
       return (groups || []) as GrowthGroup[]
-    },
-    refetchOnWindowFocus: false
+    }
   })
 }

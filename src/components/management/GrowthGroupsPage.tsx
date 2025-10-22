@@ -11,7 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calendar, Clock, MapPin, Phone, PlusCircle, Users } from 'lucide-react'
+import { Calendar, Clock, MapPin, Phone, PlusCircle, Users, RefreshCw } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'react-hot-toast'
 import GroupLeadersList from './GroupLeadersList'
 import GroupMembersList from './GroupMembersList'
 
@@ -19,6 +21,7 @@ const weekdays = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábad
 
 const GrowthGroupsPage: React.FC = () => {
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
   const canManageGroups = user?.role === 'admin' || user?.role === 'pastor'
   const { data: groups } = useChurchGrowthGroups()
   const { data: membersList } = useMembers()
@@ -48,6 +51,11 @@ const GrowthGroupsPage: React.FC = () => {
   const memberOptions = useMemo(() => {
     return (membersList || []).map(m => ({ id: m.id, name: m.nome_completo || m.email }))
   }, [membersList])
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['gc-groups'] })
+    toast.info('Atualizando grupos...')
+  }
 
   const handleCreate = () => {
     createGroup.mutate(
@@ -116,56 +124,62 @@ const GrowthGroupsPage: React.FC = () => {
           <h1 className="text-xl md:text-2xl font-semibold">Grupos de Crescimento (GC)</h1>
           <p className="text-sm text-muted-foreground">Crie grupos, defina líderes e gerencie participantes.</p>
         </div>
-        {canManageGroups && (
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2"><PlusCircle className="w-4 h-4" /> Novo Grupo</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo Grupo de Crescimento</DialogTitle>
-                <DialogDescription>Informe os dados principais do grupo.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-3">
-                <div>
-                  <Label>Nome</Label>
-                  <Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
-                </div>
-                <div>
-                  <Label>Descrição</Label>
-                  <Input value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefresh}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
+          {canManageGroups && (
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2"><PlusCircle className="w-4 h-4" /> Novo Grupo</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Novo Grupo de Crescimento</DialogTitle>
+                  <DialogDescription>Informe os dados principais do grupo.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-3">
                   <div>
-                    <Label>Dia da reunião</Label>
-                    <Select value={form.meeting_day} onValueChange={v => setForm(f => ({ ...f, meeting_day: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                      <SelectContent>
-                        {weekdays.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label>Nome</Label>
+                    <Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
                   </div>
                   <div>
-                    <Label>Horário</Label>
-                    <Input placeholder="19:30" value={form.meeting_time} onChange={e => setForm(f => ({ ...f, meeting_time: e.target.value }))} />
+                    <Label>Descrição</Label>
+                    <Input value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Dia da reunião</Label>
+                      <Select value={form.meeting_day} onValueChange={v => setForm(f => ({ ...f, meeting_day: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                          {weekdays.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Horário</Label>
+                      <Input placeholder="19:30" value={form.meeting_time} onChange={e => setForm(f => ({ ...f, meeting_time: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Local</Label>
+                    <Input value={form.meeting_location} onChange={e => setForm(f => ({ ...f, meeting_location: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Telefone de contato</Label>
+                    <Input value={form.contact_phone} onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))} />
                   </div>
                 </div>
-                <div>
-                  <Label>Local</Label>
-                  <Input value={form.meeting_location} onChange={e => setForm(f => ({ ...f, meeting_location: e.target.value }))} />
-                </div>
-                <div>
-                  <Label>Telefone de contato</Label>
-                  <Input value={form.contact_phone} onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))} />
-                </div>
-              </div>
-              <DialogFooter className="mt-4">
-                <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-                <Button onClick={handleCreate} disabled={createGroup.isPending}>Salvar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+                <DialogFooter className="mt-4">
+                  <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleCreate} disabled={createGroup.isPending}>Salvar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       <Card>

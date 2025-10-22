@@ -15,6 +15,7 @@ import PasswordResetPage from './pages/PasswordResetPage'
 import NewPasswordPage from './pages/NewPasswordPage'
 import { useEffect } from 'react'
 import CookieConsent from './components/system/CookieConsent'
+import ErrorBoundary from './components/shared/ErrorBoundary'
 
 // ----------------------------
 // ProtectedRoute genérico
@@ -72,120 +73,35 @@ function App() {
   }, [checkAuth, initializeAuthListener])
 
   return (
-    <>
-      <CookieConsent />
+    <ErrorBoundary>
       <Routes>
-        {/* Landing */}
-        <Route
-          path="/"
-          element={
-            user ? (
-              <Navigate
-                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
-                replace
-              />
-            ) : (
-              <LandingPage />
-            )
-          }
-        />
-
-        {/* Login & Registro comuns */}
-        <Route
-          path="/login"
-          element={
-            user ? (
-              <Navigate
-                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
-                replace
-              />
-            ) : (
-              <LoginPage />
-            )
-          }
-        />
-        <Route path="/recuperar-senha" element={<PasswordResetPage />} />
-        <Route path="/nova-senha" element={<NewPasswordPage />} />
-        <Route
-          path="/register/:churchId"
-          element={
-            user ? (
-              <Navigate
-                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
-                replace
-              />
-            ) : (
-              <RegisterPage />
-            )
-          }
-        />
-        <Route
-          path="/cadastrar-igreja"
-          element={
-            <CadastrarIgrejaPage />
-          }
-        />
-
-        {/* Login & registro de super admin */}
-        <Route
-          path="/master-admin-login"
-          element={
-            user?.role === 'super_admin' ? (
-              <Navigate to="/master-admin" replace />
-            ) : (
-              <MasterAdminLoginPage />
-            )
-          }
-        />
-        <Route
-          path="/super-admin-register"
-          element={
-            user?.role === 'super_admin' ? (
-              <Navigate to="/master-admin" replace />
-            ) : (
-              <SuperAdminRegisterPage />
-            )
-          }
-        />
-
-        {/* Rotas protegidas */}
-        <Route
-          path="/master-admin"
-          element={
-            <ProtectedRoute onlySuperAdmin>
-              <MasterAdminPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/cadastrar-igreja" element={<CadastrarIgrejaPage />} />
+        <Route path="/password-reset" element={<PasswordResetPage />} />
+        <Route path="/new-password" element={<NewPasswordPage />} />
+        <Route path="/master-admin-login" element={<MasterAdminLoginPage />} />
+        <Route path="/super-admin-register" element={<SuperAdminRegisterPage />} />
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute requireTenant>
+            <ProtectedRoute>
               <DashboardPage currentChurchId={currentChurchId!} />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/ead"
+          path="/master-admin"
           element={
-            <ProtectedRoute requireTenant>
-              <EADPortalPage />
+            <ProtectedRoute requireSuperAdmin>
+              <MasterAdminPage />
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/escolas/:schoolId"
-          element={
-            <ProtectedRoute requireTenant>
-              <SchoolDetailsPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </ErrorBoundary>
   )
 }
 

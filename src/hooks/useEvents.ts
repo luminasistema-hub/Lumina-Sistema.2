@@ -85,58 +85,6 @@ export const useEvents = (params?: { search?: string | null; type?: string | nul
     [currentChurchId, user?.id, params?.search, params?.type]
   );
 
-  useEffect(() => {
-    if (!currentChurchId) return;
-    let active = true;
-    let channel: any = null;
-    let invalidateTimer: any = null;
-    const scheduleInvalidate = () => {
-      if (invalidateTimer) clearTimeout(invalidateTimer);
-      invalidateTimer = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey });
-      }, 500); // evita invalidar em cascata
-    };
-    (async () => {
-      const { data: churchRow } = await supabase
-        .from('igrejas')
-        .select('parent_church_id')
-        .eq('id', currentChurchId)
-        .maybeSingle();
-      if (!active) return;
-      const parentIdLocal = churchRow?.parent_church_id ?? null;
-      channel = supabase
-        .channel(`public-events-hook-${currentChurchId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
-          scheduleInvalidate
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
-          scheduleInvalidate
-        );
-      if (parentIdLocal) {
-        channel
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${parentIdLocal}` },
-            scheduleInvalidate
-          )
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${parentIdLocal}` },
-            scheduleInvalidate
-          );
-      }
-      channel.subscribe();
-    })();
-    return () => {
-      active = false;
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [currentChurchId, queryClient, queryKey]);
-
   const { data: events = [], isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
@@ -150,8 +98,9 @@ export const useEvents = (params?: { search?: string | null; type?: string | nul
     },
     enabled: !!currentChurchId,
     placeholderData: (prev) => prev, // mantém dados anteriores para evitar flicker
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 60 * 15, // 15 minutos de cache
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const registerMutation = useMutation({
