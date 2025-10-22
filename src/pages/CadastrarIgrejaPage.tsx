@@ -225,30 +225,35 @@ const CadastrarIgrejaPage = () => {
       }
 
       // Para planos pagos, cria a assinatura na ASAAS
-      toast.loading('Criando sua assinatura e redirecionando para o pagamento...');
-
-      const { data: subscriptionData, error: subscriptionError } = await supabase.functions.invoke('create-asaas-subscription', {
+      const subscriptionPromise = supabase.functions.invoke('create-asaas-subscription', {
         body: {
           churchId: newChurchId,
           planId: selectedPlan,
         },
       });
 
-      if (subscriptionError || (subscriptionData && subscriptionData.error)) {
-        const errorMessage = subscriptionError?.message || subscriptionData?.error;
-        console.error('Erro ao criar assinatura ASAAS:', errorMessage);
-        toast.error('Houve um problema ao criar sua assinatura.');
-        toast.info('Seu cadastro foi concluído. Você pode configurar o pagamento na área do administrador.');
-        navigate('/login');
-        return;
-      }
+      toast.promise(subscriptionPromise, {
+        loading: 'Criando sua assinatura e redirecionando para o pagamento...',
+        success: (result) => {
+          const { data: subscriptionData, error: subscriptionError } = result;
 
-      if (subscriptionData.paymentLink) {
-        window.location.href = subscriptionData.paymentLink;
-      } else {
-        toast.error('Não foi possível obter o link de pagamento. Por favor, entre em contato com o suporte.');
-        navigate('/login');
-      }
+          if (subscriptionError || (subscriptionData && subscriptionData.error)) {
+            throw new Error(subscriptionError?.message || subscriptionData?.error || 'Erro ao criar assinatura.');
+          }
+
+          if (subscriptionData.paymentLink) {
+            window.location.href = subscriptionData.paymentLink;
+            return 'Redirecionando para o pagamento!';
+          }
+          
+          throw new Error('Não foi possível obter o link de pagamento.');
+        },
+        error: (err) => {
+          console.error('Erro ao criar assinatura ASAAS:', err.message);
+          navigate('/login');
+          return 'Houve um problema ao criar sua assinatura. Seu cadastro foi concluído, você pode configurar o pagamento mais tarde.';
+        },
+      });
 
     } catch (err: any) {
       console.error('FormularioCadastroIgreja: Erro no cadastro:', err);
