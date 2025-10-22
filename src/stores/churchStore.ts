@@ -44,6 +44,9 @@ export interface Church {
   nome_responsavel?: string;
   site?: string;
   descricao?: string;
+  share_devocionais_to_children?: boolean;
+  share_eventos_to_children?: boolean;
+  share_trilha_to_children?: boolean;
 }
 
 interface ChurchState {
@@ -124,6 +127,9 @@ export const useChurchStore = create<ChurchState>()(
           nome_responsavel: c.nome_responsavel,
           site: c.site,
           descricao: c.descricao,
+          share_devocionais_to_children: c.share_devocionais_to_children ?? false,
+          share_eventos_to_children: c.share_eventos_to_children ?? false,
+          share_trilha_to_children: c.share_trilha_to_children ?? false,
         })) as Church[], isLoadingChurches: false, lastLoadedAt: Date.now() });
       },
 
@@ -200,7 +206,9 @@ export const useChurchStore = create<ChurchState>()(
         if (updates.nome_responsavel) updatePayload.nome_responsavel = updates.nome_responsavel;
         if (updates.site) updatePayload.site = updates.site;
         if (updates.descricao) updatePayload.descricao = updates.descricao;
-
+        if (updates.share_devocionais_to_children !== undefined) updatePayload.share_devocionais_to_children = updates.share_devocionais_to_children;
+        if (updates.share_eventos_to_children !== undefined) updatePayload.share_eventos_to_children = updates.share_eventos_to_children;
+        if (updates.share_trilha_to_children !== undefined) updatePayload.share_trilha_to_children = updates.share_trilha_to_children;
 
         const { data, error } = await supabase
           .from('igrejas')
@@ -242,6 +250,9 @@ export const useChurchStore = create<ChurchState>()(
           nome_responsavel: data.nome_responsavel,
           site: data.site,
           descricao: data.descricao,
+          share_devocionais_to_children: data.share_devocionais_to_children ?? false,
+          share_eventos_to_children: data.share_eventos_to_children ?? false,
+          share_trilha_to_children: data.share_trilha_to_children ?? false,
         };
 
         set((state) => ({

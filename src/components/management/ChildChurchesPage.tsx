@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { useChurchStore } from '@/stores/churchStore';
 import { toast } from 'sonner';
 import { Church, Users, Crown, FolderTree, Plus, Eye, Loader2 } from 'lucide-react';
 import ChildChurchDashboardDialog from './ChildChurchDashboardDialog';
@@ -46,6 +48,7 @@ type ChildItem = {
 
 const ChildChurchesPage = () => {
   const { currentChurchId, user, setCurrentChurchId } = useAuthStore();
+  const churchStore = useChurchStore();
   const [loading, setLoading] = useState(true);
   const [parentInfo, setParentInfo] = useState<{ isChild: boolean; motherId: string | null; motherName?: string } | null>(null);
   const [children, setChildren] = useState<ChildItem[]>([]);
@@ -64,7 +67,24 @@ const ChildChurchesPage = () => {
   });
   const [openDashboard, setOpenDashboard] = useState(false);
   const [selectedChild, setSelectedChild] = useState<ChildItem | null>(null);
+  const [prefs, setPrefs] = useState({
+    shareDevos: false,
+    shareEvents: false,
+    shareTrilha: false,
+  });
+
   const canManage = useMemo(() => user?.role === 'admin' || user?.role === 'pastor', [user?.role]);
+
+  useEffect(() => {
+    if (currentChurchId) {
+      const church = churchStore.getChurchById(currentChurchId);
+      setPrefs({
+        shareDevos: church?.share_devocionais_to_children ?? false,
+        shareEvents: church?.share_eventos_to_children ?? false,
+        shareTrilha: church?.share_trilha_to_children ?? false,
+      });
+    }
+  }, [currentChurchId, churchStore.churches]);
 
   const load = useCallback(async () => {
     if (!currentChurchId) {
@@ -256,53 +276,68 @@ const ChildChurchesPage = () => {
             </div>
           )}
           {!parentInfo?.isChild && canManage && (
-            <Dialog open={openCreate} onOpenChange={setOpenCreate}>
-              <DialogTrigger asChild>
-                <Button><Plus className="w-4 h-4 mr-2" />Nova Igreja Filha</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Criar Igreja Filha</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label>Nome da Igreja</Label>
-                    <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderTree className="w-5 h-5 text-indigo-600" />
+                  Preferências de Compartilhamento
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="p-3 border rounded-md flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium">Devocionais</p>
+                      <p className="text-sm text-gray-600">Compartilhar novos devocionais com igrejas filhas por padrão.</p>
+                    </div>
+                    <Switch
+                      checked={prefs.shareDevos}
+                      onCheckedChange={(v) => setPrefs((p) => ({ ...p, shareDevos: v }))}
+                      aria-label="Compartilhar devocionais com igrejas filhas"
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Responsável (Pastor)</Label>
-                    <Input value={form.nome_responsavel} onChange={(e) => setForm({ ...form, nome_responsavel: e.target.value })} />
+                  <div className="p-3 border rounded-md flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium">Eventos</p>
+                      <p className="text-sm text-gray-600">Compartilhar novos eventos com igrejas filhas por padrão.</p>
+                    </div>
+                    <Switch
+                      checked={prefs.shareEvents}
+                      onCheckedChange={(v) => setPrefs((p) => ({ ...p, shareEvents: v }))}
+                      aria-label="Compartilhar eventos com igrejas filhas"
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Telefone</Label>
-                    <Input value={form.telefone_contato} onChange={(e) => setForm({ ...form, telefone_contato: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Endereço</Label>
-                    <Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>CNPJ (opcional)</Label>
-                    <Input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Senha da Igreja Filha</Label>
-                    <Input value={form.panel_password} onChange={(e) => setForm({ ...form, panel_password: e.target.value })} />
-                    <p className="text-xs text-gray-500">O pastor da igreja filha poderá alterar esta senha depois, no próprio painel.</p>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={() => setOpenCreate(false)}>Cancelar</Button>
-                    <Button onClick={handleCreate} disabled={creating}>
-                      {creating ? 'Criando...' : 'Criar Filha'}
-                    </Button>
+                  <div className="p-3 border rounded-md flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium">Trilha de Membro</p>
+                      <p className="text-sm text-gray-600">Compartilhar trilha ativa com igrejas filhas por padrão.</p>
+                    </div>
+                    <Switch
+                      checked={prefs.shareTrilha}
+                      onCheckedChange={(v) => setPrefs((p) => ({ ...p, shareTrilha: v }))}
+                      aria-label="Compartilhar trilha com igrejas filhas"
+                    />
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
+                <div className="flex justify-end">
+                  <Button
+                    variant="default"
+                    onClick={async () => {
+                      if (!currentChurchId) return toast.error('Nenhuma igreja selecionada.');
+                      const saved = await churchStore.updateChurch(currentChurchId, {
+                        share_devocionais_to_children: prefs.shareDevos,
+                        share_eventos_to_children: prefs.shareEvents,
+                        share_trilha_to_children: prefs.shareTrilha,
+                      });
+                      if (!saved) return toast.error('Não foi possível salvar preferências.');
+                      toast.success('Preferências atualizadas!');
+                    }}
+                  >
+                    Salvar preferências
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </CardContent>
       </Card>

@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
+import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useChurchStore } from '@/stores/churchStore';
 
 interface CreateTrilhaDialogProps {
   isOpen: boolean;
@@ -18,6 +20,13 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [loading, setLoading] = useState(false);
+  const churchStore = useChurchStore();
+  const [shareWithChildren, setShareWithChildren] = useState(false);
+
+  useEffect(() => {
+    const church = churchStore.getChurchById(currentChurchId);
+    setShareWithChildren(church?.share_trilha_to_children ?? false);
+  }, [currentChurchId, churchStore.churches]);
 
   const handleCreate = async () => {
     if (!titulo.trim()) {
@@ -40,6 +49,7 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
           titulo: titulo.trim(),
           descricao: descricao.trim(),
           is_ativa: true,
+          compartilhar_com_filhas: shareWithChildren,
         });
       if (error) throw error;
       toast.success('Trilha criada com sucesso!');
@@ -79,6 +89,13 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
             />
+          </div>
+          <div className="p-3 border rounded-md flex items-center justify-between">
+            <div className="space-y-1">
+              <Label>Compartilhar com igrejas filhas</Label>
+              <p className="text-xs text-gray-600">Se ativado, a trilha ficará visível para igrejas filhas.</p>
+            </div>
+            <Switch checked={shareWithChildren} onCheckedChange={setShareWithChildren} aria-label="Compartilhar trilha com igrejas filhas" />
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Calendar, User, Tag, Pencil, Trash2, Star, Plus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { useChurchStore } from '@/stores/churchStore';
 
 type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado';
 type DevotionalCategory = 'Diário' | 'Semanal' | 'Especial' | 'Temático';
@@ -32,11 +34,13 @@ interface Devotional {
   featured: boolean;
   membros?: { nome_completo: string | null };
   created_at: string;
+  compartilhar_com_filhas?: boolean;
 }
 
 const DevotionalsManagementPage = () => {
   const { currentChurchId, user } = useAuthStore();
   const qc = useQueryClient();
+  const churchStore = useChurchStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -121,6 +125,7 @@ const DevotionalsManagementPage = () => {
     status: 'Rascunho',
     imagem_capa: '',
     featured: false,
+    compartilhar_com_filhas: churchStore.getChurchById(currentChurchId!)?.share_devocionais_to_children ?? false,
   });
 
   // queryKey já foi definido acima
@@ -146,6 +151,7 @@ const DevotionalsManagementPage = () => {
       status: 'Rascunho',
       imagem_capa: '',
       featured: false,
+      compartilhar_com_filhas: churchStore.getChurchById(currentChurchId!)?.share_devocionais_to_children ?? false,
     });
     setEditingItem(null);
   };
@@ -160,8 +166,8 @@ const DevotionalsManagementPage = () => {
         id_igreja: currentChurchId,
         autor_id: user.id,
         tempo_leitura: tempo,
-        // Ajusta data_publicacao ao publicar
         data_publicacao: form.status === 'Publicado' ? new Date().toISOString() : null,
+        compartilhar_com_filhas: form.compartilhar_com_filhas ?? (churchStore.getChurchById(currentChurchId!)?.share_devocionais_to_children ?? false),
       };
       const { error } = await supabase.from('devocionais').insert(payload);
       if (error) throw new Error(error.message);
@@ -193,6 +199,7 @@ const DevotionalsManagementPage = () => {
         data_publicacao: (form.status ?? editingItem.status) === 'Publicado'
           ? (editingItem.data_publicacao || new Date().toISOString())
           : null,
+        compartilhar_com_filhas: form.compartilhar_com_filhas ?? editingItem.compartilhar_com_filhas ?? false,
       };
       const { error } = await supabase.from('devocionais').update(payload).eq('id', editingItem.id);
       if (error) throw new Error(error.message);
@@ -261,6 +268,7 @@ const DevotionalsManagementPage = () => {
       status: item.status,
       imagem_capa: item.imagem_capa || '',
       featured: item.featured,
+      compartilhar_com_filhas: item.compartilhar_com_filhas ?? false,
     });
     setIsDialogOpen(true);
   };
@@ -415,6 +423,18 @@ const DevotionalsManagementPage = () => {
                   <SelectItem value="true">Destacado</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="p-3 border rounded-md flex items-center justify-between">
+              <div className="space-y-1">
+                <Label>Compartilhar com igrejas filhas</Label>
+                <p className="text-xs text-gray-600">Se ativado, este devocional ficará visível para igrejas filhas.</p>
+              </div>
+              <Switch
+                checked={!!form.compartilhar_com_filhas}
+                onCheckedChange={(v) => setForm({ ...form, compartilhar_com_filhas: v })}
+                aria-label="Compartilhar devocional com igrejas filhas"
+              />
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

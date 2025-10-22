@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EventItem } from "./EditEventDialog";
+import { useChurchStore } from "@/stores/churchStore";
 
 export function CreateEventDialog({
   open,
@@ -31,6 +33,13 @@ export function CreateEventDialog({
   const [inscricoesAbertas, setInscricoesAbertas] = useState(true);
   const [saving, setSaving] = useState(false);
   const [paidType, setPaidType] = useState<'gratuito' | 'pago'>('gratuito');
+  const churchStore = useChurchStore();
+  const [shareWithChildren, setShareWithChildren] = useState(false);
+
+  useEffect(() => {
+    const church = churchStore.getChurchById(igrejaId);
+    setShareWithChildren(church?.share_eventos_to_children ?? false);
+  }, [igrejaId, churchStore.churches]);
 
   const handleCreate = async () => {
     if (!nome || !dataHora || !local) {
@@ -50,6 +59,7 @@ export function CreateEventDialog({
       valor_inscricao: paidType === 'pago' ? (valorInscricao ? Number(valorInscricao) : 0) : 0,
       inscricoes_abertas: inscricoesAbertas,
       link_externo: paidType === 'pago' && Number(valorInscricao) > 0 ? (linkExterno || null) : null,
+      compartilhar_com_filhas: shareWithChildren,
     };
 
     const { error } = await supabase.from("eventos").insert(payload);
@@ -199,6 +209,14 @@ export function CreateEventDialog({
               </div>
             </div>
           )}
+
+          <div className="p-3 border rounded-md flex items-center justify-between">
+            <div className="space-y-1">
+              <Label>Compartilhar com igrejas filhas</Label>
+              <p className="text-xs text-gray-600">Se ativado, este evento aparecerá para igrejas filhas.</p>
+            </div>
+            <Switch checked={shareWithChildren} onCheckedChange={setShareWithChildren} aria-label="Compartilhar evento com igrejas filhas" />
+          </div>
 
           <Button onClick={handleCreate} className="w-full" disabled={saving}>
             {saving ? "Criando..." : "Criar Evento"}
