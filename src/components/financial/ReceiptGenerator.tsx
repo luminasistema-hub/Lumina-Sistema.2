@@ -134,17 +134,19 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <table style={{ width: '100%', marginBottom: '15px' }}>
-              <tr>
-                <td style={{ width: '50%', paddingRight: '10px' }}>
-                  <p style={{ fontSize: '10px', color: '#666', margin: '0' }}>Número do Recibo</p>
-                  <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '5px 0' }}>{data.numero}</p>
-                </td>
-                <td style={{ width: '50%', paddingLeft: '10px' }}>
-                  <p style={{ fontSize: '10px', color: '#666', margin: '0' }}>Data de Emissão</p>
-                  <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '5px 0' }}>{data.data_emissao}</p>
-                </td>
-              </tr>
+            <table style={{ width: '100%', marginBottom: '15px', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '50%', paddingRight: '10px' }}>
+                    <p style={{ fontSize: '10px', color: '#666', margin: '0' }}>Número do Recibo</p>
+                    <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '5px 0' }}>{data.numero}</p>
+                  </td>
+                  <td style={{ width: '50%', paddingLeft: '10px' }}>
+                    <p style={{ fontSize: '10px', color: '#666', margin: '0' }}>Data de Emissão</p>
+                    <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '5px 0' }}>{data.data_emissao}</p>
+                  </td>
+                </tr>
+              </tbody>
             </table>
           </div>
 
@@ -154,17 +156,19 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
               <p style={{ fontSize: '14px', fontWeight: '600', margin: '5px 0' }}>{data.doador}</p>
             </div>
 
-            <table style={{ width: '100%', marginBottom: '15px' }}>
-              <tr>
-                <td style={{ width: '50%', paddingRight: '10px' }}>
-                  <p style={{ fontSize: '10px', color: '#666', margin: '0' }}>Categoria</p>
-                  <p style={{ fontSize: '12px', margin: '5px 0' }}>{data.categoria}</p>
-                </td>
-                <td style={{ width: '50%', paddingLeft: '10px' }}>
-                  <p style={{ fontSize: '10px', color: '#666', margin: '0' }}>Forma de Pagamento</p>
-                  <p style={{ fontSize: '12px', margin: '5px 0' }}>{data.metodo_pagamento}</p>
-                </td>
-              </tr>
+            <table style={{ width: '100%', marginBottom: '15px', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '50%', paddingRight: '10px' }}>
+                    <p style={{ fontSize: '10px', color: '#666', margin: '0' }}>Categoria</p>
+                    <p style={{ fontSize: '12px', margin: '5px 0' }}>{data.categoria}</p>
+                  </td>
+                  <td style={{ width: '50%', paddingLeft: '10px' }}>
+                    <p style={{ fontSize: '10px', color: '#666', margin: '0' }}>Forma de Pagamento</p>
+                    <p style={{ fontSize: '12px', margin: '5px 0' }}>{data.metodo_pagamento}</p>
+                  </td>
+                </tr>
+              </tbody>
             </table>
 
             <div style={{ marginBottom: '15px' }}>
@@ -218,6 +222,12 @@ const ReceiptGenerator: React.FC<ReceiptGeneratorProps> = ({ data, onPrint, onDo
             left: 0;
             top: 0;
             width: 100%;
+          }
+          
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
         }
       `}</style>

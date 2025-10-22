@@ -4,7 +4,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Church } from '@/stores/churchStore'
@@ -83,12 +82,12 @@ export const UnifiedReceiptDialog = ({
               </span>
             )}
           </DialogTitle>
-          <DialogDescription>
+          <p className="text-sm text-gray-500 mt-2">
             {transaction.recibo_emitido 
               ? 'Este recibo já foi emitido anteriormente. Você pode visualizar e imprimir novamente.'
               : 'Visualize, imprima e marque a emissão do recibo.'
             }
-          </DialogDescription>
+          </p>
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto px-6 pb-4">
