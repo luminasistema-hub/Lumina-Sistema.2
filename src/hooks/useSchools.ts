@@ -15,6 +15,7 @@ export interface School {
   updated_at: string
   data_inicio?: string
   data_fim?: string
+  status: 'aberta' | 'fechada' | 'concluida'
 }
 
 export interface SchoolEnrollment {

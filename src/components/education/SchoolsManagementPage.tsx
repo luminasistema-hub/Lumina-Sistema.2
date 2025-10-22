@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSchools, useCreateSchool, useUpdateSchool, useDeleteSchool, useSchoolLessons, useCreateLesson, useUpdateLesson, useDeleteLesson, useSchoolEnrollments, useSchoolAttendance, useRegisterStudentAttendance, useQuizQuestions } from '@/hooks/useSchools'
+import { useSchools, useCreateSchool, useUpdateSchool, useDeleteSchool, useSchoolLessons, useCreateLesson, useUpdateLesson, useDeleteLesson, useSchoolEnrollments, useSchoolAttendance, useRegisterStudentAttendance, useQuizQuestions, useGraduateStudent } from '@/hooks/useSchools'
 import { useMembers } from '@/hooks/useMembers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,16 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { 
   Table, 
   TableBody, 
@@ -31,11 +41,12 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Users, BookOpen, Play, FileText, CheckSquare, MapPin, HelpCircle, CheckCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, BookOpen, Play, FileText, CheckSquare, MapPin, HelpCircle, CheckCircle, GraduationCap, Lock, Unlock } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import QuizQuestionsManager from './QuizQuestionsManager'
 import { Progress } from '@/components/ui/progress'
 import { DatePicker } from '@/components/ui/datepicker'
+import { supabase } from '@/integrations/supabase/client'
 
 const SchoolsManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
@@ -44,17 +55,20 @@ const SchoolsManagementPage = () => {
   const createSchoolMutation = useCreateSchool()
   const updateSchoolMutation = useUpdateSchool()
   const deleteSchoolMutation = useDeleteSchool()
+  const graduateStudentMutation = useGraduateStudent()
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
   const [isStudentsDialogOpen, setIsStudentsDialogOpen] = useState(false)
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false)
   const [isQuizManagerOpen, setIsQuizManagerOpen] = useState(false)
+  const [isGraduationDialogOpen, setIsGraduationDialogOpen] = useState(false)
   const [editingSchool, setEditingSchool] = useState<any>(null)
   const [selectedSchool, setSelectedSchool] = useState<any>(null)
   const [editingLesson, setEditingLesson] = useState<any>(null)
   const [lessonForAttendance, setLessonForAttendance] = useState<any>(null)
   const [lessonForQuiz, setLessonForQuiz] = useState<any>(null)
+  const [schoolToGraduate, setSchoolToGraduate] = useState<any>(null)
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -220,6 +234,65 @@ const SchoolsManagementPage = () => {
       deleteLessonMutation.mutate(lessonId)
     }
   }
+
+  const handleToggleEnrollmentStatus = (school: any) => {
+    const newStatus = school.status === 'aberta' ? 'fechada' : 'aberta';
+    updateSchoolMutation.mutate({
+      id: school.id,
+      status: newStatus
+    }, {
+      onSuccess: () => {
+        toast.success(`Matrículas ${newStatus === 'fechada' ? 'encerradas' : 'abertas'} com sucesso!`);
+      }
+    });
+  };
+
+  const handleGraduateSchool = async () => {
+    if (!schoolToGraduate) return;
+
+    const toastId = toast.loading("Iniciando conclusão da escola...");
+
+    try {
+      // 1. Fetch enrollments for this school
+      const { data: enrollments, error } = await supabase
+        .from('escola_inscricoes')
+        .select('membro_id')
+        .eq('escola_id', schoolToGraduate.id);
+
+      if (error) {
+        throw new Error("Erro ao buscar alunos inscritos.");
+      }
+
+      if (enrollments && enrollments.length > 0) {
+        toast.loading(`Concluindo ${enrollments.length} aluno(s)...`, { id: toastId });
+        // 2. Graduate each student
+        const graduationPromises = enrollments.map(enrollment => 
+          graduateStudentMutation.mutateAsync({ schoolId: schoolToGraduate.id, memberId: enrollment.membro_id })
+        );
+        
+        await Promise.all(graduationPromises);
+        toast.success(`${enrollments.length} aluno(s) foram concluídos com sucesso!`, { id: toastId });
+      } else {
+        toast.info("Não há alunos inscritos para concluir.", { id: toastId });
+      }
+
+      // 3. Update school status to 'concluida'
+      updateSchoolMutation.mutate({
+        id: schoolToGraduate.id,
+        status: 'concluida'
+      }, {
+        onSuccess: () => {
+          toast.success("Escola marcada como concluída.");
+        }
+      });
+
+    } catch (e: any) {
+      toast.error(e.message || "Ocorreu um erro ao concluir a escola.", { id: toastId });
+    } finally {
+      setIsGraduationDialogOpen(false);
+      setSchoolToGraduate(null);
+    }
+  };
 
   const handleRegisterAttendance = (memberId: string, present: boolean) => {
     if (!lessonForAttendance || !selectedSchool) return
@@ -411,6 +484,7 @@ const SchoolsManagementPage = () => {
                   <TableHead>Nome</TableHead>
                   <TableHead>Professor</TableHead>
                   <TableHead>Período</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Compartilhada</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -431,6 +505,15 @@ const SchoolsManagementPage = () => {
                       }
                     </TableCell>
                     <TableCell>
+                      <Badge variant={
+                        school.status === 'aberta' ? 'default' :
+                        school.status === 'fechada' ? 'secondary' :
+                        'destructive'
+                      }>
+                        {school.status.charAt(0).toUpperCase() + school.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       {school.compartilhar_com_filhas ? (
                         <Badge variant="default">Sim</Badge>
                       ) : (
@@ -443,6 +526,7 @@ const SchoolsManagementPage = () => {
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleOpenStudentsDialog(school)}
+                          disabled={school.status === 'concluida'}
                         >
                           <Users className="w-4 h-4" />
                         </Button>
@@ -450,6 +534,7 @@ const SchoolsManagementPage = () => {
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleOpenDialog(school)}
+                          disabled={school.status === 'concluida'}
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -457,8 +542,30 @@ const SchoolsManagementPage = () => {
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleOpenLessons(school)}
+                          disabled={school.status === 'concluida'}
                         >
                           <BookOpen className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleToggleEnrollmentStatus(school)}
+                          disabled={school.status === 'concluida'}
+                          title={school.status === 'aberta' ? 'Encerrar matrículas' : 'Abrir matrículas'}
+                        >
+                          {school.status === 'aberta' ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            setSchoolToGraduate(school)
+                            setIsGraduationDialogOpen(true)
+                          }}
+                          disabled={school.status === 'concluida'}
+                          title="Concluir Escola"
+                        >
+                          <GraduationCap className="w-4 h-4" />
                         </Button>
                         <Button 
                           variant="outline" 
@@ -480,6 +587,21 @@ const SchoolsManagementPage = () => {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={isGraduationDialogOpen} onOpenChange={setIsGraduationDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Concluir Escola?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja concluir a escola "{schoolToGraduate?.nome}"? Todos os alunos inscritos serão marcados como formados, o progresso na jornada será atualizado e não será mais possível editar a escola.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSchoolToGraduate(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleGraduateSchool}>Sim, Concluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog para gerenciar alunos */}
       {selectedSchool && (
