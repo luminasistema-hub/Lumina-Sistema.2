@@ -437,9 +437,9 @@ const SchoolsManagementPage = () => {
               
               <div className="flex items-center justify-between p-3 border rounded-md">
                 <div className="space-y-1">
-                  <Label>Compartilhar com igrejas filhas</Label>
+                  <Label>Compartilhar com os Campus</Label>
                   <p className="text-sm text-gray-500">
-                    Se ativado, esta escola ficará visível para igrejas filhas
+                    Se ativado, esta escola ficará visível para os campus ministeriais
                   </p>
                 </div>
                 <Switch

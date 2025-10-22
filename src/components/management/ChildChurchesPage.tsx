@@ -60,12 +60,12 @@ const ChildChurchesPage = () => {
 
   const handleCreate = async (values: ChildFormValues) => {
     if (!currentChurchId) return toast.error('Nenhuma igreja selecionada.');
-    if (!canManage) return toast.error('Você não tem permissão para criar igrejas filhas.');
-    if (parentInfo?.isChild) return toast.error('Igrejas filhas não podem criar novas igrejas.');
+    if (!canManage) return toast.error('Você não tem permissão para criar campus ministeriais.');
+    if (parentInfo?.isChild) return toast.error('Um Campus não pode criar outros campus.');
 
     // Verificação do limite
     if (parentInfo && children.length >= parentInfo.limite_igrejas_filhas) {
-      return toast.error(`Limite de ${parentInfo.limite_igrejas_filhas} igrejas filhas atingido. Para adicionar mais, considere fazer um upgrade do plano.`);
+      return toast.error(`Limite de ${parentInfo.limite_igrejas_filhas} campus ministeriais atingido. Para adicionar mais, considere fazer um upgrade do plano.`);
     }
 
     setCreating(true);
@@ -78,10 +78,10 @@ const ChildChurchesPage = () => {
 
     if (error) {
       const serverMsg = (error as any)?.context?.body?.error || error.message;
-      return toast.error('Erro ao criar igreja filha: ' + serverMsg);
+      return toast.error('Erro ao criar campus ministerial: ' + serverMsg);
     }
 
-    toast.success('Igreja filha criada e pastor habilitado para login!');
+    toast.success('Campus ministerial criado e pastor habilitado para login!');
     form.reset();
     loadPageData();
   };
@@ -114,24 +114,24 @@ const ChildChurchesPage = () => {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-xl p-6 text-white shadow-lg">
-        <h1 className="text-2xl md:text-3xl font-bold">Gestão de Igrejas Filhas</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">Gestão de Campus Ministeriais</h1>
         <p className="text-indigo-100 mt-1">
-          Crie e gerencie as igrejas que estão sob sua liderança direta.
+          Crie e gerencie os campus que estão sob sua liderança direta.
         </p>
       </div>
 
       {!parentInfo?.isChild && canManage && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Plus className="w-5 h-5 text-primary" />Nova Igreja Filha</CardTitle>
-            <CardDescription>Preencha os dados para cadastrar uma nova igreja e habilitar o acesso do pastor responsável.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Plus className="w-5 h-5 text-primary" />Novo Campus Ministerial</CardTitle>
+            <CardDescription>Preencha os dados para cadastrar um novo campus e habilitar o acesso do pastor responsável.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={form.control} name="nome" render={({ field }) => (
-                    <FormItem><FormLabel>Nome da Igreja</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Nome do Campus</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="nome_responsavel" render={({ field }) => (
                     <FormItem><FormLabel>Responsável (Pastor)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -154,7 +154,7 @@ const ChildChurchesPage = () => {
                 )} />
                 <div className="flex justify-end">
                   <Button type="submit" disabled={creating}>
-                    {creating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Cadastrando...</> : 'Cadastrar Igreja'}
+                    {creating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Cadastrando...</> : 'Cadastrar Campus'}
                   </Button>
                 </div>
               </form>
@@ -165,12 +165,12 @@ const ChildChurchesPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Church className="w-5 h-5 text-primary" />Igrejas Filhas ({children.length})</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Church className="w-5 h-5 text-primary" />Campus Ministeriais ({children.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {children.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>Nenhuma igreja filha cadastrada.</p>
+              <p>Nenhum campus ministerial cadastrado.</p>
               {!parentInfo?.isChild && <p className="text-sm">Use o formulário acima para começar.</p>}
             </div>
           ) : (
@@ -187,7 +187,7 @@ const ChildChurchesPage = () => {
                   </CardHeader>
                   <CardContent className="space-y-3 flex-grow">
                     <div className="space-y-2 p-3 border rounded-md">
-                      <h4 className="font-medium text-sm flex items-center gap-2"><Share2 className="w-4 h-4" /> Herdar Conteúdo da Igreja Mãe</h4>
+                      <h4 className="font-medium text-sm flex items-center gap-2"><Share2 className="w-4 h-4" /> Herdar Conteúdo do Campus Principal</h4>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                         <div className="flex items-center justify-between"><Label htmlFor={`sh-escolas-${c.id}`} className="flex items-center gap-1.5"><BookOpen size={14}/>Escolas</Label><Switch id={`sh-escolas-${c.id}`} checked={c.compartilha_escolas_da_mae} onCheckedChange={(val) => handleSharingToggle(c.id, 'compartilha_escolas_da_mae', val)} /></div>
                         <div className="flex items-center justify-between"><Label htmlFor={`sh-eventos-${c.id}`} className="flex items-center gap-1.5"><Calendar size={14}/>Eventos</Label><Switch id={`sh-eventos-${c.id}`} checked={c.compartilha_eventos_da_mae} onCheckedChange={(val) => handleSharingToggle(c.id, 'compartilha_eventos_da_mae', val)} /></div>

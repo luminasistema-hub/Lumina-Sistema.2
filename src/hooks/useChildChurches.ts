@@ -29,7 +29,7 @@ const fetchChildChurches = async (churchId: string): Promise<ChildChurch[]> => {
   });
 
   if (error) {
-    throw new Error('Erro ao carregar igrejas filhas: ' + error.message);
+    throw new Error('Erro ao carregar campus ministeriais: ' + error.message);
   }
   return data as ChildChurch[];
 };

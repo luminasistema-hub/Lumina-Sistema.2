@@ -75,7 +75,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
 
     const currentChurch = churches.find(c => c.id === currentChurchId);
     
-    // Uma igreja é "mãe" se NÃO tiver um `parent_church_id`
+    // Uma igreja é "principal" se NÃO tiver um `parent_church_id`
     // Se a igreja ainda não foi encontrada (carregando), o padrão é ocultar por segurança
     setIsParentChurch(currentChurch ? !currentChurch.parent_church_id : false);
 
@@ -201,7 +201,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
         { id: "events-management", title: "Gestão de Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
         { id: "devotionals-management", title: "Gestão de Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" },
         { id: "schools-management", title: "Gestão de Escolas", icon: <GraduationCap className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
-        { id: "child-churches", title: "Igrejas Filhas", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" }
+        { id: "child-churches", title: "Campus Ministeriais", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" }
       ]
     },
     {
@@ -224,7 +224,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
       if (module.id === "my-gc") {
         return hasMyGCAccess;
       }
-      // Apenas exibe o módulo de igrejas filhas se for uma igreja mãe
+      // Apenas exibe o módulo de campus se for uma igreja principal
       if (module.id === "child-churches" && !isParentChurch) {
         return false;
       }

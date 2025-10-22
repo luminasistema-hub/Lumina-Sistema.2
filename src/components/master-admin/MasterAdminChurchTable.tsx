@@ -182,7 +182,7 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <GitFork className="w-4 h-4 text-gray-500" />
-                      <span>{childCounts[church.id] || 0} / {church.limite_igrejas_filhas === 0 ? '∞' : church.limite_igrejas_filhas} Igrejas Filhas</span>
+                      <span>{childCounts[church.id] || 0} / {church.limite_igrejas_filhas === 0 ? '∞' : church.limite_igrejas_filhas} Campus</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <DollarSign className="w-4 h-4 text-gray-500" />
