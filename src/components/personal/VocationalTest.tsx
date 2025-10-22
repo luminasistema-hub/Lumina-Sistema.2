@@ -584,24 +584,6 @@ const VocationalTest = () => {
                   </ul>
                 </div>
               </div>
-
-              <div className="bg-white rounded-lg p-4 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <ArrowRight className="w-4 h-4 text-blue-500" />
-                  Próximos Passos:
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <Button className="bg-blue-500 hover:bg-blue-600">
-                    Falar com Líder do Ministério
-                  </Button>
-                  <Button variant="outline">
-                    Ver Cronograma de Treinamento
-                  </Button>
-                  <Button variant="outline">
-                    Participar como Voluntário
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
         )}
