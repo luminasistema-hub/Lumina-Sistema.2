@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { toast } from "react-hot-toast"
 
 // Serviços
 import { fetchVoluntarios } from "@/services/voluntariosService"
@@ -10,7 +11,9 @@ import {
   addVoluntarioToEscala,
   removeVoluntarioFromEscala
 } from "@/services/escalaVoluntariosService"
-import { updateEscalaStatus } from "@/services/escalaService"
+import { updateEscalaStatus, getEscalaById } from "@/services/escalaService"
+import { sendEmailNotification, createInAppNotification } from "@/services/notificationService"
+import { useAuthStore } from "@/stores/authStore"
 
 interface GerenciarDemandaProps {
   escalaId: string
@@ -21,6 +24,7 @@ export default function GerenciarDemanda({ escalaId }: GerenciarDemandaProps) {
   const [voluntariosDisponiveis, setVoluntariosDisponiveis] = useState<any[]>([])
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState("Pendente")
+  const { user, currentChurchId, currentChurchName } = useAuthStore()
 
   // 🔄 Carregar dados
   const loadData = async () => {
@@ -37,8 +41,52 @@ export default function GerenciarDemanda({ escalaId }: GerenciarDemandaProps) {
 
   // 📌 Atribuir voluntário
   const handleAddVoluntario = async (idVoluntario: string) => {
-    await addVoluntarioToEscala(escalaId, idVoluntario)
-    loadData()
+    const voluntario = voluntariosDisponiveis.find(v => v.id === idVoluntario);
+    if (!voluntario) return;
+
+    const addPromise = addVoluntarioToEscala(escalaId, idVoluntario);
+    toast.promise(addPromise, {
+      loading: `Atribuindo ${voluntario.nome_completo}...`,
+      success: async () => {
+        await loadData();
+        
+        // Enviar notificação após sucesso
+        const escalaInfo = await getEscalaById(escalaId);
+        if (escalaInfo && currentChurchId && currentChurchName) {
+          const subject = `[${currentChurchName}] Você foi escalado para um serviço!`;
+          const htmlContent = `
+            <div style="font-family: sans-serif; line-height: 1.6;">
+              <h2>Olá, ${voluntario.nome_completo}!</h2>
+              <p>Você foi escalado(a) para servir no ministério <strong>${escalaInfo.ministerio?.nome || ''}</strong>.</p>
+              <p><strong>Data do Serviço:</strong> ${new Date(escalaInfo.data_servico + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+              <p>Por favor, acesse o aplicativo para confirmar sua participação e ver mais detalhes.</p>
+              <a href="${window.location.origin}/dashboard?module=my-ministry" style="display: inline-block; padding: 10px 15px; background-color: #6d28d9; color: white; text-decoration: none; border-radius: 5px;">
+                Acessar Meu Ministério
+              </a>
+              <p style="font-size: 0.9em; color: #666;">Se o botão não funcionar, copie e cole o seguinte link no seu navegador: ${window.location.origin}/dashboard?module=my-ministry</p>
+            </div>
+          `;
+
+          sendEmailNotification({
+            to: voluntario.email,
+            subject,
+            htmlContent,
+          });
+
+          createInAppNotification({
+            id_igreja: currentChurchId,
+            membro_id: idVoluntario,
+            titulo: 'Você foi escalado para um serviço',
+            descricao: `Ministério ${escalaInfo.ministerio?.nome} em ${new Date(escalaInfo.data_servico + 'T00:00:00').toLocaleDateString('pt-BR')}.`,
+            link: '/dashboard?module=my-ministry',
+            tipo: 'escala'
+          });
+        }
+        
+        return `${voluntario.nome_completo} foi atribuído com sucesso!`;
+      },
+      error: 'Falha ao atribuir voluntário.'
+    });
   }
 
   // 📌 Remover voluntário
