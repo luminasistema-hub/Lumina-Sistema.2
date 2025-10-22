@@ -85,24 +85,33 @@ const fetchSchools = async (churchId: string) => {
   const { data, error } = await supabase.rpc('get_escolas_para_igreja', { id_igreja_atual: churchId })
   
   if (error) throw new Error(error.message)
+  if (!data || data.length === 0) return []
+
+  const schools = data as School[]
   
-  // Buscar nomes dos professores
-  const schoolIds = data.map((school: any) => school.id)
-  if (schoolIds.length === 0) return []
+  // Coletar IDs dos professores para buscar os nomes em uma única query
+  const professorIds = [...new Set(schools.map(school => school.professor_id).filter(Boolean))]
   
-  const { data: schoolsWithProfessors, error: professorError } = await supabase
-    .from('escolas')
-    .select(`
-      *,
-      membros(nome_completo)
-    `)
-    .in('id', schoolIds)
+  let professorNames = new Map<string, string>()
+  if (professorIds.length > 0) {
+    const { data: professors, error: professorError } = await supabase
+      .from('membros')
+      .select('id, nome_completo')
+      .in('id', professorIds)
+    
+    if (professorError) {
+      console.error("Erro ao buscar nomes de professores:", professorError.message)
+    } else {
+      professors.forEach(p => {
+        professorNames.set(p.id, p.nome_completo)
+      })
+    }
+  }
   
-  if (professorError) throw new Error(professorError.message)
-  
-  return schoolsWithProfessors.map((school: any) => ({
+  // Mapear os nomes dos professores de volta para as escolas
+  return schools.map(school => ({
     ...school,
-    professor_nome: school.membros?.nome_completo || 'Professor não definido'
+    professor_nome: school.professor_id ? professorNames.get(school.professor_id) || 'Professor não definido' : 'Professor não definido'
   }))
 }
 
