@@ -24,6 +24,8 @@ import {
 } from 'lucide-react'
 import AddMinistryDialog from './AddMinistryDialog'
 import { useLoadingProtection } from '@/hooks/useLoadingProtection'
+import MinistryRolesManager from './MinistryRolesManager'
+import MinistrySchedules from './MinistrySchedules'
 
 // Interfaces
 interface Ministry {
@@ -267,8 +269,10 @@ const MinistriesPage = () => {
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader><DialogTitle className="text-2xl">{selectedMinistry?.nome}</DialogTitle><DialogDescription>Liderado por {selectedMinistry?.lider_nome}</DialogDescription></DialogHeader>
           <Tabs defaultValue="volunteers" className="mt-4">
-            <TabsList className="grid w-full grid-cols-1">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="volunteers">Voluntários</TabsTrigger>
+              <TabsTrigger value="roles">Funções</TabsTrigger>
+              <TabsTrigger value="schedules">Escalas</TabsTrigger>
             </TabsList>
             <TabsContent value="volunteers" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
               {(canManage) && (
@@ -330,6 +334,19 @@ const MinistriesPage = () => {
                   ))}
                   {volunteers.length === 0 && <p className="text-center text-gray-500 py-4">Nenhum voluntário neste ministério ainda.</p>}
               </div>
+            </TabsContent>
+            <TabsContent value="roles" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
+              {selectedMinistry && (
+                <MinistryRolesManager
+                  ministryId={selectedMinistry.id}
+                  churchId={selectedMinistry.id_igreja}
+                />
+              )}
+            </TabsContent>
+            <TabsContent value="schedules" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
+              {selectedMinistry && (
+                <MinistrySchedules ministerioId={selectedMinistry.id} />
+              )}
             </TabsContent>
           </Tabs>
         </DialogContent>
