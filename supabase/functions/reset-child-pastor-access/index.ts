@@ -114,20 +114,43 @@ serve(async (req) => {
     .maybeSingle()
 
   try {
+    const targetEmail = church.email
+
     if (pastorMember?.id) {
+      // Se o email do pastor for diferente do email da igreja, atualiza o email no Auth e na tabela membros
+      if (targetEmail && pastorMember.email !== targetEmail) {
+        const { error: emailErr } = await service.auth.admin.updateUserById(pastorMember.id, {
+          email: targetEmail,
+          email_confirm: true,
+          user_metadata: {
+            full_name: church.nome_responsavel,
+            church_id: church.id,
+            church_name: church.nome,
+            initial_role: "pastor",
+          },
+        })
+        if (emailErr) throw new Error(`updateUserById(email): ${emailErr.message}`)
+
+        const { error: updMemberEmailErr } = await service
+          .from("membros")
+          .update({ email: targetEmail, nome_completo: church.nome_responsavel, funcao: "pastor" })
+          .eq("id", pastorMember.id)
+        if (updMemberEmailErr) throw new Error(`membros.update(email): ${updMemberEmailErr.message}`)
+      }
+
       // Atualiza senha do usuário pastor existente
       const { error: updErr } = await service.auth.admin.updateUserById(pastorMember.id, {
         password: church.panel_password,
         email_confirm: true,
       })
-      if (updErr) throw new Error(`updateUserById: ${updErr.message}`)
+      if (updErr) throw new Error(`updateUserById(password): ${updErr.message}`)
 
       // Garante status ativo
       const { error: statusErr } = await service
         .from("membros")
         .update({ status: "ativo" })
         .eq("id", pastorMember.id)
-      if (statusErr) throw new Error(`membros.update: ${statusErr.message}`)
+      if (statusErr) throw new Error(`membros.update(status): ${statusErr.message}`)
 
       return new Response(JSON.stringify({ ok: true, mode: "updated", userId: pastorMember.id }), {
         status: 200,
@@ -136,7 +159,7 @@ serve(async (req) => {
     } else {
       // Cria novo usuário pastor usando email da igreja e panel_password
       const { data: created, error: createErr } = await service.auth.admin.createUser({
-        email: church.email,
+        email: targetEmail,
         password: church.panel_password,
         email_confirm: true,
         user_metadata: {
@@ -155,7 +178,7 @@ serve(async (req) => {
         id: newUserId,
         id_igreja: church.id,
         nome_completo: church.nome_responsavel,
-        email: church.email,
+        email: targetEmail,
         funcao: "pastor",
         status: "ativo",
         perfil_completo: false,

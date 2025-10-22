@@ -95,7 +95,7 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
     const { data: sessionRes } = await supabase.auth.getSession();
     const token = sessionRes?.session?.access_token;
 
-    const { error } = await supabase.functions.invoke('reset-child-pastor-access', {
+    const { data, error } = await supabase.functions.invoke('reset-child-pastor-access', {
       body: { churchId: child.id },
       headers: {
         Authorization: token ? `Bearer ${token}` : '',
@@ -103,7 +103,18 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
     });
 
     if (error) {
-      toast.error('Falha ao resetar acesso do pastor: ' + error.message);
+      let serverMsg = error.message;
+      // Tenta extrair o JSON retornado pela função (quando disponível)
+      const raw = (error as any)?.context?.body;
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed?.error) serverMsg = parsed.error;
+        } catch {
+          serverMsg = raw;
+        }
+      }
+      toast.error('Falha ao resetar acesso do pastor: ' + serverMsg);
       return;
     }
     toast.success('Acesso do pastor resetado! Use o e-mail da igreja e a "Senha do Painel".');
