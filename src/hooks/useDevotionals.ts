@@ -27,7 +27,7 @@ export interface Devotional {
   tags: string[]
   autor_id: string
   data_publicacao: string
-  status: 'Rascunho' | 'Publicado' | 'Arquivado'
+  status: 'Rascunho' | 'Publicado' | 'Arquivado' | 'Pendente'
   imagem_capa?: string
   tempo_leitura: number
   featured: boolean

@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado';
+type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado' | 'Pendente';
 type DevotionalCategory = 'Diário' | 'Semanal' | 'Especial' | 'Temático';
 
 interface Devotional {
@@ -55,7 +55,7 @@ const DevotionalsManagementPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const canManage = user?.role === 'admin' || user?.role === 'pastor';
+  const canManage = user?.role === 'admin' || user?.role === 'pastor' || user?.extraPermissions?.includes('devotional-approver');
 
   // Defina o queryKey antes de qualquer uso (incluindo em useEffect)
   const queryKey = useMemo(
@@ -281,7 +281,7 @@ const DevotionalsManagementPage = () => {
   };
 
   const categories: string[] = ['all', 'Diário', 'Semanal', 'Especial', 'Temático'];
-  const statusOptions: string[] = ['all', 'Publicado', 'Rascunho', 'Arquivado'];
+  const statusOptions: string[] = ['all', 'Publicado', 'Pendente', 'Rascunho', 'Arquivado'];
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -344,7 +344,7 @@ const DevotionalsManagementPage = () => {
                 <div className="space-y-1">
                   <CardTitle className="text-lg line-clamp-2">{d.titulo}</CardTitle>
                   <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                    <Badge variant="outline">{d.status}</Badge>
+                    <Badge variant={d.status === 'Pendente' ? 'destructive' : 'outline'}>{d.status}</Badge>
                     <Badge className="bg-blue-100 text-blue-800">{d.categoria}</Badge>
                     <div className="flex items-center gap-1">
                       <User className="w-4 h-4" />
@@ -358,19 +358,25 @@ const DevotionalsManagementPage = () => {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant={d.featured ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFeaturedMutation.mutate(d)}>
-                    <Star className="w-4 h-4 mr-1" /> {d.featured ? 'Destacado' : 'Destacar'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => openEditDialog(d)}>
-                    <Pencil className="w-4 h-4 mr-1" /> Editar
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setStatusMutation.mutate({ id: d.id, status: d.status === 'Publicado' ? 'Arquivado' : 'Publicado' })}>
-                    {d.status === 'Publicado' ? 'Arquivar' : 'Publicar'}
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteMutation.mutate(d.id)}>
-                    <Trash2 className="w-4 h-4 mr-1" /> Remover
-                  </Button>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button variant={d.featured ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFeaturedMutation.mutate(d)}>
+                      <Star className="w-4 h-4 mr-1" /> {d.featured ? 'Destacado' : 'Destacar'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => openEditDialog(d)}>
+                      <Pencil className="w-4 h-4 mr-1" /> Editar
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteMutation.mutate(d.id)}>
+                      <Trash2 className="w-4 h-4 mr-1" /> Remover
+                    </Button>
+                  </div>
+                  {d.status === 'Pendente' && canManage && (
+                    <div className="flex items-center gap-2 mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm font-medium text-yellow-800">Aguardando aprovação</p>
+                      <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => setStatusMutation.mutate({ id: d.id, status: 'Publicado' })}>Aprovar</Button>
+                      <Button size="sm" variant="destructive" onClick={() => setStatusMutation.mutate({ id: d.id, status: 'Arquivado' })}>Rejeitar</Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -420,6 +426,7 @@ const DevotionalsManagementPage = () => {
                 <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Rascunho">Rascunho</SelectItem>
+                  <SelectItem value="Pendente">Pendente</SelectItem>
                   <SelectItem value="Publicado">Publicado</SelectItem>
                   <SelectItem value="Arquivado">Arquivado</SelectItem>
                 </SelectContent>

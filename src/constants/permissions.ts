@@ -8,6 +8,7 @@ export type PermissionId =
   | 'financial-panel'
   | 'kids-management'
   | 'notification-management'
+  | 'devotional-approver'
   | 'system-settings';
 
 export const AVAILABLE_PERMISSIONS: { id: PermissionId; label: string }[] = [
@@ -20,5 +21,6 @@ export const AVAILABLE_PERMISSIONS: { id: PermissionId; label: string }[] = [
   { id: 'financial-panel', label: 'Painel Financeiro' },
   { id: 'kids-management', label: 'Gestão Kids' },
   { id: 'notification-management', label: 'Gestão de Notificações' },
+  { id: 'devotional-approver', label: 'Aprovar Devocionais' },
   { id: 'system-settings', label: 'Configurações do Sistema' },
 ];

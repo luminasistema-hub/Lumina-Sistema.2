@@ -166,6 +166,7 @@ const DevotionalsPage = () => {
   const [selectedTag, setSelectedTag] = useState<string>('all')
 
   const canCreateDevotionals = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'lider_ministerio'
+  const canApproveDevotionals = user?.role === 'admin' || user?.role === 'pastor' || (user?.extraPermissions && user.extraPermissions.includes('devotional-approver'))
 
   const [newDevotional, setNewDevotional] = useState<Partial<Devotional>>({
     titulo: '',
@@ -195,10 +196,16 @@ const DevotionalsPage = () => {
       toast.error('Preencha todos os campos obrigatórios.')
       return
     }
-    createDevotionalMutation.mutate({ ...newDevotional, status }, {
+
+    const finalStatus = status === 'Publicado' && !canApproveDevotionals ? 'Pendente' : status
+
+    createDevotionalMutation.mutate({ ...newDevotional, status: finalStatus as any }, {
       onSuccess: () => {
         setIsCreateDialogOpen(false)
         setNewDevotional({ titulo: '', conteudo: '', versiculo_referencia: '', categoria: 'Diário', tags: [], status: 'Rascunho' })
+        if (finalStatus === 'Pendente') {
+          toast.info('Seu devocional foi enviado para aprovação.')
+        }
       }
     })
   }
@@ -269,7 +276,11 @@ const DevotionalsPage = () => {
                   <div className="flex justify-end gap-2 pt-4">
                     <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancelar</Button>
                     <Button variant="outline" onClick={() => handleCreateDevotional('Rascunho')} disabled={createDevotionalMutation.isPending}>Salvar Rascunho</Button>
-                    <Button onClick={() => handleCreateDevotional('Publicado')} disabled={createDevotionalMutation.isPending}>{createDevotionalMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Publicar'}</Button>
+                    <Button onClick={() => handleCreateDevotional('Publicado')} disabled={createDevotionalMutation.isPending}>
+                      {createDevotionalMutation.isPending 
+                        ? <Loader2 className="w-4 h-4 animate-spin" /> 
+                        : (canApproveDevotionals ? 'Publicar' : 'Enviar para Aprovação')}
+                    </Button>
                   </div>
                 </div>
               </DialogContent>
