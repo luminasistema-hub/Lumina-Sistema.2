@@ -34,7 +34,9 @@ const ContractViewDialog: React.FC<ContractViewDialogProps> = ({ isOpen, onClose
   };
 
   const isPlanoPago = church.valor_mensal_assinatura > 0;
-  const dataAceite = church.created_at ? new Date(church.created_at).toLocaleDateString('pt-BR') : 'Data não disponível';
+  const dataAceite = church.data_emissao_contrato 
+    ? new Date(church.data_emissao_contrato + 'T00:00:00').toLocaleDateString('pt-BR') 
+    : new Date(church.created_at).toLocaleDateString('pt-BR');
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

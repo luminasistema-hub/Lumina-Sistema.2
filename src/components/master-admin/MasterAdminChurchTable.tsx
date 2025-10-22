@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { Church, useChurchStore, PaymentRecord } from '../../stores/churchStore';
-import { Search, Filter, Edit, History, DollarSign, CheckCircle, XCircle, Clock, Shield, Users, Loader2, Calendar, AlertTriangle, Link as LinkIcon } from 'lucide-react';
+import { Search, Filter, Edit, History, DollarSign, CheckCircle, XCircle, Clock, Shield, Users, Loader2, Calendar, AlertTriangle, Link as LinkIcon, GitFork } from 'lucide-react';
 import ManageChurchSubscriptionDialog from './ManageChurchSubscriptionDialog';
 import ViewPaymentHistoryDialog from './ViewPaymentHistoryDialog';
 import GeneratePaymentLinkDialog from './GeneratePaymentLinkDialog';
@@ -29,9 +29,18 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
   const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false);
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
 
+  const childCounts = React.useMemo(() => {
+    return churches.reduce((acc, church) => {
+      if (church.parent_church_id) {
+        acc[church.parent_church_id] = (acc[church.parent_church_id] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+  }, [churches]);
+
   const filteredChurches = churches.filter(church => {
     const matchesSearch = church.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          church.adminUserId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (church.adminUserId && church.adminUserId.toLowerCase().includes(searchTerm.toLowerCase())) ||
                           church.subscriptionPlanName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || church.status === filterStatus;
     const matchesPlan = filterPlan === 'all' || church.subscriptionPlanName === filterPlan;
@@ -159,32 +168,32 @@ const MasterAdminChurchTable: React.FC<MasterAdminChurchTableProps> = ({ churche
             {filteredChurches.map((church) => (
               <Card key={church.id} className="border-0 shadow-sm">
                 <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="col-span-full lg:col-span-1">
                       <h3 className="text-lg font-semibold text-gray-900">{church.name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {getStatusBadge(church.status)}
                         {getPaymentStatusBadge(church.ultimo_pagamento_status)}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Users className="w-4 h-4" />
-                      <span>{church.currentMembers} / {church.memberLimit === Infinity ? 'Ilimitado' : church.memberLimit} Membros</span>
+                      <Users className="w-4 h-4 text-gray-500" />
+                      <span>{church.currentMembers} / {church.memberLimit === Infinity ? '∞' : church.memberLimit} Membros</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <DollarSign className="w-4 h-4" />
-                      <span>Plano: {church.subscriptionPlanName}</span>
+                      <GitFork className="w-4 h-4 text-gray-500" />
+                      <span>{childCounts[church.id] || 0} / {church.limite_igrejas_filhas === 0 ? '∞' : church.limite_igrejas_filhas} Igrejas Filhas</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <DollarSign className="w-4 h-4" />
-                      <span>Mensalidade: R$ {church.valor_mensal_assinatura.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <DollarSign className="w-4 h-4 text-gray-500" />
+                      <span>Plano: {church.subscriptionPlanName} (R$ {church.valor_mensal_assinatura.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Calendar className="w-4 h-4" />
-                      <span>Próx. Pagamento: {church.data_proximo_pagamento ? new Date(church.data_proximo_pagamento).toLocaleDateString('pt-BR') : 'N/A'}</span>
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <span>Próx. Pag.: {church.data_proximo_pagamento ? new Date(church.data_proximo_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}</span>
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-wrap justify-end">
+                  <div className="flex gap-2 flex-wrap justify-end self-start md:self-center pt-2 md:pt-0">
                     <Button
                       variant="outline"
                       size="sm"

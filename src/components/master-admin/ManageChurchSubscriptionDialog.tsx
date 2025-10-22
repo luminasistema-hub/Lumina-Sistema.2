@@ -31,11 +31,13 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
         valor_mensal_assinatura: church.valor_mensal_assinatura,
         data_proximo_pagamento: church.data_proximo_pagamento,
         ultimo_pagamento_status: church.ultimo_pagamento_status,
+        memberLimit: church.memberLimit,
+        limite_igrejas_filhas: church.limite_igrejas_filhas,
       });
     }
   }, [church]);
 
-  const handleInputChange = (field: keyof Church | 'plano_id', value: any) => {
+  const handleInputChange = (field: keyof Church | 'plano_id' | 'memberLimit' | 'limite_igrejas_filhas', value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (field === 'plano_id') {
       const planDetails = subscriptionPlans.find(p => p.id === value);
@@ -101,6 +103,28 @@ const ManageChurchSubscriptionDialog: React.FC<ManageChurchSubscriptionDialogPro
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="memberLimit">Limite de Membros</Label>
+              <Input
+                id="memberLimit"
+                type="number"
+                value={formData.memberLimit || ''}
+                onChange={(e) => handleInputChange('memberLimit', parseInt(e.target.value, 10))}
+                placeholder="Ex: 100"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="childChurchLimit">Limite Igrejas Filhas</Label>
+              <Input
+                id="childChurchLimit"
+                type="number"
+                value={formData.limite_igrejas_filhas || ''}
+                onChange={(e) => handleInputChange('limite_igrejas_filhas', parseInt(e.target.value, 10))}
+                placeholder="0 para ilimitado"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="monthlyValue">Valor Mensal</Label>

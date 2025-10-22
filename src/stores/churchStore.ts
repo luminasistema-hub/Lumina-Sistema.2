@@ -52,6 +52,10 @@ export interface Church {
   compartilha_eventos_da_mae?: boolean;
   compartilha_jornada_da_mae?: boolean;
   compartilha_devocionais_da_mae?: boolean;
+  // Novos campos de gestão
+  data_emissao_contrato?: string;
+  limite_igrejas_filhas: number;
+  parent_church_id?: string | null;
 }
 
 interface ChurchState {
@@ -139,6 +143,9 @@ export const useChurchStore = create<ChurchState>()(
           compartilha_eventos_da_mae: c.compartilha_eventos_da_mae ?? true,
           compartilha_jornada_da_mae: c.compartilha_jornada_da_mae ?? true,
           compartilha_devocionais_da_mae: c.compartilha_devocionais_da_mae ?? true,
+          data_emissao_contrato: c.data_emissao_contrato,
+          limite_igrejas_filhas: c.limite_igrejas_filhas || 0,
+          parent_church_id: c.parent_church_id,
         })) as Church[], isLoadingChurches: false, lastLoadedAt: Date.now() });
       },
 
@@ -223,6 +230,10 @@ export const useChurchStore = create<ChurchState>()(
         if (updates.compartilha_eventos_da_mae !== undefined) updatePayload.compartilha_eventos_da_mae = updates.compartilha_eventos_da_mae;
         if (updates.compartilha_jornada_da_mae !== undefined) updatePayload.compartilha_jornada_da_mae = updates.compartilha_jornada_da_mae;
         if (updates.compartilha_devocionais_da_mae !== undefined) updatePayload.compartilha_devocionais_da_mae = updates.compartilha_devocionais_da_mae;
+        // Novos campos de gestão
+        if (updates.data_emissao_contrato) updatePayload.data_emissao_contrato = updates.data_emissao_contrato;
+        if (updates.limite_igrejas_filhas !== undefined) updatePayload.limite_igrejas_filhas = updates.limite_igrejas_filhas;
+        if (updates.memberLimit !== undefined) updatePayload.limite_membros = updates.memberLimit;
 
         const { data, error } = await supabase
           .from('igrejas')
@@ -271,6 +282,9 @@ export const useChurchStore = create<ChurchState>()(
           compartilha_eventos_da_mae: data.compartilha_eventos_da_mae ?? true,
           compartilha_jornada_da_mae: data.compartilha_jornada_da_mae ?? true,
           compartilha_devocionais_da_mae: data.compartilha_devocionais_da_mae ?? true,
+          data_emissao_contrato: data.data_emissao_contrato,
+          limite_igrejas_filhas: data.limite_igrejas_filhas,
+          parent_church_id: data.parent_church_id,
         };
 
         set((state) => ({

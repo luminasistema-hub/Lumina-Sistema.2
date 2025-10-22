@@ -240,7 +240,7 @@ const MasterAdminPage = () => {
           </TabsContent>
 
           <TabsContent value="contracts" className="space-y-6">
-            <ContractManagementTab churches={churches} />
+            <ContractManagementTab churches={churches} onUpdateChurch={handleUpdateChurch} />
           </TabsContent>
 
           <TabsContent value="database" className="space-y-6">
