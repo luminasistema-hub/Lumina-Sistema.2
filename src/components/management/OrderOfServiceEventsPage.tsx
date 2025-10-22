@@ -23,7 +23,11 @@ const OrderOfServiceEventsPage = () => {
   const [selectedEvent, setSelectedEvent] = useState<Evento | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data: eventsData, isLoading, refetch } = useEvents(currentChurchId);
+  const { events, isLoading, queryClient } = useEvents();
+
+  const refetch = () => {
+    queryClient.invalidateQueries({ queryKey: ['events', currentChurchId] });
+  };
 
   const openEvent = (ev: Evento) => {
     setSelectedEvent(ev);
@@ -47,13 +51,13 @@ const OrderOfServiceEventsPage = () => {
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Ordem de Culto/Eventos</h1>
-        <Button variant="outline" onClick={() => refetch()}>Atualizar</Button>
+        <Button variant="outline" onClick={refetch}>Atualizar</Button>
       </div>
 
       {isLoading && <div className="p-6 text-center text-muted-foreground">Carregando eventos...</div>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {(eventsData ?? []).map((ev) => (
+        {(events ?? []).map((ev) => (
           <Card key={ev.id} className="hover:shadow-md transition cursor-pointer" onClick={() => openEvent(ev)}>
             <CardHeader>
               <CardTitle className="text-lg">{ev.nome}</CardTitle>
