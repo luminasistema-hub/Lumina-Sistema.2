@@ -71,27 +71,60 @@ export const useJourneyData = () => {
 
     setLoading(true);
     try {
-      const { data: trilhaData, error: trilhaError } = await supabase
+      // Descobrir a igreja mãe da atual
+      const { data: churchRow } = await supabase
+        .from('igrejas')
+        .select('parent_church_id')
+        .eq('id', currentChurchId)
+        .maybeSingle();
+      const parentId: string | null = churchRow?.parent_church_id ?? null;
+
+      // 1) Trilha ativa da própria igreja
+      const { data: trilhaAtual, error: trilhaError } = await supabase
         .from('trilhas_crescimento')
-        .select('id, titulo, descricao')
+        .select('id, titulo, descricao, compartilhar_com_filhas')
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
         .maybeSingle();
-
       if (trilhaError) throw trilhaError;
-      if (!trilhaData) {
+
+      // 2) Trilhas compartilhadas da igreja-mãe (se houver mãe)
+      let trilhasCompartilhadasMae: { id: string; titulo: string; descricao: string }[] = [];
+      if (parentId) {
+        const { data: trilhasMae } = await supabase
+          .from('trilhas_crescimento')
+          .select('id, titulo, descricao')
+          .eq('id_igreja', parentId)
+          .eq('is_ativa', true)
+          .eq('compartilhar_com_filhas', true);
+        trilhasCompartilhadasMae = (trilhasMae || []).map(t => ({ id: t.id, titulo: t.titulo, descricao: t.descricao }));
+      }
+
+      // Escolher trilha principal para cabeçalho (da atual, senão a primeira compartilhada)
+      const trilhaHeader = trilhaAtual || trilhasCompartilhadasMae[0] || null;
+      if (!trilhaHeader) {
         setEtapas([]);
         setTrilhaInfo(null);
         setLoading(false);
         return;
       }
-      
-      setTrilhaInfo({ id: trilhaData.id, titulo: trilhaData.titulo, descricao: trilhaData.descricao });
+      setTrilhaInfo({ id: trilhaHeader.id, titulo: trilhaHeader.titulo, descricao: trilhaHeader.descricao });
+
+      // Coletar etapas de ambas as trilhas (atual + compartilhadas da mãe)
+      const trilhaIds: string[] = [
+        ...(trilhaAtual?.id ? [trilhaAtual.id] : []),
+        ...trilhasCompartilhadasMae.map(t => t.id)
+      ];
+      if (trilhaIds.length === 0) {
+        setEtapas([]);
+        setLoading(false);
+        return;
+      }
 
       const { data: etapasRawData, error: etapasDataError } = await supabase
         .from('etapas_trilha')
         .select('*')
-        .eq('id_trilha', trilhaData.id)
+        .in('id_trilha', trilhaIds)
         .order('ordem', { ascending: true });
       if (etapasDataError) throw etapasDataError;
 
@@ -151,9 +184,15 @@ export const useJourneyData = () => {
         const allPassosCompleted = passosDaEtapa.length > 0 && passosDaEtapa.every(p => p.completed);
 
         return {
-          ...etapa,
+          id: etapa.id,
+          id_trilha: etapa.id_trilha,
+          ordem: etapa.ordem,
+          titulo: etapa.titulo,
+          descricao: etapa.descricao,
+          cor: etapa.cor,
+          created_at: etapa.created_at,
           passos: passosDaEtapa,
-          allPassosCompleted: allPassosCompleted,
+          allPassosCompleted,
         };
       });
       

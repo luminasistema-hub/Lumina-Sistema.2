@@ -43,28 +43,31 @@ export interface DevotionalDetails extends Devotional {
 }
 
 const fetchDevotionals = async (churchId: string, filters: any) => {
-  let query = supabase
-    .from('devocionais')
-    .select(
-      `
-      *,
-      membros ( nome_completo ),
-      devocional_curtidas ( membro_id ),
-      devocional_comentarios ( count )
-    `
-    )
-    .eq('id_igreja', churchId)
-
-  if (filters.status) query = query.eq('status', filters.status)
-  if (filters.authorId) query = query.eq('autor_id', filters.authorId)
-  if (filters.category && filters.category !== 'all') query = query.eq('categoria', filters.category)
-  if (filters.tag && filters.tag !== 'all') query = query.contains('tags', [filters.tag])
-  if (filters.searchTerm) query = query.or(`titulo.ilike.%${filters.searchTerm}%,conteudo.ilike.%${filters.searchTerm}%`)
-
-  const { data, error } = await query.order('featured', { ascending: false }).order('data_publicacao', { ascending: false })
-
+  // Usa a função RPC para retornar devocionais da igreja atual
+  // incluindo os da igreja-mãe com compartilhar_com_filhas = true
+  const { data, error } = await supabase.rpc('get_devocionais_para_igreja', { id_igreja_atual: churchId })
   if (error) throw new Error(error.message)
-  return data as Devotional[]
+  let rows = (data as any[]) as Devotional[]
+
+  // Filtros aplicados no cliente
+  if (filters.status) rows = rows.filter(d => d.status === filters.status)
+  if (filters.authorId) rows = rows.filter(d => d.autor_id === filters.authorId)
+  if (filters.category && filters.category !== 'all') rows = rows.filter(d => d.categoria === filters.category)
+  if (filters.tag && filters.tag !== 'all') rows = rows.filter(d => Array.isArray(d.tags) && d.tags.includes(filters.tag))
+  if (filters.searchTerm) {
+    const t = String(filters.searchTerm).toLowerCase()
+    rows = rows.filter(d => (d.titulo?.toLowerCase().includes(t) || d.conteudo?.toLowerCase().includes(t)))
+  }
+
+  // Ordenação similar à anterior
+  rows.sort((a, b) => {
+    if (a.featured !== b.featured) return a.featured ? -1 : 1
+    const da = a.data_publicacao ? new Date(a.data_publicacao).getTime() : 0
+    const db = b.data_publicacao ? new Date(b.data_publicacao).getTime() : 0
+    return db - da
+  })
+
+  return rows
 }
 
 export const useDevotionals = (filters: any) => {

@@ -24,6 +24,7 @@ const NotificationManager = lazy(() => import('../components/admin/NotificationM
 const SystemSettings = lazy(() => import('../components/admin/SystemSettings'))
 import { SpecialNotificationDialog } from '@/components/shared/SpecialNotificationDialog'
 import PastorAreaPage from '@/components/pastor/PastorAreaPage'
+const ChildChurchesPage = lazy(() => import('../components/management/ChildChurchesPage'))
 
 interface DashboardPageProps {
   currentChurchId: string
@@ -87,6 +88,8 @@ const DashboardPage = ({ currentChurchId }: DashboardPageProps) => {
         return <EventsManagementPage />
       case 'devotionals-management':
         return <DevotionalsManagementPage />
+      case 'child-churches':
+        return <ChildChurchesPage />
       // Administração
       case 'notification-management':
         return <NotificationManager />

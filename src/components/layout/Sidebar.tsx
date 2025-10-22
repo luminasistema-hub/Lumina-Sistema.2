@@ -172,7 +172,8 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
         { id: "journey-config", title: "Config. da Jornada", icon: <ClipboardList className="w-4 h-4" />, roles: ["admin","pastor", "integra"], status: "complete" },
         { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","gestao_kids"], status: "complete" },
         { id: "events-management", title: "Gestão de Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
-        { id: "devotionals-management", title: "Gestão de Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" }
+        { id: "devotionals-management", title: "Gestão de Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" },
+        { id: "child-churches", title: "Igrejas Filhas", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" }
       ]
     },
     {
