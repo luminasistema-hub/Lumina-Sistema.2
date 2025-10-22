@@ -48,6 +48,7 @@ interface AuthState {
   user: User | null
   isLoading: boolean
   currentChurchId: string | null
+  primaryChurchId: string | null
 
   login: (email: string, password: string) => Promise<boolean>
   logout: () => void
@@ -66,6 +67,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isLoading: true,
       currentChurchId: null,
+      primaryChurchId: null,
 
       login: async (email, password) => {
         set({ isLoading: true })
@@ -92,7 +94,7 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         set({ isLoading: true })
         await supabase.auth.signOut()
-        set({ user: null, currentChurchId: null, isLoading: false })
+        set({ user: null, currentChurchId: null, primaryChurchId: null, isLoading: false })
       },
 
       checkAuth: async () => {
@@ -184,7 +186,8 @@ export const useAuthStore = create<AuthState>()(
                   extraPermissions: Array.isArray(profile.extra_permissoes) ? profile.extra_permissoes : [],
                   personalInfo,
                 },
-                currentChurchId: profile.id_igreja,
+                currentChurchId: get().currentChurchId || profile.id_igreja,
+                primaryChurchId: profile.id_igreja,
               });
             } else {
               // 2) Fallback: verifica se é Super Admin
@@ -215,18 +218,19 @@ export const useAuthStore = create<AuthState>()(
                     personalInfo: null,
                   },
                   currentChurchId: null,
+                  primaryChurchId: null,
                 });
               } else {
                 // Não é membro nem super_admin
-                set({ user: null, currentChurchId: null });
+                set({ user: null, currentChurchId: null, primaryChurchId: null });
               }
             }
           } else {
-            set({ user: null, currentChurchId: null })
+            set({ user: null, currentChurchId: null, primaryChurchId: null })
           }
         } catch (error) {
           console.error('AuthStore: Erro no checkAuth:', error)
-          set({ user: null, currentChurchId: null })
+          set({ user: null, currentChurchId: null, primaryChurchId: null })
         } finally {
           isCheckingAuth = false
           set({ isLoading: false })
@@ -249,7 +253,7 @@ export const useAuthStore = create<AuthState>()(
           ) {
             await get().checkAuth()
           } else if (event === 'SIGNED_OUT') {
-            set({ user: null, currentChurchId: null, isLoading: false })
+            set({ user: null, currentChurchId: null, primaryChurchId: null, isLoading: false })
           }
         })
 
@@ -279,6 +283,7 @@ export const useAuthStore = create<AuthState>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         currentChurchId: state.currentChurchId,
+        primaryChurchId: state.primaryChurchId,
       }),
     }
   )
