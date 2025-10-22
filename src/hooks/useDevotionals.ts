@@ -121,7 +121,7 @@ export const useDevotionals = (filters: any) => {
     filters.searchTerm,
   ]);
 
-  const queryKey = ['devotionals', currentChurchId, user?.id, memoizedFilters];
+  const queryKey = useMemo(() => ['devotionals', currentChurchId, user?.id, memoizedFilters], [currentChurchId, user?.id, memoizedFilters]);
 
   useEffect(() => {
     if (!currentChurchId) return;
