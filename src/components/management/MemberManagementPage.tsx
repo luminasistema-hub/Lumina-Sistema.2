@@ -59,6 +59,14 @@ const MemberManagementPage = () => {
   const { getChurchById } = useChurchStore()
   const queryClient = useQueryClient();
 
+  // Declarar searchTerm ANTES de useDebouncedValue
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterRole, setFilterRole] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterMinistry, setFilterMinistry] = useState('all')
+  const [filterBirthday, setFilterBirthday] = useState('all')
+  const [filterWedding, setFilterWedding] = useState('all')
+
   const debouncedSearch = useDebouncedValue(searchTerm, 250);
   const { data: membersData, isLoading, error } = useMembers({
     search: debouncedSearch || null,
@@ -78,12 +86,6 @@ const MemberManagementPage = () => {
   const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
   const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false)
   const [generatedLink, setGeneratedLink] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterRole, setFilterRole] = useState('all')
-  const [filterStatus, setFilterStatus] = useState('all')
-  const [filterMinistry, setFilterMinistry] = useState('all')
-  const [filterBirthday, setFilterBirthday] = useState('all')
-  const [filterWedding, setFilterWedding] = useState('all')
   // Dados extras para o popup
   const [memberExtra, setMemberExtra] = useState<{
     loading: boolean;
