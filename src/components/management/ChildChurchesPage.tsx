@@ -144,44 +144,38 @@ const ChildChurchesPage = () => {
   const handleCreate = async () => {
     if (!currentChurchId) return toast.error('Nenhuma igreja selecionada.');
     if (!canManage) return toast.error('Você não tem permissão para criar igrejas filhas.');
-    // Bloquear se a igreja atual já for filha
     if (parentInfo?.isChild) {
       return toast.error('Igrejas filhas não podem criar novas igrejas.');
     }
-
-    if (!form.nome || !form.nome_responsavel || !form.email) {
-      return toast.error('Preencha ao menos nome, responsável e email.');
+    if (!form.nome || !form.nome_responsavel || !form.email || !form.panel_password) {
+      return toast.error('Preencha nome, responsável, email e a senha da igreja filha.');
     }
 
     setCreating(true);
-    // Buscar plano/limites da mãe
-    const { data: mother } = await supabase
-      .from('igrejas')
-      .select('plano_id, limite_membros, valor_mensal_assinatura')
-      .eq('id', currentChurchId)
-      .maybeSingle();
 
-    const payload: any = {
-      nome: form.nome,
-      nome_responsavel: form.nome_responsavel,
-      email: form.email,
-      telefone_contato: form.telefone_contato,
-      endereco: form.endereco,
-      cnpj: form.cnpj?.replace(/[^\d]+/g, '') || null,
-      parent_church_id: currentChurchId,
-      plano_id: mother?.plano_id || null,
-      limite_membros: mother?.limite_membros || null,
-      valor_mensal_assinatura: mother?.valor_mensal_assinatura || null,
-      panel_password: form.panel_password || null,
-      status: 'active', // autoriza o uso imediato do painel da igreja filha
-    };
+    // Invoca Edge Function que cria a igreja filha e o usuário pastor
+    const { data, error } = await supabase.functions.invoke('register-child-church', {
+      body: {
+        motherChurchId: currentChurchId,
+        child: {
+          nome: form.nome,
+          nome_responsavel: form.nome_responsavel,
+          email: form.email,
+          telefone_contato: form.telefone_contato,
+          endereco: form.endereco,
+          cnpj: form.cnpj,
+          panel_password: form.panel_password,
+        },
+      },
+    });
 
-    const { error } = await supabase.from('igrejas').insert(payload);
     setCreating(false);
+
     if (error) {
       return toast.error('Erro ao criar igreja filha: ' + error.message);
     }
-    toast.success('Igreja filha criada com sucesso!');
+
+    toast.success('Igreja filha criada e pastor habilitado para login!');
     setOpenCreate(false);
     setForm({ nome: '', nome_responsavel: '', email: '', telefone_contato: '', endereco: '', cnpj: '', panel_password: '' });
     load();
