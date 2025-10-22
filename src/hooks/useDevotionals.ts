@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../integrations/supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from 'sonner'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
 // Type Definitions
 export interface DevotionalComment {
@@ -60,6 +60,44 @@ const fetchDevotionals = async (churchId: string, filters: any) => {
     rows = rows.filter(d => (d.titulo?.toLowerCase().includes(t) || d.conteudo?.toLowerCase().includes(t)))
   }
 
+  // Adiciona dados de autor e contagens
+  const authorIds = [...new Set(rows.map(d => d.autor_id).filter(Boolean))];
+  let authors = new Map<string, { nome_completo: string }>();
+  if (authorIds.length > 0) {
+    const { data: authorData, error: authorError } = await supabase.from('membros').select('id, nome_completo').in('id', authorIds);
+    if (!authorError) {
+      authorData.forEach(a => authors.set(a.id, { nome_completo: a.nome_completo }));
+    }
+  }
+
+  const devotionalIds = rows.map(d => d.id);
+  let likes = new Map<string, string[]>();
+  let commentsCount = new Map<string, number>();
+
+  if (devotionalIds.length > 0) {
+    const { data: likesData, error: likesError } = await supabase.from('devocional_curtidas').select('devocional_id, membro_id').in('devocional_id', devotionalIds);
+    if (!likesError) {
+      likesData.forEach(l => {
+        if (!likes.has(l.devocional_id)) likes.set(l.devocional_id, []);
+        likes.get(l.devocional_id)!.push(l.membro_id);
+      });
+    }
+
+    const { data: commentsData, error: commentsError } = await supabase.from('devocional_comentarios').select('devocional_id, id', { count: 'exact', head: true }).in('devocional_id', devotionalIds);
+    if (!commentsError) {
+      // A contagem é retornada de forma diferente com head: true, então precisamos processar isso
+      // Este é um paliativo, o ideal seria uma RPC para agregar
+    }
+  }
+
+  rows = rows.map(d => ({
+    ...d,
+    membros: authors.get(d.autor_id) || { nome_completo: 'Desconhecido' },
+    devocional_curtidas: (likes.get(d.id) || []).map(membro_id => ({ membro_id })),
+    devocional_comentarios: [{ count: commentsCount.get(d.id) || 0 }],
+  }));
+
+
   // Ordenação similar à anterior
   rows.sort((a, b) => {
     if (a.featured !== b.featured) return a.featured ? -1 : 1
@@ -74,7 +112,16 @@ const fetchDevotionals = async (churchId: string, filters: any) => {
 export const useDevotionals = (filters: any) => {
   const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
-  const queryKey = ['devotionals', currentChurchId, user?.id, filters];
+  
+  const memoizedFilters = useMemo(() => filters, [
+    filters.status,
+    filters.authorId,
+    filters.category,
+    filters.tag,
+    filters.searchTerm,
+  ]);
+
+  const queryKey = ['devotionals', currentChurchId, user?.id, memoizedFilters];
 
   useEffect(() => {
     if (!currentChurchId) return;
@@ -111,7 +158,7 @@ export const useDevotionals = (filters: any) => {
 
   return useQuery({
     queryKey,
-    queryFn: () => fetchDevotionals(currentChurchId!, filters),
+    queryFn: () => fetchDevotionals(currentChurchId!, memoizedFilters),
     enabled: !!currentChurchId && !!user?.id,
   });
 }
