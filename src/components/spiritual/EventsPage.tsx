@@ -28,19 +28,18 @@ interface Event {
   capacidade_maxima?: number; inscricoes_abertas: boolean; valor_inscricao?: number;
   status: 'Planejado' | 'Confirmado' | 'Em Andamento' | 'Finalizado' | 'Cancelado';
   participantes_count: number; is_registered?: boolean;
-  link_externo?: string; // novo campo para link de inscrição externa
+  link_externo?: string;
 }
 
 const fetchEvents = async (churchId: string | null) => {
   if (!churchId) return [];
-  // 1) Tentativa via RPC (inclui eventos da mãe compartilhados + contagem/inscrição)
   try {
     const { data, error } = await supabase.rpc('get_eventos_para_igreja_com_participacao', {
-      id_igreja_atual: churchId?.toString(),
+      id_igreja_atual: churchId,
     });
     if (error) throw error;
     const items: Event[] = (data || []).map((e: any) => ({
-      id: e.id,
+      id: e.evento_id,                // usa a coluna não ambígua
       nome: e.nome,
       data_hora: e.data_hora,
       local: e.local ?? '',
@@ -57,7 +56,6 @@ const fetchEvents = async (churchId: string | null) => {
     items.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
     return items;
   } catch (rpcErr: any) {
-    // 2) Fallback: carregar eventos da própria igreja (sem contagem/inscrição)
     toast.error(`Falha ao carregar eventos compartilhados: ${rpcErr?.message || 'erro RPC'}. Exibindo apenas eventos da sua igreja.`);
     const { data: ownEvents, error: ownErr } = await supabase
       .from('eventos')
@@ -76,8 +74,8 @@ const fetchEvents = async (churchId: string | null) => {
       inscricoes_abertas: Boolean(e.inscricoes_abertas),
       valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
       status: (e.status || 'Planejado') as Event['status'],
-      participantes_count: 0, // sem contagem no fallback
-      is_registered: false,   // sem checagem no fallback
+      participantes_count: 0,
+      is_registered: false,
       link_externo: e.link_externo ?? undefined,
     }));
     return items;

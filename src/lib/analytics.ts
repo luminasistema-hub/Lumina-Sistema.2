@@ -13,22 +13,18 @@ export const trackEvent = async (eventName: string, details?: EventDetails) => {
     return;
   }
 
-  try {
-    const { error } = await supabase
-      .from('eventos_aplicacao')
-      .insert({
-        user_id: user.id,
-        church_id: currentChurchId,
-        event_name: eventName,
-        event_details: details || {},
-      });
+  const { error } = await supabase
+    .from('eventos_aplicacao')
+    .insert({
+      membro_id: user.id,
+      church_id: currentChurchId,
+      event_name: eventName,
+      event_details: details || {},
+    });
 
-    if (error) {
-      console.error('Analytics: Error tracking event:', error.message);
-    } else {
-      console.log(`Analytics: Event '${eventName}' tracked successfully.`, details);
-    }
-  } catch (error) {
-    console.error('Analytics: Unexpected error tracking event:', error);
+  if (error) {
+    console.error('Analytics: Error tracking event:', error.message);
+  } else {
+    console.log(`Analytics: Event '${eventName}' tracked successfully.`, details);
   }
 };
