@@ -7,7 +7,9 @@ import {
   useUserQuizAnswers, 
   useStudentAttendance,
   useSubmitQuizAnswer,
-  useRegisterAttendance
+  useRegisterAttendance,
+  useStudentProgress,
+  useMarkLessonAsCompleted
 } from '@/hooks/useSchools'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,7 +23,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { BookOpen, Play, CheckCircle, Calendar, User, FileText, MapPin, CheckSquare } from 'lucide-react'
+import { BookOpen, Play, CheckCircle, Calendar, User, FileText, MapPin, CheckSquare, Lock } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const SchoolDetailsPage = () => {
@@ -35,9 +37,11 @@ const SchoolDetailsPage = () => {
   const { data: quizQuestions } = useQuizQuestions(selectedLesson?.id || null)
   const { data: userQuizAnswers } = useUserQuizAnswers(selectedLesson?.id || null)
   const { data: attendance } = useStudentAttendance(selectedLesson?.id || null)
+  const { data: studentProgress } = useStudentProgress(schoolId)
   
   const submitQuizAnswerMutation = useSubmitQuizAnswer()
   const registerAttendanceMutation = useRegisterAttendance()
+  const markLessonAsCompletedMutation = useMarkLessonAsCompleted()
   
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false)
@@ -46,6 +50,9 @@ const SchoolDetailsPage = () => {
   
   const school = schools?.find(s => s.id === schoolId)
   
+  // Mapear aulas concluídas para verificação rápida
+  const completedLessons = new Set(studentProgress?.map(p => p.aula_id))
+
   // Verificar se o usuário está inscrito na escola
   const [isEnrolled, setIsEnrolled] = useState(false)
   
@@ -82,6 +89,10 @@ const SchoolDetailsPage = () => {
       })
       setSelectedAnswer(null)
     }
+  }
+
+  const handleMarkAsCompleted = (lessonId: string) => {
+    markLessonAsCompletedMutation.mutate({ lessonId })
   }
   
   const handleRegisterAttendance = (lessonId: string) => {
@@ -178,20 +189,29 @@ const SchoolDetailsPage = () => {
       
       {lessons && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {lessons.map((lesson) => {
+          {lessons.map((lesson, index) => {
             const userAnswer = userAnswersMap[lesson.id]
             const userAttendance = attendance?.aula_id === lesson.id
+            const isCompleted = completedLessons.has(lesson.id)
             
+            const previousLesson = lessons[index - 1]
+            const isPreviousCompleted = index === 0 || completedLessons.has(previousLesson.id)
+            const isLocked = !isPreviousCompleted
+
             return (
-              <Card key={lesson.id} className="border-0 shadow-sm">
+              <Card key={lesson.id} className={`border-0 shadow-sm ${isLocked ? 'bg-gray-50 opacity-60' : ''}`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
+                    {isLocked && <Lock className="w-4 h-4 text-gray-500" />}
                     {getLessonTypeIcon(lesson.tipo_aula)}
                     {lesson.titulo}
                   </CardTitle>
-                  <Badge variant="outline">
-                    {getLessonTypeLabel(lesson.tipo_aula)}
-                  </Badge>
+                  <div className="flex gap-2 items-center">
+                    <Badge variant="outline">
+                      {getLessonTypeLabel(lesson.tipo_aula)}
+                    </Badge>
+                    {isCompleted && <Badge variant="default" className="bg-green-500">Concluída</Badge>}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 mb-4">
@@ -203,6 +223,7 @@ const SchoolDetailsPage = () => {
                       <Button 
                         size="sm" 
                         onClick={() => handleOpenLesson(lesson)}
+                        disabled={isLocked}
                       >
                         {lesson.tipo_aula === 'video' && (
                           <>
@@ -269,6 +290,11 @@ const SchoolDetailsPage = () => {
               </p>
             </div>
           </div>
+          {!completedLessons.has(selectedLesson?.id) && (
+            <Button onClick={() => handleMarkAsCompleted(selectedLesson.id)}>
+              Marcar como Concluída
+            </Button>
+          )}
         </DialogContent>
       </Dialog>
       
@@ -302,6 +328,11 @@ const SchoolDetailsPage = () => {
               </p>
             </div>
           </div>
+          {!completedLessons.has(selectedLesson?.id) && (
+            <Button onClick={() => handleMarkAsCompleted(selectedLesson.id)}>
+              Marcar como Concluída
+            </Button>
+          )}
         </DialogContent>
       </Dialog>
       
@@ -381,6 +412,14 @@ const SchoolDetailsPage = () => {
               </div>
             )}
           </div>
+          {!completedLessons.has(selectedLesson?.id) && (
+            <Button 
+              onClick={() => handleMarkAsCompleted(selectedLesson.id)}
+              disabled={!quizQuestions || quizQuestions.length === 0 || Object.keys(userAnswersMap).length < quizQuestions.length}
+            >
+              Marcar como Concluída
+            </Button>
+          )}
         </DialogContent>
       </Dialog>
     </div>

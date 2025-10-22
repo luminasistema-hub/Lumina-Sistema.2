@@ -13,6 +13,8 @@ export interface School {
   compartilhar_com_filhas: boolean
   created_at: string
   updated_at: string
+  data_inicio?: string
+  data_fim?: string
 }
 
 export interface SchoolEnrollment {
@@ -66,6 +68,14 @@ export interface QuizAnswer {
   resposta_escolhida: number
   pontuacao_obtida: number
   created_at: string
+}
+
+export interface StudentProgress {
+  id: string
+  aula_id: string
+  membro_id: string
+  id_igreja: string
+  completed_at: string
 }
 
 // Função para buscar escolas (incluindo as compartilhadas com igrejas filhas)
@@ -235,6 +245,37 @@ export const useUserQuizAnswers = (lessonId: string | null) => {
     queryKey: ['user-quiz-answers', user?.id, lessonId],
     queryFn: () => fetchUserQuizAnswers(user!.id, lessonId!),
     enabled: !!user?.id && !!lessonId
+  })
+}
+
+// Função para buscar o progresso do aluno em uma escola
+const fetchStudentProgress = async (userId: string, schoolId: string) => {
+  const { data: lessons, error: lessonsError } = await supabase
+    .from('escola_aulas')
+    .select('id')
+    .eq('escola_id', schoolId)
+
+  if (lessonsError) throw new Error(lessonsError.message)
+  const lessonIds = lessons.map(l => l.id)
+
+  if (lessonIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('escola_progresso_aulas')
+    .select('*')
+    .eq('membro_id', userId)
+    .in('aula_id', lessonIds)
+
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useStudentProgress = (schoolId: string | null) => {
+  const { user } = useAuthStore()
+  return useQuery({
+    queryKey: ['student-progress', user?.id, schoolId],
+    queryFn: () => fetchStudentProgress(user!.id, schoolId!),
+    enabled: !!user?.id && !!schoolId
   })
 }
 
@@ -484,6 +525,39 @@ export const useSubmitQuizAnswer = () => {
     },
     onError: (error) => {
       toast.error(`Erro ao registrar resposta: ${error.message}`)
+    }
+  })
+}
+
+// Hook para marcar aula como concluída
+export const useMarkLessonAsCompleted = () => {
+  const queryClient = useQueryClient()
+  const { user, currentChurchId } = useAuthStore()
+
+  return useMutation({
+    mutationFn: async ({ lessonId }: { lessonId: string }) => {
+      const { data, error } = await supabase
+        .from('escola_progresso_aulas')
+        .insert({
+          aula_id: lessonId,
+          membro_id: user!.id,
+          id_igreja: currentChurchId!
+        })
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Aula concluída!')
+      queryClient.invalidateQueries({ queryKey: ['student-progress', user?.id] })
+    },
+    onError: (error) => {
+      if (error.message.includes('duplicate key value')) {
+        // Não mostrar erro se já estiver concluída
+        return
+      }
+      toast.error(`Erro ao marcar aula como concluída: ${error.message}`)
     }
   })
 }

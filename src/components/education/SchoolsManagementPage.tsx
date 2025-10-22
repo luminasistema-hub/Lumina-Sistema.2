@@ -35,6 +35,7 @@ import { Plus, Pencil, Trash2, Users, BookOpen, Play, FileText, CheckSquare, Map
 import { useAuthStore } from '@/stores/authStore'
 import QuizQuestionsManager from './QuizQuestionsManager'
 import { Progress } from '@/components/ui/progress'
+import { DatePicker } from '@/components/ui/datepicker'
 
 const SchoolsManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
@@ -59,7 +60,9 @@ const SchoolsManagementPage = () => {
     nome: '',
     descricao: '',
     professor_id: '',
-    compartilhar_com_filhas: false
+    compartilhar_com_filhas: false,
+    data_inicio: undefined as Date | undefined,
+    data_fim: undefined as Date | undefined
   })
   
   const [lessonFormData, setLessonFormData] = useState({
@@ -85,7 +88,9 @@ const SchoolsManagementPage = () => {
       nome: '',
       descricao: '',
       professor_id: '',
-      compartilhar_com_filhas: false
+      compartilhar_com_filhas: false,
+      data_inicio: undefined,
+      data_fim: undefined
     })
     setEditingSchool(null)
   }
@@ -110,7 +115,9 @@ const SchoolsManagementPage = () => {
         nome: school.nome || '',
         descricao: school.descricao || '',
         professor_id: school.professor_id || '',
-        compartilhar_com_filhas: school.compartilhar_com_filhas || false
+        compartilhar_com_filhas: school.compartilhar_com_filhas || false,
+        data_inicio: school.data_inicio ? new Date(school.data_inicio) : undefined,
+        data_fim: school.data_fim ? new Date(school.data_fim) : undefined
       })
     } else {
       resetForm()
@@ -308,6 +315,25 @@ const SchoolsManagementPage = () => {
                   rows={3}
                 />
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="data_inicio">Data de Início</Label>
+                  <DatePicker 
+                    date={formData.data_inicio}
+                    setDate={(date) => setFormData({ ...formData, data_inicio: date })}
+                    placeholder="Selecione a data de início"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="data_fim">Data de Fim</Label>
+                  <DatePicker 
+                    date={formData.data_fim}
+                    setDate={(date) => setFormData({ ...formData, data_fim: date })}
+                    placeholder="Selecione a data de término"
+                  />
+                </div>
+              </div>
               
               <div className="space-y-2">
                 <Label htmlFor="professor">Professor</Label>
@@ -383,6 +409,7 @@ const SchoolsManagementPage = () => {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Professor</TableHead>
+                  <TableHead>Período</TableHead>
                   <TableHead>Compartilhada</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -395,6 +422,12 @@ const SchoolsManagementPage = () => {
                       {school.professor_nome || (
                         <span className="text-gray-500">Não definido</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      {school.data_inicio && school.data_fim 
+                        ? `${new Date(school.data_inicio).toLocaleDateString()} - ${new Date(school.data_fim).toLocaleDateString()}`
+                        : <span className="text-gray-500">Não definido</span>
+                      }
                     </TableCell>
                     <TableCell>
                       {school.compartilhar_com_filhas ? (
