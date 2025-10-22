@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../integrations/supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from 'sonner'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
 export interface School {
   id: string
@@ -119,7 +119,7 @@ const fetchSchools = async (churchId: string) => {
 export const useSchools = () => {
   const { currentChurchId } = useAuthStore()
   const queryClient = useQueryClient()
-  const queryKey = ['schools', currentChurchId]
+  const queryKey = useMemo(() => ['schools', currentChurchId], [currentChurchId]);
 
   useEffect(() => {
     if (!currentChurchId) return
