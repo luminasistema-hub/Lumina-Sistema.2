@@ -77,67 +77,81 @@ const fetchEvents = async (churchId: string | null): Promise<Event[]> => {
   }
 };
 
-export const useEvents = () => {
+export const useEvents = (params?: { search?: string | null; type?: string | null }) => {
   const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ['events', currentChurchId, user?.id], [currentChurchId, user?.id]);
+  const queryKey = useMemo(
+    () => ['events', currentChurchId, user?.id, params?.search ?? '', params?.type ?? ''],
+    [currentChurchId, user?.id, params?.search, params?.type]
+  );
 
   useEffect(() => {
     if (!currentChurchId) return;
-
-    const setupRealtime = async () => {
+    let active = true;
+    let channel: any = null;
+    let invalidateTimer: any = null;
+    const scheduleInvalidate = () => {
+      if (invalidateTimer) clearTimeout(invalidateTimer);
+      invalidateTimer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey });
+      }, 500); // evita invalidar em cascata
+    };
+    (async () => {
       const { data: churchRow } = await supabase
         .from('igrejas')
         .select('parent_church_id')
         .eq('id', currentChurchId)
         .maybeSingle();
+      if (!active) return;
       const parentIdLocal = churchRow?.parent_church_id ?? null;
-
-      const channel = supabase
+      channel = supabase
         .channel(`public-events-hook-${currentChurchId}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
-          () => queryClient.invalidateQueries({ queryKey })
+          scheduleInvalidate
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
-          () => queryClient.invalidateQueries({ queryKey })
+          scheduleInvalidate
         );
-
       if (parentIdLocal) {
         channel
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${parentIdLocal}` },
-            () => queryClient.invalidateQueries({ queryKey })
+            scheduleInvalidate
           )
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${parentIdLocal}` },
-            () => queryClient.invalidateQueries({ queryKey })
+            scheduleInvalidate
           );
       }
-
       channel.subscribe();
-      
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    };
-
-    const unsubscribe = setupRealtime();
-
+    })();
     return () => {
-      unsubscribe.then(cleanup => cleanup && cleanup());
+      active = false;
+      if (channel) supabase.removeChannel(channel);
     };
   }, [currentChurchId, queryClient, queryKey]);
 
   const { data: events = [], isLoading } = useQuery({
     queryKey,
-    queryFn: () => fetchEvents(currentChurchId),
+    queryFn: async () => {
+      if (!currentChurchId) return [];
+      const { data, error } = await supabase.functions.invoke('get-events', {
+        body: { church_id: currentChurchId, search: params?.search ?? null, type: params?.type ?? null },
+      });
+      if (error) throw new Error(error.message);
+      const list = (data as any)?.events || [];
+      return list as Event[];
+    },
     enabled: !!currentChurchId,
+    placeholderData: (prev) => prev, // mantém dados anteriores para evitar flicker
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: false,
   });
 
   const registerMutation = useMutation({

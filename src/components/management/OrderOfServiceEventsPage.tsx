@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,13 +21,14 @@ type Evento = {
 
 const OrderOfServiceEventsPage = () => {
   const { currentChurchId } = useAuthStore();
+  const queryClient = useQueryClient();
   const [selectedEvent, setSelectedEvent] = useState<Evento | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { events, isLoading, queryClient } = useEvents();
+  const { events, isLoading, queryKey } = useEvents();
 
   const refetch = () => {
-    queryClient.invalidateQueries({ queryKey: ['events', currentChurchId] });
+    queryClient.invalidateQueries({ queryKey });
   };
 
   const openEvent = (ev: Evento) => {
@@ -54,7 +56,9 @@ const OrderOfServiceEventsPage = () => {
         <Button variant="outline" onClick={refetch}>Atualizar</Button>
       </div>
 
-      {isLoading && <div className="p-6 text-center text-muted-foreground">Carregando eventos...</div>}
+      {(isLoading && events.length === 0) && (
+        <div className="p-6 text-center text-muted-foreground">Carregando eventos...</div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {(events ?? []).map((ev) => (
