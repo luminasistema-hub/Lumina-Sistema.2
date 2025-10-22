@@ -1,8 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../integrations/supabase/client'
-import { useAuthStore } from '../stores/authStore'
-import { toast } from 'sonner'
-import { useEffect, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/authStore';
+import { useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 
 // Type Definitions
 export interface DevotionalComment {
