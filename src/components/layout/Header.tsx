@@ -17,7 +17,6 @@ import {
   Loader2,
   CheckCheck,
 } from 'lucide-react'
-// removed search input
 import { useState } from 'react' 
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -25,6 +24,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
 import NotificationDialog from '@/components/notifications/NotificationDialog'
+import { SessionTimer } from './SessionTimer'
 
 type HeaderProps = {
   onOpenMobileMenu?: () => void;
@@ -124,11 +124,11 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
               <Menu className="w-5 h-5" />
             </Button>
           )}
-          
-          {/* barra de pesquisa removida */}
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
+          <SessionTimer />
+          
           <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="sm" className="relative flex" aria-label="Notificações">
