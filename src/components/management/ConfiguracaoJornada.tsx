@@ -17,6 +17,7 @@ import { SortablePassoItem } from './SortablePassoItem';
 import CreateTrilhaDialog from './CreateTrilhaDialog';
 import MembersManagementCard from './MembersManagementCard';
 import { useSchools, School } from '../../hooks/useSchools';
+import { useChildChurches } from '@/hooks/useChildChurches';
 
 interface QuizPergunta {
   id?: string;
@@ -61,6 +62,8 @@ const ConfiguracaoJornada = () => {
 
   const { data: schoolsData } = useSchools();
   const availableSchools = schoolsData || [];
+
+  const { parentInfo, isLoading: isLoadingParentInfo } = useChildChurches();
 
   const [isEtapaModalOpen, setIsEtapaModalOpen] = useState(false);
   const [etapaParaEditar, setEtapaParaEditar] = useState<EtapaTrilha | null>(null);
@@ -580,6 +583,38 @@ const ConfiguracaoJornada = () => {
       <div className="flex items-center justify-center py-8">
         <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
         <span className="ml-3 text-gray-600">Carregando configuração da jornada...</span>
+      </div>
+    );
+  }
+
+  if (isLoadingParentInfo) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+        <span className="ml-3 text-gray-600">Verificando hierarquia da igreja...</span>
+      </div>
+    );
+  }
+
+  if (parentInfo?.isChild) {
+    return (
+      <div className="p-6 md:p-8">
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-900">
+              <AlertCircle className="w-6 h-6" />
+              Configuração Centralizada
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-blue-800">
+              Esta igreja é uma filial. A Jornada do Membro é herdada diretamente da igreja-mãe e não pode ser configurada aqui.
+            </p>
+            <p className="text-blue-800 mt-2">
+              Qualquer alteração na jornada deve ser feita pelo administrador da igreja principal.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }

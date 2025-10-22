@@ -8,6 +8,7 @@ import { Switch } from '../ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useChurchStore } from '@/stores/churchStore';
+import { useChildChurches } from '@/hooks/useChildChurches';
 
 interface CreateTrilhaDialogProps {
   isOpen: boolean;
@@ -20,13 +21,16 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [loading, setLoading] = useState(false);
-  const churchStore = useChurchStore();
-  const [shareWithChildren, setShareWithChildren] = useState(false);
+  const { parentInfo } = useChildChurches();
+  const [shareWithChildren, setShareWithChildren] = useState(true);
 
   useEffect(() => {
-    const church = churchStore.getChurchById(currentChurchId);
-    setShareWithChildren(church?.share_trilha_to_children ?? false);
-  }, [currentChurchId, churchStore.churches]);
+    if (isOpen) {
+      setTitulo('');
+      setDescricao('');
+      setShareWithChildren(true);
+    }
+  }, [isOpen]);
 
   const handleCreate = async () => {
     if (!titulo.trim()) {
@@ -90,13 +94,15 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
               onChange={(e) => setDescricao(e.target.value)}
             />
           </div>
-          <div className="p-3 border rounded-md flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Compartilhar com igrejas filhas</Label>
-              <p className="text-xs text-gray-600">Se ativado, a trilha ficará visível para igrejas filhas.</p>
+          {!parentInfo?.isChild && (
+            <div className="p-3 border rounded-md flex items-center justify-between">
+              <div className="space-y-1">
+                <Label>Compartilhar com igrejas filhas</Label>
+                <p className="text-xs text-gray-600">Se ativado, a trilha ficará visível para igrejas filhas.</p>
+              </div>
+              <Switch checked={shareWithChildren} onCheckedChange={setShareWithChildren} aria-label="Compartilhar trilha com igrejas filhas" />
             </div>
-            <Switch checked={shareWithChildren} onCheckedChange={setShareWithChildren} aria-label="Compartilhar trilha com igrejas filhas" />
-          </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button onClick={handleCreate} disabled={loading}>
