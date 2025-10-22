@@ -5,7 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Copy, Link as LinkIcon } from 'lucide-react';
 import copy from 'copy-to-clipboard';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 const ABACATEPAY_WEBHOOK_URL = 'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/abacatepay-webhook';
 const ASAAS_WEBHOOK_URL = 'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/asaas-webhook-handler';
