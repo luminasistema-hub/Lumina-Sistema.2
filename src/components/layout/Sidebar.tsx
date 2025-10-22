@@ -12,6 +12,7 @@ import { cn } from "../../lib/utils";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useChurchStore } from "@/stores/churchStore";
 
 // 🔹 Tipos de módulos
 interface ModuleItem {
@@ -41,6 +42,8 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>(["personal","management","spiritual"]);
   const { user, currentChurchId } = useAuthStore();
+  const { churches, loadChurches } = useChurchStore();
+  const [isParentChurch, setIsParentChurch] = useState(true);
   const [hasMyMinistryAccess, setHasMyMinistryAccess] = useState(false);
   const [hasMyGCAccess, setHasMyGCAccess] = useState(false);
   const [isMasterMenuOpen, setIsMasterMenuOpen] = useState(true);
@@ -54,6 +57,29 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
       setIsMasterMenuOpen(false);
     }
   }, [isMobileView]);
+
+  useEffect(() => {
+    // Super admin pode ver, pois gerencia todas as igrejas
+    if (user?.role === 'super_admin') {
+      setIsParentChurch(true);
+      return;
+    }
+
+    if (!currentChurchId) {
+      setIsParentChurch(false); // Oculta se não houver contexto de igreja
+      return;
+    }
+
+    // Garante que os dados das igrejas sejam carregados
+    loadChurches();
+
+    const currentChurch = churches.find(c => c.id === currentChurchId);
+    
+    // Uma igreja é "mãe" se NÃO tiver um `parent_church_id`
+    // Se a igreja ainda não foi encontrada (carregando), o padrão é ocultar por segurança
+    setIsParentChurch(currentChurch ? !currentChurch.parent_church_id : false);
+
+  }, [currentChurchId, churches, user?.role, loadChurches]);
 
   useEffect(() => {
     let mounted = true;
@@ -197,6 +223,10 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
       }
       if (module.id === "my-gc") {
         return hasMyGCAccess;
+      }
+      // Apenas exibe o módulo de igrejas filhas se for uma igreja mãe
+      if (module.id === "child-churches" && !isParentChurch) {
+        return false;
       }
       const byRole = module.roles.includes(user.role);
       const byExtra = Array.isArray(user.extraPermissions) && user.extraPermissions.includes(module.id);
