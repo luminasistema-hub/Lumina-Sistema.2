@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSchools, useCreateSchool, useUpdateSchool, useDeleteSchool } from '@/hooks/useSchools'
+import { useSchools, useCreateSchool, useUpdateSchool, useDeleteSchool, useSchoolLessons, useCreateLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/useSchools'
 import { useMembers } from '@/hooks/useMembers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Users } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, BookOpen, Play, FileText, CheckSquare, MapPin } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const SchoolsManagementPage = () => {
@@ -43,13 +43,31 @@ const SchoolsManagementPage = () => {
   const deleteSchoolMutation = useDeleteSchool()
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
   const [editingSchool, setEditingSchool] = useState<any>(null)
+  const [selectedSchool, setSelectedSchool] = useState<any>(null)
+  const [editingLesson, setEditingLesson] = useState<any>(null)
+  
   const [formData, setFormData] = useState({
     nome: '',
     descricao: '',
     professor_id: '',
     compartilhar_com_filhas: false
   })
+  
+  const [lessonFormData, setLessonFormData] = useState({
+    titulo: '',
+    descricao: '',
+    tipo_aula: 'texto' as 'texto' | 'video' | 'quiz' | 'presencial',
+    youtube_url: '',
+    conteudo_texto: '',
+    ordem: 1
+  })
+
+  const { data: lessons } = useSchoolLessons(selectedSchool?.id || null)
+  const createLessonMutation = useCreateLesson()
+  const updateLessonMutation = useUpdateLesson()
+  const deleteLessonMutation = useDeleteLesson()
 
   const resetForm = () => {
     setFormData({
@@ -59,6 +77,18 @@ const SchoolsManagementPage = () => {
       compartilhar_com_filhas: false
     })
     setEditingSchool(null)
+  }
+
+  const resetLessonForm = () => {
+    setLessonFormData({
+      titulo: '',
+      descricao: '',
+      tipo_aula: 'texto',
+      youtube_url: '',
+      conteudo_texto: '',
+      ordem: 1
+    })
+    setEditingLesson(null)
   }
 
   const handleOpenDialog = (school?: any) => {
@@ -74,6 +104,27 @@ const SchoolsManagementPage = () => {
       resetForm()
     }
     setIsDialogOpen(true)
+  }
+
+  const handleOpenLessons = (school: any) => {
+    setSelectedSchool(school)
+  }
+
+  const handleOpenLessonDialog = (lesson?: any) => {
+    if (lesson) {
+      setEditingLesson(lesson)
+      setLessonFormData({
+        titulo: lesson.titulo || '',
+        descricao: lesson.descricao || '',
+        tipo_aula: lesson.tipo_aula || 'texto',
+        youtube_url: lesson.youtube_url || '',
+        conteudo_texto: lesson.conteudo_texto || '',
+        ordem: lesson.ordem || 1
+      })
+    } else {
+      resetLessonForm()
+    }
+    setIsLessonDialogOpen(true)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -97,9 +148,41 @@ const SchoolsManagementPage = () => {
     resetForm()
   }
 
+  const handleSubmitLesson = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!lessonFormData.titulo.trim()) {
+      toast.error('O título da aula é obrigatório')
+      return
+    }
+    
+    const lessonData = {
+      ...lessonFormData,
+      escola_id: selectedSchool.id
+    }
+    
+    if (editingLesson) {
+      updateLessonMutation.mutate({
+        id: editingLesson.id,
+        ...lessonData
+      })
+    } else {
+      createLessonMutation.mutate(lessonData)
+    }
+    
+    setIsLessonDialogOpen(false)
+    resetLessonForm()
+  }
+
   const handleDelete = (schoolId: string) => {
     if (confirm('Tem certeza que deseja remover esta escola?')) {
       deleteSchoolMutation.mutate(schoolId)
+    }
+  }
+
+  const handleDeleteLesson = (lessonId: string) => {
+    if (confirm('Tem certeza que deseja remover esta aula?')) {
+      deleteLessonMutation.mutate(lessonId)
     }
   }
 
@@ -112,6 +195,39 @@ const SchoolsManagementPage = () => {
 
   // Filtrar apenas as escolas da igreja atual para gestão
   const churchSchools = schools?.filter(school => school.id_igreja === currentChurchId) || []
+
+  // Verificar se o usuário é professor da escola ou admin
+  const canManageLessons = (school: any) => {
+    return user?.role === 'admin' || 
+           user?.role === 'pastor' || 
+           user?.id === school.professor_id
+  }
+
+  const getLessonTypeIcon = (type: string) => {
+    switch (type) {
+      case 'video':
+        return <Play className="w-4 h-4" />
+      case 'quiz':
+        return <CheckSquare className="w-4 h-4" />
+      case 'presencial':
+        return <MapPin className="w-4 h-4" />
+      default:
+        return <FileText className="w-4 h-4" />
+    }
+  }
+
+  const getLessonTypeLabel = (type: string) => {
+    switch (type) {
+      case 'video':
+        return 'Vídeo'
+      case 'quiz':
+        return 'Quiz'
+      case 'presencial':
+        return 'Presencial'
+      default:
+        return 'Texto'
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -261,16 +377,16 @@ const SchoolsManagementPage = () => {
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => handleDelete(school.id)}
+                          onClick={() => handleOpenLessons(school)}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <BookOpen className="w-4 h-4" />
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => window.location.href = `/escolas/${school.id}`}
+                          onClick={() => handleDelete(school.id)}
                         >
-                          <Users className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -285,6 +401,189 @@ const SchoolsManagementPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog para gerenciar aulas */}
+      {selectedSchool && (
+        <Dialog open={!!selectedSchool} onOpenChange={() => setSelectedSchool(null)}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>
+                Aulas - {selectedSchool.nome}
+              </DialogTitle>
+              <div className="text-sm text-gray-500">
+                Professor: {selectedSchool.professor_nome || 'Não definido'}
+              </div>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {canManageLessons(selectedSchool) && (
+                <div className="flex justify-end">
+                  <Button onClick={() => handleOpenLessonDialog()}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nova Aula
+                  </Button>
+                </div>
+              )}
+              
+              {lessons && lessons.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Título</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Ordem</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lessons.map((lesson) => (
+                      <TableRow key={lesson.id}>
+                        <TableCell className="font-medium">{lesson.titulo}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {getLessonTypeIcon(lesson.tipo_aula)}
+                            <span className="ml-1">{getLessonTypeLabel(lesson.tipo_aula)}</span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{lesson.ordem}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {canManageLessons(selectedSchool) && (
+                              <>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleOpenLessonDialog(lesson)}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleDeleteLesson(lesson.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  Nenhuma aula cadastrada ainda
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog para criar/editar aula */}
+      <Dialog open={isLessonDialogOpen} onOpenChange={(open) => {
+        setIsLessonDialogOpen(open)
+        if (!open) resetLessonForm()
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingLesson ? 'Editar Aula' : 'Nova Aula'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmitLesson} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="titulo">Título da Aula *</Label>
+              <Input
+                id="titulo"
+                value={lessonFormData.titulo}
+                onChange={(e) => setLessonFormData({...lessonFormData, titulo: e.target.value})}
+                placeholder="Ex: Introdução ao Discipulado"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="descricao">Descrição</Label>
+              <Textarea
+                id="descricao"
+                value={lessonFormData.descricao}
+                onChange={(e) => setLessonFormData({...lessonFormData, descricao: e.target.value})}
+                placeholder="Descreva o conteúdo desta aula"
+                rows={3}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="tipo_aula">Tipo de Aula *</Label>
+              <Select 
+                value={lessonFormData.tipo_aula} 
+                onValueChange={(value) => setLessonFormData({...lessonFormData, tipo_aula: value as any})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo de aula" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="texto">Texto</SelectItem>
+                  <SelectItem value="video">Vídeo</SelectItem>
+                  <SelectItem value="quiz">Quiz</SelectItem>
+                  <SelectItem value="presencial">Presencial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {lessonFormData.tipo_aula === 'video' && (
+              <div className="space-y-2">
+                <Label htmlFor="youtube_url">URL do YouTube</Label>
+                <Input
+                  id="youtube_url"
+                  value={lessonFormData.youtube_url}
+                  onChange={(e) => setLessonFormData({...lessonFormData, youtube_url: e.target.value})}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+              </div>
+            )}
+            
+            {lessonFormData.tipo_aula === 'texto' && (
+              <div className="space-y-2">
+                <Label htmlFor="conteudo_texto">Conteúdo</Label>
+                <Textarea
+                  id="conteudo_texto"
+                  value={lessonFormData.conteudo_texto}
+                  onChange={(e) => setLessonFormData({...lessonFormData, conteudo_texto: e.target.value})}
+                  placeholder="Digite o conteúdo da aula..."
+                  rows={6}
+                />
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="ordem">Ordem</Label>
+              <Input
+                id="ordem"
+                type="number"
+                min="1"
+                value={lessonFormData.ordem}
+                onChange={(e) => setLessonFormData({...lessonFormData, ordem: parseInt(e.target.value) || 1})}
+              />
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsLessonDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit">
+                {editingLesson ? 'Atualizar' : 'Criar'} Aula
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

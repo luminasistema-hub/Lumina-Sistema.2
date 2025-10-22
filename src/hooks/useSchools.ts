@@ -30,7 +30,9 @@ export interface SchoolLesson {
   escola_id: string
   titulo: string
   descricao: string
-  youtube_url: string
+  tipo_aula: 'texto' | 'video' | 'quiz' | 'presencial'
+  youtube_url?: string
+  conteudo_texto?: string
   ordem: number
   created_at: string
   updated_at: string
@@ -456,7 +458,7 @@ export const useUpdateLesson = () => {
     },
     onSuccess: (_, variables) => {
       toast.success('Aula atualizada com sucesso!')
-      queryClient.invalidateQueries({ queryKey: ['school-lessons'] })
+      queryClient.invalidateQueries({ queryKey: ['school-lessons', variables.escola_id] })
     },
     onError: (error) => {
       toast.error(`Erro ao atualizar aula: ${error.message}`)

@@ -20,7 +20,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { toast } from 'sonner'
-import { BookOpen, Play, CheckCircle, Calendar, User } from 'lucide-react'
+import { BookOpen, Play, CheckCircle, Calendar, User, FileText, MapPin, CheckSquare } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const SchoolDetailsPage = () => {
@@ -30,7 +30,7 @@ const SchoolDetailsPage = () => {
   const { data: lessons, isLoading: lessonsLoading, error: lessonsError } = useSchoolLessons(schoolId || null)
   const [selectedLesson, setSelectedLesson] = useState<any>(null)
   const [selectedQuestion, setSelectedQuestion] = useState<any>(null)
-  const { data: quizQuestions, error: quizError } = useQuizQuestions(selectedLesson?.id || null)
+  const { data: quizQuestions } = useQuizQuestions(selectedLesson?.id || null)
   const { data: userQuizAnswers } = useUserQuizAnswers(selectedLesson?.id || null)
   const { data: attendance } = useStudentAttendance(selectedLesson?.id || null)
   
@@ -40,6 +40,7 @@ const SchoolDetailsPage = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false)
   const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false)
+  const [isTextDialogOpen, setIsTextDialogOpen] = useState(false)
   
   const school = schools?.find(s => s.id === schoolId)
   
@@ -54,12 +55,21 @@ const SchoolDetailsPage = () => {
   
   const handleOpenLesson = (lesson: any) => {
     setSelectedLesson(lesson)
-    setIsVideoDialogOpen(true)
-  }
-  
-  const handleOpenQuiz = (lesson: any) => {
-    setSelectedLesson(lesson)
-    setIsQuizDialogOpen(true)
+    
+    switch (lesson.tipo_aula) {
+      case 'video':
+        setIsVideoDialogOpen(true)
+        break
+      case 'texto':
+        setIsTextDialogOpen(true)
+        break
+      case 'quiz':
+        setIsQuizDialogOpen(true)
+        break
+      default:
+        // Para aulas presenciais, não abrimos um dialog
+        break
+    }
   }
   
   const handleSubmitQuiz = () => {
@@ -96,6 +106,32 @@ const SchoolDetailsPage = () => {
     acc[answer.pergunta_id] = answer
     return acc
   }, {} as Record<string, any>) || {}
+  
+  const getLessonTypeIcon = (type: string) => {
+    switch (type) {
+      case 'video':
+        return <Play className="w-4 h-4" />
+      case 'quiz':
+        return <CheckSquare className="w-4 h-4" />
+      case 'presencial':
+        return <MapPin className="w-4 h-4" />
+      default:
+        return <FileText className="w-4 h-4" />
+    }
+  }
+  
+  const getLessonTypeLabel = (type: string) => {
+    switch (type) {
+      case 'video':
+        return 'Vídeo'
+      case 'quiz':
+        return 'Quiz'
+      case 'presencial':
+        return 'Presencial'
+      default:
+        return 'Texto'
+    }
+  }
   
   return (
     <div className="p-6 space-y-6">
@@ -140,9 +176,12 @@ const SchoolDetailsPage = () => {
               <Card key={lesson.id} className="border-0 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <BookOpen className="w-5 h-5" />
+                    {getLessonTypeIcon(lesson.tipo_aula)}
                     {lesson.titulo}
                   </CardTitle>
+                  <Badge variant="outline">
+                    {getLessonTypeLabel(lesson.tipo_aula)}
+                  </Badge>
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 mb-4">
@@ -154,32 +193,49 @@ const SchoolDetailsPage = () => {
                       <Button 
                         size="sm" 
                         onClick={() => handleOpenLesson(lesson)}
-                        disabled={!lesson.youtube_url}
                       >
-                        <Play className="w-4 h-4 mr-2" />
-                        Assistir
-                      </Button>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleOpenQuiz(lesson)}
-                      >
-                        Quiz
+                        {lesson.tipo_aula === 'video' && (
+                          <>
+                            <Play className="w-4 h-4 mr-2" />
+                            Assistir
+                          </>
+                        )}
+                        {lesson.tipo_aula === 'texto' && (
+                          <>
+                            <FileText className="w-4 h-4 mr-2" />
+                            Ler
+                          </>
+                        )}
+                        {lesson.tipo_aula === 'quiz' && (
+                          <>
+                            <CheckSquare className="w-4 h-4 mr-2" />
+                            Quiz
+                          </>
+                        )}
+                        {lesson.tipo_aula === 'presencial' && (
+                          <>
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Presencial
+                          </>
+                        )}
                       </Button>
                     </div>
                     
                     <div className="flex gap-2">
-                      {userAttendance ? (
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleRegisterAttendance(lesson.id)}
-                        >
-                          Registrar presença
-                        </Button>
+                      {lesson.tipo_aula === 'presencial' && (
+                        <>
+                          {userAttendance ? (
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                          ) : (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleRegisterAttendance(lesson.id)}
+                            >
+                              Registrar presença
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -189,6 +245,22 @@ const SchoolDetailsPage = () => {
           })}
         </div>
       )}
+      
+      {/* Dialog para conteúdo de texto */}
+      <Dialog open={isTextDialogOpen} onOpenChange={setIsTextDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{selectedLesson?.titulo}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="prose max-w-none">
+              <p className="text-gray-600 whitespace-pre-wrap">
+                {selectedLesson?.conteudo_texto || 'Nenhum conteúdo disponível'}
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       {/* Dialog para vídeo da aula */}
       <Dialog open={isVideoDialogOpen} onOpenChange={setIsVideoDialogOpen}>
