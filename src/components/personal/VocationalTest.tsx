@@ -391,7 +391,7 @@ const VocationalTest = () => {
               <p className="text-blue-800 text-sm mb-3">
                 Para cada afirmação, avalie o quanto ela se aplica a você usando a escala de 1 a 5:
               </p>
-              <div className="grid grid-cols-5 gap-2 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-xs">
                 <div className="text-center p-2 bg-red-100 text-red-800 rounded">
                   <div className="font-bold">1</div>
                   <div>Discordo totalmente</div>
@@ -536,26 +536,26 @@ const VocationalTest = () => {
         {topMinistry && (
           <Card className={`border-2 ${topMinistry.bgColor} shadow-lg`}>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className={`w-12 h-12 ${topMinistry.bgColor} rounded-full flex items-center justify-center ${topMinistry.color}`}>
                     {topMinistry.icon}
                   </div>
                   <div>
-                    <CardTitle className="text-2xl">Seu Ministério Recomendado</CardTitle>
-                    <CardDescription className="text-lg font-semibold">
+                    <CardTitle className="text-xl sm:text-2xl">Seu Ministério Recomendado</CardTitle>
+                    <CardDescription className="text-base sm:text-lg font-semibold">
                       {topMinistry.name}
                     </CardDescription>
                   </div>
                 </div>
-                <Badge className="bg-green-100 text-green-800 text-lg px-4 py-2">
+                <Badge className="bg-green-100 text-green-800 text-lg px-4 py-2 self-start sm:self-auto">
                   <Award className="w-4 h-4 mr-1" />
                   {topMinistry.percentage}% compatível
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <p className="text-gray-700 text-lg leading-relaxed">
+              <p className="text-gray-700 text-base sm:text-lg leading-relaxed">
                 {topMinistry.description}
               </p>
 
