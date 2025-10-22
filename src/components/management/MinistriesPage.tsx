@@ -23,142 +23,41 @@ import {
   UserPlus
 } from 'lucide-react'
 import AddMinistryDialog from './AddMinistryDialog'
-import { useLoadingProtection } from '@/hooks/useLoadingProtection'
 import MinistryRolesManager from './MinistryRolesManager'
 import MinistrySchedules from './MinistrySchedules'
-
-// Interfaces
-interface Ministry {
-  id: string; nome: string; descricao: string; lider_id: string | null;
-  lider_nome?: string; created_at: string; id_igreja: string;
-  volunteers_count?: number;
-}
+import { useQueryClient } from '@tanstack/react-query'
+import { useMinistries, Ministry } from '@/hooks/useMinistries'
+import { useMinistryVolunteers, Volunteer } from '@/hooks/useMinistryVolunteers'
 
 const MinistriesPage = () => {
   const { user, currentChurchId } = useAuthStore()
-  const [ministries, setMinistries] = useState<Ministry[]>([])
+  const queryClient = useQueryClient()
   const [selectedMinistry, setSelectedMinistry] = useState<Ministry | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [memberOptions, setMemberOptions] = useState<MemberOption[]>([])
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [selectedVolunteerToAdd, setSelectedVolunteerToAdd] = useState<string | null>(null);
   const [openAddDialog, setOpenAddDialog] = useState(false);
-  const { protectedFetch, cleanup } = useLoadingProtection();
-  const channelRef = useRef<any>(null)
 
   const canManage = user?.role === 'admin' || user?.role === 'pastor';
   const isLeaderOfSelected = selectedMinistry?.lider_id === user?.id;
 
-  const loadData = useCallback(async () => {
-    return protectedFetch(
-      async () => {
-        if (!currentChurchId) {
-          return { ministries: [], members: [] };
-        }
-        
-        let { data: ministriesData, error: ministriesError } = await supabase.from('ministerios')
-          .select(`*, volunteers:ministerio_voluntarios!ministerio_voluntarios_ministerio_id_fkey(count)`)
-          .eq('id_igreja', currentChurchId).order('nome');
-        if (ministriesError) throw ministriesError;
+  const { data: ministriesData, isLoading: isLoadingMinistries, error: ministriesError } = useMinistries();
+  const { ministries = [], members: memberOptions = [] } = ministriesData || {};
 
-        const leaderIds = ministriesData.map(m => m.lider_id).filter(Boolean) as string[];
-        const leadersMap = new Map<string, string>();
-        if (leaderIds.length > 0) {
-            const { data: leadersData, error: leadersError } = await supabase.from('membros')
-                .select('id, nome_completo').in('id', leaderIds);
-            if (leadersError) throw leadersError;
-            leadersData.forEach(l => leadersMap.set(l.id, l.nome_completo));
-        }
-
-        const formattedMinistries: Ministry[] = ministriesData.map((m: any) => ({
-          ...m,
-          lider_nome: leadersMap.get(m.lider_id) || 'Não Atribuído',
-          volunteers_count: m.volunteers[0]?.count || 0,
-        }));
-        
-        // Buscar TODOS os usuários da igreja (sem filtrar por status),
-        // permitindo eleger líder dentre qualquer membro vinculado à igreja.
-        const { data: membersData, error: membersError } = await supabase
-          .from('membros')
-          .select('id, nome_completo')
-          .eq('id_igreja', currentChurchId)
-          .order('nome_completo');
-        if (membersError) throw membersError;
-        
-        return { ministries: formattedMinistries, members: membersData };
-      },
-      (result) => {
-        setMinistries(result.ministries);
-        setMemberOptions(result.members);
-      },
-      (error: any) => {
-        toast.error('Falha ao carregar dados: ' + error.message);
-        setMinistries([]);
-        setMemberOptions([]);
-      },
-      () => {
-        setLoading(false);
-      }
-    );
-  }, [currentChurchId]);
+  const { data: volunteers = [], error: volunteersError } = useMinistryVolunteers(selectedMinistry?.id || null);
 
   useEffect(() => {
-    setLoading(true);
-    loadData();
-    
-    // Realtime subscription com proteção única
-    if (channelRef.current) {
-      try { supabase.removeChannel(channelRef.current); } catch {}
-      channelRef.current = null;
+    if (ministriesError) {
+      toast.error(`Falha ao carregar ministérios: ${ministriesError.message}`);
     }
-    
-    if (currentChurchId) {
-      const channel = supabase
-        .channel(`ministries-management-${currentChurchId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'ministerios', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { loadData(); }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'ministerio_voluntarios', filter: `id_igreja=eq.${currentChurchId}` },
-          () => { loadData(); }
-        )
-        .subscribe();
-      channelRef.current = channel;
+    if (volunteersError) {
+      toast.error(`Falha ao carregar voluntários: ${volunteersError.message}`);
     }
-    
-    return () => {
-      if (channelRef.current) {
-        try { supabase.removeChannel(channelRef.current); } catch {}
-        channelRef.current = null;
-      }
-      cleanup();
-    };
-  }, [loadData]);
-
-  const loadMinistryDetails = useCallback(async (ministryId: string) => {
-    const { data: volunteerData, error: volunteerError } = await supabase.from('ministerio_voluntarios')
-      .select('id, membro:membros(id, nome_completo)').eq('ministerio_id', ministryId);
-    if (volunteerError) toast.error('Erro ao carregar voluntários.');
-    else setVolunteers(volunteerData.map((v: any) => ({ volunteer_id: v.id, ...v.membro })) as Volunteer[]);
-  }, []);
-  
-  useEffect(() => {
-    if (selectedMinistry) {
-      loadMinistryDetails(selectedMinistry.id);
-    } else {
-      setVolunteers([]);
-    }
-  }, [selectedMinistry, loadMinistryDetails]);
+  }, [ministriesError, volunteersError]);
 
   const handleAddVolunteer = (ministryId: string, memberId: string | null) => {
     if (!memberId) return toast.error("Selecione um membro para adicionar.");
     if (volunteers.some(v => v.id === memberId)) return toast.info("Este membro já é voluntário.");
     
-    // CORREÇÃO: Usando upsert para evitar erros de chave duplicada em race conditions.
     const promise = async () => {
       const { error } = await supabase
         .from('ministerio_voluntarios')
@@ -172,8 +71,8 @@ const MinistriesPage = () => {
     toast.promise(promise(), {
       loading: 'Adicionando voluntário...',
       success: () => { 
-        loadMinistryDetails(ministryId); 
-        loadData(); 
+        queryClient.invalidateQueries({ queryKey: ['ministryVolunteers', ministryId] });
+        queryClient.invalidateQueries({ queryKey: ['ministries', currentChurchId] });
         setSelectedVolunteerToAdd(null);
         return "Voluntário adicionado!"; 
       },
@@ -188,16 +87,40 @@ const MinistriesPage = () => {
     };
     toast.promise(promise(), {
       loading: 'Removendo voluntário...',
-      success: () => { loadMinistryDetails(ministryId); loadData(); return "Voluntário removido!"; },
+      success: () => { 
+        queryClient.invalidateQueries({ queryKey: ['ministryVolunteers', ministryId] });
+        queryClient.invalidateQueries({ queryKey: ['ministries', currentChurchId] });
+        return "Voluntário removido!"; 
+      },
       error: (err: any) => `Erro: ${err.message}`,
     });
   }
 
-  // Removido: criação de escalas agora fica apenas em "Meu Ministério"
+  const handleLeaderChange = async (memberId: string) => {
+    if (!selectedMinistry) return;
+    const newLeaderId = memberId === 'null' ? null : memberId;
+    
+    const { error } = await supabase
+      .from('ministerios')
+      .update({ lider_id: newLeaderId })
+      .eq('id', selectedMinistry.id);
+      
+    if (error) { 
+      toast.error('Falha ao definir líder: ' + error.message); 
+      return; 
+    }
+    
+    const newLeaderName = newLeaderId ? (memberOptions.find(m => m.id === newLeaderId)?.nome_completo || 'Líder') : 'Não Atribuído';
+    setSelectedMinistry((prev) => prev ? { ...prev, lider_id: newLeaderId, lider_nome: newLeaderName } as Ministry : prev);
+    
+    queryClient.invalidateQueries({ queryKey: ['ministries', currentChurchId] });
+    
+    toast.success('Líder definido!');
+  }
 
   const filteredMinistries = ministries.filter(m => m.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  if (loading) return <div className="flex items-center justify-center h-[60vh]"><Loader2 className="w-10 h-10 text-purple-600 animate-spin" /><p className="ml-4 text-lg">Carregando...</p></div>;
+  if (isLoadingMinistries) return <div className="flex items-center justify-center h-[60vh]"><Loader2 className="w-10 h-10 text-purple-600 animate-spin" /><p className="ml-4 text-lg">Carregando...</p></div>;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -260,7 +183,7 @@ const MinistriesPage = () => {
           open={openAddDialog}
           onOpenChange={setOpenAddDialog}
           churchId={currentChurchId}
-          onCreated={() => loadData()}
+          onCreated={() => queryClient.invalidateQueries({ queryKey: ['ministries', currentChurchId] })}
         />
       )}
       
@@ -282,20 +205,7 @@ const MinistriesPage = () => {
                       <Label className="text-sm">Definir Líder do Ministério</Label>
                       <Select
                         value={selectedMinistry?.lider_id || ''}
-                        onValueChange={async (memberId) => {
-                          if (!selectedMinistry) return;
-                          const { error } = await supabase
-                            .from('ministerios')
-                            .update({ lider_id: memberId === 'null' ? null : memberId })
-                            .eq('id', selectedMinistry.id);
-                          if (error) { toast.error('Falha ao definir líder: ' + error.message); return; }
-                          // Atualização otimista do item selecionado
-                          const newLeaderId = memberId === 'null' ? null : memberId;
-                          const newLeaderName = newLeaderId ? (memberOptions.find(m => m.id === newLeaderId)?.nome_completo || 'Líder') : 'Não Atribuído';
-                          setSelectedMinistry((prev) => prev ? { ...prev, lider_id: newLeaderId, lider_nome: newLeaderName } as Ministry : prev);
-                          setMinistries((prev) => prev.map(m => m.id === selectedMinistry.id ? { ...m, lider_id: newLeaderId, lider_nome: newLeaderName } : m));
-                          toast.success('Líder definido!');
-                        }}
+                        onValueChange={handleLeaderChange}
                       >
                         <SelectTrigger className="w-full"><SelectValue placeholder="Selecione um líder" /></SelectTrigger>
                         <SelectContent>
@@ -318,7 +228,7 @@ const MinistriesPage = () => {
               )}
               {(canManage || isLeaderOfSelected) && (
                   <Card className="mb-4"><CardContent className="p-4 flex items-center gap-4">
-                      <Select onValueChange={setSelectedVolunteerToAdd}>
+                      <Select onValueChange={setSelectedVolunteerToAdd} value={selectedVolunteerToAdd || ''}>
                           <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione um membro para adicionar..." /></SelectTrigger>
                           <SelectContent>{memberOptions.filter(m => !volunteers.some(v => v.id === m.id)).map(m => <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>)}</SelectContent>
                       </Select>
