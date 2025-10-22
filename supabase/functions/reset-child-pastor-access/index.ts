@@ -6,6 +6,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
+// Helper: localizar usuário pelo e-mail (varre páginas)
+async function findUserByEmail(admin: ReturnType<typeof createClient>, email: string) {
+  // Tentativas de paginação (200 por página, até 5 páginas = 1000 usuários)
+  const perPage = 200
+  for (let page = 1; page <= 5; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) throw new Error(`listUsers: ${error.message}`)
+    const found = data.users?.find((u: any) => (u.email || "").toLowerCase() === email.toLowerCase())
+    if (found) return found
+    if (!data.users || data.users.length < perPage) break
+  }
+  return null
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders })
@@ -42,7 +56,6 @@ serve(async (req) => {
     })
   }
 
-  // Identifica o autor da chamada
   const userRes = await service.auth.getUser(token)
   const user = userRes.data?.user
   if (!user) {
@@ -52,7 +65,6 @@ serve(async (req) => {
     })
   }
 
-  // Carrega dados da igreja filha
   const { data: church, error: churchErr } = await service
     .from("igrejas")
     .select("id, parent_church_id, nome, email, nome_responsavel, panel_password")
@@ -78,7 +90,6 @@ serve(async (req) => {
     })
   }
 
-  // Permissões: super_admin ou admin/pastor da igreja mãe ou da própria filha
   const { data: sa } = await service
     .from("super_admins")
     .select("id")
@@ -104,7 +115,6 @@ serve(async (req) => {
     })
   }
 
-  // Verifica se já existe um pastor registrado para a igreja
   const { data: pastorMember } = await service
     .from("membros")
     .select("id, email")
@@ -117,7 +127,7 @@ serve(async (req) => {
     const targetEmail = church.email
 
     if (pastorMember?.id) {
-      // Se o email do pastor for diferente do email da igreja, atualiza o email no Auth e na tabela membros
+      // Atualiza email se necessário (ignora erro se email já em uso por outro user)
       if (targetEmail && pastorMember.email !== targetEmail) {
         const { error: emailErr } = await service.auth.admin.updateUserById(pastorMember.id, {
           email: targetEmail,
@@ -129,7 +139,10 @@ serve(async (req) => {
             initial_role: "pastor",
           },
         })
-        if (emailErr) throw new Error(`updateUserById(email): ${emailErr.message}`)
+        // Se o email já estiver em uso, seguimos apenas com a troca de senha
+        if (emailErr && !/already|in use|registered/i.test(emailErr.message)) {
+          throw new Error(`updateUserById(email): ${emailErr.message}`)
+        }
 
         const { error: updMemberEmailErr } = await service
           .from("membros")
@@ -138,14 +151,12 @@ serve(async (req) => {
         if (updMemberEmailErr) throw new Error(`membros.update(email): ${updMemberEmailErr.message}`)
       }
 
-      // Atualiza senha do usuário pastor existente
       const { error: updErr } = await service.auth.admin.updateUserById(pastorMember.id, {
         password: church.panel_password,
         email_confirm: true,
       })
       if (updErr) throw new Error(`updateUserById(password): ${updErr.message}`)
 
-      // Garante status ativo
       const { error: statusErr } = await service
         .from("membros")
         .update({ status: "ativo" })
@@ -157,7 +168,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     } else {
-      // Cria novo usuário pastor usando email da igreja e panel_password
+      // Tenta criar o usuário, ou reutiliza se e-mail já existir
       const { data: created, error: createErr } = await service.auth.admin.createUser({
         email: targetEmail,
         password: church.panel_password,
@@ -169,23 +180,51 @@ serve(async (req) => {
           initial_role: "pastor",
         },
       })
-      if (createErr) throw new Error(`createUser: ${createErr.message}`)
-      const newUserId = created.user?.id
-      if (!newUserId) throw new Error("createUser: missing user id")
 
-      // Insere como membro pastor ativo
-      const { error: insertErr } = await service.from("membros").insert({
-        id: newUserId,
-        id_igreja: church.id,
-        nome_completo: church.nome_responsavel,
-        email: targetEmail,
-        funcao: "pastor",
-        status: "ativo",
-        perfil_completo: false,
-      })
-      if (insertErr) throw new Error(`membros.insert: ${insertErr.message}`)
+      let targetUserId = created?.user?.id || null
 
-      return new Response(JSON.stringify({ ok: true, mode: "created", userId: newUserId }), {
+      if (createErr) {
+        // Se o e-mail já estiver cadastrado, reutiliza o usuário existente
+        if (/already|in use|registered/i.test(createErr.message)) {
+          const existing = await findUserByEmail(service, targetEmail)
+          if (!existing?.id) throw new Error(`createUser/email conflict: usuário com email ${targetEmail} já existe, mas não foi possível localizar o ID.`)
+
+          targetUserId = existing.id
+
+          // Ajusta senha e metadados para a igreja filha
+          const { error: updExistingErr } = await service.auth.admin.updateUserById(targetUserId, {
+            password: church.panel_password,
+            email_confirm: true,
+            user_metadata: {
+              full_name: church.nome_responsavel,
+              church_id: church.id,
+              church_name: church.nome,
+              initial_role: "pastor",
+            },
+          })
+          if (updExistingErr) throw new Error(`updateUserById(existing): ${updExistingErr.message}`)
+        } else {
+          throw new Error(`createUser: ${createErr.message}`)
+        }
+      }
+
+      if (!targetUserId) throw new Error("Falha ao obter userId do pastor.")
+
+      // Upsert em membros como pastor da igreja filha
+      const { error: upsertErr } = await service
+        .from("membros")
+        .upsert({
+          id: targetUserId,
+          id_igreja: church.id,
+          nome_completo: church.nome_responsavel,
+          email: targetEmail,
+          funcao: "pastor",
+          status: "ativo",
+          perfil_completo: false,
+        }, { onConflict: "id" })
+      if (upsertErr) throw new Error(`membros.upsert: ${upsertErr.message}`)
+
+      return new Response(JSON.stringify({ ok: true, mode: "created_or_reused", userId: targetUserId }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       })

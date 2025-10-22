@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ interface Props {
 
 const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onSaved }) => {
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [form, setForm] = useState({
     nome: child?.nome || '',
     nome_responsavel: '',
@@ -92,6 +93,7 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
 
   const handleResetPastorAccess = async () => {
     if (!child?.id) return;
+    setResetting(true);
     const { data: sessionRes } = await supabase.auth.getSession();
     const token = sessionRes?.session?.access_token;
 
@@ -102,9 +104,10 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
       },
     });
 
+    setResetting(false);
+
     if (error) {
       let serverMsg = error.message;
-      // Tenta extrair o JSON retornado pela função (quando disponível)
       const raw = (error as any)?.context?.body;
       if (typeof raw === 'string') {
         try {
@@ -122,11 +125,15 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] sm:w-auto sm:max-w-lg md:max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Igreja Filha</DialogTitle>
+          <DialogDescription>
+            Gerencie dados da igreja filha e o acesso do pastor. Preencha e salve antes de resetar o acesso.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {/* Campos responsivos */}
           <div className="space-y-2">
             <Label>Nome da Igreja</Label>
             <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
@@ -155,13 +162,13 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
             <Label>Senha do Painel</Label>
             <Input value={form.panel_password} onChange={(e) => setForm({ ...form, panel_password: e.target.value })} />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
               {saving ? 'Salvando...' : 'Salvar'}
             </Button>
-            <Button variant="secondary" onClick={handleResetPastorAccess}>
-              Resetar acesso do Pastor
+            <Button variant="secondary" onClick={handleResetPastorAccess} disabled={resetting} className="w-full sm:w-auto">
+              {resetting ? 'Resetando...' : 'Resetar acesso do Pastor'}
             </Button>
           </div>
         </div>
