@@ -99,9 +99,7 @@ export const useChurchStore = create<ChurchState>()(
         set({ isLoadingChurches: true });
         
         console.log('churchStore: Loading churches from Supabase...');
-        const { data, error } = await supabase
-          .from('igrejas')
-          .select('*, plano:planos_assinatura(nome)');
+        const { data, error } = await supabase.rpc('get_churches_with_hierarchy_metrics');
 
         if (error) {
           console.error('churchStore: Error loading churches from Supabase:', error);
@@ -115,7 +113,7 @@ export const useChurchStore = create<ChurchState>()(
           address: c.endereco,
           contactEmail: c.email,
           contactPhone: c.telefone_contato,
-          subscriptionPlanName: Array.isArray(c.plano) ? c.plano[0]?.nome : c.plano?.nome || 'N/A',
+          subscriptionPlanName: c.plano_nome || 'N/A',
           plano_id: c.plano_id,
           memberLimit: c.limite_membros,
           currentMembers: c.membros_atuais,
