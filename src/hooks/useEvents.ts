@@ -22,86 +22,41 @@ export interface Event {
   is_registered: boolean;
 }
 
-const fetchEvents = async (churchId: string | null, userId: string, params?: { search?: string | null; type?: string | null }): Promise<Event[]> => {
+const fetchEvents = async (churchId: string | null): Promise<Event[]> => {
   if (!churchId) return [];
-  
   try {
-    // Buscar eventos da própria igreja
-    let query = supabase
+    const { data, error } = await supabase.rpc('get_eventos_para_igreja_com_participacao', {
+      id_igreja_atual: churchId,
+    });
+    if (error) throw error;
+    const items: Event[] = (data || []).map((e: any) => ({
+      id: e.evento_id,
+      id_igreja: e.id_igreja,
+      nome: e.nome,
+      data_hora: e.data_hora,
+      local: e.local ?? '',
+      descricao: e.descricao ?? '',
+      tipo: (e.tipo || 'Outro') as Event['tipo'],
+      capacidade_maxima: e.capacidade_maxima ?? undefined,
+      inscricoes_abertas: Boolean(e.inscricoes_abertas),
+      valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
+      status: (e.status || 'Planejado') as Event['status'],
+      participantes_count: Number(e.participantes_count || 0),
+      is_registered: Boolean(e.is_registered),
+      link_externo: e.link_externo ?? undefined,
+      compartilhar_com_filhas: e.compartilhar_com_filhas,
+    }));
+    items.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
+    return items;
+  } catch (rpcErr: any) {
+    toast.error(`Falha ao carregar eventos compartilhados: ${rpcErr?.message || 'erro RPC'}. Exibindo apenas eventos da sua igreja.`);
+    const { data: ownEvents, error: ownErr } = await supabase
       .from('eventos')
       .select('*')
-      .eq('id_igreja', churchId);
-
-    // Aplicar filtros
-    if (params?.search) {
-      query = query.ilike('nome', `%${params.search}%`);
-    }
-    if (params?.type && params.type !== 'all') {
-      query = query.eq('tipo', params.type);
-    }
-
-    const { data: ownEvents, error: ownError } = await query.order('data_hora', { ascending: true });
-    if (ownError) throw ownError;
-
-    let allEvents = ownEvents || [];
-
-    // Buscar eventos compartilhados da igreja-mãe (se aplicável)
-    try {
-      const { data: churchData } = await supabase
-        .from('igrejas')
-        .select('parent_church_id, compartilha_eventos_da_mae')
-        .eq('id', churchId)
-        .single();
-
-      if (churchData?.parent_church_id && churchData?.compartilha_eventos_da_mae) {
-        let sharedQuery = supabase
-          .from('eventos')
-          .select('*')
-          .eq('id_igreja', churchData.parent_church_id)
-          .eq('compartilhar_com_filhas', true);
-
-        if (params?.search) {
-          sharedQuery = sharedQuery.ilike('nome', `%${params.search}%`);
-        }
-        if (params?.type && params.type !== 'all') {
-          sharedQuery = sharedQuery.eq('tipo', params.type);
-        }
-
-        const { data: sharedEvents, error: sharedError } = await sharedQuery.order('data_hora', { ascending: true });
-
-        if (!sharedError && sharedEvents) {
-          allEvents = [...allEvents, ...sharedEvents];
-        }
-      }
-    } catch (err) {
-      console.warn('Erro ao buscar eventos compartilhados:', err);
-    }
-
-    // Buscar participantes para todos os eventos
-    const eventIds = allEvents.map(e => e.id);
-    let participantsMap = new Map<string, number>();
-    let registrationMap = new Map<string, boolean>();
-
-    if (eventIds.length > 0) {
-      const { data: participantsData } = await supabase
-        .from('evento_participantes')
-        .select('evento_id, membro_id')
-        .in('evento_id', eventIds);
-
-      if (participantsData) {
-        participantsData.forEach(p => {
-          const count = participantsMap.get(p.evento_id) || 0;
-          participantsMap.set(p.evento_id, count + 1);
-          
-          if (p.membro_id === userId) {
-            registrationMap.set(p.evento_id, true);
-          }
-        });
-      }
-    }
-
-    // Mapear eventos com dados de participação
-    const events: Event[] = allEvents.map(e => ({
+      .eq('id_igreja', churchId)
+      .order('data_hora', { ascending: true });
+    if (ownErr) throw ownErr;
+    const items: Event[] = (ownEvents || []).map((e: any) => ({
       id: e.id,
       id_igreja: e.id_igreja,
       nome: e.nome,
@@ -113,67 +68,77 @@ const fetchEvents = async (churchId: string | null, userId: string, params?: { s
       inscricoes_abertas: Boolean(e.inscricoes_abertas),
       valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
       status: (e.status || 'Planejado') as Event['status'],
-      participantes_count: participantsMap.get(e.id) || 0,
-      is_registered: registrationMap.get(e.id) || false,
+      participantes_count: 0,
+      is_registered: false,
       link_externo: e.link_externo ?? undefined,
       compartilhar_com_filhas: e.compartilhar_com_filhas,
     }));
-
-    // Ordenar por data
-    events.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
-
-    return events;
-  } catch (error: any) {
-    console.error('Erro ao buscar eventos:', error);
-    toast.error(`Erro ao carregar eventos: ${error.message}`);
-    return [];
+    return items;
   }
 };
 
-export const useEvents = (params?: { search?: string | null; type?: string | null }) => {
+export const useEvents = () => {
   const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
-  const queryKey = useMemo(
-    () => ['events', currentChurchId, user?.id, params?.search ?? '', params?.type ?? ''],
-    [currentChurchId, user?.id, params?.search, params?.type]
-  );
-
-  const { data: events = [], isLoading } = useQuery({
-    queryKey,
-    queryFn: async () => {
-      if (!currentChurchId || !user?.id) return [];
-      return fetchEvents(currentChurchId, user.id, params);
-    },
-    enabled: !!currentChurchId && !!user?.id,
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 10,
-  });
+  const queryKey = useMemo(() => ['events', currentChurchId, user?.id], [currentChurchId, user?.id]);
 
   useEffect(() => {
     if (!currentChurchId) return;
 
-    const channel = supabase
-      .channel(`events-${currentChurchId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'eventos' },
-        () => {
-          queryClient.invalidateQueries({ queryKey });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'evento_participantes' },
-        () => {
-          queryClient.invalidateQueries({ queryKey });
-        }
-      )
-      .subscribe();
+    const setupRealtime = async () => {
+      const { data: churchRow } = await supabase
+        .from('igrejas')
+        .select('parent_church_id')
+        .eq('id', currentChurchId)
+        .maybeSingle();
+      const parentIdLocal = churchRow?.parent_church_id ?? null;
+
+      const channel = supabase
+        .channel(`public-events-hook-${currentChurchId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
+          () => queryClient.invalidateQueries({ queryKey })
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
+          () => queryClient.invalidateQueries({ queryKey })
+        );
+
+      if (parentIdLocal) {
+        channel
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${parentIdLocal}` },
+            () => queryClient.invalidateQueries({ queryKey })
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${parentIdLocal}` },
+            () => queryClient.invalidateQueries({ queryKey })
+          );
+      }
+
+      channel.subscribe();
+      
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    };
+
+    const unsubscribe = setupRealtime();
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe.then(cleanup => cleanup && cleanup());
     };
   }, [currentChurchId, queryClient, queryKey]);
+
+  const { data: events = [], isLoading } = useQuery({
+    queryKey,
+    queryFn: () => fetchEvents(currentChurchId),
+    enabled: !!currentChurchId,
+  });
 
   const registerMutation = useMutation({
     mutationFn: async (event: Event) => {

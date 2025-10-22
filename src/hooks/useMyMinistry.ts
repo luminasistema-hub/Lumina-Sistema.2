@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 export interface MyMinistry {
@@ -80,17 +80,14 @@ export const useMyMinistry = (selectedMinistryId: string | null) => {
   const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const myMinistriesQueryKey = useMemo(() => ['myMinistries', user?.id, currentChurchId], [user?.id, currentChurchId]);
-  const myAssignmentsQueryKey = useMemo(() => ['myAssignments', user?.id, selectedMinistryId], [user?.id, selectedMinistryId]);
-
   const myMinistriesQuery = useQuery({
-    queryKey: myMinistriesQueryKey,
+    queryKey: ['myMinistries', user?.id, currentChurchId],
     queryFn: () => fetchMyMinistries(user!.id, currentChurchId!),
     enabled: !!user?.id && !!currentChurchId,
   });
 
   const myAssignmentsQuery = useQuery({
-    queryKey: myAssignmentsQueryKey,
+    queryKey: ['myAssignments', user?.id, selectedMinistryId],
     queryFn: () => fetchMyAssignments(user!.id, selectedMinistryId!),
     enabled: !!user?.id && !!selectedMinistryId,
   });
@@ -104,14 +101,14 @@ export const useMyMinistry = (selectedMinistryId: string | null) => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ministerio_voluntarios', filter: `membro_id=eq.${user.id}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: myMinistriesQueryKey });
+          queryClient.invalidateQueries({ queryKey: ['myMinistries', user.id, currentChurchId] });
         }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'escala_voluntarios', filter: `membro_id=eq.${user.id}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: myAssignmentsQueryKey });
+          queryClient.invalidateQueries({ queryKey: ['myAssignments', user.id, selectedMinistryId] });
         }
       )
       .subscribe();
@@ -119,7 +116,7 @@ export const useMyMinistry = (selectedMinistryId: string | null) => {
     return () => {
       supabase.removeChannel(ministryChannel);
     };
-  }, [user?.id, currentChurchId, selectedMinistryId, queryClient, myMinistriesQueryKey, myAssignmentsQueryKey]);
+  }, [user?.id, currentChurchId, selectedMinistryId, queryClient]);
 
   const confirmPresenceMutation = useMutation({
     mutationFn: async ({ escalaId, confirm }: { escalaId: string; confirm: boolean }) => {
@@ -134,7 +131,7 @@ export const useMyMinistry = (selectedMinistryId: string | null) => {
       return { escalaId, status };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: myAssignmentsQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['myAssignments', user?.id, selectedMinistryId] });
       toast.success("Presença atualizada!");
     },
     onError: (error: Error) => {

@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuthStore } from '../stores/authStore';
-import { useEffect } from 'react';
 
 export interface Kid {
   id: string;

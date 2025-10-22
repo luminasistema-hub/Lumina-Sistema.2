@@ -27,12 +27,10 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Baby,
-  Loader2
+  Baby
 } from 'lucide-react'
 import { Checkbox } from '../ui/checkbox'
 import { AVAILABLE_PERMISSIONS } from '@/constants/permissions'
-import { getRolePermissionPreset } from '@/utils/access'
 
 interface UserManagementProps {}
 
@@ -59,7 +57,6 @@ const UserManagement = ({}: UserManagementProps) => {
   const [filterRole, setFilterRole] = useState<string>('all')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
 
   const [editUser, setEditUser] = useState<Partial<User>>({ extraPermissions: [] })
 
@@ -130,7 +127,6 @@ const UserManagement = ({}: UserManagementProps) => {
       return;
     }
 
-    setSaving(true)
     const { error } = await supabase
       .from('membros') 
       .update({
@@ -145,7 +141,6 @@ const UserManagement = ({}: UserManagementProps) => {
     if (error) {
       console.error('Error updating user:', error);
       toast.error('Erro ao atualizar usuário: ' + error.message);
-      setSaving(false)
       return;
     }
 
@@ -163,20 +158,10 @@ const UserManagement = ({}: UserManagementProps) => {
       }
     }
 
-    // Se editar o próprio usuário logado, atualiza imediatamente o estado de auth para refletir no menu
-    try {
-      if (selectedUser.id === user?.id) {
-        await useAuthStore.getState().checkAuth();
-      }
-    } catch (e) {
-      console.warn('UserManagement: falha ao atualizar estado de auth após edição', e);
-    }
-
     setIsEditDialogOpen(false);
     setSelectedUser(null);
     setEditUser({});
     toast.success('Usuário atualizado com sucesso!');
-    setSaving(false)
     loadUsers(currentChurchId);
   };
 
@@ -557,35 +542,6 @@ const UserManagement = ({}: UserManagementProps) => {
 
             <div className="space-y-2">
               <Label>Permissões Extras</Label>
-              {/* Ações rápidas para facilitar concessão de acesso */}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const role = (editUser.role as UserRole) || 'membro';
-                    const preset = getRolePermissionPreset(role);
-                    setEditUser({ ...editUser, extraPermissions: preset });
-                    toast.info('Aplicado preset de permissões com base no papel.');
-                  }}
-                >
-                  Sugestão por Papel
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditUser({ ...editUser, extraPermissions: AVAILABLE_PERMISSIONS.map(p => p.id) })}
-                >
-                  Selecionar tudo
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditUser({ ...editUser, extraPermissions: [] })}
-                >
-                  Limpar tudo
-                </Button>
-              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {AVAILABLE_PERMISSIONS.map((perm) => {
                   const checked = (editUser.extraPermissions || []).includes(perm.id);
@@ -595,7 +551,7 @@ const UserManagement = ({}: UserManagementProps) => {
                         checked={checked}
                         onCheckedChange={(val) => {
                           const curr = new Set(editUser.extraPermissions || []);
-                          if (val === true) curr.add(perm.id);
+                          if (val) curr.add(perm.id);
                           else curr.delete(perm.id);
                           setEditUser({ ...editUser, extraPermissions: Array.from(curr) });
                         }}
@@ -612,8 +568,8 @@ const UserManagement = ({}: UserManagementProps) => {
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleEditUser} disabled={saving}>
-                {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</> : 'Salvar Alterações'}
+              <Button onClick={handleEditUser}>
+                Salvar Alterações
               </Button>
             </div>
           </div>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Label } from '../components/ui/label'
 import { toast } from 'sonner'
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react'
-import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 const LoginPage = () => {
   const [email, setEmail] = useState('')
@@ -14,7 +14,6 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const { login, isLoading } = useAuthStore()
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
 
   useEffect(() => {
     if (searchParams.get('churchId') || searchParams.get('churchName')) {
@@ -24,18 +23,20 @@ const LoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('LoginPage: Form submitted for login:', { email })
     
     if (!email || !password) {
       toast.error('Por favor, preencha todos os campos')
       return
     }
 
+    console.log('LoginPage: Attempting login via useAuthStore.login().');
     const success = await login(email, password);
     if (!success) {
-      // Erro já tratado no authStore
+      console.error('LoginPage: Login failed via useAuthStore.login().');
+      // A toast de erro já é tratada dentro do método login, se necessário
     } else {
-      toast.success('Login realizado com sucesso!')
-      navigate('/dashboard')
+      console.log('LoginPage: Login successful via useAuthStore.login().');
     }
   }
 
@@ -53,6 +54,7 @@ const LoginPage = () => {
             <CardDescription className="text-base">
               Entre em sua conta
             </CardDescription>
+            {/* O Badge "Sistema em Produção" foi removido daqui */}
           </CardHeader>
           
           <CardContent>
@@ -113,6 +115,7 @@ const LoginPage = () => {
             </form>
 
             <div className="mt-6 text-center">
+              {/* Link de cadastro foi substituído pelo de recuperar senha */}
               <Link
                 to="/recuperar-senha"
                 className="text-sm text-blue-600 hover:text-blue-800 font-medium"

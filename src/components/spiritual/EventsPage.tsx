@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
@@ -26,12 +25,15 @@ const EventsPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
 
-  const debouncedSearch = useDebouncedValue(searchTerm, 250);
-  const { events, isLoading, registerMutation, unregisterMutation } = useEvents({
-    search: debouncedSearch || null,
-    type: filterType,
-  });
-  const filteredEvents = events;
+  const { events, isLoading, registerMutation, unregisterMutation } = useEvents();
+
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => 
+        (filterType === 'all' || event.tipo === filterType) &&
+        ((event.nome || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+         (event.local || '').toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [events, filterType, searchTerm]);
   
   // Novo handler: abre link externo se evento for pago; caso contrário, realiza inscrição interna
   const handleInscricaoClick = (event: Event) => {

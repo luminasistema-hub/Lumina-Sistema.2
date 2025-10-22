@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -58,8 +58,6 @@ const ChildChurchesPage = () => {
   const [creating, setCreating] = useState(false);
   const [openDashboard, setOpenDashboard] = useState(false);
   const [selectedChild, setSelectedChild] = useState<ChildItem | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const isLoadingRef = useRef(false);
 
   const form = useForm<ChildFormValues>({
     resolver: zodResolver(childFormSchema),
@@ -81,97 +79,72 @@ const ChildChurchesPage = () => {
       setLoading(false);
       return;
     }
-    if (isLoadingRef.current) return;
-    isLoadingRef.current = true;
-    const firstLoad = children.length === 0;
-    if (firstLoad) {
-      setLoading(true);
-    } else {
-      setIsRefreshing(true);
+    setLoading(true);
+    
+    await loadChurchStore(); // Garante que o store está atualizado
+
+    const mother = getChurchById(currentChurchId);
+    if (!mother) {
+      toast.error('Erro ao carregar igreja atual.');
+      setLoading(false);
+      return;
     }
-    try {
-      await loadChurchStore(); // Garante que o store está atualizado
 
-      const mother = getChurchById(currentChurchId);
-      if (!mother) {
-        toast.error('Erro ao carregar igreja atual.');
-        return;
-      }
+    const { data: motherData, error: motherErr } = await supabase
+      .from('igrejas')
+      .select('parent_church_id')
+      .eq('id', currentChurchId)
+      .maybeSingle();
 
-      const { data: motherData, error: motherErr } = await supabase
-        .from('igrejas')
-        .select('parent_church_id')
-        .eq('id', currentChurchId)
-        .maybeSingle();
-
-      if (motherErr) {
-        toast.error('Erro ao verificar hierarquia da igreja.');
-        return;
-      }
-
-      const isChild = !!motherData?.parent_church_id;
-      setParentInfo({ isChild, motherId: motherData?.parent_church_id || null });
-
-      // Lista igrejas filhas
-      const { data: childs, error: childErr } = await supabase
-        .from('igrejas')
-        .select('id, nome, created_at, compartilha_escolas_da_mae, compartilha_eventos_da_mae, compartilha_jornada_da_mae, compartilha_devocionais_da_mae')
-        .eq('parent_church_id', currentChurchId)
-        .order('nome');
-
-      if (childErr) {
-        toast.error('Erro ao carregar igrejas filhas.');
-        setChildren([]);
-        return;
-      }
-
-      // Coletar métricas de forma paralela
-      const items: ChildItem[] = [];
-      if (childs && childs.length > 0) {
-        const metricsPromises = childs.map(async (ch) => {
-          const [membersCount, leadersCount, ministriesCount] = await Promise.all([
-            supabase.from('membros').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id),
-            supabase.from('membros').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id).in('funcao', ['admin', 'pastor', 'lider']),
-            supabase.from('ministerios').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id)
-          ]);
-
-          return {
-            id: ch.id,
-            nome: ch.nome,
-            created_at: ch.created_at,
-            metrics: {
-              members: membersCount.count || 0,
-              leaders: leadersCount.count || 0,
-              ministries: ministriesCount.count || 0
-            },
-            compartilha_escolas_da_mae: ch.compartilha_escolas_da_mae,
-            compartilha_eventos_da_mae: ch.compartilha_eventos_da_mae,
-            compartilha_jornada_da_mae: ch.compartilha_jornada_da_mae,
-            compartilha_devocionais_da_mae: ch.compartilha_devocionais_da_mae,
-          } as ChildItem;
-        });
-        const results = await Promise.all(metricsPromises);
-        items.push(...results);
-      }
-
-      setChildren(items);
-    } catch (error) {
-      console.error('Erro ao carregar dados das igrejas filhas:', error);
-      toast.error('Erro ao carregar dados das igrejas filhas.');
-    } finally {
-      if (firstLoad) {
-        setLoading(false);
-      }
-      setIsRefreshing(false);
-      isLoadingRef.current = false;
+    if (motherErr) {
+      toast.error('Erro ao verificar hierarquia da igreja.');
+      setLoading(false);
+      return;
     }
-  }, [currentChurchId, getChurchById, loadChurchStore, children.length]);
+
+    const isChild = !!motherData?.parent_church_id;
+    setParentInfo({ isChild, motherId: motherData?.parent_church_id || null });
+
+    // Lista igrejas filhas
+    const { data: childs, error: childErr } = await supabase
+      .from('igrejas')
+      .select('id, nome, created_at, compartilha_escolas_da_mae, compartilha_eventos_da_mae, compartilha_jornada_da_mae, compartilha_devocionais_da_mae')
+      .eq('parent_church_id', currentChurchId)
+      .order('nome');
+
+    if (childErr) {
+      toast.error('Erro ao carregar igrejas filhas.');
+      setChildren([]);
+      setLoading(false);
+      return;
+    }
+
+    // Coletar métricas para cada filha
+    const items: ChildItem[] = [];
+    for (const ch of (childs || [])) {
+      const { count: members } = await supabase.from('membros').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id);
+      const { count: leaders } = await supabase.from('membros').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id).in('funcao', ['admin', 'pastor', 'lider']);
+      const { count: ministries } = await supabase.from('ministerios').select('id', { count: 'exact', head: true }).eq('id_igreja', ch.id);
+
+      items.push({
+        id: ch.id,
+        nome: ch.nome,
+        created_at: ch.created_at,
+        metrics: { members: members || 0, leaders: leaders || 0, ministries: ministries || 0 },
+        compartilha_escolas_da_mae: ch.compartilha_escolas_da_mae,
+        compartilha_eventos_da_mae: ch.compartilha_eventos_da_mae,
+        compartilha_jornada_da_mae: ch.compartilha_jornada_da_mae,
+        compartilha_devocionais_da_mae: ch.compartilha_devocionais_da_mae,
+      });
+    }
+
+    setChildren(items);
+    setLoading(false);
+  }, [currentChurchId, getChurchById, loadChurchStore]);
 
   useEffect(() => {
-    // Executa quando a igreja atual muda; função estável impede loop
     loadPageData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChurchId]);
+  }, [loadPageData]);
 
   const handleCreate = async (values: ChildFormValues) => {
     if (!currentChurchId) return toast.error('Nenhuma igreja selecionada.');
@@ -215,7 +188,7 @@ const ChildChurchesPage = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Carregando igrejas filhas...</span>
+        <span className="ml-2 text-muted-foreground">Carregando...</span>
       </div>
     );
   }
@@ -231,13 +204,6 @@ const ChildChurchesPage = () => {
         <p className="text-indigo-100 mt-1">
           Crie e gerencie as igrejas que estão sob sua liderança direta.
         </p>
-        {parentInfo?.isChild && (
-          <div className="mt-3 p-3 bg-yellow-500/20 rounded-lg border border-yellow-400/30">
-            <p className="text-sm text-yellow-100">
-              <strong>Atenção:</strong> Como igreja filha, você não pode criar novas igrejas filhas.
-            </p>
-          </div>
-        )}
       </div>
 
       {!parentInfo?.isChild && canManage && (
@@ -284,21 +250,19 @@ const ChildChurchesPage = () => {
       )}
 
       <Card>
-        <CardHeader className="flex items-center justify-between">
+        <CardHeader>
           <CardTitle className="flex items-center gap-2"><Church className="w-5 h-5 text-primary" />Igrejas Filhas ({children.length})</CardTitle>
-          {isRefreshing && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
         </CardHeader>
         <CardContent className="space-y-4">
           {children.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <Church className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>Nenhuma igreja filha cadastrada.</p>
               {!parentInfo?.isChild && <p className="text-sm">Use o formulário acima para começar.</p>}
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {children.map((c) => (
-                <Card key={c.id} className="border flex flex-col hover:shadow-md transition-shadow">
+                <Card key={c.id} className="border flex flex-col">
                   <CardHeader>
                     <CardTitle className="text-lg">{c.nome}</CardTitle>
                     <div className="flex flex-wrap gap-2 text-sm pt-2">

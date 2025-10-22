@@ -1,46 +1,61 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuthStore } from '../../stores/authStore'
-import { useChurchStore } from '../../stores/churchStore'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Badge } from '../ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Progress } from '../ui/progress'
+import { Checkbox } from '../ui/checkbox'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
 import { UnifiedReceiptDialog } from '../financial/UnifiedReceiptDialog'
-import BudgetManagement from '../financial/BudgetManagement'
-import ReportViewerDialog from '../financial/ReportViewerDialog'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useChurchStore } from '../../stores/churchStore'
 import { 
+  DollarSign, 
+  TrendingUp, 
+  TrendingDown,
+  Calendar,
   PieChart,
   BarChart3,
+  Download,
   Plus,
   Edit,
   Trash2,
   Receipt,
-  Target,
-  FileText,
-  Loader2,
-  Calculator,
-  CheckCircle,
-  X,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Calendar,
-  User,
   CreditCard,
-  AlertCircle,
+  Banknote,
+  Building,
+  Target,
+  AlertTriangle,
+  CheckCircle,
+  Filter,
+  Search,
+  FileText,
+  Printer,
+  Tag,
+  Upload,
   Settings,
-  Download
+  Calculator,
+  Clock,
+  Users,
+  ArrowUpRight,
+  ArrowDownRight,
+  Eye,
+  Bell,
+  Wallet,
+  PlusCircle,
+  MinusCircle,
+  Loader2,
+  X
 } from 'lucide-react'
+import { ScrollArea } from '../ui/scroll-area'
 import TransactionDetailsDialog from '../financial/TransactionDetailsDialog'
+import ReportViewerDialog from '../financial/ReportViewerDialog'
 
 interface FinancialTransaction {
   id: string
@@ -65,50 +80,84 @@ interface FinancialTransaction {
   id_igreja: string
 }
 
+interface Budget {
+  id: string
+  categoria: string
+  subcategoria?: string
+  valor_orcado: number
+  valor_gasto: number
+  valor_disponivel: number
+  mes_ano: string
+  descricao?: string
+  responsavel: string
+  status: 'Ativo' | 'Excedido' | 'Finalizado'
+  alertas_configurados: boolean
+  id_igreja: string
+}
+
 interface FinancialGoal {
   id: string
-  id_igreja: string
   nome: string
   valor_meta: number
   valor_atual: number
   data_inicio: string
-  data_limite?: string
-  categoria?: string
-  descricao?: string
-  status: 'Ativo' | 'Concluído' | 'Cancelado'
+  data_limite: string
+  categoria: string
+  descricao: string
+  status: 'Ativo' | 'Concluído' | 'Pausado' | 'Cancelado'
+  contribuidores: number
+  campanha_ativa: boolean
+  id_igreja: string
 }
 
-const PAGE_SIZE = 10
+interface FinancialReport {
+  id: string
+  tipo: 'Mensal' | 'Trimestral' | 'Anual' | 'Personalizado'
+  periodo_inicio: string
+  periodo_fim: string
+  gerado_por: string
+  data_geracao: string
+  dados: {
+    total_entradas: number
+    total_saidas: number
+    saldo_periodo: number
+    categorias_entrada: Array<{categoria: string, valor: number}>
+    categorias_saida: Array<{categoria: string, valor: number}>
+    maior_entrada: FinancialTransaction | null
+    maior_saida: FinancialTransaction | null
+  }
+}
 
 const FinancialPanel = () => {
   const { user, currentChurchId } = useAuthStore()
-  const churchStore = useChurchStore()
-  const queryClient = useQueryClient()
-
-  const [viewMode, setViewMode] = useState<'dashboard' | 'transactions' | 'budget' | 'goals' | 'reports'>('dashboard')
-  const [page, setPage] = useState(0)
-  const [searchTerm, setSearchTerm] = useState('')
-  const debouncedSearchTerm = useDebouncedValue(searchTerm, 500)
+  const { getChurchById } = useChurchStore()
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>([])
+  const [budgets, setBudgets] = useState<Budget[]>([])
+  const [goals, setGoals] = useState<FinancialGoal[]>([])
+  const [reports, setReports] = useState<FinancialReport[]>([])
+  const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [selectedMemberFilter, setSelectedMemberFilter] = useState('all')
-  const [selectedStatus, setSelectedStatus] = useState('all')
-  const [selectedType, setSelectedType] = useState('all')
-  
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
   const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false)
-  const [isChurchSettingsOpen, setIsChurchSettingsOpen] = useState(false)
+  const [transactionToEdit, setTransactionToEdit] = useState<FinancialTransaction | null>(null)
+  const [isAddBudgetOpen, setIsAddBudgetOpen] = useState(false)
+  const [isEditBudgetOpen, setIsEditBudgetOpen] = useState(false)
+  const [budgetToEdit, setBudgetToEdit] = useState<Budget | null>(null)
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false)
   const [isEditGoalOpen, setIsEditGoalOpen] = useState(false)
   const [goalToEdit, setGoalToEdit] = useState<FinancialGoal | null>(null)
-  const [transactionToEdit, setTransactionToEdit] = useState<FinancialTransaction | null>(null)
+  const [isGenerateReportOpen, setIsGenerateReportOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [viewMode, setViewMode] = useState<'dashboard' | 'transactions' | 'budget' | 'goals' | 'reports'>('dashboard')
+  const [loadingData, setLoadingData] = useState(true)
+  const [pendingNotifications, setPendingNotifications] = useState<any[]>([])
   const [receiptTransaction, setReceiptTransaction] = useState<FinancialTransaction | null>(null)
-  const [detailsTransaction, setDetailsTransaction] = useState<FinancialTransaction | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [selectedReport, setSelectedReport] = useState<any>(null)
-  const [reportPeriod, setReportPeriod] = useState({
-    inicio: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    fim: new Date().toISOString().split('T')[0]
-  })
+  const [detailsTransaction, setDetailsTransaction] = useState<FinancialTransaction | null>(null)
+  const [reportViewerOpen, setReportViewerOpen] = useState(false)
+  const [selectedReport, setSelectedReport] = useState<FinancialReport | null>(null)
+  const [members, setMembers] = useState<Array<{ id: string; nome_completo: string }>>([])
+  const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>('all')
 
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
@@ -120,395 +169,402 @@ const FinancialPanel = () => {
     data_transacao: new Date().toISOString().split('T')[0],
     descricao: '',
     metodo_pagamento: 'PIX',
-    responsavel: user?.name || '',
     observacoes: '',
     centro_custo: '',
     numero_documento: '',
-    membro_id: '' as string,
-    status: 'Confirmado' as 'Pendente' | 'Confirmado' | 'Cancelado'
+    membro_id: '' as string
+  })
+
+  const [newBudget, setNewBudget] = useState({
+    categoria: '',
+    subcategoria: '',
+    valor_orcado: 0,
+    mes_ano: new Date().toISOString().slice(0, 7),
+    descricao: '',
+    alertas_configurados: true
   })
 
   const [newGoal, setNewGoal] = useState({
     nome: '',
     valor_meta: 0,
-    data_inicio: new Date().toISOString().split('T')[0],
     data_limite: '',
     categoria: '',
-    descricao: ''
+    descricao: '',
+    campanha_ativa: false,
+    status: 'Ativo' as FinancialGoal['status'] // Adicionado status para o newGoal
   })
 
-  const categoriesEntrada = ['Dízimos', 'Ofertas', 'Doações Especiais', 'Eventos', 'Vendas', 'Outros']
-  const categoriesSaida = ['Pessoal', 'Manutenção', 'Utilidades', 'Ministérios', 'Eventos', 'Equipamentos', 'Outros']
-  const allCategories = useMemo(() => Array.from(new Set([...categoriesEntrada, ...categoriesSaida])), [])
+  const [reportParams, setReportParams] = useState({
+    tipo: 'Mensal' as const,
+    periodo_inicio: new Date().toISOString().split('T')[0],
+    periodo_fim: new Date().toISOString().split('T')[0],
+    incluir_graficos: true,
+    incluir_detalhes: true
+  })
+
+  // Categorias financeiras
+  const categoriesEntrada = [
+    'Dízimos',
+    'Ofertas',
+    'Doações Especiais',
+    'Eventos',
+    'Vendas',
+    'Aluguel de Espaço',
+    'Investimentos',
+    'Rendimentos',
+    'Transferências',
+    'Outros'
+  ]
+
+  const categoriesSaida = [
+    'Pessoal',
+    'Manutenção',
+    'Utilidades',
+    'Ministérios',
+    'Eventos',
+    'Equipamentos',
+    'Reforma/Construção',
+    'Ação Social',
+    'Missões',
+    'Impostos',
+    'Seguros',
+    'Transporte',
+    'Marketing',
+    'Jurídico',
+    'Outros'
+  ]
+
+  // Lista única de categorias para o filtro (evita duplicatas como 'Eventos' e 'Outros')
+  const allCategories = useMemo(
+    () => Array.from(new Set([...categoriesEntrada, ...categoriesSaida])),
+    []
+  )
+
+  const subcategorias: Record<string, string[]> = {
+    'Pessoal': ['Salários', 'Benefícios', 'Encargos', 'Ajuda de Custo', 'Treinamentos'],
+    'Utilidades': ['Energia Elétrica', 'Água', 'Internet', 'Telefone', 'Gás'],
+    'Manutenção': ['Limpeza', 'Jardinagem', 'Reparos', 'Materiais'],
+    'Ministérios': ['Louvor', 'Kids', 'Jovens', 'Diaconato', 'Ensino'],
+    'Eventos': ['Materiais', 'Alimentação', 'Decoração', 'Equipamentos'],
+    'Equipamentos': ['Som', 'Vídeo', 'Instrumentos', 'Móveis', 'Informática']
+  }
+
   const metodosPagamento = ['PIX', 'Dinheiro', 'Cartão Débito', 'Cartão Crédito', 'Transferência', 'Cheque', 'Boleto']
 
-  const currentChurch = churchStore.getChurchById(currentChurchId!)
-
-  // Garante que os dados da igreja estejam carregados quando necessário
-  useEffect(() => {
-    if (currentChurchId && !currentChurch) {
-      churchStore.loadChurches()
+  const loadFinancialData = useCallback(async () => {
+    if (!currentChurchId) {
+      setTransactions([])
+      setBudgets([])
+      setGoals([])
+      setReports([])
+      setLoadingData(false)
+      return
     }
-  }, [currentChurchId, currentChurch, churchStore])
 
-  // Query para membros
-  const { data: members = [] } = useQuery({
-    queryKey: ['members', currentChurchId],
-    queryFn: async () => {
-      if (!currentChurchId) return []
-      const { data, error } = await supabase
+    setLoadingData(true)
+    try {
+      // Load Transactions
+      const { data: transactionsData, error: transactionsError } = await supabase
+        .from('transacoes_financeiras')
+        .select('*')
+        .eq('id_igreja', currentChurchId)
+        .order('data_transacao', { ascending: false })
+
+      if (transactionsError) throw transactionsError
+      setTransactions(transactionsData as FinancialTransaction[])
+
+      // Load pending contributions notifications
+      const { data: notificationsData, error: notificationsError } = await supabase
+        .from('eventos_aplicacao')
+        .select('*')
+        .eq('church_id', currentChurchId)
+        .eq('event_name', 'nova_contribuicao_pendente')
+        .order('created_at', { ascending: false })
+
+      if (notificationsError) {
+        console.error('Error loading notifications:', notificationsError)
+      }
+      setPendingNotifications(notificationsData || [])
+
+      // Load Budgets
+      const { data: budgetsData, error: budgetsError } = await supabase
+        .from('orcamentos')
+        .select('*')
+        .eq('id_igreja', currentChurchId)
+        .order('mes_ano', { ascending: false })
+
+      if (budgetsError) throw budgetsError
+      setBudgets(budgetsData.map(b => ({
+        ...b,
+        valor_disponivel: b.valor_orcado - b.valor_gasto
+      })) as Budget[])
+
+      // Load Members (para filtros e vínculo em lançamentos)
+      const { data: membersData, error: membersError } = await supabase
         .from('membros')
         .select('id, nome_completo')
         .eq('id_igreja', currentChurchId)
-        .order('nome_completo')
-      if (error) throw error
-      return data || []
-    },
-    enabled: !!currentChurchId,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // Query para transações paginadas
-  const { data: transactionsResponse, isLoading: isLoadingTransactions, isFetching: isFetchingTransactions } = useQuery({
-    queryKey: ['transactions', currentChurchId, page, debouncedSearchTerm, selectedCategory, selectedMemberFilter, selectedStatus, selectedType],
-    queryFn: async () => {
-      if (!currentChurchId) return { data: [], count: 0 }
-      
-      let query = supabase
-        .from('transacoes_financeiras')
-        .select('*', { count: 'exact' })
-        .eq('id_igreja', currentChurchId)
-        .order('data_transacao', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
-
-      if (debouncedSearchTerm) {
-        query = query.or(`descricao.ilike.%${debouncedSearchTerm}%,numero_documento.ilike.%${debouncedSearchTerm}%,responsavel.ilike.%${debouncedSearchTerm}%`)
+        .order('nome_completo', { ascending: true })
+      if (membersError) {
+        console.error('Error loading members:', membersError)
+      } else {
+        setMembers(membersData || [])
       }
-      if (selectedCategory !== 'all') query = query.eq('categoria', selectedCategory)
-      if (selectedMemberFilter !== 'all') query = query.eq('membro_id', selectedMemberFilter)
-      if (selectedStatus !== 'all') query = query.eq('status', selectedStatus)
-      if (selectedType !== 'all') query = query.eq('tipo', selectedType)
 
-      const { data, error, count } = await query
-      if (error) throw error
-      return { data: (data || []) as FinancialTransaction[], count: count || 0 }
-    },
-    enabled: !!currentChurchId && viewMode === 'transactions',
-    staleTime: 30 * 1000,
-  })
+      // Load Reports
+      setReports([])
 
-  const transactions = transactionsResponse?.data || []
-  const transactionCount = transactionsResponse?.count || 0
+    } catch (error: any) {
+      console.error('Error loading financial data:', error.message)
+      toast.error('Erro ao carregar dados financeiros: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }, [currentChurchId])
 
-  // Query para resumo financeiro
-  const { data: financialSummary, isFetching: isFetchingSummary } = useQuery({
-    queryKey: ['financial-summary', currentChurchId],
-    queryFn: async () => {
-      if (!currentChurchId) return { 
-        saldoAtual: 0, 
-        entradasMes: 0, 
-        saidasMes: 0, 
-        pendingTransactionsCount: 0,
-        entradasTotal: 0,
-        saidasTotal: 0,
-        transacoesHoje: 0
-      }
-      
-      const currentMonth = new Date().toISOString().slice(0, 7)
-      const today = new Date().toISOString().split('T')[0]
-      
-      const { data, error } = await supabase
-        .from('transacoes_financeiras')
-        .select('valor, tipo, status, data_transacao')
-        .eq('id_igreja', currentChurchId)
-      
-      if (error) throw error
-      const allTrans = data || []
-      const confirmed = allTrans.filter(t => t.status === 'Confirmado')
-      
-      const totalEntradas = confirmed.filter(t => t.tipo === 'Entrada').reduce((sum, t) => sum + t.valor, 0)
-      const totalSaidas = confirmed.filter(t => t.tipo === 'Saída').reduce((sum, t) => sum + t.valor, 0)
-      const saldoAtual = totalEntradas - totalSaidas
-      const entradasMes = confirmed.filter(t => t.tipo === 'Entrada' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
-      const saidasMes = confirmed.filter(t => t.tipo === 'Saída' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
-      const pendingCount = allTrans.filter(t => t.status === 'Pendente').length
-      const transacoesHoje = allTrans.filter(t => t.data_transacao.startsWith(today)).length
-
-      return { 
-        saldoAtual, 
-        entradasMes, 
-        saidasMes, 
-        pendingTransactionsCount: pendingCount,
-        entradasTotal: totalEntradas,
-        saidasTotal: totalSaidas,
-        transacoesHoje
-      }
-    },
-    enabled: !!currentChurchId && viewMode === 'dashboard',
-    staleTime: 60 * 1000,
-  })
-
-  // Query para metas financeiras
-  const { data: goals = [], isFetching: isFetchingGoals } = useQuery({
-    queryKey: ['financial-goals', currentChurchId],
-    queryFn: async () => {
-      if (!currentChurchId) return []
-      const { data, error } = await supabase
-        .from('metas_financeiras')
-        .select('*')
-        .eq('id_igreja', currentChurchId)
-        .order('data_inicio', { ascending: false })
-      if (error) throw error
-      return data as FinancialGoal[]
-    },
-    enabled: !!currentChurchId && viewMode === 'goals',
-    staleTime: 60 * 1000,
-  })
-
-  const summary = financialSummary || { 
-    saldoAtual: 0, 
-    entradasMes: 0, 
-    saidasMes: 0, 
-    pendingTransactionsCount: 0,
-    entradasTotal: 0,
-    saidasTotal: 0,
-    transacoesHoje: 0
-  }
-  
-  const pendingTransactions = useMemo(() => transactions.filter(t => t.status === 'Pendente'), [transactions])
-
-  // Realtime subscription
   useEffect(() => {
-    if (!currentChurchId) return
-    const channel = supabase
-      .channel(`financial-${currentChurchId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'transacoes_financeiras', 
-        filter: `id_igreja=eq.${currentChurchId}` 
-      }, () => {
-        queryClient.invalidateQueries({ queryKey: ['transactions', currentChurchId] })
-        queryClient.invalidateQueries({ queryKey: ['financial-summary', currentChurchId] })
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [currentChurchId, queryClient])
+    loadFinancialData()
+  }, [loadFinancialData])
 
-  // Mutations
-  const addTransactionMutation = useMutation({
-    mutationFn: async (transaction: any) => {
-      const { error } = await supabase.from('transacoes_financeiras').insert({
-        ...transaction,
-        id_igreja: currentChurchId,
-        responsavel: user?.name || transaction.responsavel
-      })
+  const markReceiptAsIssued = async (transactionId: string) => {
+    if (!canManageFinancial) {
+      toast.error('Você não tem permissão para emitir recibos.')
+      return
+    }
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({ recibo_emitido: true })
+        .eq('id', transactionId)
+
+      if (error) {
+        console.error('Error marking receipt as issued:', error)
+        toast.error('Erro ao marcar recibo como emitido: ' + error.message)
+        return
+      }
+      toast.success('Recibo marcado como emitido!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Unexpected error marking receipt:', error.message)
+      toast.error('Erro inesperado ao marcar recibo.')
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleAddTransaction = async () => {
+    if (!newTransaction.categoria || !newTransaction.valor || !newTransaction.descricao || !currentChurchId) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const numeroDocumento = `${newTransaction.tipo === 'Entrada' ? 'ENT' : 'SAI'}-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(transactions.length + 1).padStart(3, '0')}`
+
+      // Se tipo for Entrada e houver membro selecionado, buscar o nome para integrar ao painel do membro
+      const selectedMember = members.find(m => m.id === newTransaction.membro_id)
+
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .insert({
+          id_igreja: currentChurchId,
+          tipo: newTransaction.tipo,
+          categoria: newTransaction.categoria,
+          subcategoria: newTransaction.subcategoria || null,
+          valor: newTransaction.valor,
+          data_transacao: newTransaction.data_transacao,
+          descricao: newTransaction.descricao,
+          metodo_pagamento: newTransaction.metodo_pagamento,
+          responsavel: user?.name || 'Sistema',
+          status: 'Pendente',
+          observacoes: newTransaction.observacoes || null,
+          numero_documento: numeroDocumento,
+          centro_custo: newTransaction.centro_custo || null,
+          membro_id: newTransaction.tipo === 'Entrada' && newTransaction.membro_id ? newTransaction.membro_id : null,
+          membro_nome: newTransaction.tipo === 'Entrada' && selectedMember ? selectedMember.nome_completo : null
+        })
+
       if (error) throw error
-    },
-    onSuccess: () => {
       toast.success('Transação adicionada com sucesso!')
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['financial-summary'] })
       setIsAddTransactionOpen(false)
-      resetNewTransactionForm()
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
+      setNewTransaction({
+        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+        descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: '', membro_id: ''
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error adding transaction:', error.message)
+      toast.error('Erro ao adicionar transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
 
-  const updateTransactionMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string, data: any }) => {
-      const { error } = await supabase.from('transacoes_financeiras').update(data).eq('id', id)
+  const handleEditTransaction = async () => {
+    if (!transactionToEdit?.id || !currentChurchId) {
+      toast.error('Nenhuma transação selecionada para editar.')
+      return
+    }
+    if (!newTransaction.categoria || !newTransaction.valor || !newTransaction.descricao) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const selectedMember = members.find(m => m.id === newTransaction.membro_id)
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({
+          tipo: newTransaction.tipo,
+          categoria: newTransaction.categoria,
+          subcategoria: newTransaction.subcategoria || null,
+          valor: newTransaction.valor,
+          data_transacao: newTransaction.data_transacao,
+          descricao: newTransaction.descricao,
+          metodo_pagamento: newTransaction.metodo_pagamento,
+          observacoes: newTransaction.observacoes || null,
+          centro_custo: newTransaction.centro_custo || null,
+          numero_documento: newTransaction.numero_documento || null,
+          status: transactionToEdit.status, // Manter status atual
+          aprovado_por: transactionToEdit.aprovado_por,
+          data_aprovacao: transactionToEdit.data_aprovacao,
+          recibo_emitido: transactionToEdit.recibo_emitido,
+          membro_id: newTransaction.tipo === 'Entrada' ? (newTransaction.membro_id || null) : transactionToEdit.membro_id || null,
+          membro_nome: newTransaction.tipo === 'Entrada' && selectedMember ? selectedMember.nome_completo : transactionToEdit.membro_nome || null
+        })
+        .eq('id', transactionToEdit.id)
+
       if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Transação atualizada!')
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['financial-summary'] })
+      toast.success('Transação atualizada com sucesso!')
       setIsEditTransactionOpen(false)
       setTransactionToEdit(null)
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const deleteTransactionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('transacoes_financeiras').delete().eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Transação removida!')
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['financial-summary'] })
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const approveTransactionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('transacoes_financeiras').update({
-        status: 'Confirmado',
-        aprovado_por: user?.name,
-        data_aprovacao: new Date().toISOString()
-      }).eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Transação aprovada!')
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['financial-summary'] })
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const rejectTransactionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('transacoes_financeiras').update({
-        status: 'Cancelado',
-        aprovado_por: user?.name,
-        data_aprovacao: new Date().toISOString()
-      }).eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Transação cancelada!')
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-      queryClient.invalidateQueries({ queryKey: ['financial-summary'] })
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const markReceiptIssuedMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('transacoes_financeiras').update({
-        recibo_emitido: true
-      }).eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Recibo marcado como emitido!')
-      queryClient.invalidateQueries({ queryKey: ['transactions'] })
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const updateChurchInfoMutation = useMutation({
-    mutationFn: async (updates: any) => {
-      if (!currentChurchId) throw new Error('Igreja não selecionada')
-      await churchStore.updateChurch(currentChurchId, updates)
-    },
-    onSuccess: () => {
-      toast.success('Informações da igreja atualizadas!')
-      setIsChurchSettingsOpen(false)
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const addGoalMutation = useMutation({
-    mutationFn: async (goal: any) => {
-      const { error } = await supabase.from('metas_financeiras').insert({
-        ...goal,
-        id_igreja: currentChurchId,
-        valor_atual: 0,
-        status: 'Ativo'
+      setNewTransaction({
+        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+        descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
       })
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Meta criada com sucesso!')
-      queryClient.invalidateQueries({ queryKey: ['financial-goals'] })
-      setIsAddGoalOpen(false)
-      resetGoalForm()
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const updateGoalMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string, data: any }) => {
-      const { error } = await supabase.from('metas_financeiras').update(data).eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Meta atualizada!')
-      queryClient.invalidateQueries({ queryKey: ['financial-goals'] })
-      setIsEditGoalOpen(false)
-      setGoalToEdit(null)
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const deleteGoalMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('metas_financeiras').delete().eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Meta removida!')
-      queryClient.invalidateQueries({ queryKey: ['financial-goals'] })
-    },
-    onError: (error: any) => toast.error(`Erro: ${error.message}`)
-  })
-
-  const resetNewTransactionForm = () => {
-    setNewTransaction({
-      tipo: 'Entrada',
-      categoria: '',
-      subcategoria: '',
-      valor: 0,
-      data_transacao: new Date().toISOString().split('T')[0],
-      descricao: '',
-      metodo_pagamento: 'PIX',
-      responsavel: user?.name || '',
-      observacoes: '',
-      centro_custo: '',
-      numero_documento: '',
-      membro_id: '',
-      status: 'Confirmado'
-    })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error editing transaction:', error.message)
+      toast.error('Erro ao editar transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
   }
 
-  const resetGoalForm = () => {
-    setNewGoal({
-      nome: '',
-      valor_meta: 0,
-      data_inicio: new Date().toISOString().split('T')[0],
-      data_limite: '',
-      categoria: '',
-      descricao: ''
-    })
-  }
-
-  const handleAddTransaction = () => {
-    if (!newTransaction.categoria || !newTransaction.descricao || newTransaction.valor <= 0) {
-      toast.error('Preencha todos os campos obrigatórios')
+  const handleDeleteTransaction = async (transactionId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta transação?')) return
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
       return
     }
-    addTransactionMutation.mutate(newTransaction)
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .delete()
+        .eq('id', transactionId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Transação excluída com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error deleting transaction:', error.message)
+      toast.error('Erro ao excluir transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
   }
 
-  const handleEditTransaction = () => {
-    if (!transactionToEdit) return
-    updateTransactionMutation.mutate({ id: transactionToEdit.id, data: transactionToEdit })
-  }
-
-  const handleAddGoal = () => {
-    if (!newGoal.nome || newGoal.valor_meta <= 0) {
-      toast.error('Preencha todos os campos obrigatórios')
+  const approveTransaction = async (transactionId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
       return
     }
-    addGoalMutation.mutate(newGoal)
+    setLoadingData(true)
+    try {
+      // Update transaction status
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({ 
+          status: 'Confirmado',
+          aprovado_por: user?.name || 'Admin',
+          data_aprovacao: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', transactionId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+
+      // Delete related notification
+      const { error: notificationError } = await supabase
+        .from('eventos_aplicacao')
+        .delete()
+        .eq('event_details->>transaction_id', transactionId)
+        .eq('event_name', 'nova_contribuicao_pendente')
+        .eq('church_id', currentChurchId)
+
+      if (notificationError) {
+        console.error('Error deleting notification:', notificationError)
+      }
+
+      toast.success('Transação aprovada com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error approving transaction:', error.message)
+      toast.error('Erro ao aprovar transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
   }
 
-  const handleEditGoal = () => {
-    if (!goalToEdit) return
-    updateGoalMutation.mutate({ id: goalToEdit.id, data: goalToEdit })
+  const rejectTransaction = async (transactionId: string) => {
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+    setLoadingData(true)
+    try {
+      // Update transaction status
+      const { error } = await supabase
+        .from('transacoes_financeiras')
+        .update({ 
+          status: 'Cancelado',
+          aprovado_por: user?.name || 'Admin',
+          data_aprovacao: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', transactionId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+
+      // Delete related notification
+      const { error: notificationError } = await supabase
+        .from('eventos_aplicacao')
+        .delete()
+        .eq('event_details->>transaction_id', transactionId)
+        .eq('event_name', 'nova_contribuicao_pendente')
+        .eq('church_id', currentChurchId)
+
+      if (notificationError) {
+        console.error('Error deleting notification:', notificationError)
+      }
+
+      toast.success('Transação rejeitada com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error rejecting transaction:', error.message)
+      toast.error('Erro ao rejeitar transação: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
   }
 
-  const openDetails = (transaction: FinancialTransaction) => {
-    setDetailsTransaction(transaction)
-    setDetailsOpen(true)
-  }
-
-  const generateReceipt = (transaction: FinancialTransaction) => {
+  const generateReceipt = async (transaction: FinancialTransaction) => {
     if (transaction.tipo === 'Saída') {
       toast.error('Recibos só podem ser gerados para entradas')
       return
@@ -516,655 +572,1554 @@ const FinancialPanel = () => {
     setReceiptTransaction(transaction)
   }
 
-  const generateReport = async () => {
-    if (!currentChurchId) return
-    
-    const { data: transactionsData, error } = await supabase
-      .from('transacoes_financeiras')
-      .select('*')
-      .eq('id_igreja', currentChurchId)
-      .eq('status', 'Confirmado')
-      .gte('data_transacao', reportPeriod.inicio)
-      .lte('data_transacao', reportPeriod.fim)
-    
-    if (error) {
-      toast.error('Erro ao gerar relatório')
+  const openDetails = (transaction: FinancialTransaction) => {
+    setDetailsTransaction(transaction)
+    setDetailsOpen(true)
+  }
+
+  const viewReport = (report: FinancialReport) => {
+    setSelectedReport(report)
+    setReportViewerOpen(true)
+  }
+
+  const downloadReportCsv = (report: FinancialReport) => {
+    // Reaproveita a lógica do viewer criando o CSV aqui também
+    const lines: string[] = []
+    lines.push(`Relatório,${report.tipo}`)
+    lines.push(`Período,${report.periodo_inicio},${report.periodo_fim}`)
+    lines.push(`Gerado por,${report.gerado_por}`)
+    lines.push(`Data de geração,${new Date(report.data_geracao).toLocaleString('pt-BR')}`)
+    lines.push('')
+    lines.push('Resumo')
+    lines.push(`Total Entradas,${report.dados.total_entradas.toFixed(2)}`)
+    lines.push(`Total Saídas,${report.dados.total_saidas.toFixed(2)}`)
+    lines.push(`Saldo do Período,${report.dados.saldo_periodo.toFixed(2)}`)
+    lines.push('')
+    lines.push('Categorias de Entrada')
+    lines.push('Categoria,Valor')
+    report.dados.categorias_entrada.forEach(c => lines.push(`${c.categoria},${c.valor.toFixed(2)}`))
+    lines.push('')
+    lines.push('Categorias de Saída')
+    lines.push('Categoria,Valor')
+    report.dados.categorias_saida.forEach(c => lines.push(`${c.categoria},${c.valor.toFixed(2)}`))
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `relatorio-${report.tipo}-${report.periodo_inicio}-${report.periodo_fim}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleAddBudget = async () => {
+    if (!newBudget.categoria || !newBudget.valor_orcado || !newBudget.mes_ano || !currentChurchId) {
+      toast.error('Preencha todos os campos obrigatórios')
       return
     }
 
-    const entradas = transactionsData.filter(t => t.tipo === 'Entrada')
-    const saidas = transactionsData.filter(t => t.tipo === 'Saída')
-    
-    const totalEntradas = entradas.reduce((sum, t) => sum + t.valor, 0)
-    const totalSaidas = saidas.reduce((sum, t) => sum + t.valor, 0)
-    
-    const categoriasEntrada = entradas.reduce((acc, t) => {
-      const existing = acc.find(c => c.categoria === t.categoria)
-      if (existing) {
-        existing.valor += t.valor
-      } else {
-        acc.push({ categoria: t.categoria, valor: t.valor })
-      }
-      return acc
-    }, [] as Array<{categoria: string, valor: number}>)
-    
-    const categoriasSaida = saidas.reduce((acc, t) => {
-      const existing = acc.find(c => c.categoria === t.categoria)
-      if (existing) {
-        existing.valor += t.valor
-      } else {
-        acc.push({ categoria: t.categoria, valor: t.valor })
-      }
-      return acc
-    }, [] as Array<{categoria: string, valor: number}>)
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('orcamentos')
+        .insert({
+          id_igreja: currentChurchId,
+          categoria: newBudget.categoria,
+          subcategoria: newBudget.subcategoria || null,
+          valor_orcado: newBudget.valor_orcado,
+          valor_gasto: 0, // Sempre inicia com 0
+          mes_ano: newBudget.mes_ano,
+          descricao: newBudget.descricao || null,
+          responsavel: user?.name || 'Sistema',
+          status: 'Ativo',
+          alertas_configurados: newBudget.alertas_configurados
+        })
 
-    const report = {
+      if (error) throw error
+      toast.success('Orçamento criado com sucesso!')
+      setIsAddBudgetOpen(false)
+      setNewBudget({
+        categoria: undefined, subcategoria: undefined, valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
+        descricao: '', alertas_configurados: true
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error adding budget:', error.message)
+      toast.error('Erro ao criar orçamento: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleEditBudget = async () => {
+    if (!budgetToEdit?.id || !currentChurchId) {
+      toast.error('Nenhum orçamento selecionado para editar.')
+      return
+    }
+    if (!newBudget.categoria || !newBudget.valor_orcado || !newBudget.mes_ano) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('orcamentos')
+        .update({
+          categoria: newBudget.categoria,
+          subcategoria: newBudget.subcategoria || null,
+          valor_orcado: newBudget.valor_orcado,
+          mes_ano: newBudget.mes_ano,
+          descricao: newBudget.descricao || null,
+          alertas_configurados: newBudget.alertas_configurados,
+          // Recalcular valor_disponivel e status com base no valor_gasto existente
+          valor_disponivel: newBudget.valor_orcado - budgetToEdit.valor_gasto,
+          status: (newBudget.valor_orcado - budgetToEdit.valor_gasto) < 0 ? 'Excedido' : 'Ativo',
+        })
+        .eq('id', budgetToEdit.id)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Orçamento atualizado com sucesso!')
+      setIsEditBudgetOpen(false)
+      setBudgetToEdit(null)
+      setNewBudget({
+        categoria: undefined, subcategoria: undefined, valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
+        descricao: '', alertas_configurados: true
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error editing budget:', error.message)
+      toast.error('Erro ao editar orçamento: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleDeleteBudget = async (budgetId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este orçamento?')) return
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('orcamentos')
+        .delete()
+        .eq('id', budgetId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Orçamento excluído com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error deleting budget:', error.message)
+      toast.error('Erro ao excluir orçamento: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleAddGoal = async () => {
+    if (!newGoal.nome || !newGoal.valor_meta || !newGoal.data_limite || !currentChurchId) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('metas_financeiras')
+        .insert({
+          id_igreja: currentChurchId,
+          nome: newGoal.nome,
+          valor_meta: newGoal.valor_meta,
+          valor_atual: 0, // Sempre inicia com 0
+          data_inicio: new Date().toISOString().split('T')[0],
+          data_limite: newGoal.data_limite,
+          categoria: newGoal.categoria || null,
+          descricao: newGoal.descricao || null,
+          status: 'Ativo',
+          contribuidores: 0,
+          campanha_ativa: newGoal.campanha_ativa
+        })
+
+      if (error) throw error
+      toast.success('Meta financeira criada com sucesso!')
+      setIsAddGoalOpen(false)
+      setNewGoal({
+        nome: '', valor_meta: 0, data_limite: '', categoria: undefined,
+        descricao: '', campanha_ativa: false, status: 'Ativo'
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error adding goal:', error.message)
+      toast.error('Erro ao criar meta: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleEditGoal = async () => {
+    if (!goalToEdit?.id || !currentChurchId) {
+      toast.error('Nenhuma meta selecionada para editar.')
+      return
+    }
+    if (!newGoal.nome || !newGoal.valor_meta || !newGoal.data_limite) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('metas_financeiras')
+        .update({
+          nome: newGoal.nome,
+          valor_meta: newGoal.valor_meta,
+          data_limite: newGoal.data_limite,
+          categoria: newGoal.categoria || null,
+          descricao: newGoal.descricao || null,
+          status: newGoal.status || 'Ativo', // Permitir editar status
+          campanha_ativa: newGoal.campanha_ativa,
+          // valor_atual e contribuidores não são editáveis diretamente aqui
+        })
+        .eq('id', goalToEdit.id)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Meta financeira atualizada com sucesso!')
+      setIsEditGoalOpen(false)
+      setGoalToEdit(null)
+      setNewGoal({
+        nome: '', valor_meta: 0, data_limite: '', categoria: undefined,
+        descricao: '', campanha_ativa: false, status: 'Ativo'
+      })
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error editing goal:', error.message)
+      toast.error('Erro ao editar meta: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const handleDeleteGoal = async (goalId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta meta?')) return
+    if (!currentChurchId) {
+      toast.error('Nenhuma igreja ativa selecionada.')
+      return
+    }
+
+    setLoadingData(true)
+    try {
+      const { error } = await supabase
+        .from('metas_financeiras')
+        .delete()
+        .eq('id', goalId)
+        .eq('id_igreja', currentChurchId)
+
+      if (error) throw error
+      toast.success('Meta financeira excluída com sucesso!')
+      loadFinancialData()
+    } catch (error: any) {
+      console.error('Error deleting goal:', error.message)
+      toast.error('Erro ao excluir meta: ' + error.message)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  const generateReport = () => {
+    const startDate = new Date(reportParams.periodo_inicio)
+    const endDate = new Date(reportParams.periodo_fim)
+    
+    const filteredTransactions = transactions.filter(t => {
+      const transactionDate = new Date(t.data_transacao)
+      return transactionDate >= startDate && transactionDate <= endDate && t.status === 'Confirmado'
+    })
+
+    const entradas = filteredTransactions.filter(t => t.tipo === 'Entrada')
+    const saidas = filteredTransactions.filter(t => t.tipo === 'Saída')
+
+    const total_entradas = entradas.reduce((sum, t) => sum + t.valor, 0)
+    const total_saidas = saidas.reduce((sum, t) => sum + t.valor, 0)
+
+    const categorias_entrada = categoriesEntrada.map(cat => ({
+      categoria: cat,
+      valor: entradas.filter(t => t.categoria === cat).reduce((sum, t) => sum + t.valor, 0)
+    })).filter(c => c.valor > 0)
+
+    const categorias_saida = categoriesSaida.map(cat => ({
+      categoria: cat,
+      valor: saidas.filter(t => t.categoria === cat).reduce((sum, t) => sum + t.valor, 0)
+    })).filter(c => c.valor > 0)
+
+    const report: FinancialReport = {
       id: Date.now().toString(),
-      tipo: 'Personalizado',
-      periodo_inicio: reportPeriod.inicio,
-      periodo_fim: reportPeriod.fim,
-      gerado_por: user?.name || 'Sistema',
+      tipo: reportParams.tipo,
+      periodo_inicio: reportParams.periodo_inicio,
+      periodo_fim: reportParams.periodo_fim,
+      gerado_por: user?.name || '',
       data_geracao: new Date().toISOString(),
       dados: {
-        total_entradas: totalEntradas,
-        total_saidas: totalSaidas,
-        saldo_periodo: totalEntradas - totalSaidas,
-        categorias_entrada: categoriasEntrada,
-        categorias_saida: categoriasSaida,
+        total_entradas,
+        total_saidas,
+        saldo_periodo: total_entradas - total_saidas,
+        categorias_entrada,
+        categorias_saida,
         maior_entrada: entradas.sort((a, b) => b.valor - a.valor)[0] || null,
         maior_saida: saidas.sort((a, b) => b.valor - a.valor)[0] || null
       }
     }
 
-    setSelectedReport(report)
+    setReports([report, ...reports])
+    setIsGenerateReportOpen(false)
+    toast.success('Relatório gerado com sucesso!')
   }
 
+  // Cálculos para dashboard
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const confirmedTransactions = transactions.filter(t => t.status === 'Confirmado')
+  const pendingTransactions = transactions.filter(t => t.status === 'Pendente')
+  
+  const totalEntradas = confirmedTransactions.filter(t => t.tipo === 'Entrada').reduce((sum, t) => sum + t.valor, 0)
+  const totalSaidas = confirmedTransactions.filter(t => t.tipo === 'Saída').reduce((sum, t) => sum + t.valor, 0)
+  const saldoAtual = totalEntradas - totalSaidas
+
+  const entradasMes = confirmedTransactions.filter(t => t.tipo === 'Entrada' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
+  const saidasMes = confirmedTransactions.filter(t => t.tipo === 'Saída' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
+  const saldoMes = entradasMes - saidasMes
+
+  const budgetTotal = budgets.reduce((sum, b) => sum + b.valor_orcado, 0)
+  const budgetUsed = budgets.reduce((sum, b) => sum + b.valor_gasto, 0)
+  const budgetProgress = budgetTotal > 0 ? (budgetUsed / budgetTotal) * 100 : 0
+
   if (!currentChurchId) {
-    return <div className="p-6 text-center text-gray-600">Selecione uma igreja para gerenciar o painel financeiro.</div>
+    return (
+      <div className="p-6 text-center text-gray-600">
+        Selecione uma igreja para gerenciar o painel financeiro.
+      </div>
+    )
+  }
+
+  if (loadingData) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-green-500" />
+        <p className="ml-3 text-lg text-gray-600">Carregando dados financeiros...</p>
+      </div>
+    )
   }
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Painel Financeiro</h1>
-        <div className="flex gap-2">
-          {canManageFinancial && (
-            <Button variant="outline" onClick={() => setIsChurchSettingsOpen(true)}>
-              <Settings className="w-4 h-4 mr-2" /> Configurações
-            </Button>
-          )}
-          {canManageFinancial && viewMode === 'transactions' && (
-            <Button onClick={() => setIsAddTransactionOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" /> Nova Transação
-            </Button>
-          )}
-          {canManageFinancial && viewMode === 'goals' && (
-            <Button onClick={() => setIsAddGoalOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" /> Nova Meta
-            </Button>
-          )}
-        </div>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-green-500 to-blue-600 rounded-xl md:rounded-2xl p-4 md:p-6 text-white">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Gestão Financeira 💰</h1>
+        <p className="text-green-100 text-base md:text-lg">
+          Controle completo das finanças da igreja com relatórios avançados
+        </p>
       </div>
 
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="dashboard"><PieChart className="w-4 h-4 mr-2" />Dashboard</TabsTrigger>
-          <TabsTrigger value="transactions"><BarChart3 className="w-4 h-4 mr-2" />Transações</TabsTrigger>
-          <TabsTrigger value="budget"><Calculator className="w-4 h-4 mr-2" />Orçamento</TabsTrigger>
-          <TabsTrigger value="goals"><Target className="w-4 h-4 mr-2" />Metas</TabsTrigger>
-          <TabsTrigger value="reports"><FileText className="w-4 h-4 mr-2" />Relatórios</TabsTrigger>
-        </TabsList>
+      {/* Navigation */}
+      <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as typeof viewMode)}>
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+          <TabsList className="grid grid-cols-4 w-full lg:w-auto">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="transactions">Transações</TabsTrigger>
+            <TabsTrigger value="budget">Orçamento</TabsTrigger>
+            <TabsTrigger value="reports">Relatórios</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-6 relative">
-          {isFetchingSummary && (
-            <div className="absolute right-2 -top-6 text-gray-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Saldo Atual
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${summary.saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  R$ {summary.saldoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          <div className="flex gap-2">
+            <Dialog open={isGenerateReportOpen} onOpenChange={setIsGenerateReportOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Gerar Relatório
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Gerar Relatório Financeiro</DialogTitle>
+                  <DialogDescription>
+                    Configure os parâmetros do relatório
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Tipo de Relatório</Label>
+                    <Select value={reportParams.tipo} onValueChange={(value) => setReportParams({...reportParams, tipo: value as typeof reportParams.tipo})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Mensal">Mensal</SelectItem>
+                        <SelectItem value="Trimestral">Trimestral</SelectItem>
+                        <SelectItem value="Anual">Anual</SelectItem>
+                        <SelectItem value="Personalizado">Personalizado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Data Início</Label>
+                      <Input
+                        type="date"
+                        value={reportParams.periodo_inicio}
+                        onChange={(e) => setReportParams({...reportParams, periodo_inicio: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Data Fim</Label>
+                      <Input
+                        type="date"
+                        value={reportParams.periodo_fim}
+                        onChange={(e) => setReportParams({...reportParams, periodo_fim: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="graficos"
+                        checked={reportParams.incluir_graficos}
+                        onCheckedChange={(checked) => setReportParams({...reportParams, incluir_graficos: checked as boolean})}
+                      />
+                      <Label htmlFor="graficos">Incluir gráficos</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="detalhes"
+                        checked={reportParams.incluir_detalhes}
+                        onCheckedChange={(checked) => setReportParams({...reportParams, incluir_detalhes: checked as boolean})}
+                      />
+                      <Label htmlFor="detalhes">Incluir detalhes das transações</Label>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsGenerateReportOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={generateReport}>
+                      Gerar
+                    </Button>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Total: R$ {summary.entradasTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - R$ {summary.saidasTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
+              </DialogContent>
+            </Dialog>
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Exportar
+            </Button>
+          </div>
+        </div>
+
+        <TabsContent value="dashboard" className="space-y-6">
+          {/* Financial Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Saldo Atual</p>
+                    <p className={`text-xl md:text-2xl font-bold ${saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      R$ {saldoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <Wallet className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Entradas (Mês)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  R$ {summary.entradasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Entradas (Mês)</p>
+                    <p className="text-xl md:text-2xl font-bold text-green-600">
+                      R$ {entradasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-green-50 rounded-lg flex items-center justify-center">
+                    <ArrowUpRight className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                </p>
               </CardContent>
             </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <TrendingDown className="w-4 h-4" />
-                  Saídas (Mês)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  R$ {summary.saidasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Saídas (Mês)</p>
+                    <p className="text-xl md:text-2xl font-bold text-red-600">
+                      R$ {saidasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-red-50 rounded-lg flex items-center justify-center">
+                    <ArrowDownRight className="w-5 h-5 md:w-6 md:h-6 text-red-600" />
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                </p>
               </CardContent>
             </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  Pendências
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{summary.pendingTransactionsCount}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {summary.transacoesHoje} transações hoje
-                </p>
+
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Pendências</p>
+                    <p className="text-xl md:text-2xl font-bold text-orange-600">
+                      {pendingTransactions.length}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-50 rounded-lg flex items-center justify-center">
+                    <Clock className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
 
-          {pendingTransactions.length > 0 && canManageFinancial && (
-            <Card>
+          {/* Quick Actions and Alerts */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-orange-500" />
-                  Transações Pendentes de Aprovação
+                  <PlusCircle className="w-5 h-5 text-green-500" />
+                  Ações Rápidas
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {pendingTransactions.map(t => (
-                  <div key={t.id} className="flex items-center justify-between p-3 border rounded-md bg-orange-50">
-                    <div className="flex-1">
-                      <p className="font-medium">{t.descricao}</p>
-                      <p className="text-sm text-gray-600">
-                        {t.categoria} • R$ {t.valor.toFixed(2)} • {new Date(t.data_transacao).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="text-green-600" onClick={() => approveTransactionMutation.mutate(t.id)}>
-                        <CheckCircle className="w-4 h-4 mr-1" /> Aprovar
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-red-600" onClick={() => rejectTransactionMutation.mutate(t.id)}>
-                        <X className="w-4 h-4 mr-1" /> Rejeitar
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <CardContent className="space-y-3">
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={() => {
+                    setViewMode('transactions')
+                    setIsAddTransactionOpen(true)
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nova Transação
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={() => {
+                    setViewMode('budget')
+                    setIsAddBudgetOpen(true)
+                  }}
+                >
+                  <Target className="w-4 h-4 mr-2" />
+                  Novo Orçamento
+                </Button>
               </CardContent>
             </Card>
-          )}
-        </TabsContent>
 
-        <TabsContent value="transactions" className="space-y-4 relative">
-          {isFetchingTransactions && transactions.length > 0 && (
-            <div className="absolute right-2 -top-6 text-gray-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
-            </div>
-          )}
-          {!transactions || (transactions.length === 0 && isLoadingTransactions) ? (
-            <div className="text-center p-8">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-              <p className="text-gray-500">Carregando transações...</p>
-            </div>
-          ) : (
-            <>
-              <Card>
-                <CardContent className="p-4 grid gap-3 md:grid-cols-5">
-                  <Input 
-                    placeholder="Buscar..." 
-                    value={searchTerm} 
-                    onChange={e => { 
-                      setSearchTerm(e.target.value)
-                      setPage(0) 
-                    }} 
-                  />
-                  <Select value={selectedType} onValueChange={(v) => { 
-                    setSelectedType(v)
-                    setPage(0) 
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Tipos</SelectItem>
-                      <SelectItem value="Entrada">Entrada</SelectItem>
-                      <SelectItem value="Saída">Saída</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedCategory} onValueChange={(v) => { 
-                    setSelectedCategory(v)
-                    setPage(0) 
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedStatus} onValueChange={(v) => { 
-                    setSelectedStatus(v)
-                    setPage(0) 
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="Confirmado">Confirmado</SelectItem>
-                      <SelectItem value="Pendente">Pendente</SelectItem>
-                      <SelectItem value="Cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedMemberFilter} onValueChange={(v) => { 
-                    setSelectedMemberFilter(v)
-                    setPage(0) 
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Membro" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {members.map(m => <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-3">
-                {transactions.length === 0 && (
-                  <Card className="p-8 text-center text-gray-500">
-                    Nenhuma transação encontrada
-                  </Card>
-                )}
-                
-                {transactions.map((transaction) => (
-                  <Card key={transaction.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant={transaction.tipo === 'Entrada' ? 'default' : 'destructive'}>
-                              {transaction.tipo}
-                            </Badge>
-                            <Badge variant="outline">{transaction.categoria}</Badge>
-                            <Badge variant={
-                              transaction.status === 'Confirmado' ? 'default' : 
-                              transaction.status === 'Pendente' ? 'secondary' : 
-                              'destructive'
-                            }>
-                              {transaction.status}
-                            </Badge>
-                            {transaction.recibo_emitido && (
-                              <Badge variant="outline" className="text-green-600">
-                                <Receipt className="w-3 h-3 mr-1" />
-                                Recibo Emitido
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="font-semibold text-lg mb-1">{transaction.descricao}</p>
-                          <div className="flex flex-wrap gap-3 text-sm text-gray-600">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <CreditCard className="w-3 h-3" />
-                              {transaction.metodo_pagamento}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {transaction.responsavel}
-                            </span>
-                            {transaction.numero_documento && (
-                              <span className="flex items-center gap-1">
-                                <FileText className="w-3 h-3" />
-                                {transaction.numero_documento}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <span className={`text-2xl font-bold ${transaction.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.tipo === 'Entrada' ? '+' : '-'} R$ {transaction.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openDetails(transaction)}>
-                              Ver Detalhes
-                            </Button>
-                            {transaction.tipo === 'Entrada' && canManageFinancial && (
-                              <Button variant="ghost" size="sm" onClick={() => generateReceipt(transaction)}>
-                                <Receipt className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {canManageFinancial && (
-                              <>
-                                <Button variant="ghost" size="sm" onClick={() => { 
-                                  setTransactionToEdit(transaction)
-                                  setIsEditTransactionOpen(true) 
-                                }}>
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => {
-                                  if (confirm('Tem certeza que deseja excluir esta transação?')) {
-                                    deleteTransactionMutation.mutate(transaction.id)
-                                  }
-                                }}>
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-yellow-500" />
+                  Alertas Financeiros
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="max-h-64 pr-2">
+                  <div className="space-y-3">
+                    {budgets.filter(b => b.status === 'Excedido').map(budget => (
+                      <div key={budget.id} className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border-l-4 border-red-400">
+                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        <div className="text-sm">
+                          <p className="font-medium text-red-800">Orçamento Excedido</p>
+                          <p className="text-red-600">{budget.categoria}</p>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {transactionCount > PAGE_SIZE && (
-                <div className="flex items-center justify-between pt-4">
-                  <span className="text-sm text-gray-600">
-                    Mostrando {page * PAGE_SIZE + 1} - {Math.min((page + 1) * PAGE_SIZE, transactionCount)} de {transactionCount} transações
-                  </span>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setPage(p => Math.max(0, p - 1))} 
-                      disabled={page === 0}
-                    >
-                      Anterior
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setPage(p => p + 1)} 
-                      disabled={(page + 1) * PAGE_SIZE >= transactionCount}
-                    >
-                      Próxima
-                    </Button>
+                    ))}
+                    {pendingNotifications.map((n) => (
+                      <div key={n.id} className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
+                        <Clock className="w-4 h-4 text-yellow-500" />
+                        <div className="text-sm">
+                          <p className="font-medium text-yellow-800">Nova transação pendente</p>
+                          <p className="text-yellow-600">
+                            {n.event_details?.mensagem || `Valor R$ ${Number(n.event_details?.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              )}
-            </>
-          )}
-        </TabsContent>
+                </ScrollArea>
+              </CardContent>
+            </Card>
 
-        <TabsContent value="budget">
-          <BudgetManagement />
-        </TabsContent>
-        
-        <TabsContent value="goals" className="space-y-4 relative">
-          {isFetchingGoals && (
-            <div className="absolute right-2 -top-6 text-gray-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {goals.map((goal) => {
-              const percentage = goal.valor_meta > 0 ? (goal.valor_atual / goal.valor_meta) * 100 : 0
-              const isCompleted = percentage >= 100
-              const isExpired = goal.data_limite && new Date(goal.data_limite) < new Date()
-              
-              return (
-                <Card key={goal.id} className={isCompleted ? 'border-green-500' : isExpired ? 'border-red-500' : ''}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{goal.nome}</CardTitle>
-                        {goal.categoria && <p className="text-sm text-gray-500">{goal.categoria}</p>}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-500" />
+                  Transações Recentes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="max-h-64 pr-2">
+                  <div className="space-y-3">
+                    {transactions.slice(0, 5).map(t => (
+                      <div key={t.id} className="flex items-center justify-between text-sm">
+                        <span className="truncate">
+                          {t.tipo === 'Entrada' ? '➕' : '➖'} {t.categoria} • R$ {t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-gray-500">{new Date(t.data_transacao).toLocaleDateString('pt-BR')}</span>
                       </div>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => {
-                          setGoalToEdit(goal)
-                          setIsEditGoalOpen(true)
-                        }}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => {
-                          if (confirm('Tem certeza que deseja excluir esta meta?')) {
-                            deleteGoalMutation.mutate(goal.id)
-                          }
-                        }}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {goal.descricao && (
-                      <p className="text-sm text-gray-600">{goal.descricao}</p>
+                    ))}
+                    {transactions.length === 0 && (
+                      <p className="text-sm text-gray-500">Nenhuma transação registrada.</p>
                     )}
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Arrecadado:</span>
-                        <span className="font-semibold text-green-600">
-                          R$ {goal.valor_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Meta:</span>
-                        <span className="font-semibold">
-                          R$ {goal.valor_meta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Faltam:</span>
-                        <span className="font-semibold text-orange-600">
-                          R$ {Math.max(0, goal.valor_meta - goal.valor_atual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
 
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>{percentage.toFixed(1)}%</span>
-                        {goal.data_limite && (
-                          <span>Prazo: {new Date(goal.data_limite).toLocaleDateString('pt-BR')}</span>
+          {/* Budget Overview */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PieChart className="w-5 h-5 text-purple-500" />
+                Execução Orçamentária - {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {budgets.map(budget => (
+                  <div key={budget.id} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{budget.categoria}</span>
+                        {budget.subcategoria && (
+                          <Badge variant="outline" className="text-xs">{budget.subcategoria}</Badge>
+                        )}
+                        {budget.status === 'Excedido' && (
+                          <Badge className="bg-red-100 text-red-800 text-xs">Excedido</Badge>
                         )}
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all ${
-                            isCompleted ? 'bg-green-500' : 
-                            isExpired ? 'bg-red-500' : 
-                            percentage > 70 ? 'bg-yellow-500' : 'bg-blue-500'
-                          }`}
-                          style={{ width: `${Math.min(percentage, 100)}%` }}
+                      <div className="text-right">
+                        <p className="text-sm font-medium">
+                          R$ {budget.valor_gasto.toLocaleString('pt-BR')} / R$ {budget.valor_orcado.toLocaleString('pt-BR')}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {((budget.valor_gasto / budget.valor_orcado) * 100).toFixed(1)}% utilizado
+                        </p>
+                      </div>
+                    </div>
+                    <Progress 
+                      value={(budget.valor_gasto / budget.valor_orcado) * 100} 
+                      className={`h-2 ${budget.status === 'Excedido' ? 'bg-red-100' : ''}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-4">
+          {/* Transaction Filters and Add Button */}
+          <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+            <div className="flex gap-3 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar transações..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {allCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedMemberFilter} onValueChange={setSelectedMemberFilter}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Filtrar por membro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os membros</SelectItem>
+                  {members.map(m => (
+                    <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {canManageFinancial && (
+              <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-green-500 hover:bg-green-600">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nova Transação
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Nova Transação</DialogTitle>
+                    <DialogDescription>
+                      Registre uma nova movimentação financeira
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="tipo">Tipo *</Label>
+                        <Select value={newTransaction.tipo} onValueChange={(value) => setNewTransaction({...newTransaction, tipo: value as 'Entrada' | 'Saída'})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Entrada">Entrada</SelectItem>
+                            <SelectItem value="Saída">Saída</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="categoria">Categoria *</Label>
+                        <Select value={newTransaction.categoria || ''} onValueChange={(value) => setNewTransaction({...newTransaction, categoria: value === 'null' ? '' : value, subcategoria: ''})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="null">Nenhum</SelectItem>
+                            {(newTransaction.tipo === 'Entrada' ? categoriesEntrada : categoriesSaida).map(cat => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {newTransaction.categoria && subcategorias[newTransaction.categoria as keyof typeof subcategorias] && (
+                      <div className="space-y-2">
+                        <Label htmlFor="subcategoria">Subcategoria</Label>
+                        <Select value={newTransaction.subcategoria || ''} onValueChange={(value) => setNewTransaction({...newTransaction, subcategoria: value === 'null' ? '' : value})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a subcategoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="null">Nenhum</SelectItem>
+                            {subcategorias[newTransaction.categoria as keyof typeof subcategorias]?.map(subcat => (
+                              <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="valor">Valor (R$) *</Label>
+                        <Input
+                          id="valor"
+                          type="number"
+                          step="0.01"
+                          value={newTransaction.valor || ''}
+                          onChange={(e) => setNewTransaction({...newTransaction, valor: parseFloat(e.target.value) || 0})}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="data_transacao">Data *</Label>
+                        <Input
+                          id="data_transacao"
+                          type="date"
+                          value={newTransaction.data_transacao}
+                          onChange={(e) => setNewTransaction({...newTransaction, data_transacao: e.target.value})}
                         />
                       </div>
                     </div>
 
-                    {isCompleted && (
-                      <Badge className="w-full justify-center bg-green-500">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Meta Atingida!
-                      </Badge>
+                    <div className="space-y-2">
+                      <Label htmlFor="descricao">Descrição *</Label>
+                      <Input
+                        id="descricao"
+                        value={newTransaction.descricao}
+                        onChange={(e) => setNewTransaction({...newTransaction, descricao: e.target.value})}
+                        placeholder="Descrição da transação"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="metodo">Método de Pagamento</Label>
+                        <Select value={newTransaction.metodo_pagamento || ''} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value === 'null' ? '' : value})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o método" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="null">Nenhum</SelectItem>
+                            {metodosPagamento.map(metodo => (
+                              <SelectItem key={metodo} value={metodo}>{metodo}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="centro_custo">Centro de Custo</Label>
+                        <Input
+                          id="centro_custo"
+                          value={newTransaction.centro_custo}
+                          onChange={(e) => setNewTransaction({...newTransaction, centro_custo: e.target.value})}
+                          placeholder="Ex: Geral, Ministério Kids"
+                        />
+                      </div>
+                    </div>
+
+                    {newTransaction.tipo === 'Entrada' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="membro">Membro (Entrada)</Label>
+                        <Select
+                          value={newTransaction.membro_id || ''}
+                          onValueChange={(value) => setNewTransaction({ ...newTransaction, membro_id: value === 'null' ? '' : value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o membro" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="null">Nenhum</SelectItem>
+                            {members.map(m => (
+                              <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     )}
-                    {isExpired && !isCompleted && (
-                      <Badge variant="destructive" className="w-full justify-center">
-                        <AlertCircle className="w-3 h-3 mr-1" />
-                        Prazo Expirado
-                      </Badge>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="observacoes">Observações</Label>
+                      <Textarea
+                        id="observacoes"
+                        value={newTransaction.observacoes}
+                        onChange={(e) => setNewTransaction({...newTransaction, observacoes: e.target.value})}
+                        placeholder="Observações adicionais"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setIsAddTransactionOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleAddTransaction}>
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
 
-          {goals.length === 0 && (
-            <Card className="p-8 text-center">
-              <Target className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-gray-600 mb-2">Nenhuma meta financeira cadastrada</p>
-              <p className="text-sm text-gray-500 mb-4">Crie metas para acompanhar arrecadações específicas</p>
-              <Button onClick={() => setIsAddGoalOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" /> Criar Primeira Meta
-              </Button>
-            </Card>
+          {/* Pending Transactions Section */}
+          {pendingTransactions.length > 0 && (
+            <div className="pending-transactions-section space-y-4">
+              <h3 className="text-lg font-semibold text-orange-700">Transações Pendentes de Aprovação</h3>
+              {pendingTransactions.map((transaction) => (
+                <Card key={transaction.id} className="border-orange-200 bg-orange-50">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            R$ {transaction.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </h3>
+                          <Badge className="bg-yellow-100 text-yellow-800">
+                            <Clock className="w-3 h-3 mr-1" />
+                            Pendente
+                          </Badge>
+                          <Badge variant="outline">{transaction.categoria}</Badge>
+                        </div>
+                        <p className="text-gray-700 mb-2">{transaction.descricao}</p>
+                        <div className="flex gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>{new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <CreditCard className="w-4 h-4" />
+                            <span>{transaction.metodo_pagamento}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Building className="w-4 h-4" />
+                            <span>{transaction.responsavel}</span>
+                          </div>
+                        </div>
+                        {transaction.observacoes && (
+                          <p className="text-sm text-gray-600 mt-2">💬 {transaction.observacoes}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {transaction.tipo === 'Entrada' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => generateReceipt(transaction)}
+                          >
+                            <Receipt className="w-4 h-4 mr-2" />
+                            Recibo
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          className="bg-green-500 hover:bg-green-600"
+                          onClick={() => approveTransaction(transaction.id)}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Aprovar
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-red-600"
+                          onClick={() => rejectTransaction(transaction.id)}
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Rejeitar
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
-        </TabsContent>
-        
-        <TabsContent value="reports" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gerar Relatório Financeiro</CardTitle>
-              <CardDescription>
-                Selecione o período para gerar um relatório detalhado das movimentações financeiras
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Data Início</Label>
-                  <Input 
-                    type="date" 
-                    value={reportPeriod.inicio}
-                    onChange={(e) => setReportPeriod({...reportPeriod, inicio: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Data Fim</Label>
-                  <Input 
-                    type="date" 
-                    value={reportPeriod.fim}
-                    onChange={(e) => setReportPeriod({...reportPeriod, fim: e.target.value})}
-                  />
-                </div>
-              </div>
-              <Button onClick={generateReport} className="w-full">
-                <Download className="w-4 h-4 mr-2" />
-                Gerar Relatório
-              </Button>
-            </CardContent>
-          </Card>
 
-          {selectedReport && (
-            <ReportViewerDialog
-              isOpen={!!selectedReport}
-              onOpenChange={() => setSelectedReport(null)}
-              report={selectedReport}
-            />
+          {/* All Transactions List */}
+          <div className="space-y-4">
+            {transactions
+              .filter(t => 
+                (selectedCategory === 'all' || t.categoria === selectedCategory) &&
+                (selectedMemberFilter === 'all' || t.membro_id === selectedMemberFilter) &&
+                (searchTerm === '' || 
+                  t.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  t.numero_documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  t.responsavel.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+              )
+              .map((transaction) => (
+              <Card key={transaction.id} className="border-0 shadow-sm">
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          R$ {transaction.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </h3>
+                        <div className="flex gap-2">
+                          <Badge className={transaction.tipo === 'Entrada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                            {transaction.tipo === 'Entrada' ? <ArrowUpRight className="w-3 h-3 mr-1" /> : <ArrowDownRight className="w-3 h-3 mr-1" />}
+                            {transaction.tipo}
+                          </Badge>
+                          <Badge variant="outline">{transaction.categoria}</Badge>
+                          {transaction.subcategoria && (
+                            <Badge variant="outline" className="text-xs">{transaction.subcategoria}</Badge>
+                          )}
+                          <Badge className={
+                            transaction.status === 'Confirmado' ? 'bg-blue-100 text-blue-800' :
+                            transaction.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }>
+                            {transaction.status === 'Confirmado' && <CheckCircle className="w-3 h-3 mr-1" />}
+                            {transaction.status === 'Pendente' && <Clock className="w-3 h-3 mr-1" />}
+                            {transaction.status}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <p className="text-gray-700 mb-2">{transaction.descricao}</p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-sm text-gray-600 mb-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>{new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4" />
+                          <span>{transaction.metodo_pagamento}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Building className="w-4 h-4" />
+                          <span>{transaction.responsavel}</span>
+                        </div>
+                        {transaction.numero_documento && (
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            <span>{transaction.numero_documento}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {transaction.centro_custo && (
+                        <p className="text-sm text-blue-600 mb-1">
+                          📊 Centro de Custo: {transaction.centro_custo}
+                        </p>
+                      )}
+
+                      {transaction.observacoes && (
+                        <p className="text-sm text-gray-600 mb-1">
+                          💬 {transaction.observacoes}
+                        </p>
+                      )}
+
+                      {transaction.aprovado_por && transaction.data_aprovacao && (
+                        <p className="text-xs text-green-600">
+                          ✅ Aprovado por {transaction.aprovado_por} em {new Date(transaction.data_aprovacao).toLocaleDateString('pt-BR')}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      {transaction.status === 'Pendente' && canManageFinancial && (
+                        <Button 
+                          size="sm" 
+                          className="bg-green-500 hover:bg-green-600"
+                          onClick={() => approveTransaction(transaction.id)}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Aprovar
+                        </Button>
+                      )}
+                      {transaction.tipo === 'Entrada' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => generateReceipt(transaction)}
+                        >
+                          <Receipt className="w-4 h-4 mr-2" />
+                          {transaction.recibo_emitido ? 'Ver Recibo' : 'Emitir Recibo'}
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" onClick={() => openDetails(transaction)}>
+                        <Eye className="w-4 h-4 mr-2" />
+                        Ver
+                      </Button>
+                      {canManageFinancial && (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setTransactionToEdit(transaction)
+                              setNewTransaction({
+                                tipo: transaction.tipo,
+                                categoria: transaction.categoria,
+                                subcategoria: transaction.subcategoria || undefined,
+                                valor: transaction.valor,
+                                data_transacao: transaction.data_transacao,
+                                descricao: transaction.descricao,
+                                metodo_pagamento: transaction.metodo_pagamento,
+                                observacoes: transaction.observacoes || undefined,
+                                centro_custo: transaction.centro_custo || undefined,
+                                numero_documento: transaction.numero_documento || undefined
+                              })
+                              setIsEditTransactionOpen(true)
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-600"
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="budget" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Orçamento Mensal</h2>
+            {canManageFinancial && (
+              <Dialog open={isAddBudgetOpen} onOpenChange={setIsAddBudgetOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-blue-500 hover:bg-blue-600">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Orçamento
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Criar Orçamento</DialogTitle>
+                    <DialogDescription>
+                      Configure um novo orçamento mensal
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="categoria">Categoria *</Label>
+                      <Select value={newBudget.categoria || ''} onValueChange={(value) => setNewBudget({...newBudget, categoria: value === 'null' ? '' : value, subcategoria: ''})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="null">Nenhum</SelectItem>
+                          {categoriesSaida.map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {newBudget.categoria && subcategorias[newBudget.categoria as keyof typeof subcategorias] && (
+                      <div className="space-y-2">
+                        <Label htmlFor="subcategoria">Subcategoria</Label>
+                        <Select value={newBudget.subcategoria || ''} onValueChange={(value) => setNewBudget({...newBudget, subcategoria: value === 'null' ? '' : value})}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a subcategoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="null">Nenhum</SelectItem>
+                            {subcategorias[newBudget.categoria as keyof typeof subcategorias]?.map(subcat => (
+                              <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="valor_orcado">Valor Orçado (R$) *</Label>
+                      <Input
+                        id="valor_orcado"
+                        type="number"
+                        step="0.01"
+                        value={newBudget.valor_orcado || ''}
+                        onChange={(e) => setNewBudget({...newBudget, valor_orcado: parseFloat(e.target.value) || 0})}
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="mes_ano">Mês/Ano</Label>
+                      <Input
+                        id="mes_ano"
+                        type="month"
+                        value={newBudget.mes_ano}
+                        onChange={(e) => setNewBudget({...newBudget, mes_ano: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="descricao">Descrição</Label>
+                      <Textarea
+                        id="descricao"
+                        value={newBudget.descricao}
+                        onChange={(e) => setNewBudget({...newBudget, descricao: e.target.value})}
+                        placeholder="Descrição do orçamento"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="alertas"
+                        checked={newBudget.alertas_configurados}
+                        onCheckedChange={(checked) => setNewBudget({...newBudget, alertas_configurados: checked as boolean})}
+                      />
+                      <Label htmlFor="alertas">Configurar alertas automáticos</Label>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setIsAddBudgetOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleAddBudget}>
+                        Criar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {budgets.map(budget => (
+              <Card key={budget.id} className={`border-0 shadow-sm ${budget.status === 'Excedido' ? 'border-l-4 border-red-400' : ''}`}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">{budget.categoria}</h3>
+                      {budget.subcategoria && (
+                        <p className="text-sm text-gray-600">{budget.subcategoria}</p>
+                      )}
+                      <p className="text-sm text-gray-500">{budget.descricao}</p>
+                    </div>
+                    <div className="text-right flex gap-2 items-center">
+                      <Badge className={
+                        budget.status === 'Ativo' ? 'bg-green-100 text-green-800' :
+                        budget.status === 'Excedido' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }>
+                        {budget.status}
+                      </Badge>
+                      {canManageFinancial && (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setBudgetToEdit(budget)
+                              setNewBudget({
+                                categoria: budget.categoria,
+                                subcategoria: budget.subcategoria || undefined,
+                                valor_orcado: budget.valor_orcado,
+                                mes_ano: budget.mes_ano,
+                                descricao: budget.descricao || undefined,
+                                alertas_configurados: budget.alertas_configurados
+                              })
+                              setIsEditBudgetOpen(true)
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-600"
+                            onClick={() => handleDeleteBudget(budget.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span>Orçado: R$ {budget.valor_orcado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>Gasto: R$ {budget.valor_gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <Progress 
+                      value={(budget.valor_gasto / budget.valor_orcado) * 100} 
+                      className={`h-3 ${budget.status === 'Excedido' ? 'bg-red-100' : ''}`}
+                    />
+                    <div className="flex justify-between text-sm">
+                      <span className={`font-medium ${budget.valor_disponivel < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        Disponível: R$ {budget.valor_disponivel.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-gray-500">
+                        {((budget.valor_gasto / budget.valor_orcado) * 100).toFixed(1)}% utilizado
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {budget.status === 'Excedido' && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                        <p className="text-sm text-red-800 font-medium">Orçamento excedido!</p>
+                      </div>
+                      <p className="text-xs text-red-600 mt-1">
+                        Valor excedente: R$ {Math.abs(budget.valor_disponivel).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="goals" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Metas Financeiras</h2>
+            {canManageFinancial && (
+              <Dialog open={isAddGoalOpen} onOpenChange={setIsAddGoalOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-purple-500 hover:bg-purple-600">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nova Meta
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Criar Meta Financeira</DialogTitle>
+                    <DialogDescription>
+                      Configure uma nova meta de arrecadação
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="nome">Nome da Meta *</Label>
+                      <Input
+                        id="nome"
+                        value={newGoal.nome}
+                        onChange={(e) => setNewGoal({...newGoal, nome: e.target.value})}
+                        placeholder="Ex: Reforma do Templo"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="valor_meta">Valor da Meta (R$) *</Label>
+                      <Input
+                        id="valor_meta"
+                        type="number"
+                        step="0.01"
+                        value={newGoal.valor_meta || ''}
+                        onChange={(e) => setNewGoal({...newGoal, valor_meta: parseFloat(e.target.value) || 0})}
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="data_limite">Data Limite *</Label>
+                      <Input
+                        id="data_limite"
+                        type="date"
+                        value={newGoal.data_limite}
+                        onChange={(e) => setNewGoal({...newGoal, data_limite: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="categoria">Categoria</Label>
+                      <Select value={newGoal.categoria || ''} onValueChange={(value) => setNewGoal({...newGoal, categoria: value === 'null' ? '' : value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="null">Nenhum</SelectItem>
+                          {categoriesEntrada.map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="descricao">Descrição</Label>
+                      <Textarea
+                        id="descricao"
+                        value={newGoal.descricao}
+                        onChange={(e) => setNewGoal({...newGoal, descricao: e.target.value})}
+                        placeholder="Descrição da meta"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="campanha"
+                        checked={newGoal.campanha_ativa}
+                        onCheckedChange={(checked) => setNewGoal({...newGoal, campanha_ativa: checked as boolean})}
+                      />
+                      <Label htmlFor="campanha">Criar campanha de arrecadação</Label>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setIsAddGoalOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleAddGoal}>
+                        Criar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {goals.map(goal => (
+              <Card key={goal.id} className="border-0 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold">{goal.nome}</h3>
+                      <p className="text-sm text-gray-600">{goal.categoria}</p>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <Badge className={
+                        goal.status === 'Ativo' ? 'bg-green-100 text-green-800' :
+                        goal.status === 'Concluído' ? 'bg-blue-100 text-blue-800' :
+                        goal.status === 'Pausado' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }>
+                        {goal.status}
+                      </Badge>
+                      {canManageFinancial && (
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setGoalToEdit(goal)
+                              setNewGoal({
+                                nome: goal.nome,
+                                valor_meta: goal.valor_meta,
+                                data_limite: goal.data_limite,
+                                categoria: goal.categoria || undefined,
+                                descricao: goal.descricao || undefined,
+                                campanha_ativa: goal.campanha_ativa,
+                                status: goal.status
+                              })
+                              setIsEditGoalOpen(true)
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-600"
+                            onClick={() => handleDeleteGoal(goal.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <p className="text-sm text-gray-700 mb-4">{goal.descricao}</p>
+                  
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span>Progresso</span>
+                      <span className="font-medium">
+                        {Math.round((goal.valor_atual / goal.valor_meta) * 100)}%
+                      </span>
+                    </div>
+                    <Progress value={(goal.valor_atual / goal.valor_meta) * 100} className="h-3" />
+                    <div className="flex justify-between text-sm">
+                      <span>R$ {goal.valor_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>R$ {goal.valor_meta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t flex justify-between text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <Users className="w-4 h-4" />
+                      <span>{goal.contribuidores} contribuidores</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>até {new Date(goal.data_limite).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+                  
+                  {goal.campanha_ativa && (
+                    <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                      <p className="text-xs text-purple-800 font-medium">🎯 Campanha ativa</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Relatórios Financeiros</h2>
+          </div>
+
+          {reports.length > 0 ? (
+            <div className="space-y-4">
+              {reports.map(report => (
+                <Card key={report.id} className="border-0 shadow-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">Relatório {report.tipo}</h3>
+                        <p className="text-sm text-gray-600">
+                          {new Date(report.periodo_inicio).toLocaleDateString('pt-BR')} até {new Date(report.periodo_fim).toLocaleDateString('pt-BR')}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Gerado por {report.gerado_por} em {new Date(report.data_geracao).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => viewReport(report)}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          Visualizar
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => downloadReportCsv(report)}>
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <p className="text-2xl font-bold text-green-600">
+                          R$ {report.dados.total_entradas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-sm text-gray-600">Total Entradas</p>
+                      </div>
+                      <div className="text-center p-3 bg-red-50 rounded-lg">
+                        <p className="text-2xl font-bold text-red-600">
+                          R$ {report.dados.total_saidas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-sm text-gray-600">Total Saídas</p>
+                      </div>
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <p className={`text-2xl font-bold ${report.dados.saldo_periodo >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          R$ {report.dados.saldo_periodo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-sm text-gray-600">Saldo do Período</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-12 text-center">
+                <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum relatório gerado</h3>
+                <p className="text-gray-600 mb-4">
+                  Gere seu primeiro relatório financeiro para análise detalhada.
+                </p>
+                <Button onClick={() => setIsGenerateReportOpen(true)}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Gerar Primeiro Relatório
+                </Button>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
 
-      {/* Dialog de Configurações da Igreja */}
-      <Dialog open={isChurchSettingsOpen} onOpenChange={setIsChurchSettingsOpen}>
-        <DialogContent className="max-w-2xl">
+      {/* Edit Transaction Dialog */}
+      <Dialog open={isEditTransactionOpen} onOpenChange={setIsEditTransactionOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Configurações da Igreja</DialogTitle>
+            <DialogTitle>Editar Transação</DialogTitle>
             <DialogDescription>
-              Configure as informações que aparecerão nos recibos e documentos financeiros
+              Edite os detalhes da transação selecionada
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nome da Igreja</Label>
-              <Input 
-                value={currentChurch?.name || ''} 
-                onChange={(e) => {
-                  if (currentChurch) {
-                    churchStore.updateChurch(currentChurch.id, { name: e.target.value })
-                  }
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>CNPJ</Label>
-              <Input 
-                value={currentChurch?.cnpj || ''} 
-                onChange={(e) => {
-                  if (currentChurch) {
-                    churchStore.updateChurch(currentChurch.id, { cnpj: e.target.value })
-                  }
-                }}
-                placeholder="00.000.000/0000-00"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Endereço Completo</Label>
-              <Input 
-                value={currentChurch?.address || ''} 
-                onChange={(e) => {
-                  if (currentChurch) {
-                    churchStore.updateChurch(currentChurch.id, { address: e.target.value })
-                  }
-                }}
-                placeholder="Rua, número, bairro, cidade - UF"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input 
-                  value={currentChurch?.contactPhone || ''} 
-                  onChange={(e) => {
-                    if (currentChurch) {
-                      churchStore.updateChurch(currentChurch.id, { contactPhone: e.target.value })
-                    }
-                  }}
-                  placeholder="(00) 00000-0000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>E-mail</Label>
-                <Input 
-                  type="email"
-                  value={currentChurch?.contactEmail || ''} 
-                  onChange={(e) => {
-                    if (currentChurch) {
-                      churchStore.updateChurch(currentChurch.id, { contactEmail: e.target.value })
-                    }
-                  }}
-                  placeholder="contato@igreja.com"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setIsChurchSettingsOpen(false)}>
-                Fechar
-              </Button>
-              <Button onClick={() => {
-                toast.success('Configurações salvas!')
-                setIsChurchSettingsOpen(false)
-              }}>
-                Salvar Configurações
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog para adicionar transação */}
-      <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nova Transação</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Tipo *</Label>
-                <Select value={newTransaction.tipo} onValueChange={(v: any) => setNewTransaction({...newTransaction, tipo: v, categoria: ''})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label htmlFor="edit-tipo">Tipo *</Label>
+                <Select value={newTransaction.tipo} onValueChange={(value) => setNewTransaction({...newTransaction, tipo: value as 'Entrada' | 'Saída'})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Entrada">Entrada</SelectItem>
                     <SelectItem value="Saída">Saída</SelectItem>
@@ -1172,377 +2127,164 @@ const FinancialPanel = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Categoria *</Label>
-                <Select value={newTransaction.categoria} onValueChange={(v) => setNewTransaction({...newTransaction, categoria: v})}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <Label htmlFor="edit-categoria">Categoria *</Label>
+                <Select value={newTransaction.categoria || ''} onValueChange={(value) => setNewTransaction({...newTransaction, categoria: value === 'null' ? '' : value, subcategoria: ''})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {(newTransaction.tipo === 'Entrada' ? categoriesEntrada : categoriesSaida).map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem value="null">Nenhum</SelectItem>
+                    {(newTransaction.tipo === 'Entrada' ? categoriesEntrada : categoriesSaida).map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Descrição *</Label>
-              <Input 
-                value={newTransaction.descricao} 
-                onChange={(e) => setNewTransaction({...newTransaction, descricao: e.target.value})} 
-                placeholder="Ex: Dízimo de João Silva"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+
+            {newTransaction.categoria && subcategorias[newTransaction.categoria as keyof typeof subcategorias] && (
               <div className="space-y-2">
-                <Label>Valor *</Label>
-                <Input 
-                  type="number" 
-                  step="0.01" 
-                  value={newTransaction.valor} 
-                  onChange={(e) => setNewTransaction({...newTransaction, valor: parseFloat(e.target.value) || 0})} 
+                <Label htmlFor="edit-subcategoria">Subcategoria</Label>
+                <Select value={newTransaction.subcategoria || ''} onValueChange={(value) => setNewTransaction({...newTransaction, subcategoria: value === 'null' ? '' : value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a subcategoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="null">Nenhum</SelectItem>
+                    {subcategorias[newTransaction.categoria as keyof typeof subcategorias]?.map(subcat => (
+                      <SelectItem key={subcat} value={subcat}>{subcat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-valor">Valor (R$) *</Label>
+                <Input
+                  id="edit-valor"
+                  type="number"
+                  step="0.01"
+                  value={newTransaction.valor || ''}
+                  onChange={(e) => setNewTransaction({...newTransaction, valor: parseFloat(e.target.value) || 0})}
                   placeholder="0,00"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Data *</Label>
-                <Input 
-                  type="date" 
-                  value={newTransaction.data_transacao} 
-                  onChange={(e) => setNewTransaction({...newTransaction, data_transacao: e.target.value})} 
+                <Label htmlFor="edit-data_transacao">Data *</Label>
+                <Input
+                  id="edit-data_transacao"
+                  type="date"
+                  value={newTransaction.data_transacao}
+                  onChange={(e) => setNewTransaction({...newTransaction, data_transacao: e.target.value})}
                 />
               </div>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Método de Pagamento</Label>
-                <Select value={newTransaction.metodo_pagamento} onValueChange={(v) => setNewTransaction({...newTransaction, metodo_pagamento: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {metodosPagamento.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select value={newTransaction.status} onValueChange={(v: any) => setNewTransaction({...newTransaction, status: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Confirmado">Confirmado</SelectItem>
-                    <SelectItem value="Pendente">Pendente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
+
             <div className="space-y-2">
-              <Label>Membro (opcional)</Label>
-              <Select value={newTransaction.membro_id} onValueChange={(v) => setNewTransaction({...newTransaction, membro_id: v})}>
-                <SelectTrigger><SelectValue placeholder="Selecione um membro" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
-                  {members.map(m => <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Número do Documento</Label>
-                <Input 
-                  value={newTransaction.numero_documento} 
-                  onChange={(e) => setNewTransaction({...newTransaction, numero_documento: e.target.value})} 
-                  placeholder="Ex: 001/2024"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Centro de Custo</Label>
-                <Input 
-                  value={newTransaction.centro_custo} 
-                  onChange={(e) => setNewTransaction({...newTransaction, centro_custo: e.target.value})} 
-                  placeholder="Ex: Ministério Infantil"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea 
-                value={newTransaction.observacoes} 
-                onChange={(e) => setNewTransaction({...newTransaction, observacoes: e.target.value})} 
-                rows={3} 
-                placeholder="Informações adicionais sobre a transação"
+              <Label htmlFor="edit-descricao">Descrição *</Label>
+              <Input
+                id="edit-descricao"
+                value={newTransaction.descricao}
+                onChange={(e) => setNewTransaction({...newTransaction, descricao: e.target.value})}
+                placeholder="Descrição da transação"
               />
             </div>
-            
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => {
-                setIsAddTransactionOpen(false)
-                resetNewTransactionForm()
-              }}>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-metodo">Método de Pagamento</Label>
+                <Select value={newTransaction.metodo_pagamento || ''} onValueChange={(value) => setNewTransaction({...newTransaction, metodo_pagamento: value === 'null' ? '' : value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="null">Nenhum</SelectItem>
+                    {metodosPagamento.map(metodo => (
+                      <SelectItem key={metodo} value={metodo}>{metodo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-centro_custo">Centro de Custo</Label>
+                <Input
+                  id="edit-centro_custo"
+                  value={newTransaction.centro_custo}
+                  onChange={(e) => setNewTransaction({...newTransaction, centro_custo: e.target.value})}
+                  placeholder="Ex: Geral, Ministério Kids"
+                />
+              </div>
+            </div>
+
+            {newTransaction.tipo === 'Entrada' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-membro">Membro (Entrada)</Label>
+                <Select
+                  value={newTransaction.membro_id || ''}
+                  onValueChange={(value) => setNewTransaction({ ...newTransaction, membro_id: value === 'null' ? '' : value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o membro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="null">Nenhum</SelectItem>
+                    {members.map(m => (
+                      <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-observacoes">Observações</Label>
+              <Textarea
+                id="edit-observacoes"
+                value={newTransaction.observacoes}
+                onChange={(e) => setNewTransaction({...newTransaction, observacoes: e.target.value})}
+                placeholder="Observações adicionais"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsEditTransactionOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleAddTransaction} disabled={addTransactionMutation.isPending}>
-                {addTransactionMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  'Salvar Transação'
-                )}
+              <Button onClick={handleEditTransaction}>
+                Salvar Alterações
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog para editar transação */}
-      <Dialog open={isEditTransactionOpen} onOpenChange={setIsEditTransactionOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Editar Transação</DialogTitle></DialogHeader>
-          {transactionToEdit && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Descrição</Label>
-                <Input 
-                  value={transactionToEdit.descricao} 
-                  onChange={(e) => setTransactionToEdit({...transactionToEdit, descricao: e.target.value})} 
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Valor</Label>
-                  <Input 
-                    type="number" 
-                    step="0.01" 
-                    value={transactionToEdit.valor} 
-                    onChange={(e) => setTransactionToEdit({...transactionToEdit, valor: parseFloat(e.target.value) || 0})} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Data</Label>
-                  <Input 
-                    type="date" 
-                    value={transactionToEdit.data_transacao} 
-                    onChange={(e) => setTransactionToEdit({...transactionToEdit, data_transacao: e.target.value})} 
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select 
-                  value={transactionToEdit.status} 
-                  onValueChange={(v: any) => setTransactionToEdit({...transactionToEdit, status: v})}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Confirmado">Confirmado</SelectItem>
-                    <SelectItem value="Pendente">Pendente</SelectItem>
-                    <SelectItem value="Cancelado">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Observações</Label>
-                <Textarea 
-                  value={transactionToEdit.observacoes || ''} 
-                  onChange={(e) => setTransactionToEdit({...transactionToEdit, observacoes: e.target.value})} 
-                  rows={3} 
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => {
-                  setIsEditTransactionOpen(false)
-                  setTransactionToEdit(null)
-                }}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleEditTransaction} disabled={updateTransactionMutation.isPending}>
-                  {updateTransactionMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    'Salvar Alterações'
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Unified Receipt Dialog */}
+      <UnifiedReceiptDialog
+        isOpen={!!receiptTransaction}
+        onOpenChange={(isOpen) => !isOpen && setReceiptTransaction(null)}
+        transaction={receiptTransaction}
+        church={currentChurchId ? getChurchById(currentChurchId) : null}
+        onMarkAsIssued={markReceiptAsIssued}
+        canManage={canManageFinancial}
+      />
 
-      {/* Dialog para adicionar meta */}
-      <Dialog open={isAddGoalOpen} onOpenChange={setIsAddGoalOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Nova Meta Financeira</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nome da Meta *</Label>
-              <Input 
-                value={newGoal.nome} 
-                onChange={(e) => setNewGoal({...newGoal, nome: e.target.value})} 
-                placeholder="Ex: Reforma do Templo"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Valor da Meta *</Label>
-              <Input 
-                type="number" 
-                step="0.01" 
-                value={newGoal.valor_meta} 
-                onChange={(e) => setNewGoal({...newGoal, valor_meta: parseFloat(e.target.value) || 0})} 
-                placeholder="0,00"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data Início</Label>
-                <Input 
-                  type="date" 
-                  value={newGoal.data_inicio} 
-                  onChange={(e) => setNewGoal({...newGoal, data_inicio: e.target.value})} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Data Limite (opcional)</Label>
-                <Input 
-                  type="date" 
-                  value={newGoal.data_limite} 
-                  onChange={(e) => setNewGoal({...newGoal, data_limite: e.target.value})} 
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Categoria (opcional)</Label>
-              <Input 
-                value={newGoal.categoria} 
-                onChange={(e) => setNewGoal({...newGoal, categoria: e.target.value})} 
-                placeholder="Ex: Infraestrutura"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea 
-                value={newGoal.descricao} 
-                onChange={(e) => setNewGoal({...newGoal, descricao: e.target.value})} 
-                rows={3} 
-                placeholder="Descreva o objetivo desta meta"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => {
-                setIsAddGoalOpen(false)
-                resetGoalForm()
-              }}>
-                Cancelar
-              </Button>
-              <Button onClick={handleAddGoal} disabled={addGoalMutation.isPending}>
-                {addGoalMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  'Criar Meta'
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Transaction Details Dialog */}
+      <TransactionDetailsDialog
+        isOpen={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        transaction={detailsTransaction}
+        onReceipt={(t) => generateReceipt(t)}
+      />
 
-      {/* Dialog para editar meta */}
-      <Dialog open={isEditGoalOpen} onOpenChange={setIsEditGoalOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Editar Meta Financeira</DialogTitle></DialogHeader>
-          {goalToEdit && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Nome da Meta</Label>
-                <Input 
-                  value={goalToEdit.nome} 
-                  onChange={(e) => setGoalToEdit({...goalToEdit, nome: e.target.value})} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Valor da Meta</Label>
-                <Input 
-                  type="number" 
-                  step="0.01" 
-                  value={goalToEdit.valor_meta} 
-                  onChange={(e) => setGoalToEdit({...goalToEdit, valor_meta: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Valor Atual</Label>
-                <Input 
-                  type="number" 
-                  step="0.01" 
-                  value={goalToEdit.valor_atual} 
-                  onChange={(e) => setGoalToEdit({...goalToEdit, valor_atual: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select 
-                  value={goalToEdit.status} 
-                  onValueChange={(v: any) => setGoalToEdit({...goalToEdit, status: v})}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Ativo">Ativo</SelectItem>
-                    <SelectItem value="Concluído">Concluído</SelectItem>
-                    <SelectItem value="Cancelado">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => {
-                  setIsEditGoalOpen(false)
-                  setGoalToEdit(null)
-                }}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleEditGoal} disabled={updateGoalMutation.isPending}>
-                  {updateGoalMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    'Salvar Alterações'
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {receiptTransaction && (
-        <UnifiedReceiptDialog
-          transaction={receiptTransaction}
-          church={currentChurch}
-          isOpen={!!receiptTransaction}
-          onOpenChange={() => setReceiptTransaction(null)}
-          onMarkAsIssued={(id) => markReceiptIssuedMutation.mutate(id)}
-          canManage={canManageFinancial}
-          churchId={currentChurchId!}
-        />
-      )}
-
-      {detailsTransaction && (
-        <TransactionDetailsDialog
-          transaction={detailsTransaction}
-          isOpen={detailsOpen}
-          onOpenChange={setDetailsOpen}
-          onReceipt={canManageFinancial ? generateReceipt : undefined}
-        />
-      )}
+      {/* Report Viewer Dialog */}
+      <ReportViewerDialog
+        isOpen={reportViewerOpen}
+        onOpenChange={setReportViewerOpen}
+        report={selectedReport}
+      />
     </div>
   )
 }

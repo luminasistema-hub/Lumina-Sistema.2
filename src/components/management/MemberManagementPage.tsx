@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useAuthStore, UserRole } from '../../stores/authStore' 
 import { useChurchStore } from '../../stores/churchStore'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -59,33 +58,22 @@ const MemberManagementPage = () => {
   const { getChurchById } = useChurchStore()
   const queryClient = useQueryClient();
 
-  // Declarar searchTerm ANTES de useDebouncedValue
+  const { data: membersData, isLoading, error } = useMembers();
+  // Mantém uma referência estável para a lista de membros enquanto carrega
+  const members = useMemo(() => membersData ?? [], [membersData]);
+
+  const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null)
+  const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false)
+  const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
+  const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false)
+  const [generatedLink, setGeneratedLink] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterMinistry, setFilterMinistry] = useState('all')
   const [filterBirthday, setFilterBirthday] = useState('all')
   const [filterWedding, setFilterWedding] = useState('all')
-
-  const debouncedSearch = useDebouncedValue(searchTerm, 250);
-  const { data: membersData, isLoading, error } = useMembers({
-    search: debouncedSearch || null,
-    role: filterRole !== 'all' ? (filterRole as UserRole) : null,
-    status: filterStatus !== 'all' ? (filterStatus as Member['status']) : null,
-    ministry: filterMinistry !== 'all' ? filterMinistry : null,
-    birthdayMonth: filterBirthday === 'mes_atual',
-    weddingMonth: filterWedding === 'mes_atual',
-  });
-  // Mantém uma referência estável para a lista de membros enquanto carrega
-  const members = useMemo(() => membersData ?? [], [membersData]);
-
-  const [filteredMembers, setFilteredMembers] = useState<Member[]>([])
-
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null)
-  const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false)
-  const [isEditMemberDialogOpen, setIsEditMemberDialogOpen] = useState(false)
-  const [isGenerateLinkDialogOpen, setIsGenerateLinkDialogOpen] = useState(false)
-  const [generatedLink, setGeneratedLink] = useState('')
   // Dados extras para o popup
   const [memberExtra, setMemberExtra] = useState<{
     loading: boolean;
@@ -129,10 +117,49 @@ const MemberManagementPage = () => {
     return d.getMonth() === now.getMonth();
   }, []);
 
-  // Resultado já vem filtrado do servidor; apenas conecta ao estado local
+  // Filtragem de membros otimizada
   useEffect(() => {
-    setFilteredMembers(isLoading ? [] : members);
-  }, [isLoading, members])
+    // Evita setState contínuo enquanto dados estão carregando
+    if (isLoading) {
+      setFilteredMembers([]);
+      return;
+    }
+    let filtered = members
+
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(member => 
+        member.nome_completo.toLowerCase().includes(searchLower) || 
+        member.email.toLowerCase().includes(searchLower) ||
+        (member.telefone && member.telefone.includes(searchTerm))
+      )
+    }
+
+    if (filterRole !== 'all') {
+      filtered = filtered.filter(member => member.funcao === filterRole)
+    }
+
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(member => member.status === filterStatus)
+    }
+
+    if (filterMinistry !== 'all') {
+      const ministryLower = filterMinistry.toLowerCase();
+      filtered = filtered.filter(member => 
+        member.ministerio_recomendado?.toLowerCase().includes(ministryLower)
+      )
+    }
+
+    if (filterBirthday === 'mes_atual') {
+      filtered = filtered.filter(member => isSameMonth(member.data_nascimento))
+    }
+
+    if (filterWedding === 'mes_atual') {
+      filtered = filtered.filter(member => isSameMonth(member.data_casamento))
+    }
+
+    setFilteredMembers(filtered)
+  }, [isLoading, members, searchTerm, filterRole, filterStatus, filterMinistry, filterBirthday, filterWedding, isSameMonth])
 
   const addMemberMutation = useMutation({
     mutationFn: async (newMemberData: typeof newMember) => {

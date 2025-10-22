@@ -1,27 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
-import { useEffect, useMemo } from 'react';
-
-export interface Notification {
-  id: string;
-  id_igreja: string;
-  membro_id: string | null;
-  tipo: string | null;
-  titulo: string;
-  descricao: string | null;
-  link: string | null;
-  lida: boolean;
-  created_at: string;
-}
+import { useEffect } from 'react';
 
 export const useNotifications = () => {
   const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const queryKey = useMemo(() => ['notifications', user?.id, currentChurchId], [user?.id, currentChurchId]);
+  const queryKey = ['notifications', user?.id, currentChurchId];
 
-  const { data: notifications = [], isLoading } = useQuery<Notification[]>({
+  const { data: notifications = [], isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
       if (!user?.id || !currentChurchId) return [];
@@ -33,7 +21,7 @@ export const useNotifications = () => {
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
-      return data as Notification[];
+      return data;
     },
     enabled: !!user?.id && !!currentChurchId,
   });
@@ -105,11 +93,5 @@ export const useNotifications = () => {
     };
   }, [user?.id, currentChurchId, queryClient, queryKey]);
 
-  return { 
-    notifications, 
-    isLoading, 
-    unreadCount, 
-    markAllAsRead: markAsReadMutation.mutate, 
-    markOneAsRead: markOneAsReadMutation.mutate 
-  };
+  return { notifications, isLoading, unreadCount, markAllAsRead: markAsReadMutation.mutate, markOneAsRead: markOneAsReadMutation.mutate };
 };

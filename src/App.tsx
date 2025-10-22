@@ -1,5 +1,5 @@
 // src/App.tsx
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -9,11 +9,12 @@ import MasterAdminLoginPage from './pages/MasterAdminLoginPage'
 import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage'
 import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
+import EADPortalPage from './pages/EADPortalPage'
+import SchoolDetailsPage from './pages/SchoolDetailsPage'
 import PasswordResetPage from './pages/PasswordResetPage'
 import NewPasswordPage from './pages/NewPasswordPage'
-import NotFound from './pages/NotFound'
 import { useEffect } from 'react'
-import ErrorBoundary from './components/shared/ErrorBoundary'
+import CookieConsent from './components/system/CookieConsent'
 
 // ----------------------------
 // ProtectedRoute genérico
@@ -22,12 +23,10 @@ function ProtectedRoute({
   children,
   requireTenant = false,
   onlySuperAdmin = false,
-  requireSuperAdmin = false,
 }: {
   children: JSX.Element
   requireTenant?: boolean
   onlySuperAdmin?: boolean
-  requireSuperAdmin?: boolean
 }) {
   const { user, isLoading, currentChurchId } = useAuthStore()
   const loc = useLocation()
@@ -47,7 +46,7 @@ function ProtectedRoute({
     return <Navigate to="/login" state={{ from: loc }} replace />
   }
 
-  if ((onlySuperAdmin || requireSuperAdmin) && user.role !== 'super_admin') {
+  if (onlySuperAdmin && user.role !== 'super_admin') {
     return <Navigate to="/" replace />
   }
 
@@ -63,8 +62,6 @@ function ProtectedRoute({
 // ----------------------------
 function App() {
   const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore()
-  const location = useLocation()
-  const navigate = useNavigate()
 
   useEffect(() => {
     checkAuth()
@@ -74,43 +71,121 @@ function App() {
     }
   }, [checkAuth, initializeAuthListener])
 
-  // Redirecionar usuário logado para dashboard se estiver em páginas públicas
-  useEffect(() => {
-    if (!isLoading && user && (location.pathname === '/' || location.pathname === '/login')) {
-      navigate('/dashboard', { replace: true })
-    }
-  }, [user, isLoading, location.pathname, navigate])
-
   return (
-    <ErrorBoundary>
+    <>
+      <CookieConsent />
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/cadastrar-igreja" element={<CadastrarIgrejaPage />} />
-        <Route path="/password-reset" element={<PasswordResetPage />} />
-        <Route path="/new-password" element={<NewPasswordPage />} />
-        <Route path="/master-admin-login" element={<MasterAdminLoginPage />} />
-        <Route path="/super-admin-register" element={<SuperAdminRegisterPage />} />
+        {/* Landing */}
+        <Route
+          path="/"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <LandingPage />
+            )
+          }
+        />
+
+        {/* Login & Registro comuns */}
+        <Route
+          path="/login"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <LoginPage />
+            )
+          }
+        />
+        <Route path="/recuperar-senha" element={<PasswordResetPage />} />
+        <Route path="/nova-senha" element={<NewPasswordPage />} />
+        <Route
+          path="/register/:churchId"
+          element={
+            user ? (
+              <Navigate
+                to={user.role === 'super_admin' ? '/master-admin' : '/dashboard'}
+                replace
+              />
+            ) : (
+              <RegisterPage />
+            )
+          }
+        />
+        <Route
+          path="/cadastrar-igreja"
+          element={
+            <CadastrarIgrejaPage />
+          }
+        />
+
+        {/* Login & registro de super admin */}
+        <Route
+          path="/master-admin-login"
+          element={
+            user?.role === 'super_admin' ? (
+              <Navigate to="/master-admin" replace />
+            ) : (
+              <MasterAdminLoginPage />
+            )
+          }
+        />
+        <Route
+          path="/super-admin-register"
+          element={
+            user?.role === 'super_admin' ? (
+              <Navigate to="/master-admin" replace />
+            ) : (
+              <SuperAdminRegisterPage />
+            )
+          }
+        />
+
+        {/* Rotas protegidas */}
+        <Route
+          path="/master-admin"
+          element={
+            <ProtectedRoute onlySuperAdmin>
+              <MasterAdminPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireTenant>
               <DashboardPage currentChurchId={currentChurchId!} />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/master-admin"
+          path="/ead"
           element={
-            <ProtectedRoute requireSuperAdmin>
-              <MasterAdminPage />
+            <ProtectedRoute requireTenant>
+              <EADPortalPage />
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<NotFound />} />
+        <Route
+          path="/escolas/:schoolId"
+          element={
+            <ProtectedRoute requireTenant>
+              <SchoolDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* catch all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </ErrorBoundary>
+    </>
   )
 }
 

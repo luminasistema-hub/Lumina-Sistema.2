@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../integrations/supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from 'sonner'
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 
 export interface Contribution {
   id: string
@@ -45,7 +45,7 @@ const fetchContributions = async (churchId: string, userId: string): Promise<Con
 export const useContributions = () => {
   const { user, currentChurchId } = useAuthStore()
   const queryClient = useQueryClient()
-  const queryKey = useMemo(() => ['contributions', currentChurchId, user?.id], [currentChurchId, user?.id]);
+  const queryKey = ['contributions', currentChurchId, user?.id]
 
   useEffect(() => {
     if (!currentChurchId || !user?.id) return

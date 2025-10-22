@@ -6,7 +6,16 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link as LinkIcon, CheckCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import type { Notification } from "@/hooks/useNotifications";
+
+type Notification = {
+  id: string;
+  titulo: string;
+  descricao?: string | null;
+  link?: string | null;
+  created_at: string;
+  user_id?: string | null;
+  lido?: boolean;
+};
 
 type Props = {
   open: boolean;
@@ -36,7 +45,7 @@ const NotificationDialog: React.FC<Props> = ({ open, onOpenChange, notification,
     onOpenChange(false);
   };
 
-  const canMarkRead = !!notification.membro_id && !notification.lida;
+  const canMarkRead = !!notification.user_id && !notification.lido;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

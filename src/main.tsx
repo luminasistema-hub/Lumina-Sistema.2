@@ -30,11 +30,10 @@ Object.keys(sessionStorage).forEach(key => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 10, // 10 minutos - cache agressivo
-      gcTime: 1000 * 60 * 30, // 30 minutos para o cache ser limpo
-      refetchOnWindowFocus: false,    // DESABILITADO para economizar
-      refetchOnReconnect: false,      // DESABILITADO para economizar
-      refetchOnMount: false,          // DESABILITADO - usa cache se disponível
+      staleTime: 1000 * 60 * 2, // 2 minutos para dados serem considerados "velhos"
+      gcTime: 1000 * 60 * 15, // 15 minutos para o cache ser limpo se não usado
+      refetchOnWindowFocus: true,    // **CHAVE**: revalida ao voltar para a aba
+      refetchOnReconnect: true,      // **CHAVE**: revalida ao reconectar a internet
       retry: 1, // Tenta novamente 1 vez em caso de erro
     },
   },

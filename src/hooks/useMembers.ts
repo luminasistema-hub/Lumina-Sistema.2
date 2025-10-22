@@ -38,33 +38,11 @@ export interface MemberProfile {
   churchName?: string;
 }
 
-type MembersQueryParams = {
-  search?: string | null;
-  role?: UserRole | null;
-  status?: MemberProfile['status'] | null;
-  ministry?: string | null;
-  birthdayMonth?: boolean;
-  weddingMonth?: boolean;
-};
-
-const fetchMembers = async (
-  churchId: string | null,
-  getChurchById: (id: string) => { name: string } | undefined,
-  _userId: string | null,
-  params?: MembersQueryParams
-): Promise<MemberProfile[]> => {
+const fetchMembers = async (churchId: string | null, getChurchById: (id: string) => { name: string } | undefined, _userId?: string | null): Promise<MemberProfile[]> => {
   if (!churchId) return [];
 
   const { data, error } = await supabase.functions.invoke('get-church-members', {
-    body: {
-      church_id: churchId,
-      search: params?.search ?? null,
-      role: params?.role ?? null,
-      status: params?.status ?? null,
-      ministry: params?.ministry ?? null,
-      birthday_month: params?.birthdayMonth ?? false,
-      wedding_month: params?.weddingMonth ?? false,
-    },
+    body: { church_id: churchId }
   });
 
   if (error) throw new Error(error.message);
@@ -98,33 +76,19 @@ const fetchMembers = async (
     data_conversao: member.informacoes_pessoais?.data_conversao,
     dias_disponiveis: member.informacoes_pessoais?.dias_disponiveis,
     horarios_disponiveis: member.informacoes_pessoais?.horarios_disponiveis,
-    churchName: getChurchById?.(churchId)?.name,
+    churchName: getChurchById?.(churchId)?.name
   }));
 
   return membersData;
 };
 
-export const useMembers = (params?: MembersQueryParams) => {
+export const useMembers = () => {
   const { user, currentChurchId } = useAuthStore();
   const { getChurchById } = useChurchStore();
 
   return useQuery({
-    queryKey: [
-      'members',
-      currentChurchId,
-      user?.id,
-      params?.search ?? '',
-      params?.role ?? '',
-      params?.status ?? '',
-      params?.ministry ?? '',
-      params?.birthdayMonth ?? false,
-      params?.weddingMonth ?? false,
-    ],
-    queryFn: () => fetchMembers(currentChurchId, getChurchById, user?.id || null, params),
+    queryKey: ['members', currentChurchId, user?.id],
+    queryFn: () => fetchMembers(currentChurchId, getChurchById, user?.id || null),
     enabled: !!currentChurchId && !!user?.id,
-    // Evita flicker e loading indesejado ao digitar/alterar filtros
-    placeholderData: (prev) => prev,
-    staleTime: 1000 * 60 * 2,
-    refetchOnWindowFocus: false,
   });
 };

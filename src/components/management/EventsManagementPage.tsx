@@ -1,251 +1,166 @@
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/integrations/supabase/client'
-import { useAuthStore } from '@/stores/authStore'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calendar, Plus, Search, Loader2, AlertCircle } from 'lucide-react'
-import { toast } from 'sonner'
-import { CreateEventDialog } from './CreateEventDialog'
-import EditEventDialog from './EditEventDialog'
-import EventCard from './EventCard'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
-
-interface Event {
-  id: string
-  id_igreja: string
-  nome: string
-  descricao?: string
-  data_hora: string
-  local: string
-  tipo: string
-  status: string
-  capacidade_maxima?: number
-  inscricoes_abertas: boolean
-  valor_inscricao?: number
-  link_externo?: string
-  compartilhar_com_filhas?: boolean
-}
+import { useState, useMemo } from 'react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/stores/authStore';
+import { EventCard } from './EventCard';
+import { CreateEventDialog } from './CreateEventDialog';
+import EditEventDialog, { EventItem } from './EditEventDialog';
+import EventParticipantsDialog from './EventParticipantsDialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { Plus, Search, Users, Loader2, Trash2 } from 'lucide-react';
 
 const EventsManagementPage = () => {
-  const { user, currentChurchId } = useAuthStore()
-  const queryClient = useQueryClient()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null)
+  const { currentChurchId, user } = useAuthStore();
+  const queryClient = useQueryClient();
 
-  const debouncedSearch = useDebouncedValue(searchTerm, 300)
+  const [isCreateOpen, setCreateOpen] = useState(false);
+  const [isEditOpen, setEditOpen] = useState(false);
+  const [isParticipantsOpen, setParticipantsOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+  const [filter, setFilter] = useState('all');
 
-  const { data: events = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['events-management', currentChurchId, debouncedSearch, typeFilter, statusFilter],
+  const queryKey = useMemo(() => ['eventsManagement', currentChurchId, filter, debouncedSearch], [currentChurchId, filter, debouncedSearch]);
+
+  const { data: events, isLoading, error } = useQuery({
+    queryKey,
     queryFn: async () => {
-      if (!currentChurchId) return []
+      if (!currentChurchId) return [];
+      let query = supabase.from('eventos').select('*').eq('id_igreja', currentChurchId);
 
-      try {
-        let query = supabase
-          .from('eventos')
-          .select('*')
-          .eq('id_igreja', currentChurchId)
-          .order('data_hora', { ascending: false })
-
-        if (debouncedSearch) {
-          query = query.ilike('nome', `%${debouncedSearch}%`)
-        }
-        if (typeFilter !== 'all') {
-          query = query.eq('tipo', typeFilter)
-        }
-        if (statusFilter !== 'all') {
-          query = query.eq('status', statusFilter)
-        }
-
-        const { data, error } = await query
-
-        if (error) throw error
-        return (data || []) as Event[]
-      } catch (err: any) {
-        console.error('Erro ao buscar eventos:', err)
-        toast.error('Erro ao carregar eventos: ' + err.message)
-        return []
+      if (filter === 'upcoming') {
+        query = query.gte('data_hora', new Date().toISOString());
+      } else if (filter === 'past') {
+        query = query.lt('data_hora', new Date().toISOString());
       }
+
+      if (debouncedSearch) {
+        query = query.ilike('nome', `%${debouncedSearch}%`);
+      }
+
+      const { data, error } = await query.order('data_hora', { ascending: filter === 'upcoming' });
+      if (error) throw new Error(error.message);
+      return data as EventItem[];
     },
     enabled: !!currentChurchId,
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    retry: 2,
-    retryDelay: 1000,
-  })
+  });
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey });
+    queryClient.refetchQueries({ queryKey });
+    setCreateOpen(false);
+    setEditOpen(false);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (eventId: string) => {
-      const { error } = await supabase.from('eventos').delete().eq('id', eventId)
-      if (error) throw error
+      const { error } = await supabase.from('eventos').delete().eq('id', eventId);
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      toast.success('Evento excluído com sucesso!')
-      queryClient.invalidateQueries({ queryKey: ['events-management'] })
+      toast.success('Evento removido com sucesso!');
+      handleSuccess();
     },
-    onError: (error: any) => {
-      toast.error('Erro ao excluir evento: ' + error.message)
+    onError: (err: any) => {
+      toast.error(`Erro ao remover evento: ${err.message}`);
     },
-  })
+  });
 
-  const handleDelete = (eventId: string) => {
-    if (confirm('Tem certeza que deseja excluir este evento?')) {
-      deleteMutation.mutate(eventId)
-    }
-  }
+  const handleEdit = (event: EventItem) => {
+    setSelectedEvent(event);
+    setEditOpen(true);
+  };
 
-  const filteredEvents = useMemo(() => events, [events])
+  const handleViewParticipants = (event: EventItem) => {
+    setSelectedEvent(event);
+    setParticipantsOpen(true);
+  };
 
   if (!currentChurchId) {
-    return (
-      <div className="p-6 text-center">
-        <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600">Selecione uma igreja para gerenciar eventos.</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-6 text-center">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-red-900 mb-2">Erro ao carregar eventos</h3>
-            <p className="text-red-700 mb-4">{(error as Error).message}</p>
-            <Button onClick={() => refetch()} variant="outline">
-              Tentar Novamente
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return <div className="p-6 text-center">Por favor, selecione uma igreja para gerenciar os eventos.</div>;
   }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Gestão de Eventos</h1>
-          <p className="text-sm text-muted-foreground">Crie e gerencie os eventos da igreja</p>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Gestão de Eventos</h1>
+        <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+          <div className="relative w-full sm:w-auto flex-grow">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar evento..."
+              className="pl-9 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Filtrar eventos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="upcoming">Próximos</SelectItem>
+              <SelectItem value="past">Passados</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => setCreateOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" /> Criar Evento
+          </Button>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Evento
-        </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Filtros
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Buscar eventos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Tipos</SelectItem>
-                <SelectItem value="Culto">Culto</SelectItem>
-                <SelectItem value="Conferência">Conferência</SelectItem>
-                <SelectItem value="Retiro">Retiro</SelectItem>
-                <SelectItem value="Evangelismo">Evangelismo</SelectItem>
-                <SelectItem value="Outro">Outro</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="Planejado">Planejado</SelectItem>
-                <SelectItem value="Confirmado">Confirmado</SelectItem>
-                <SelectItem value="Em Andamento">Em Andamento</SelectItem>
-                <SelectItem value="Finalizado">Finalizado</SelectItem>
-                <SelectItem value="Cancelado">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-          <span className="ml-3 text-gray-600">Carregando eventos...</span>
+      {isLoading && (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Carregando eventos...</span>
         </div>
-      ) : filteredEvents.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum evento encontrado</h3>
-            <p className="text-gray-600 mb-4">
-              {searchTerm || typeFilter !== 'all' || statusFilter !== 'all'
-                ? 'Tente ajustar os filtros de busca'
-                : 'Comece criando seu primeiro evento'}
-            </p>
-            {!searchTerm && typeFilter === 'all' && statusFilter === 'all' && (
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Criar Primeiro Evento
+      )}
+      {error && <div className="text-red-500 p-4 bg-red-50 rounded-md">Erro ao carregar eventos: {error.message}</div>}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {events?.map((event) => (
+          <div key={event.id} className="flex flex-col">
+            <EventCard event={event as any} onClick={() => handleEdit(event)} />
+            <div className="mt-2 flex gap-2">
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewParticipants(event)}>
+                <Users className="mr-2 h-4 w-4" /> Ver Inscritos
               </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredEvents.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              onEdit={() => setEditingEvent(event)}
-              onDelete={() => handleDelete(event.id)}
-            />
-          ))}
+              <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(event.id)} disabled={deleteMutation.isPending}>
+                <Trash2 className="mr-2 h-4 w-4" /> Remover
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {events?.length === 0 && !isLoading && (
+        <div className="text-center py-12 text-gray-500">
+          <p>Nenhum evento encontrado para os filtros selecionados.</p>
         </div>
       )}
 
-      <CreateEventDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onSuccess={() => {
-          setIsCreateDialogOpen(false)
-          queryClient.invalidateQueries({ queryKey: ['events-management'] })
-        }}
-      />
-
-      {editingEvent && (
-        <EditEventDialog
-          event={editingEvent}
-          open={!!editingEvent}
-          onOpenChange={(open) => !open && setEditingEvent(null)}
-          onSuccess={() => {
-            setEditingEvent(null)
-            queryClient.invalidateQueries({ queryKey: ['events-management'] })
-          }}
+      {currentChurchId && (
+        <CreateEventDialog
+          open={isCreateOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={handleSuccess}
+          igrejaId={currentChurchId}
         />
       )}
+      {selectedEvent && (
+        <>
+          <EditEventDialog open={isEditOpen} onClose={() => setEditOpen(false)} event={selectedEvent} onUpdated={handleSuccess} />
+          <EventParticipantsDialog open={isParticipantsOpen} onClose={() => setParticipantsOpen(false)} eventId={selectedEvent.id} churchId={currentChurchId} eventName={selectedEvent.nome} />
+        </>
+      )}
     </div>
-  )
-}
+  );
+};
 
-export default EventsManagementPage
+export default EventsManagementPage;

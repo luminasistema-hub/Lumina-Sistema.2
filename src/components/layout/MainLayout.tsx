@@ -64,9 +64,9 @@ const MainLayout = ({ children, activeModule = "dashboard", onModuleSelect }: Ma
     setSpecialNotification(null);
   };
 
-  const handleModuleSelect = (module: string) => {
-    onModuleSelect(module)
-    setIsMobileMenuOpen(false)
+  const handleModuleSelect = (moduleId: string) => {
+    console.log(`MainLayout: Selected module: ${moduleId}`);
+    onModuleSelect?.(moduleId);
   };
 
   if (!user) return null;

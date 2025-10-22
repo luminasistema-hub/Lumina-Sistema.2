@@ -226,5 +226,3 @@ export function CreateEventDialog({
     </Dialog>
   );
 }
-
-export default CreateEventDialog;

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuthStore } from '../stores/authStore';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 
 interface MinistryRow {
   id: string;
@@ -93,7 +93,7 @@ const fetchPersonalStats = async (userId: string | null, churchId: string | null
 export const usePersonalStats = () => {
   const { user, currentChurchId } = useAuthStore();
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ['personalStats', user?.id, currentChurchId], [user?.id, currentChurchId]);
+  const queryKey = ['personalStats', user?.id, currentChurchId];
 
   useEffect(() => {
     if (!user?.id || !currentChurchId) return;

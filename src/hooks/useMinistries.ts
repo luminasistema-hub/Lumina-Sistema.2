@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../integrations/supabase/client'
 import { useAuthStore } from '../stores/authStore'
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 
 export interface Ministry {
   id: string;
@@ -72,7 +72,7 @@ export const useMinistries = () => {
   const { currentChurchId } = useAuthStore()
   const queryClient = useQueryClient()
 
-  const queryKey = useMemo(() => ['ministries', currentChurchId], [currentChurchId]);
+  const queryKey = ['ministries', currentChurchId]
 
   useEffect(() => {
     if (!currentChurchId) return

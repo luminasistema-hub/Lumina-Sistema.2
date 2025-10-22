@@ -1,7 +1,6 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuthStore } from '../stores/authStore';
-import { useEffect, useMemo } from 'react';
 
 export interface PastorAreaItem {
   id: string;
@@ -51,35 +50,8 @@ const fetchPastorItems = async (churchId: string | null, _userId?: string | null
 
 export const usePastorItems = () => {
   const { user, currentChurchId } = useAuthStore();
-  const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ['pastorAreaItems', currentChurchId, user?.id], [currentChurchId, user?.id]);
-
-  useEffect(() => {
-    if (!currentChurchId) return;
-
-    const channel = supabase
-      .channel(`pastor-items-${currentChurchId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'pastor_area_items',
-          filter: `id_igreja=eq.${currentChurchId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentChurchId, queryClient, queryKey]);
-
   return useQuery({
-    queryKey,
+    queryKey: ['pastorAreaItems', currentChurchId, user?.id],
     queryFn: () => fetchPastorItems(currentChurchId, user?.id || null),
     enabled: !!currentChurchId && !!user?.id,
   });
