@@ -1,5 +1,5 @@
 // src/App.tsx
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -9,8 +9,6 @@ import MasterAdminLoginPage from './pages/MasterAdminLoginPage'
 import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage'
 import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
-import EADPortalPage from './pages/EADPortalPage'
-import SchoolDetailsPage from './pages/SchoolDetailsPage'
 import PasswordResetPage from './pages/PasswordResetPage'
 import NewPasswordPage from './pages/NewPasswordPage'
 import NotFound from './pages/NotFound'
@@ -65,6 +63,8 @@ function ProtectedRoute({
 // ----------------------------
 function App() {
   const { user, isLoading, checkAuth, currentChurchId, initializeAuthListener } = useAuthStore()
+  const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     checkAuth()
@@ -73,6 +73,13 @@ function App() {
       if (typeof unsub === 'function') unsub()
     }
   }, [checkAuth, initializeAuthListener])
+
+  // Redirecionar usuário logado para dashboard se estiver em páginas públicas
+  useEffect(() => {
+    if (!isLoading && user && (location.pathname === '/' || location.pathname === '/login')) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, isLoading, location.pathname, navigate])
 
   return (
     <ErrorBoundary>

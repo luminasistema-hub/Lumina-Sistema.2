@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Label } from '../components/ui/label'
 import { toast } from 'sonner'
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 
 const LoginPage = () => {
   const [email, setEmail] = useState('')
@@ -14,6 +14,7 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const { login, isLoading } = useAuthStore()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (searchParams.get('churchId') || searchParams.get('churchName')) {
@@ -34,9 +35,10 @@ const LoginPage = () => {
     const success = await login(email, password);
     if (!success) {
       console.error('LoginPage: Login failed via useAuthStore.login().');
-      // A toast de erro já é tratada dentro do método login, se necessário
     } else {
       console.log('LoginPage: Login successful via useAuthStore.login().');
+      toast.success('Login realizado com sucesso!')
+      navigate('/dashboard')
     }
   }
 
@@ -54,7 +56,6 @@ const LoginPage = () => {
             <CardDescription className="text-base">
               Entre em sua conta
             </CardDescription>
-            {/* O Badge "Sistema em Produção" foi removido daqui */}
           </CardHeader>
           
           <CardContent>
@@ -115,7 +116,6 @@ const LoginPage = () => {
             </form>
 
             <div className="mt-6 text-center">
-              {/* Link de cadastro foi substituído pelo de recuperar senha */}
               <Link
                 to="/recuperar-senha"
                 className="text-sm text-blue-600 hover:text-blue-800 font-medium"
