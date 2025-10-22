@@ -128,6 +128,15 @@ export const useAuthStore = create<AuthState>()(
               // Nome da igreja calculado com segurança
               let resolvedChurchName: string | undefined = undefined;
 
+              // Gate de aprovação: somente usuários 'ativo' acessam (exceto admin/super_admin)
+              if ((profile.status as string) !== 'ativo' && profile.funcao !== 'super_admin' && profile.funcao !== 'admin') {
+                toast.error('Seu cadastro está aguardando aprovação de um líder.');
+                await supabase.auth.signOut();
+                set({ user: null, currentChurchId: null, isLoading: false });
+                isCheckingAuth = false;
+                return;
+              }
+
               // Verifica status de pagamento da igreja quando aplicável
               if (profile.id_igreja) {
                 const mensalidade = Number(churchRow?.valor_mensal_assinatura ?? 0);

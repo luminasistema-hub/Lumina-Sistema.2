@@ -91,6 +91,11 @@ const MemberManagementPage = () => {
     return user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'integra'
   }, [user?.role])
 
+  // Novo: quem pode aprovar (admin, pastor, líder de ministério, integra, super_admin)
+  const canApprove = useMemo(() => {
+    return ['admin', 'pastor', 'lider_ministerio', 'integra', 'super_admin'].includes(user?.role || '')
+  }, [user?.role])
+
   const [newMember, setNewMember] = useState({
     name: '',
     email: '',
@@ -226,6 +231,25 @@ const MemberManagementPage = () => {
     }
   });
 
+  // Novo: aprovação de membro (atualiza status para 'ativo')
+  const approveMemberMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      const { error } = await supabase
+        .from('membros')
+        .update({ status: 'ativo' })
+        .eq('id', memberId);
+      if (error) throw error;
+    },
+    onSuccess: (_, memberId) => {
+      toast.success('Membro aprovado com sucesso!');
+      trackEvent('approve_member', { memberId });
+      queryClient.invalidateQueries({ queryKey: ['members', currentChurchId] });
+    },
+    onError: (error: any) => {
+      toast.error('Erro ao aprovar membro: ' + error.message);
+    }
+  });
+
   const deleteMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
       if (!currentChurchId) throw new Error('Nenhuma igreja ativa selecionada.');
@@ -251,6 +275,11 @@ const MemberManagementPage = () => {
       editMemberMutation.mutate({ memberId: selectedMember.id, data: editMemberData });
     }
   }, [selectedMember, editMemberData, editMemberMutation]);
+
+  // Novo: handler de aprovação
+  const handleApproveMember = useCallback((memberId: string) => {
+    approveMemberMutation.mutate(memberId);
+  }, [approveMemberMutation]);
 
   const handleDeleteMember = useCallback((memberId: string) => {
     if (confirm('Tem certeza que deseja remover este usuário? Esta ação é irreversível.')) {
@@ -704,6 +733,16 @@ const MemberManagementPage = () => {
                   <Button variant="outline" size="sm" onClick={() => setSelectedMember(member)}>
                     <Eye className="w-4 h-4 mr-2" />Ver Perfil
                   </Button>
+                  {(canApprove && member.status === 'pendente') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-green-600"
+                      onClick={() => handleApproveMember(member.id)}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />Aprovar
+                    </Button>
+                  )}
                   {(canManageMembers || member.id === user?.id) && (
                     <Button variant="outline" size="sm" onClick={() => handleOpenEditMemberDialog(member)}>
                       <Edit className="w-4 h-4 mr-2" />Editar
