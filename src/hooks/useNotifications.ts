@@ -17,7 +17,7 @@ export const useNotifications = () => {
         .from('notificacoes')
         .select('*')
         .eq('id_igreja', currentChurchId)
-        .or(`user_id.eq.${user.id},user_id.is.null`)
+        .or(`membro_id.eq.${user.id},membro_id.is.null`)
         .order('created_at', { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -32,7 +32,7 @@ export const useNotifications = () => {
     mutationFn: async () => {
       if (!user?.id) return;
       const unreadIds = notifications
-        .filter(n => !n.lida && n.user_id === user.id)
+        .filter(n => !n.lida && n.membro_id === user.id)
         .map(n => n.id);
       if (unreadIds.length === 0) return;
 
@@ -40,7 +40,7 @@ export const useNotifications = () => {
         .from('notificacoes')
         .update({ lida: true })
         .in('id', unreadIds)
-        .eq('user_id', user.id);
+        .eq('membro_id', user.id);
       
       if (error) throw new Error(error.message);
     },
@@ -54,13 +54,13 @@ export const useNotifications = () => {
       if (!user?.id) return;
       const target = notifications.find(n => n.id === id);
       if (!target) return;
-      // Evita marcar como lida notificações da igreja (user_id nulo)
-      if (target.user_id !== user.id) return;
+      // Evita marcar como lida notificações da igreja (membro_id nulo)
+      if (target.membro_id !== user.id) return;
       const { error } = await supabase
         .from('notificacoes')
         .update({ lida: true })
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('membro_id', user.id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
