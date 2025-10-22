@@ -21,6 +21,7 @@ import {
 import DescricaoFormatada from '../utils/DescricaoFormatada';
 import JourneyActionDialog from './JourneyActionDialog';
 import { useJourneyData, PassoEtapa } from '../../hooks/useJourneyData';
+import LockedEtapaOverlay from './LockedEtapaOverlay';
 
 const MemberJourney = () => {
   const { user, currentChurchId } = useAuthStore();
@@ -221,6 +222,7 @@ const MemberJourney = () => {
               key={etapa.id} 
               className={`relative ${bgColor} ${isEtapaCompleted ? 'ring-2 ring-green-200' : ''}`}
             >
+              {etapa.isLocked && <LockedEtapaOverlay reason={etapa.lockReason} />}
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
                   <div className="flex flex-col items-center">
@@ -270,6 +272,11 @@ const MemberJourney = () => {
                                   <p className={`font-medium ${passo.completed ? 'text-gray-600 line-through' : 'text-gray-900'}`}>
                                     {passo.titulo}
                                   </p>
+                                  {passo.progress?.quiz_bloqueado && (
+                                    <p className="text-xs text-red-600 font-semibold">
+                                      Bloqueado - Fale com um líder
+                                    </p>
+                                  )}
                                   {passo.completedDate && (
                                     <p className="text-xs text-gray-500">
                                       Concluído em {new Date(passo.completedDate).toLocaleDateString('pt-BR')}
@@ -281,8 +288,9 @@ const MemberJourney = () => {
                                 <Button 
                                   size="sm" 
                                   onClick={() => handleOpenActionDialog(passo)}
+                                  disabled={etapa.isLocked || passo.progress?.quiz_bloqueado}
                                 >
-                                  Começar Agora
+                                  {passo.progress?.quiz_bloqueado ? 'Bloqueado' : 'Começar Agora'}
                                 </Button>
                               )}
                             </li>

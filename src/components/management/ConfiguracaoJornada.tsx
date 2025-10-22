@@ -16,6 +16,7 @@ import { SortableEtapaItem } from './SortableEtapaItem';
 import { SortablePassoItem } from './SortablePassoItem';
 import CreateTrilhaDialog from './CreateTrilhaDialog';
 import MembersManagementCard from './MembersManagementCard';
+import { useSchools, School } from '../../hooks/useSchools';
 
 interface QuizPergunta {
   id?: string;
@@ -36,6 +37,7 @@ interface PassoEtapa {
   conteudo?: string;
   created_at: string;
   quiz_perguntas?: QuizPergunta[];
+  nota_de_corte_quiz?: number;
 }
 
 interface EtapaTrilha {
@@ -47,6 +49,7 @@ interface EtapaTrilha {
   cor: string;
   created_at: string;
   passos: PassoEtapa[];
+  escola_pre_requisito_id?: string | null;
 }
 
 const ConfiguracaoJornada = () => {
@@ -56,12 +59,16 @@ const ConfiguracaoJornada = () => {
   const [etapaAberta, setEtapaAberta] = useState<string | null>(null);
   const [trilhaAtual, setTrilhaAtual] = useState<{ id: string; titulo: string; descricao: string } | null>(null);
 
+  const { data: schoolsData } = useSchools();
+  const availableSchools = schoolsData || [];
+
   const [isEtapaModalOpen, setIsEtapaModalOpen] = useState(false);
   const [etapaParaEditar, setEtapaParaEditar] = useState<EtapaTrilha | null>(null);
   const [formEtapaData, setFormEtapaData] = useState<Partial<EtapaTrilha>>({
     titulo: '',
     descricao: '',
     cor: '#e0f2fe',
+    escola_pre_requisito_id: null,
   });
 
   const [isPassoModalOpen, setIsPassoModalOpen] = useState(false);
@@ -71,6 +78,7 @@ const ConfiguracaoJornada = () => {
     tipo_passo: 'leitura',
     conteudo: '',
     quiz_perguntas: [],
+    nota_de_corte_quiz: 70,
   });
 
   const [isCreateTrilhaOpen, setIsCreateTrilhaOpen] = useState(false);
@@ -111,7 +119,7 @@ const ConfiguracaoJornada = () => {
       const { data: trilhaData, error } = await supabase
         .from('trilhas_crescimento')
         .select(`
-          id, titulo, descricao,
+          id, titulo, descricao, escola_pre_requisito_id,
           etapas_trilha (
             *,
             passos_etapa (
@@ -166,6 +174,7 @@ const ConfiguracaoJornada = () => {
       titulo: '',
       descricao: '',
       cor: '#e0f2fe',
+      escola_pre_requisito_id: null,
     });
     setIsEtapaModalOpen(true);
   };
@@ -176,6 +185,7 @@ const ConfiguracaoJornada = () => {
       titulo: etapa.titulo,
       descricao: etapa.descricao,
       cor: etapa.cor,
+      escola_pre_requisito_id: etapa.escola_pre_requisito_id,
     });
     setIsEtapaModalOpen(true);
   };
@@ -206,6 +216,7 @@ const ConfiguracaoJornada = () => {
             titulo: formEtapaData.titulo,
             descricao: formEtapaData.descricao,
             cor: formEtapaData.cor,
+            escola_pre_requisito_id: formEtapaData.escola_pre_requisito_id,
           })
           .eq('id', etapaParaEditar.id);
 
@@ -222,6 +233,7 @@ const ConfiguracaoJornada = () => {
             descricao: formEtapaData.descricao,
             cor: formEtapaData.cor,
             id_igreja: currentChurchId,
+            escola_pre_requisito_id: formEtapaData.escola_pre_requisito_id,
           });
 
         if (error) throw error;
@@ -266,6 +278,7 @@ const ConfiguracaoJornada = () => {
       tipo_passo: 'leitura',
       conteudo: '',
       quiz_perguntas: [],
+      nota_de_corte_quiz: 70,
       ordem: etapa.passos.length > 0 ? Math.max(...etapa.passos.map(p => p.ordem)) + 1 : 1,
     });
     setIsPassoModalOpen(true);
@@ -281,6 +294,7 @@ const ConfiguracaoJornada = () => {
       conteudo: passo.conteudo,
       ordem: passo.ordem,
       quiz_perguntas: passo.tipo_passo === 'quiz' ? (passo.quiz_perguntas || []) : [],
+      nota_de_corte_quiz: passo.nota_de_corte_quiz || 70,
     });
     setIsPassoModalOpen(true);
   };
@@ -334,6 +348,7 @@ const ConfiguracaoJornada = () => {
             titulo: passoDataToSave.titulo,
             tipo_passo: passoDataToSave.tipo_passo,
             conteudo: passoDataToSave.conteudo,
+            nota_de_corte_quiz: passoDataToSave.tipo_passo === 'quiz' ? passoDataToSave.nota_de_corte_quiz : null,
           })
           .eq('id', passoDataToSave.id)
           .select('id')
@@ -353,6 +368,7 @@ const ConfiguracaoJornada = () => {
             tipo_passo: passoDataToSave.tipo_passo,
             conteudo: passoDataToSave.conteudo,
             id_igreja: currentChurchId,
+            nota_de_corte_quiz: passoDataToSave.tipo_passo === 'quiz' ? passoDataToSave.nota_de_corte_quiz : null,
           })
           .select('id')
           .maybeSingle();
@@ -711,6 +727,25 @@ const ConfiguracaoJornada = () => {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="etapa-escola-requisito">Escola como Pré-requisito (Opcional)</Label>
+              <Select
+                value={formEtapaData.escola_pre_requisito_id || ''}
+                onValueChange={(value) => setFormEtapaData({...formEtapaData, escola_pre_requisito_id: value || null})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhuma escola como requisito" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhuma</SelectItem>
+                  {availableSchools.map((school: School) => (
+                    <SelectItem key={school.id} value={school.id}>
+                      {school.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="etapa-cor">Cor da Etapa</Label>
               <Select
                 value={formEtapaData.cor}
@@ -805,74 +840,88 @@ const ConfiguracaoJornada = () => {
             )}
 
             {formPassoData.tipo_passo === 'quiz' && (
-              <div className="space-y-4 border p-4 rounded-lg bg-gray-50">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <HelpCircle className="w-5 h-5 text-purple-500" />
-                  Perguntas do Quiz ({formPassoData.quiz_perguntas?.length || 0}/10)
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Cadastre até 10 perguntas de múltipla escolha. A nota final será de 0 a 10.
-                </p>
-                
-                {(formPassoData.quiz_perguntas || []).map((q, qIndex) => (
-                  <Card key={qIndex} className="p-4 space-y-3 border-l-4 border-purple-200 bg-white">
-                    <div className="flex justify-between items-center">
-                      <Label className="font-bold">Pergunta {qIndex + 1}</Label>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeQuizQuestion(qIndex)}>
-                        <X className="w-4 h-4 text-red-500" />
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`pergunta-texto-${qIndex}`}>Texto da Pergunta *</Label>
-                      <Input
-                        id={`pergunta-texto-${qIndex}`}
-                        value={q.pergunta_texto}
-                        onChange={(e) => updateQuizQuestion(qIndex, 'pergunta_texto', e.target.value)}
-                        placeholder="Qual é a capital do Brasil?"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Opções de Resposta * (Mínimo 2)</Label>
-                      {(q.opcoes || []).map((opcao, oIndex) => (
-                        <div key={oIndex} className="flex items-center gap-2">
-                          <Input
-                            value={opcao}
-                            onChange={(e) => updateQuizOption(qIndex, oIndex, e.target.value)}
-                            placeholder={`Opção ${oIndex + 1}`}
-                          />
-                          <input
-                            type="radio"
-                            name={`correct-option-${qIndex}`}
-                            checked={q.resposta_correta === oIndex}
-                            onChange={() => updateQuizQuestion(qIndex, 'resposta_correta', oIndex)}
-                            className="form-radio h-4 w-4 text-purple-600 focus:ring-purple-500"
-                          />
-                          <Label htmlFor={`correct-option-${qIndex}`} className="text-xs">Correta</Label>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeQuizOption(qIndex, oIndex)}>
-                            <X className="w-3 h-3 text-gray-500" />
-                          </Button>
-                        </div>
-                      ))}
-                      {q.opcoes.length < 5 && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => updateQuizQuestion(qIndex, 'opcoes', [...q.opcoes, ''])}
-                        >
-                          + Adicionar Opção
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="passo-nota-corte">Nota Mínima de Aprovação (%)</Label>
+                  <Input
+                    id="passo-nota-corte"
+                    type="number"
+                    value={formPassoData.nota_de_corte_quiz || 70}
+                    onChange={(e) => setFormPassoData({...formPassoData, nota_de_corte_quiz: parseInt(e.target.value)})}
+                    placeholder="Ex: 70"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+                <div className="space-y-4 border p-4 rounded-lg bg-gray-50">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <HelpCircle className="w-5 h-5 text-purple-500" />
+                    Perguntas do Quiz ({formPassoData.quiz_perguntas?.length || 0}/10)
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Cadastre até 10 perguntas de múltipla escolha. A nota final será de 0 a 10.
+                  </p>
+                  
+                  {(formPassoData.quiz_perguntas || []).map((q, qIndex) => (
+                    <Card key={qIndex} className="p-4 space-y-3 border-l-4 border-purple-200 bg-white">
+                      <div className="flex justify-between items-center">
+                        <Label className="font-bold">Pergunta {qIndex + 1}</Label>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeQuizQuestion(qIndex)}>
+                          <X className="w-4 h-4 text-red-500" />
                         </Button>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-                
-                {((formPassoData.quiz_perguntas?.length || 0) < 10) && (
-                  <Button variant="outline" className="w-full mt-4" onClick={addQuizQuestion}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Pergunta
-                  </Button>
-                )}
-              </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`pergunta-texto-${qIndex}`}>Texto da Pergunta *</Label>
+                        <Input
+                          id={`pergunta-texto-${qIndex}`}
+                          value={q.pergunta_texto}
+                          onChange={(e) => updateQuizQuestion(qIndex, 'pergunta_texto', e.target.value)}
+                          placeholder="Qual é a capital do Brasil?"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Opções de Resposta * (Mínimo 2)</Label>
+                        {(q.opcoes || []).map((opcao, oIndex) => (
+                          <div key={oIndex} className="flex items-center gap-2">
+                            <Input
+                              value={opcao}
+                              onChange={(e) => updateQuizOption(qIndex, oIndex, e.target.value)}
+                              placeholder={`Opção ${oIndex + 1}`}
+                            />
+                            <input
+                              type="radio"
+                              name={`correct-option-${qIndex}`}
+                              checked={q.resposta_correta === oIndex}
+                              onChange={() => updateQuizQuestion(qIndex, 'resposta_correta', oIndex)}
+                              className="form-radio h-4 w-4 text-purple-600 focus:ring-purple-500"
+                            />
+                            <Label htmlFor={`correct-option-${qIndex}`} className="text-xs">Correta</Label>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeQuizOption(qIndex, oIndex)}>
+                              <X className="w-3 h-3 text-gray-500" />
+                            </Button>
+                          </div>
+                        ))}
+                        {q.opcoes.length < 5 && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => updateQuizQuestion(qIndex, 'opcoes', [...q.opcoes, ''])}
+                          >
+                            + Adicionar Opção
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                  
+                  {((formPassoData.quiz_perguntas?.length || 0) < 10) && (
+                    <Button variant="outline" className="w-full mt-4" onClick={addQuizQuestion}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar Pergunta
+                    </Button>
+                  )}
+                </div>
+              </>
             )}
           </div>
           <div className="flex justify-end gap-2 mt-4">

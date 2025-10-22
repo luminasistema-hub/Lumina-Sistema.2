@@ -37,6 +37,9 @@ const QuizComponent = ({ passo, onQuizComplete }: { passo: PassoEtapa; onQuizCom
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const questions = passo.quiz_perguntas || [];
+  const requiredScore = passo.nota_de_corte_quiz || 70;
+  const attempts = passo.progress?.tentativas_quiz || 0;
+  const maxAttempts = 3;
 
   const handleAnswerChange = (qIndex: number, oIndex: number) => {
     if (submitted) return;
@@ -53,14 +56,41 @@ const QuizComponent = ({ passo, onQuizComplete }: { passo: PassoEtapa; onQuizCom
     const finalScore = (correctAnswers / questions.length) * 100;
     setScore(finalScore);
     setSubmitted(true);
-    toast.success(`Você acertou ${correctAnswers} de ${questions.length}!`);
-    onQuizComplete({ score: finalScore, answers });
+    
+    const passed = finalScore >= requiredScore;
+    if (passed) {
+      toast.success(`Você acertou ${correctAnswers} de ${questions.length}! Pontuação: ${finalScore.toFixed(0)}%`);
+    } else {
+      toast.warning(`Você acertou ${correctAnswers} de ${questions.length}. Pontuação: ${finalScore.toFixed(0)}%. Mínimo necessário: ${requiredScore}%`);
+    }
+
+    onQuizComplete({ score: finalScore, answers, passed });
   };
 
   const allAnswered = Object.keys(answers).length === questions.length;
+  const isBlocked = passo.progress?.quiz_bloqueado || false;
+
+  if (isBlocked) {
+    return (
+      <div className="text-center p-4 bg-red-100 border border-red-300 rounded-lg">
+        <h3 className="text-xl font-bold text-red-800">Quiz Bloqueado</h3>
+        <p className="text-red-700 mt-2">
+          Você atingiu o número máximo de tentativas. Por favor, entre em contato com um líder da sua igreja para que ele possa revisar seu progresso e liberar um novo acesso.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 text-center">
+        <p className="text-sm text-blue-800">
+          Nota mínima para aprovação: <span className="font-bold">{requiredScore}%</span>
+        </p>
+        <p className="text-xs text-blue-700">
+          Tentativas restantes: {Math.max(0, maxAttempts - attempts)}
+        </p>
+      </div>
       {questions.map((q, qIndex) => (
         <div key={q.id || qIndex} className="p-4 border rounded-lg">
           <p className="font-semibold mb-3">{qIndex + 1}. {q.pergunta_texto}</p>
@@ -84,8 +114,15 @@ const QuizComponent = ({ passo, onQuizComplete }: { passo: PassoEtapa; onQuizCom
       {submitted && (
         <div className="text-center p-4 bg-gray-100 rounded-lg">
           <h3 className="text-xl font-bold">Resultado do Quiz</h3>
-          <p className="text-2xl font-semibold">{score.toFixed(0)}%</p>
-          <Progress value={score} className="mt-2" />
+          <p className={`text-2xl font-semibold ${score >= requiredScore ? 'text-green-600' : 'text-red-600'}`}>
+            {score.toFixed(0)}%
+          </p>
+          <Progress 
+            value={score} 
+            className="mt-2" 
+            indicatorClassName={score >= requiredScore ? 'bg-green-500' : 'bg-red-500'}
+          />
+          {score < requiredScore && <p className="text-sm text-red-600 mt-2">Você não atingiu a nota mínima.</p>}
         </div>
       )}
     </div>
@@ -184,7 +221,8 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
   };
 
   const isQuiz = passo.tipo_passo === 'quiz';
-  const canComplete = !isQuiz || (isQuiz && quizDetails !== null);
+  const isBlocked = passo.progress?.quiz_bloqueado || false;
+  const canComplete = !isBlocked && (!isQuiz || (isQuiz && quizDetails !== null));
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
