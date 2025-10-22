@@ -21,94 +21,16 @@ import {
   Trash2,
   FileText,
   Upload,
-  Youtube
+  Youtube,
+  Loader2
 } from 'lucide-react'
-import { supabase } from '../../integrations/supabase/client'
-
-type StatusCurso = 'Rascunho' | 'Ativo' | 'Pausado' | 'Finalizado'
-type TipoCurso = 'Presencial' | 'Online' | 'Híbrido'
-type CategoriaCurso = 'Discipulado' | 'Liderança' | 'Teologia' | 'Ministério' | 'Evangelismo'
-type NivelCurso = 'Básico' | 'Intermediário' | 'Avançado'
-
-interface Course {
-  id: string
-  nome: string
-  descricao: string
-  tipo: TipoCurso
-  categoria: CategoriaCurso
-  nivel: NivelCurso | null
-  professor: {
-    id: string | null
-    nome: string | null
-    email: string | null
-  }
-  duracao_horas: number | null
-  status: StatusCurso
-  data_inicio: string | null
-  data_fim: string | null
-  certificado_disponivel: boolean
-  nota_minima_aprovacao: number | null
-  valor?: number | null
-  modulos: CourseModule[]
-  alunos_inscritos: Student[]
-}
-
-interface CourseModule {
-  id: string
-  titulo: string
-  descricao: string | null
-  ordem: number
-  aulas: Lesson[]
-  avaliacoes: Assessment[]
-}
-
-interface Lesson {
-  id: string
-  titulo: string
-  descricao: string | null
-  tipo: 'Video' | 'Texto' | 'PDF' | 'Quiz'
-  conteudo: string | null
-  duracao_minutos: number | null
-  obrigatoria: boolean | null
-  ordem: number
-}
-
-interface Assessment {
-  id: string
-  titulo: string
-  tipo: 'Quiz' | 'Dissertativa' | 'Prática'
-  perguntas: Question[]
-  nota_maxima: number
-  tentativas_permitidas: number
-}
-
-interface Question {
-  id: string
-  pergunta: string
-  tipo: 'Múltipla Escolha' | 'Verdadeiro/Falso' | 'Dissertativa'
-  opcoes?: string[]
-  resposta_correta?: string | number
-  pontos: number
-}
-
-interface Student {
-  id: string
-  nome: string
-  email: string
-  data_inscricao: string
-  progresso: number
-  certificado_emitido: boolean
-  aulas_assistidas: string[]
-  avaliacoes_respondidas: Array<{
-    avaliacao_id: string
-    nota: number
-    data_resposta: string
-  }>
-}
+import { useCourses, useCreateCourse, Course, StatusCurso, TipoCurso, CategoriaCurso, NivelCurso } from '../../hooks/useCourses'
 
 const CoursesPage = () => {
-  const { user, currentChurchId } = useAuthStore()
-  const [courses, setCourses] = useState<Course[]>([])
+  const { user } = useAuthStore()
+  const { data: courses = [], isLoading, error } = useCourses()
+  const createCourseMutation = useCreateCourse()
+
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'student' | 'teacher' | 'admin'>('student')
@@ -141,186 +63,36 @@ const CoursesPage = () => {
     }
   }, [canManageCourses, canTeach])
 
-  // Carregar cursos reais da igreja
   useEffect(() => {
-    const loadCourses = async () => {
-      if (!user || !currentChurchId) return
-      const { data, error } = await supabase
-        .from('cursos')
-        .select(`
-          id, id_igreja, nome, descricao, tipo, categoria, nivel, professor_id, duracao_horas, status, data_inicio, data_fim, certificado_disponivel, nota_minima_aprovacao, valor
-        `)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) {
-        console.error('Erro ao carregar cursos:', error.message)
-        toast.error('Erro ao carregar cursos.')
-        return
-      }
-
-      // Carregar módulos e aulas para cada curso
-      const coursesWithChildren: Course[] = []
-      for (const c of data || []) {
-        const { data: modulos } = await supabase
-          .from('cursos_modulos')
-          .select(`id, id_curso, titulo, descricao, ordem`)
-          .eq('id_curso', c.id)
-          .order('ordem', { ascending: true })
-
-        const modules: CourseModule[] = []
-        for (const m of modulos || []) {
-          const { data: aulas } = await supabase
-            .from('cursos_aulas')
-            .select(`id, id_modulo, titulo, tipo, conteudo, duracao_minutos, obrigatoria, ordem, descricao`)
-            .eq('id_modulo', m.id)
-            .order('ordem', { ascending: true })
-
-          modules.push({
-            id: m.id,
-            titulo: m.titulo,
-            descricao: m.descricao,
-            ordem: m.ordem,
-            aulas: (aulas || []).map(a => ({
-              id: a.id,
-              titulo: a.titulo,
-              descricao: a.descricao || null,
-              tipo: (a.tipo === 'video' || a.tipo === 'Video') ? 'Video' : (a.tipo === 'Texto' ? 'Texto' : (a.tipo === 'PDF' ? 'PDF' : 'Quiz')),
-              conteudo: a.conteudo || null,
-              duracao_minutos: a.duracao_minutos ?? null,
-              obrigatoria: a.obrigatoria ?? null,
-              ordem: a.ordem
-            })),
-            avaliacoes: [] // manter vazio por agora
-          })
-        }
-
-        // Professor: pode vir nulo
-        const professor = { id: c.professor_id || null, nome: null, email: null }
-        // Opcional: buscar info do professor em 'membros'
-        if (c.professor_id) {
-          const { data: profData } = await supabase
-            .from('membros')
-            .select('id, nome_completo, email')
-            .eq('id', c.professor_id)
-            .maybeSingle()
-          if (profData) {
-            professor.nome = profData.nome_completo
-            professor.email = profData.email
-          }
-        }
-
-        coursesWithChildren.push({
-          id: c.id,
-          nome: c.nome,
-          descricao: c.descricao || '',
-          tipo: c.tipo as TipoCurso,
-          categoria: (c.categoria || 'Discipulado') as CategoriaCurso,
-          nivel: (c.nivel || 'Básico') as NivelCurso,
-          professor,
-          duracao_horas: c.duracao_horas ?? 0,
-          status: (c.status || 'Rascunho') as StatusCurso,
-          data_inicio: c.data_inicio || null,
-          data_fim: c.data_fim || null,
-          certificado_disponivel: !!c.certificado_disponivel,
-          nota_minima_aprovacao: c.nota_minima_aprovacao ?? 70,
-          valor: c.valor ?? 0,
-          modulos: modules,
-          alunos_inscritos: [] // manter vazio por agora
-        })
-      }
-
-      setCourses(coursesWithChildren)
+    if (error) {
+      toast.error(`Erro ao carregar cursos: ${error.message}`)
     }
-
-    loadCourses()
-  }, [user, currentChurchId])
+  }, [error])
 
   const handleCreateCourse = async () => {
     if (!newCourse.nome || !newCourse.descricao) {
       toast.error('Preencha os campos obrigatórios')
       return
     }
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
-    }
 
-    const { data, error } = await supabase
-      .from('cursos')
-      .insert({
-        id_igreja: currentChurchId,
-        nome: newCourse.nome,
-        descricao: newCourse.descricao,
-        tipo: newCourse.tipo || 'Online',
-        categoria: newCourse.categoria || 'Discipulado',
-        nivel: newCourse.nivel || 'Básico',
-        professor_id: user?.id || null,
-        duracao_horas: newCourse.duracao_horas || 0,
-        status: 'Rascunho',
-        data_inicio: newCourse.data_inicio || null,
-        data_fim: newCourse.data_fim || null,
-        certificado_disponivel: newCourse.certificado_disponivel ?? true,
-        nota_minima_aprovacao: newCourse.nota_minima_aprovacao ?? 70,
-        valor: newCourse.valor ?? 0
-      })
-      .select('id')
-      .maybeSingle()
-
-    if (error) {
-      console.error('Erro ao criar curso:', error.message)
-      toast.error('Erro ao criar curso.')
-      return
-    }
-
-    toast.success('Curso criado com sucesso!')
-    setIsCreateDialogOpen(false)
-    setNewCourse({
-      nome: '',
-      descricao: '',
-      tipo: 'Online',
-      categoria: 'Discipulado',
-      nivel: 'Básico',
-      duracao_horas: 0,
-      status: 'Rascunho',
-      modulos: [],
-      alunos_inscritos: [],
-      certificado_disponivel: true,
-      nota_minima_aprovacao: 70
-    })
-    // Recarregar cursos
-    if (data?.id) {
-      const { data: c } = await supabase
-        .from('cursos')
-        .select(`
-          id, id_igreja, nome, descricao, tipo, categoria, nivel, professor_id, duracao_horas, status, data_inicio, data_fim, certificado_disponivel, nota_minima_aprovacao, valor
-        `)
-        .eq('id', data.id)
-        .maybeSingle()
-
-      if (c) {
-        setCourses(prev => [
-          ...prev,
-          {
-            id: c.id,
-            nome: c.nome,
-            descricao: c.descricao || '',
-            tipo: c.tipo as TipoCurso,
-            categoria: (c.categoria || 'Discipulado') as CategoriaCurso,
-            nivel: (c.nivel || 'Básico') as NivelCurso,
-            professor: { id: c.professor_id || null, nome: user?.name || null, email: user?.email || null },
-            duracao_horas: c.duracao_horas ?? 0,
-            status: (c.status || 'Rascunho') as StatusCurso,
-            data_inicio: c.data_inicio || null,
-            data_fim: c.data_fim || null,
-            certificado_disponivel: !!c.certificado_disponivel,
-            nota_minima_aprovacao: c.nota_minima_aprovacao ?? 70,
-            valor: c.valor ?? 0,
-            modulos: [],
-            alunos_inscritos: []
-          }
-        ])
+    createCourseMutation.mutate(newCourse, {
+      onSuccess: () => {
+        setIsCreateDialogOpen(false)
+        setNewCourse({
+          nome: '',
+          descricao: '',
+          tipo: 'Online',
+          categoria: 'Discipulado',
+          nivel: 'Básico',
+          duracao_horas: 0,
+          status: 'Rascunho',
+          modulos: [],
+          alunos_inscritos: [],
+          certificado_disponivel: true,
+          nota_minima_aprovacao: 70
+        })
       }
-    }
+    })
   }
 
   const getYouTubeVideoId = (url: string) => {
@@ -501,8 +273,8 @@ const CoursesPage = () => {
                     <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreateCourse}>
-                      Criar Curso
+                    <Button onClick={handleCreateCourse} disabled={createCourseMutation.isPending}>
+                      {createCourseMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar Curso'}
                     </Button>
                   </div>
                 </div>
@@ -512,6 +284,7 @@ const CoursesPage = () => {
         </div>
 
         <TabsContent value="student" className="space-y-4 md:space-y-6">
+          {isLoading && <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin" /></div>}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {activeCourses.map((course) => (
               <Card key={course.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
@@ -574,6 +347,7 @@ const CoursesPage = () => {
 
         {canTeach && (
           <TabsContent value="teacher" className="space-y-6">
+            {isLoading && <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin" /></div>}
             <div className="grid gap-6">
               {courses.filter(course => course.professor.id === user?.id).map((course) => (
                 <Card key={course.id} className="border-0 shadow-sm">
@@ -642,6 +416,7 @@ const CoursesPage = () => {
 
         {canManageCourses && (
           <TabsContent value="admin" className="space-y-6">
+            {isLoading && <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin" /></div>}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-4 text-center">
