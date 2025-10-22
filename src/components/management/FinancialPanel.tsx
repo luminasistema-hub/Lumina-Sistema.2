@@ -263,56 +263,48 @@ const FinancialPanel = () => {
 
     setLoadingData(true)
     try {
-      // Load Transactions
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from('transacoes_financeiras')
-        .select('*')
-        .eq('id_igreja', currentChurchId)
-        .order('data_transacao', { ascending: false })
+      const [
+        { data: transactionsData, error: transactionsError },
+        { data: notificationsData, error: notificationsError },
+        { data: budgetsData, error: budgetsError },
+        { data: membersData, error: membersError }
+      ] = await Promise.all([
+        supabase
+          .from('transacoes_financeiras')
+          .select('*')
+          .eq('id_igreja', currentChurchId)
+          .order('data_transacao', { ascending: false }),
+        supabase
+          .from('eventos_aplicacao')
+          .select('*')
+          .eq('church_id', currentChurchId)
+          .eq('event_name', 'nova_contribuicao_pendente')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orcamentos')
+          .select('*')
+          .eq('id_igreja', currentChurchId)
+          .order('mes_ano', { ascending: false }),
+        supabase
+          .from('membros')
+          .select('id, nome_completo')
+          .eq('id_igreja', currentChurchId)
+          .order('nome_completo', { ascending: true })
+      ]);
 
-      if (transactionsError) throw transactionsError
-      setTransactions(transactionsData as FinancialTransaction[])
+      if (transactionsError) throw transactionsError;
+      if (notificationsError) console.error('Error loading notifications:', notificationsError);
+      if (budgetsError) throw budgetsError;
+      if (membersError) console.error('Error loading members:', membersError);
 
-      // Load pending contributions notifications
-      const { data: notificationsData, error: notificationsError } = await supabase
-        .from('eventos_aplicacao')
-        .select('*')
-        .eq('church_id', currentChurchId)
-        .eq('event_name', 'nova_contribuicao_pendente')
-        .order('created_at', { ascending: false })
-
-      if (notificationsError) {
-        console.error('Error loading notifications:', notificationsError)
-      }
-      setPendingNotifications(notificationsData || [])
-
-      // Load Budgets
-      const { data: budgetsData, error: budgetsError } = await supabase
-        .from('orcamentos')
-        .select('*')
-        .eq('id_igreja', currentChurchId)
-        .order('mes_ano', { ascending: false })
-
-      if (budgetsError) throw budgetsError
-      setBudgets(budgetsData.map(b => ({
+      setTransactions((transactionsData as FinancialTransaction[]) || []);
+      setPendingNotifications(notificationsData || []);
+      setBudgets((budgetsData || []).map(b => ({
         ...b,
         valor_disponivel: b.valor_orcado - b.valor_gasto
-      })) as Budget[])
-
-      // Load Members (para filtros e vínculo em lançamentos)
-      const { data: membersData, error: membersError } = await supabase
-        .from('membros')
-        .select('id, nome_completo')
-        .eq('id_igreja', currentChurchId)
-        .order('nome_completo', { ascending: true })
-      if (membersError) {
-        console.error('Error loading members:', membersError)
-      } else {
-        setMembers(membersData || [])
-      }
-
-      // Load Reports
-      setReports([])
+      })) as Budget[]);
+      setMembers(membersData || []);
+      setReports([]);
 
     } catch (error: any) {
       console.error('Error loading financial data:', error.message)
