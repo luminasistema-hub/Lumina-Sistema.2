@@ -447,7 +447,7 @@ const LandingPage = () => {
             </div>
             <div className="flex items-center gap-3">
               <Mail className="h-4 w-4 text-primary-foreground/80" />
-              <a href="mailto:Luminasistema@gmail.com.br" className="text-sm hover:text-primary-foreground">Luminasistema@gmail.com.br</a>
+              <a href="mailto:contato@luminasistema.com.br" className="text-sm hover:text-primary-foreground">contato@luminasistema.com.br</a>
             </div>
             <div className="flex items-center gap-3">
               <Globe className="h-4 w-4 text-primary-foreground/80" />
