@@ -77,7 +77,22 @@ serve(async (req) => {
     });
   }
 
-  const { data: members, error: mErr } = await admin
+  const search: string | null = body?.search ?? null;
+  const role: string | null = body?.role ?? null;
+  const status: string | null = body?.status ?? null;
+  const ministry: string | null = body?.ministry ?? null;
+  const birthdayMonth: boolean = !!body?.birthday_month;
+  const weddingMonth: boolean = !!body?.wedding_month;
+
+  // Calcula range do mês atual para data_nascimento/data_casamento
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-11
+  const startOfMonth = new Date(year, month, 1);
+  const endOfMonth = new Date(year, month + 1, 0);
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  let query = admin
     .from("membros")
     .select(`
       id, id_igreja, funcao, perfil_completo, nome_completo, status, created_at, email, ultimo_teste_data, ministerio_recomendado, extra_permissoes,
@@ -87,8 +102,38 @@ serve(async (req) => {
         dias_disponiveis, horarios_disponiveis
       )
     `)
-    .eq("id_igreja", targetChurchId)
-    .order("nome_completo", { ascending: true });
+    .eq("id_igreja", targetChurchId);
+
+  if (role) {
+    query = query.eq("funcao", role);
+  }
+  if (status) {
+    query = query.eq("status", status);
+  }
+  if (ministry) {
+    query = query.ilike("ministerio_recomendado", `%${ministry}%`);
+  }
+  if (birthdayMonth) {
+    query = query
+      .gte("informacoes_pessoais.data_nascimento", fmt(startOfMonth))
+      .lte("informacoes_pessoais.data_nascimento", fmt(endOfMonth));
+  }
+  if (weddingMonth) {
+    query = query
+      .gte("informacoes_pessoais.data_casamento", fmt(startOfMonth))
+      .lte("informacoes_pessoais.data_casamento", fmt(endOfMonth));
+  }
+  if (search) {
+    const term = search.replace(/%/g, "").trim();
+    if (term.length > 0) {
+      // Busca em nome, email e telefone do relacionamento
+      query = query.or(
+        `nome_completo.ilike.%${term}%,email.ilike.%${term}%,informacoes_pessoais.telefone.ilike.%${term}%`
+      );
+    }
+  }
+
+  const { data: members, error: mErr } = await query.order("nome_completo", { ascending: true });
 
   if (mErr) {
     return new Response(JSON.stringify({ error: mErr.message }), {
