@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 export interface MyMinistry {
   id: string;
@@ -89,6 +91,32 @@ export const useMyMinistry = (selectedMinistryId: string | null) => {
     queryFn: () => fetchMyAssignments(user!.id, selectedMinistryId!),
     enabled: !!user?.id && !!selectedMinistryId,
   });
+
+  useEffect(() => {
+    if (!user?.id || !currentChurchId) return;
+
+    const ministryChannel = supabase
+      .channel(`my-ministry-updates-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ministerio_voluntarios', filter: `membro_id=eq.${user.id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['myMinistries', user.id, currentChurchId] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'escala_voluntarios', filter: `membro_id=eq.${user.id}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['myAssignments', user.id, selectedMinistryId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ministryChannel);
+    };
+  }, [user?.id, currentChurchId, selectedMinistryId, queryClient]);
 
   const confirmPresenceMutation = useMutation({
     mutationFn: async ({ escalaId, confirm }: { escalaId: string; confirm: boolean }) => {

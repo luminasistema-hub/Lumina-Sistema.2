@@ -85,24 +85,21 @@ export const useDevotionals = (filters: any) => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'devocionais' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['devotionals'] });
-          queryClient.invalidateQueries({ queryKey: ['devotionalDetails'] });
+          queryClient.invalidateQueries({ queryKey });
         }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'devocional_comentarios' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['devotionals'] });
-          queryClient.invalidateQueries({ queryKey: ['devotionalDetails'] });
+          queryClient.invalidateQueries({ queryKey });
         }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'devocional_curtidas' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['devotionals'] });
-          queryClient.invalidateQueries({ queryKey: ['devotionalDetails'] });
+          queryClient.invalidateQueries({ queryKey });
         }
       )
       .subscribe();
@@ -110,7 +107,7 @@ export const useDevotionals = (filters: any) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentChurchId, queryClient]);
+  }, [currentChurchId, queryClient, queryKey]);
 
   return useQuery({
     queryKey,
