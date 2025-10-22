@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Church, Users, Crown, FolderTree, Plus, Eye, Loader2 } from 'lucide-react';
+import ChildChurchDashboardDialog from './ChildChurchDashboardDialog';
+import MemberDetailsDialog from './MemberDetailsDialog';
 
 type ChildForm = {
   nome: string;
