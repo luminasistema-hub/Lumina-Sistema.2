@@ -44,9 +44,36 @@ export interface DevotionalDetails extends Devotional {
 }
 
 const fetchDevotionals = async (churchId: string, filters: any) => {
-  // Usa a função RPC para retornar devocionais da igreja atual
-  // incluindo os da igreja-mãe com compartilhar_com_filhas = true
-  const { data, error } = await supabase.rpc('get_devocionais_para_igreja', { id_igreja_atual: churchId })
+  const { data: churchData, error: churchError } = await supabase
+    .from('igrejas')
+    .select('parent_church_id, compartilha_devocionais_da_mae')
+    .eq('id', churchId)
+    .single();
+
+  if (churchError) throw new Error(churchError.message);
+
+  const churchIdsToFetch = [churchId];
+  if (churchData?.parent_church_id && churchData.compartilha_devocionais_da_mae) {
+    churchIdsToFetch.push(churchData.parent_church_id);
+  }
+
+  let query = supabase
+    .from('devocionais')
+    .select(`
+      *,
+      membros ( nome_completo ),
+      devocional_curtidas ( membro_id ),
+      devocional_comentarios ( count )
+    `)
+    .in('id_igreja', churchIdsToFetch);
+
+  // Para igrejas filhas, só pegar os compartilhados da mãe
+  if (churchIdsToFetch.length > 1) {
+    query = query.or(`id_igreja.eq.${churchId},and(id_igreja.eq.${churchData.parent_church_id},compartilhar_com_filhas.eq.true)`);
+  }
+
+  const { data, error } = await query;
+
   if (error) throw new Error(error.message)
   let rows = (data as any[]) as Devotional[]
 

@@ -324,12 +324,12 @@ const DevotionalsPage = () => {
                 </CardHeader>
                 <CardContent className="flex flex-col flex-grow">
                   <p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-grow">{stripHtml(devotional.conteudo)}</p>
-                  <div className="flex flex-wrap gap-1 mb-4">{devotional.tags.slice(0, 3).map(tag => <Badge key={tag} variant="outline" className="text-xs"><Tag className="w-3 h-3 mr-1" />{tag}</Badge>)}{devotional.tags.length > 3 && <Badge variant="outline" className="text-xs">+{devotional.tags.length - 3}</Badge>}</div>
+                  <div className="flex flex-wrap gap-1 mb-4">{(devotional.tags || []).slice(0, 3).map(tag => <Badge key={tag} variant="outline" className="text-xs"><Tag className="w-3 h-3 mr-1" />{tag}</Badge>)}{(devotional.tags?.length || 0) > 3 && <Badge variant="outline" className="text-xs">+{devotional.tags.length - 3}</Badge>}</div>
                   <div className="flex items-center justify-between text-sm text-gray-500 mt-auto">
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1"><Eye className="w-4 h-4" /><span>{devotional.visualizacoes}</span></div>
-                      <div className="flex items-center gap-1"><ThumbsUp className="w-4 h-4" /><span>{devotional.devocional_curtidas.length}</span></div>
-                      <div className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /><span>{devotional.devocional_comentarios[0]?.count || 0}</span></div>
+                      <div className="flex items-center gap-1"><Eye className="w-4 h-4" /><span>{devotional.visualizacoes || 0}</span></div>
+                      <div className="flex items-center gap-1"><ThumbsUp className="w-4 h-4" /><span>{devotional.devocional_curtidas?.length || 0}</span></div>
+                      <div className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /><span>{devotional.devocional_comentarios?.[0]?.count || 0}</span></div>
                     </div>
                     <span className="text-xs text-gray-400">{new Date(devotional.data_publicacao).toLocaleDateString('pt-BR')}</span>
                   </div>
