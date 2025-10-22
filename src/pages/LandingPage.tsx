@@ -65,7 +65,7 @@ const LandingPage = () => {
   const { plans, isLoading } = useSubscriptionPlans();
 
   const handleContatoWhatsApp = () => {
-    const telefone = "5563984861923";
+    const telefone = "5563920007673";
     const texto = "Olá! Gostaria de falar com a Lumina Sistema de Gestão.";
     const url = `https://wa.me/${telefone}?text=${encodeURIComponent(texto)}`;
     const win = window.open(url, "_blank", "noopener,noreferrer");
@@ -443,7 +443,7 @@ const LandingPage = () => {
             <h4 className="text-sm font-medium">Contato</h4>
             <div className="flex items-center gap-3">
               <PhoneCall className="h-4 w-4 text-primary-foreground/80" />
-              <a href="https://wa.me/5563984861923" target="_blank" rel="noreferrer" className="text-sm hover:text-primary-foreground">+55 63 98486-1923</a>
+              <a href="https://wa.me/5563920007673" target="_blank" rel="noreferrer" className="text-sm hover:text-primary-foreground">+55 63 92000-7673</a>
             </div>
             <div className="flex items-center gap-3">
               <Mail className="h-4 w-4 text-primary-foreground/80" />
@@ -460,7 +460,7 @@ const LandingPage = () => {
               <Building2 className="h-4 w-4 text-primary-foreground/80" />
               <div className="text-sm">
                 <div className="text-primary-foreground/80">Nome Empresarial</div>
-                <div className="font-medium">49.023.921 INOVA SIMPLES (I.S.)</div>
+                <div className="font-medium">Lumina Sistema de Gestão</div>
               </div>
             </div>
             <div className="flex items-center gap-3">
