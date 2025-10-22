@@ -188,7 +188,7 @@ const ChildChurchesPage = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Carregando...</span>
+        <span className="ml-2 text-muted-foreground">Carregando igrejas filhas...</span>
       </div>
     );
   }
@@ -204,6 +204,13 @@ const ChildChurchesPage = () => {
         <p className="text-indigo-100 mt-1">
           Crie e gerencie as igrejas que estão sob sua liderança direta.
         </p>
+        {parentInfo?.isChild && (
+          <div className="mt-3 p-3 bg-yellow-500/20 rounded-lg border border-yellow-400/30">
+            <p className="text-sm text-yellow-100">
+              <strong>Atenção:</strong> Como igreja filha, você não pode criar novas igrejas filhas.
+            </p>
+          </div>
+        )}
       </div>
 
       {!parentInfo?.isChild && canManage && (
@@ -256,13 +263,14 @@ const ChildChurchesPage = () => {
         <CardContent className="space-y-4">
           {children.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
+              <Church className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>Nenhuma igreja filha cadastrada.</p>
               {!parentInfo?.isChild && <p className="text-sm">Use o formulário acima para começar.</p>}
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {children.map((c) => (
-                <Card key={c.id} className="border flex flex-col">
+                <Card key={c.id} className="border flex flex-col hover:shadow-md transition-shadow">
                   <CardHeader>
                     <CardTitle className="text-lg">{c.nome}</CardTitle>
                     <div className="flex flex-wrap gap-2 text-sm pt-2">
