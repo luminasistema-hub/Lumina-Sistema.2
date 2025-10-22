@@ -22,13 +22,8 @@ const fetchDashboardStats = async (churchId: string | null, _userId: string | nu
     .gt('data_hora', new Date().toISOString());
   if (eventsError) throw new Error(`Eventos: ${eventsError.message}`);
 
-  // 3. Cursos em Andamento (Inscrições ativas)
-  const { count: activeCourses, error: coursesError } = await supabase
-    .from('cursos_inscricoes')
-    .select('id_curso', { count: 'exact', head: true })
-    .eq('status', 'Ativo')
-    .in('id_curso', (await supabase.from('cursos').select('id').eq('id_igreja', churchId)).data?.map(c => c.id) || []);
-  if (coursesError) throw new Error(`Cursos: ${coursesError.message}`);
+  // 3. Cursos em Andamento — removido (tabelas não existem no schema atual)
+  const activeCourses = 0;
 
   // 4. Ofertas do Mês (apenas do membro logado)
   const now = new Date();
