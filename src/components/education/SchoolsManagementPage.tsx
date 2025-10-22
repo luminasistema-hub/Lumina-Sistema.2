@@ -1,61 +1,52 @@
-import { useState } from 'react'
-import { useSchools, useCreateSchool, useUpdateSchool, useDeleteSchool, useSchoolLessons, useCreateLesson, useUpdateLesson, useDeleteLesson, useSchoolEnrollments, useSchoolAttendance, useRegisterStudentAttendance, useQuizQuestions, useGraduateStudent } from '@/hooks/useSchools'
-import { useMembers } from '@/hooks/useMembers'
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/integrations/supabase/client'
+import { useAuthStore } from '@/stores/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Users, BookOpen, Play, FileText, CheckSquare, MapPin, HelpCircle, CheckCircle, GraduationCap, Lock, Unlock } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
-import QuizQuestionsManager from './QuizQuestionsManager'
 import { Progress } from '@/components/ui/progress'
 import { DatePicker } from '@/components/ui/datepicker'
-import { supabase } from '@/integrations/supabase/client'
+import { toast } from 'sonner'
+import { Plus, Pencil, Trash2, Users, BookOpen, Play, FileText, CheckSquare, MapPin, HelpCircle, CheckCircle, GraduationCap, Lock, Unlock, Loader2 } from 'lucide-react'
+import QuizQuestionsManager from './QuizQuestionsManager'
+
+interface School {
+  id: string
+  id_igreja: string
+  nome: string
+  descricao: string
+  professor_id: string
+  professor_nome?: string
+  compartilhar_com_filhas: boolean
+  data_inicio?: string
+  data_fim?: string
+  status: 'aberta' | 'fechada' | 'concluida'
+}
+
+interface SchoolLesson {
+  id: string
+  escola_id: string
+  titulo: string
+  descricao: string
+  tipo_aula: 'texto' | 'video' | 'quiz' | 'presencial'
+  youtube_url?: string
+  conteudo_texto?: string
+  ordem: number
+  nota_de_corte?: number
+}
 
 const SchoolsManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
-  const { data: schools, isLoading, error } = useSchools()
-  const { data: members } = useMembers()
-  const createSchoolMutation = useCreateSchool()
-  const updateSchoolMutation = useUpdateSchool()
-  const deleteSchoolMutation = useDeleteSchool()
-  const graduateStudentMutation = useGraduateStudent()
+  const queryClient = useQueryClient()
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
@@ -63,12 +54,12 @@ const SchoolsManagementPage = () => {
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false)
   const [isQuizManagerOpen, setIsQuizManagerOpen] = useState(false)
   const [isGraduationDialogOpen, setIsGraduationDialogOpen] = useState(false)
-  const [editingSchool, setEditingSchool] = useState<any>(null)
-  const [selectedSchool, setSelectedSchool] = useState<any>(null)
-  const [editingLesson, setEditingLesson] = useState<any>(null)
-  const [lessonForAttendance, setLessonForAttendance] = useState<any>(null)
-  const [lessonForQuiz, setLessonForQuiz] = useState<any>(null)
-  const [schoolToGraduate, setSchoolToGraduate] = useState<any>(null)
+  const [editingSchool, setEditingSchool] = useState<School | null>(null)
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null)
+  const [editingLesson, setEditingLesson] = useState<SchoolLesson | null>(null)
+  const [lessonForAttendance, setLessonForAttendance] = useState<SchoolLesson | null>(null)
+  const [lessonForQuiz, setLessonForQuiz] = useState<SchoolLesson | null>(null)
+  const [schoolToGraduate, setSchoolToGraduate] = useState<School | null>(null)
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -89,40 +80,269 @@ const SchoolsManagementPage = () => {
     nota_de_corte: 70
   })
 
-  const { data: lessons } = useSchoolLessons(selectedSchool?.id || null)
-  const createLessonMutation = useCreateLesson()
-  const updateLessonMutation = useUpdateLesson()
-  const deleteLessonMutation = useDeleteLesson()
-  const { data: enrollments } = useSchoolEnrollments(selectedSchool?.id || null)
-  const { data: schoolAttendance } = useSchoolAttendance(selectedSchool?.id || null)
-  const registerAttendanceMutation = useRegisterStudentAttendance()
+  // Query para escolas
+  const { data: schools, isLoading } = useQuery({
+    queryKey: ['schools', currentChurchId],
+    queryFn: async () => {
+      if (!currentChurchId) return []
+      const { data, error } = await supabase.rpc('get_escolas_para_igreja', { id_igreja_atual: currentChurchId })
+      if (error) throw error
+      
+      const schoolsData = (data || []) as School[]
+      const professorIds = [...new Set(schoolsData.map(s => s.professor_id).filter(Boolean))]
+      
+      let professorNames = new Map<string, string>()
+      if (professorIds.length > 0) {
+        const { data: professors } = await supabase.from('membros').select('id, nome_completo').in('id', professorIds)
+        professors?.forEach(p => professorNames.set(p.id, p.nome_completo))
+      }
+      
+      return schoolsData.map(school => ({
+        ...school,
+        professor_nome: school.professor_id ? professorNames.get(school.professor_id) || 'Professor não definido' : 'Professor não definido'
+      }))
+    },
+    enabled: !!currentChurchId,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+
+  // Query para membros (professores)
+  const { data: members = [] } = useQuery({
+    queryKey: ['members', currentChurchId],
+    queryFn: async () => {
+      if (!currentChurchId) return []
+      const { data, error } = await supabase.from('membros').select('id, nome_completo, funcao').eq('id_igreja', currentChurchId).order('nome_completo')
+      if (error) throw error
+      return data || []
+    },
+    enabled: !!currentChurchId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  })
+
+  // Query para aulas da escola selecionada
+  const { data: lessons } = useQuery({
+    queryKey: ['school-lessons', selectedSchool?.id],
+    queryFn: async () => {
+      if (!selectedSchool?.id) return []
+      const { data, error } = await supabase.from('escola_aulas').select('*').eq('escola_id', selectedSchool.id).order('ordem')
+      if (error) throw error
+      return data as SchoolLesson[]
+    },
+    enabled: !!selectedSchool?.id,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+
+  // Query para inscrições
+  const { data: enrollments } = useQuery({
+    queryKey: ['school-enrollments', selectedSchool?.id],
+    queryFn: async () => {
+      if (!selectedSchool?.id) return []
+      const { data, error } = await supabase.from('escola_inscricoes').select('*, membros(id, nome_completo, email)').eq('escola_id', selectedSchool.id)
+      if (error) throw error
+      return data
+    },
+    enabled: !!selectedSchool?.id,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+
+  // Query para frequência
+  const { data: schoolAttendance } = useQuery({
+    queryKey: ['school-attendance', selectedSchool?.id],
+    queryFn: async () => {
+      if (!selectedSchool?.id) return []
+      const { data, error } = await supabase.from('escola_frequencia').select('*, escola_aulas!inner(escola_id)').eq('escola_aulas.escola_id', selectedSchool.id)
+      if (error) throw error
+      return data
+    },
+    enabled: !!selectedSchool?.id,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+
+  // Realtime subscriptions
+  useEffect(() => {
+    if (!currentChurchId) return
+    const channel = supabase.channel(`schools-${currentChurchId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'escolas', filter: `id_igreja=eq.${currentChurchId}` },
+        () => queryClient.invalidateQueries({ queryKey: ['schools', currentChurchId] })
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'escola_aulas' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['school-lessons'] })
+        }
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'escola_inscricoes' },
+        () => queryClient.invalidateQueries({ queryKey: ['school-enrollments'] })
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'escola_frequencia' },
+        () => queryClient.invalidateQueries({ queryKey: ['school-attendance'] })
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [currentChurchId, queryClient])
+
+  // Mutations
+  const createSchoolMutation = useMutation({
+    mutationFn: async (school: any) => {
+      const { error } = await supabase.from('escolas').insert({ ...school, id_igreja: currentChurchId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Escola criada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
+      setIsDialogOpen(false)
+      resetForm()
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const updateSchoolMutation = useMutation({
+    mutationFn: async ({ id, ...updates }: any) => {
+      const { error } = await supabase.from('escolas').update(updates).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Escola atualizada!')
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
+      setIsDialogOpen(false)
+      resetForm()
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const deleteSchoolMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('escolas').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Escola removida!')
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const createLessonMutation = useMutation({
+    mutationFn: async (lesson: any) => {
+      const { error } = await supabase.from('escola_aulas').insert(lesson)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Aula criada!')
+      queryClient.invalidateQueries({ queryKey: ['school-lessons'] })
+      setIsLessonDialogOpen(false)
+      resetLessonForm()
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const updateLessonMutation = useMutation({
+    mutationFn: async ({ id, ...updates }: any) => {
+      const { error } = await supabase.from('escola_aulas').update(updates).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Aula atualizada!')
+      queryClient.invalidateQueries({ queryKey: ['school-lessons'] })
+      setIsLessonDialogOpen(false)
+      resetLessonForm()
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const deleteLessonMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('escola_aulas').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Aula removida!')
+      queryClient.invalidateQueries({ queryKey: ['school-lessons'] })
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const registerAttendanceMutation = useMutation({
+    mutationFn: async ({ lessonId, memberId, date, present }: any) => {
+      const { data: attendanceData, error: attendanceError } = await supabase.from('escola_frequencia')
+        .upsert({ aula_id: lessonId, membro_id: memberId, data_aula: date, presente: present }, { onConflict: 'aula_id,membro_id,data_aula' })
+        .select().single()
+      if (attendanceError) throw attendanceError
+
+      if (present) {
+        const { error: progressError } = await supabase.from('escola_progresso_aulas')
+          .upsert({ aula_id: lessonId, membro_id: memberId, id_igreja: currentChurchId! }, { onConflict: 'aula_id,membro_id' })
+        if (progressError) throw progressError
+      } else {
+        await supabase.from('escola_progresso_aulas').delete().match({ aula_id: lessonId, membro_id: memberId })
+      }
+    },
+    onSuccess: () => {
+      toast.success('Frequência registrada!')
+      queryClient.invalidateQueries({ queryKey: ['school-attendance'] })
+    },
+    onError: (error: any) => toast.error(`Erro: ${error.message}`)
+  })
+
+  const graduateStudentMutation = useMutation({
+    mutationFn: async ({ schoolId, memberId }: { schoolId: string, memberId: string }) => {
+      const { data: lessons, error: lessonsError } = await supabase.from('escola_aulas').select('id').eq('escola_id', schoolId)
+      if (lessonsError) throw lessonsError
+      if (!lessons || lessons.length === 0) return
+
+      const progressRecords = lessons.map(l => ({ aula_id: l.id, membro_id: memberId, id_igreja: currentChurchId! }))
+      const { error: progressError } = await supabase.from('escola_progresso_aulas').upsert(progressRecords, { onConflict: 'aula_id,membro_id' })
+      if (progressError) throw progressError
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['school-enrollments'] })
+      queryClient.invalidateQueries({ queryKey: ['journey-data'] })
+    }
+  })
+
+  const handleGraduateSchool = async () => {
+    if (!schoolToGraduate) return
+    const toastId = toast.loading("Iniciando conclusão da escola...")
+
+    try {
+      const { data: enrollments, error } = await supabase.from('escola_inscricoes').select('membro_id').eq('escola_id', schoolToGraduate.id)
+      if (error) throw new Error("Erro ao buscar alunos inscritos.")
+
+      if (enrollments && enrollments.length > 0) {
+        toast.loading(`Concluindo ${enrollments.length} aluno(s)...`, { id: toastId })
+        const graduationPromises = enrollments.map(e => graduateStudentMutation.mutateAsync({ schoolId: schoolToGraduate.id, memberId: e.membro_id }))
+        await Promise.all(graduationPromises)
+        toast.success(`${enrollments.length} aluno(s) foram concluídos com sucesso!`, { id: toastId })
+      } else {
+        toast.info("Não há alunos inscritos para concluir.", { id: toastId })
+      }
+
+      updateSchoolMutation.mutate({ id: schoolToGraduate.id, status: 'concluida' }, {
+        onSuccess: () => toast.success("Escola marcada como concluída.")
+      })
+    } catch (e: any) {
+      toast.error(e.message || "Ocorreu um erro ao concluir a escola.", { id: toastId })
+    } finally {
+      setIsGraduationDialogOpen(false)
+      setSchoolToGraduate(null)
+    }
+  }
 
   const resetForm = () => {
-    setFormData({
-      nome: '',
-      descricao: '',
-      professor_id: '',
-      compartilhar_com_filhas: false,
-      data_inicio: undefined,
-      data_fim: undefined
-    })
+    setFormData({ nome: '', descricao: '', professor_id: '', compartilhar_com_filhas: false, data_inicio: undefined, data_fim: undefined })
     setEditingSchool(null)
   }
 
   const resetLessonForm = () => {
-    setLessonFormData({
-      titulo: '',
-      descricao: '',
-      tipo_aula: 'texto',
-      youtube_url: '',
-      conteudo_texto: '',
-      ordem: 1,
-      nota_de_corte: 70
-    })
+    setLessonFormData({ titulo: '', descricao: '', tipo_aula: 'texto', youtube_url: '', conteudo_texto: '', ordem: 1, nota_de_corte: 70 })
     setEditingLesson(null)
   }
 
-  const handleOpenDialog = (school?: any) => {
+  const handleOpenDialog = (school?: School) => {
     if (school) {
       setEditingSchool(school)
       setFormData({
@@ -139,26 +359,20 @@ const SchoolsManagementPage = () => {
     setIsDialogOpen(true)
   }
 
-  const handleOpenLessons = (school: any) => {
-    setSelectedSchool(school)
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.nome.trim()) {
+      toast.error('O nome da escola é obrigatório')
+      return
+    }
+    if (editingSchool) {
+      updateSchoolMutation.mutate({ id: editingSchool.id, ...formData })
+    } else {
+      createSchoolMutation.mutate(formData)
+    }
   }
 
-  const handleOpenStudentsDialog = (school: any) => {
-    setSelectedSchool(school)
-    setIsStudentsDialogOpen(true)
-  }
-
-  const handleOpenAttendanceDialog = (lesson: any) => {
-    setLessonForAttendance(lesson)
-    setIsAttendanceDialogOpen(true)
-  }
-
-  const handleOpenQuizDialog = (lesson: any) => {
-    setLessonForQuiz(lesson)
-    setIsQuizManagerOpen(true)
-  }
-
-  const handleOpenLessonDialog = (lesson?: any) => {
+  const handleOpenLessonDialog = (lesson?: SchoolLesson) => {
     if (lesson) {
       setEditingLesson(lesson)
       setLessonFormData({
@@ -176,284 +390,103 @@ const SchoolsManagementPage = () => {
     setIsLessonDialogOpen(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!formData.nome.trim()) {
-      toast.error('O nome da escola é obrigatório')
-      return
-    }
-    
-    if (editingSchool) {
-      updateSchoolMutation.mutate({
-        id: editingSchool.id,
-        ...formData
-      })
-    } else {
-      createSchoolMutation.mutate(formData)
-    }
-    
-    setIsDialogOpen(false)
-    resetForm()
-  }
-
   const handleSubmitLesson = (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (!lessonFormData.titulo.trim()) {
       toast.error('O título da aula é obrigatório')
       return
     }
-    
-    const lessonData = {
-      ...lessonFormData,
-      escola_id: selectedSchool.id
-    }
-    
+    const lessonData = { ...lessonFormData, escola_id: selectedSchool!.id }
     if (editingLesson) {
-      updateLessonMutation.mutate({
-        id: editingLesson.id,
-        ...lessonData
-      })
+      updateLessonMutation.mutate({ id: editingLesson.id, ...lessonData })
     } else {
       createLessonMutation.mutate(lessonData)
     }
-    
-    setIsLessonDialogOpen(false)
-    resetLessonForm()
   }
 
-  const handleDelete = (schoolId: string) => {
-    if (confirm('Tem certeza que deseja remover esta escola?')) {
-      deleteSchoolMutation.mutate(schoolId)
-    }
-  }
-
-  const handleDeleteLesson = (lessonId: string) => {
-    if (confirm('Tem certeza que deseja remover esta aula?')) {
-      deleteLessonMutation.mutate(lessonId)
-    }
-  }
-
-  const handleToggleEnrollmentStatus = (school: any) => {
-    const newStatus = school.status === 'aberta' ? 'fechada' : 'aberta';
-    updateSchoolMutation.mutate({
-      id: school.id,
-      status: newStatus
-    }, {
-      onSuccess: () => {
-        toast.success(`Matrículas ${newStatus === 'fechada' ? 'encerradas' : 'abertas'} com sucesso!`);
-      }
-    });
-  };
-
-  const handleGraduateSchool = async () => {
-    if (!schoolToGraduate) return;
-
-    const toastId = toast.loading("Iniciando conclusão da escola...");
-
-    try {
-      // 1. Fetch enrollments for this school
-      const { data: enrollments, error } = await supabase
-        .from('escola_inscricoes')
-        .select('membro_id')
-        .eq('escola_id', schoolToGraduate.id);
-
-      if (error) {
-        throw new Error("Erro ao buscar alunos inscritos.");
-      }
-
-      if (enrollments && enrollments.length > 0) {
-        toast.loading(`Concluindo ${enrollments.length} aluno(s)...`, { id: toastId });
-        // 2. Graduate each student
-        const graduationPromises = enrollments.map(enrollment => 
-          graduateStudentMutation.mutateAsync({ schoolId: schoolToGraduate.id, memberId: enrollment.membro_id })
-        );
-        
-        await Promise.all(graduationPromises);
-        toast.success(`${enrollments.length} aluno(s) foram concluídos com sucesso!`, { id: toastId });
-      } else {
-        toast.info("Não há alunos inscritos para concluir.", { id: toastId });
-      }
-
-      // 3. Update school status to 'concluida'
-      updateSchoolMutation.mutate({
-        id: schoolToGraduate.id,
-        status: 'concluida'
-      }, {
-        onSuccess: () => {
-          toast.success("Escola marcada como concluída.");
-        }
-      });
-
-    } catch (e: any) {
-      toast.error(e.message || "Ocorreu um erro ao concluir a escola.", { id: toastId });
-    } finally {
-      setIsGraduationDialogOpen(false);
-      setSchoolToGraduate(null);
-    }
-  };
-
-  const handleRegisterAttendance = (memberId: string, present: boolean) => {
-    if (!lessonForAttendance || !selectedSchool) return
-    registerAttendanceMutation.mutate({
-      lessonId: lessonForAttendance.id,
-      memberId,
-      date: new Date().toISOString().split('T')[0],
-      present,
-      schoolId: selectedSchool.id
-    })
-  }
-
-  // Filtrar membros que podem ser professores (pastores, admins, líderes de ministério)
-  const potentialTeachers = members?.filter(member => 
-    member.funcao === 'pastor' || 
-    member.funcao === 'admin' || 
-    member.funcao === 'lider_ministerio'
-  ) || []
-
-  // Filtrar apenas as escolas da igreja atual para gestão
-  const churchSchools = schools?.filter(school => school.id_igreja === currentChurchId) || []
-
-  // Verificar se o usuário é professor da escola ou admin
-  const canManageLessons = (school: any) => {
-    return user?.role === 'admin' || 
-           user?.role === 'pastor' || 
-           user?.id === school.professor_id
-  }
+  const potentialTeachers = members.filter(m => m.funcao === 'pastor' || m.funcao === 'admin' || m.funcao === 'lider_ministerio')
+  const churchSchools = schools?.filter(s => s.id_igreja === currentChurchId) || []
+  const canManageLessons = (school: School) => user?.role === 'admin' || user?.role === 'pastor' || user?.id === school.professor_id
 
   const getLessonTypeIcon = (type: string) => {
     switch (type) {
-      case 'video':
-        return <Play className="w-4 h-4" />
-      case 'quiz':
-        return <CheckSquare className="w-4 h-4" />
-      case 'presencial':
-        return <MapPin className="w-4 h-4" />
-      default:
-        return <FileText className="w-4 h-4" />
+      case 'video': return <Play className="w-4 h-4" />
+      case 'quiz': return <CheckSquare className="w-4 h-4" />
+      case 'presencial': return <MapPin className="w-4 h-4" />
+      default: return <FileText className="w-4 h-4" />
     }
   }
 
   const getLessonTypeLabel = (type: string) => {
     switch (type) {
-      case 'video':
-        return 'Vídeo'
-      case 'quiz':
-        return 'Quiz'
-      case 'presencial':
-        return 'Presencial'
-      default:
-        return 'Texto'
+      case 'video': return 'Vídeo'
+      case 'quiz': return 'Quiz'
+      case 'presencial': return 'Presencial'
+      default: return 'Texto'
     }
+  }
+
+  if (!currentChurchId) {
+    return <div className="p-6 text-center text-gray-600">Selecione uma igreja para gerenciar escolas.</div>
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="ml-3 text-lg text-gray-600">Carregando escolas...</p>
+      </div>
+    )
   }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Gestão de Escolas</h1>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open)
-          if (!open) resetForm()
-        }}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm() }}>
           <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Escola
-            </Button>
+            <Button onClick={() => handleOpenDialog()}><Plus className="w-4 h-4 mr-2" />Nova Escola</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {editingSchool ? 'Editar Escola' : 'Nova Escola'}
-              </DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>{editingSchool ? 'Editar Escola' : 'Nova Escola'}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="nome">Nome da Escola *</Label>
-                <Input
-                  id="nome"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
-                  placeholder="Ex: Escola de Liderança"
-                />
+                <Input id="nome" value={formData.nome} onChange={(e) => setFormData({...formData, nome: e.target.value})} placeholder="Ex: Escola de Liderança" />
               </div>
-              
               <div className="space-y-2">
                 <Label htmlFor="descricao">Descrição</Label>
-                <Textarea
-                  id="descricao"
-                  value={formData.descricao}
-                  onChange={(e) => setFormData({...formData, descricao: e.target.value})}
-                  placeholder="Descreva o propósito e objetivos da escola"
-                  rows={3}
-                />
+                <Textarea id="descricao" value={formData.descricao} onChange={(e) => setFormData({...formData, descricao: e.target.value})} placeholder="Descreva o propósito e objetivos da escola" rows={3} />
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="data_inicio">Data de Início</Label>
-                  <DatePicker 
-                    date={formData.data_inicio}
-                    setDate={(date) => setFormData({ ...formData, data_inicio: date })}
-                    placeholder="Selecione a data de início"
-                  />
+                  <Label>Data de Início</Label>
+                  <DatePicker date={formData.data_inicio} setDate={(date) => setFormData({ ...formData, data_inicio: date })} placeholder="Selecione a data de início" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="data_fim">Data de Fim</Label>
-                  <DatePicker 
-                    date={formData.data_fim}
-                    setDate={(date) => setFormData({ ...formData, data_fim: date })}
-                    placeholder="Selecione a data de término"
-                  />
+                  <Label>Data de Fim</Label>
+                  <DatePicker date={formData.data_fim} setDate={(date) => setFormData({ ...formData, data_fim: date })} placeholder="Selecione a data de término" />
                 </div>
               </div>
-              
               <div className="space-y-2">
-                <Label htmlFor="professor">Professor</Label>
-                <Select 
-                  value={formData.professor_id} 
-                  onValueChange={(value) => setFormData({...formData, professor_id: value})}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um professor" />
-                  </SelectTrigger>
+                <Label>Professor</Label>
+                <Select value={formData.professor_id} onValueChange={(value) => setFormData({...formData, professor_id: value})}>
+                  <SelectTrigger><SelectValue placeholder="Selecione um professor" /></SelectTrigger>
                   <SelectContent>
-                    {potentialTeachers.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.nome_completo}
-                      </SelectItem>
-                    ))}
+                    {potentialTeachers.map((member) => <SelectItem key={member.id} value={member.id}>{member.nome_completo}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              
               <div className="flex items-center justify-between p-3 border rounded-md">
                 <div className="space-y-1">
                   <Label>Compartilhar com igrejas filhas</Label>
-                  <p className="text-sm text-gray-500">
-                    Se ativado, esta escola ficará visível para igrejas filhas
-                  </p>
+                  <p className="text-sm text-gray-500">Se ativado, esta escola ficará visível para igrejas filhas</p>
                 </div>
-                <Switch
-                  checked={formData.compartilhar_com_filhas}
-                  onCheckedChange={(checked) => 
-                    setFormData({...formData, compartilhar_com_filhas: checked})
-                  }
-                />
+                <Switch checked={formData.compartilhar_com_filhas} onCheckedChange={(checked) => setFormData({...formData, compartilhar_com_filhas: checked})} />
               </div>
-              
               <div className="flex justify-end gap-2 pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {editingSchool ? 'Atualizar' : 'Criar'} Escola
-                </Button>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                <Button type="submit">{editingSchool ? 'Atualizar' : 'Criar'} Escola</Button>
               </div>
             </form>
           </DialogContent>
@@ -461,23 +494,9 @@ const SchoolsManagementPage = () => {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Escolas Cadastradas</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Escolas Cadastradas</CardTitle></CardHeader>
         <CardContent>
-          {isLoading && (
-            <div className="flex justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            </div>
-          )}
-          
-          {error && (
-            <div className="text-red-500 p-4 text-center">
-              Erro ao carregar escolas: {(error as Error).message}
-            </div>
-          )}
-          
-          {churchSchools && churchSchools.length > 0 ? (
+          {churchSchools.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -493,11 +512,7 @@ const SchoolsManagementPage = () => {
                 {churchSchools.map((school) => (
                   <TableRow key={school.id}>
                     <TableCell className="font-medium">{school.nome}</TableCell>
-                    <TableCell>
-                      {school.professor_nome || (
-                        <span className="text-gray-500">Não definido</span>
-                      )}
-                    </TableCell>
+                    <TableCell>{school.professor_nome || <span className="text-gray-500">Não definido</span>}</TableCell>
                     <TableCell>
                       {school.data_inicio && school.data_fim 
                         ? `${new Date(school.data_inicio).toLocaleDateString()} - ${new Date(school.data_fim).toLocaleDateString()}`
@@ -505,73 +520,31 @@ const SchoolsManagementPage = () => {
                       }
                     </TableCell>
                     <TableCell>
-                      <Badge variant={
-                        school.status === 'aberta' ? 'default' :
-                        school.status === 'fechada' ? 'secondary' :
-                        'destructive'
-                      }>
+                      <Badge variant={school.status === 'aberta' ? 'default' : school.status === 'fechada' ? 'secondary' : 'destructive'}>
                         {school.status.charAt(0).toUpperCase() + school.status.slice(1)}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {school.compartilhar_com_filhas ? (
-                        <Badge variant="default">Sim</Badge>
-                      ) : (
-                        <Badge variant="secondary">Não</Badge>
-                      )}
+                      {school.compartilhar_com_filhas ? <Badge variant="default">Sim</Badge> : <Badge variant="secondary">Não</Badge>}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleOpenStudentsDialog(school)}
-                          disabled={school.status === 'concluida'}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => { setSelectedSchool(school); setIsStudentsDialogOpen(true) }} disabled={school.status === 'concluida'}>
                           <Users className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleOpenDialog(school)}
-                          disabled={school.status === 'concluida'}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => handleOpenDialog(school)} disabled={school.status === 'concluida'}>
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleOpenLessons(school)}
-                          disabled={school.status === 'concluida'}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => setSelectedSchool(school)} disabled={school.status === 'concluida'}>
                           <BookOpen className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleToggleEnrollmentStatus(school)}
-                          disabled={school.status === 'concluida'}
-                          title={school.status === 'aberta' ? 'Encerrar matrículas' : 'Abrir matrículas'}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => updateSchoolMutation.mutate({ id: school.id, status: school.status === 'aberta' ? 'fechada' : 'aberta' })} disabled={school.status === 'concluida'} title={school.status === 'aberta' ? 'Encerrar matrículas' : 'Abrir matrículas'}>
                           {school.status === 'aberta' ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => {
-                            setSchoolToGraduate(school)
-                            setIsGraduationDialogOpen(true)
-                          }}
-                          disabled={school.status === 'concluida'}
-                          title="Concluir Escola"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => { setSchoolToGraduate(school); setIsGraduationDialogOpen(true) }} disabled={school.status === 'concluida'} title="Concluir Escola">
                           <GraduationCap className="w-4 h-4" />
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleDelete(school.id)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => deleteSchoolMutation.mutate(school.id)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -581,13 +554,12 @@ const SchoolsManagementPage = () => {
               </TableBody>
             </Table>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              Nenhuma escola cadastrada ainda
-            </div>
+            <div className="text-center py-8 text-gray-500">Nenhuma escola cadastrada ainda</div>
           )}
         </CardContent>
       </Card>
 
+      {/* Dialogs para alunos, aulas, frequência, quiz e graduação */}
       <AlertDialog open={isGraduationDialogOpen} onOpenChange={setIsGraduationDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -603,161 +575,131 @@ const SchoolsManagementPage = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog para gerenciar alunos */}
       {selectedSchool && (
-        <Dialog open={isStudentsDialogOpen} onOpenChange={() => setIsStudentsDialogOpen(false)}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>Alunos Inscritos - {selectedSchool.nome}</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              {enrollments && lessons ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Aluno</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Progresso de Frequência</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {enrollments.map((enrollment: any) => {
-                      const presencialLessons = lessons.filter(l => l.tipo_aula === 'presencial')
-                      const attendedLessons = schoolAttendance?.filter(att => att.membro_id === enrollment.membro_id && att.presente && presencialLessons.some(l => l.id === att.aula_id)) || []
-                      const progress = presencialLessons.length > 0 ? (attendedLessons.length / presencialLessons.length) * 100 : 0
+        <>
+          <Dialog open={isStudentsDialogOpen} onOpenChange={() => setIsStudentsDialogOpen(false)}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader><DialogTitle>Alunos Inscritos - {selectedSchool.nome}</DialogTitle></DialogHeader>
+              <div className="py-4">
+                {enrollments && lessons ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Aluno</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Progresso de Frequência</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {enrollments.map((enrollment: any) => {
+                        const presencialLessons = lessons.filter(l => l.tipo_aula === 'presencial')
+                        const attendedLessons = schoolAttendance?.filter(att => att.membro_id === enrollment.membro_id && att.presente && presencialLessons.some(l => l.id === att.aula_id)) || []
+                        const progress = presencialLessons.length > 0 ? (attendedLessons.length / presencialLessons.length) * 100 : 0
+                        return (
+                          <TableRow key={enrollment.id}>
+                            <TableCell>{enrollment.membros.nome_completo}</TableCell>
+                            <TableCell>{enrollment.membros.email}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Progress value={progress} className="w-full" />
+                                <span>{Math.round(progress)}%</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p>Carregando alunos...</p>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
 
-                      return (
-                        <TableRow key={enrollment.id}>
-                          <TableCell>{enrollment.membros.nome_completo}</TableCell>
-                          <TableCell>{enrollment.membros.email}</TableCell>
+          <Dialog open={!!selectedSchool && !isStudentsDialogOpen} onOpenChange={() => setSelectedSchool(null)}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Aulas - {selectedSchool.nome}</DialogTitle>
+                <div className="text-sm text-gray-500">Professor: {selectedSchool.professor_nome || 'Não definido'}</div>
+              </DialogHeader>
+              <div className="space-y-4">
+                {canManageLessons(selectedSchool) && (
+                  <div className="flex justify-end">
+                    <Button onClick={() => handleOpenLessonDialog()}><Plus className="w-4 h-4 mr-2" />Nova Aula</Button>
+                  </div>
+                )}
+                {lessons && lessons.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Ordem</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lessons.map((lesson) => (
+                        <TableRow key={lesson.id}>
+                          <TableCell className="font-medium">{lesson.titulo}</TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Progress value={progress} className="w-full" />
-                              <span>{Math.round(progress)}%</span>
+                            <Badge variant="outline">
+                              {getLessonTypeIcon(lesson.tipo_aula)}
+                              <span className="ml-1">{getLessonTypeLabel(lesson.tipo_aula)}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{lesson.ordem}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              {canManageLessons(selectedSchool) && (
+                                <>
+                                  {lesson.tipo_aula === 'quiz' && (
+                                    <Button variant="outline" size="sm" onClick={() => { setLessonForQuiz(lesson); setIsQuizManagerOpen(true) }}>
+                                      <HelpCircle className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {lesson.tipo_aula === 'presencial' && (
+                                    <Button variant="outline" size="sm" onClick={() => { setLessonForAttendance(lesson); setIsAttendanceDialogOpen(true) }}>
+                                      <CheckCircle className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  <Button variant="outline" size="sm" onClick={() => handleOpenLessonDialog(lesson)}>
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                  <Button variant="outline" size="sm" onClick={() => deleteLessonMutation.mutate(lesson.id)}>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p>Carregando alunos...</p>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Dialog para gerenciar aulas */}
-      {selectedSchool && (
-        <Dialog open={!!selectedSchool && !isStudentsDialogOpen} onOpenChange={() => setSelectedSchool(null)}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>
-                Aulas - {selectedSchool.nome}
-              </DialogTitle>
-              <div className="text-sm text-gray-500">
-                Professor: {selectedSchool.professor_nome || 'Não definido'}
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">Nenhuma aula cadastrada ainda</div>
+                )}
               </div>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              {canManageLessons(selectedSchool) && (
-                <div className="flex justify-end">
-                  <Button onClick={() => handleOpenLessonDialog()}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nova Aula
-                  </Button>
-                </div>
-              )}
-              
-              {lessons && lessons.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Título</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Ordem</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lessons.map((lesson) => (
-                      <TableRow key={lesson.id}>
-                        <TableCell className="font-medium">{lesson.titulo}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {getLessonTypeIcon(lesson.tipo_aula)}
-                            <span className="ml-1">{getLessonTypeLabel(lesson.tipo_aula)}</span>
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{lesson.ordem}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            {canManageLessons(selectedSchool) && (
-                              <>
-                                {lesson.tipo_aula === 'quiz' && (
-                                  <Button variant="outline" size="sm" onClick={() => handleOpenQuizDialog(lesson)}>
-                                    <HelpCircle className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                {lesson.tipo_aula === 'presencial' && (
-                                  <Button variant="outline" size="sm" onClick={() => handleOpenAttendanceDialog(lesson)}>
-                                    <CheckCircle className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={() => handleOpenLessonDialog(lesson)}
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={() => handleDeleteLesson(lesson.id)}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  Nenhuma aula cadastrada ainda
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
 
-      {/* Dialog para gerenciar quiz */}
       {lessonForQuiz && (
         <Dialog open={isQuizManagerOpen} onOpenChange={() => setIsQuizManagerOpen(false)}>
           <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Gerenciar Quiz - {lessonForQuiz.titulo}</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Gerenciar Quiz - {lessonForQuiz.titulo}</DialogTitle></DialogHeader>
             <QuizQuestionsManager lessonId={lessonForQuiz.id} />
           </DialogContent>
         </Dialog>
       )}
 
-      {/* Dialog para registrar frequência */}
       {lessonForAttendance && (
         <Dialog open={isAttendanceDialogOpen} onOpenChange={() => setIsAttendanceDialogOpen(false)}>
           <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Registrar Frequência - {lessonForAttendance.titulo}</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Registrar Frequência - {lessonForAttendance.titulo}</DialogTitle></DialogHeader>
             <div className="py-4">
               <Table>
                 <TableHeader>
@@ -775,7 +717,7 @@ const SchoolsManagementPage = () => {
                         <TableCell className="text-right">
                           <Switch
                             checked={attendanceRecord?.presente || false}
-                            onCheckedChange={(checked) => handleRegisterAttendance(enrollment.membro_id, checked)}
+                            onCheckedChange={(checked) => registerAttendanceMutation.mutate({ lessonId: lessonForAttendance.id, memberId: enrollment.membro_id, date: new Date().toISOString().split('T')[0], present: checked })}
                           />
                         </TableCell>
                       </TableRow>
@@ -788,48 +730,22 @@ const SchoolsManagementPage = () => {
         </Dialog>
       )}
 
-      {/* Dialog para criar/editar aula */}
-      <Dialog open={isLessonDialogOpen} onOpenChange={(open) => {
-        setIsLessonDialogOpen(open)
-        if (!open) resetLessonForm()
-      }}>
+      <Dialog open={isLessonDialogOpen} onOpenChange={(open) => { setIsLessonDialogOpen(open); if (!open) resetLessonForm() }}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editingLesson ? 'Editar Aula' : 'Nova Aula'}
-            </DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editingLesson ? 'Editar Aula' : 'Nova Aula'}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmitLesson} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="titulo">Título da Aula *</Label>
-              <Input
-                id="titulo"
-                value={lessonFormData.titulo}
-                onChange={(e) => setLessonFormData({...lessonFormData, titulo: e.target.value})}
-                placeholder="Ex: Introdução ao Discipulado"
-              />
+              <Label>Título da Aula *</Label>
+              <Input value={lessonFormData.titulo} onChange={(e) => setLessonFormData({...lessonFormData, titulo: e.target.value})} placeholder="Ex: Introdução ao Discipulado" />
             </div>
-            
             <div className="space-y-2">
-              <Label htmlFor="descricao">Descrição</Label>
-              <Textarea
-                id="descricao"
-                value={lessonFormData.descricao}
-                onChange={(e) => setLessonFormData({...lessonFormData, descricao: e.target.value})}
-                placeholder="Descreva o conteúdo desta aula"
-                rows={3}
-              />
+              <Label>Descrição</Label>
+              <Textarea value={lessonFormData.descricao} onChange={(e) => setLessonFormData({...lessonFormData, descricao: e.target.value})} placeholder="Descreva o conteúdo desta aula" rows={3} />
             </div>
-            
             <div className="space-y-2">
-              <Label htmlFor="tipo_aula">Tipo de Aula *</Label>
-              <Select 
-                value={lessonFormData.tipo_aula} 
-                onValueChange={(value) => setLessonFormData({...lessonFormData, tipo_aula: value as any})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo de aula" />
-                </SelectTrigger>
+              <Label>Tipo de Aula *</Label>
+              <Select value={lessonFormData.tipo_aula} onValueChange={(value: any) => setLessonFormData({...lessonFormData, tipo_aula: value})}>
+                <SelectTrigger><SelectValue placeholder="Selecione o tipo de aula" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="texto">Texto</SelectItem>
                   <SelectItem value="video">Vídeo</SelectItem>
@@ -838,68 +754,31 @@ const SchoolsManagementPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            
             {lessonFormData.tipo_aula === 'video' && (
               <div className="space-y-2">
-                <Label htmlFor="youtube_url">URL do YouTube</Label>
-                <Input
-                  id="youtube_url"
-                  value={lessonFormData.youtube_url}
-                  onChange={(e) => setLessonFormData({...lessonFormData, youtube_url: e.target.value})}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                />
+                <Label>URL do YouTube</Label>
+                <Input value={lessonFormData.youtube_url} onChange={(e) => setLessonFormData({...lessonFormData, youtube_url: e.target.value})} placeholder="https://www.youtube.com/watch?v=..." />
               </div>
             )}
-            
             {lessonFormData.tipo_aula === 'texto' && (
               <div className="space-y-2">
-                <Label htmlFor="conteudo_texto">Conteúdo</Label>
-                <Textarea
-                  id="conteudo_texto"
-                  value={lessonFormData.conteudo_texto}
-                  onChange={(e) => setLessonFormData({...lessonFormData, conteudo_texto: e.target.value})}
-                  placeholder="Digite o conteúdo da aula..."
-                  rows={6}
-                />
+                <Label>Conteúdo</Label>
+                <Textarea value={lessonFormData.conteudo_texto} onChange={(e) => setLessonFormData({...lessonFormData, conteudo_texto: e.target.value})} placeholder="Digite o conteúdo da aula..." rows={6} />
               </div>
             )}
-            
             {lessonFormData.tipo_aula === 'quiz' && (
               <div className="space-y-2">
-                <Label htmlFor="nota_de_corte">Nota de Corte (%)</Label>
-                <Input
-                  id="nota_de_corte"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={lessonFormData.nota_de_corte}
-                  onChange={(e) => setLessonFormData({...lessonFormData, nota_de_corte: parseInt(e.target.value) || 0})}
-                />
+                <Label>Nota de Corte (%)</Label>
+                <Input type="number" min="0" max="100" value={lessonFormData.nota_de_corte} onChange={(e) => setLessonFormData({...lessonFormData, nota_de_corte: parseInt(e.target.value) || 0})} />
               </div>
             )}
-            
             <div className="space-y-2">
-              <Label htmlFor="ordem">Ordem</Label>
-              <Input
-                id="ordem"
-                type="number"
-                min="1"
-                value={lessonFormData.ordem}
-                onChange={(e) => setLessonFormData({...lessonFormData, ordem: parseInt(e.target.value) || 1})}
-              />
+              <Label>Ordem</Label>
+              <Input type="number" min="1" value={lessonFormData.ordem} onChange={(e) => setLessonFormData({...lessonFormData, ordem: parseInt(e.target.value) || 1})} />
             </div>
-            
             <div className="flex justify-end gap-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setIsLessonDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit">
-                {editingLesson ? 'Atualizar' : 'Criar'} Aula
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsLessonDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit">{editingLesson ? 'Atualizar' : 'Criar'} Aula</Button>
             </div>
           </form>
         </DialogContent>
