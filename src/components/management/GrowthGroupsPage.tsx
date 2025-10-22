@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useMemo, useState } from 'react'
 import { useChurchGrowthGroups, useCreateGrowthGroup, useUpdateGrowthGroup, useAddLeaderToGroup, useAddMemberToGroup } from '@/hooks/useGrowthGroups'
 import { useMembers } from '@/hooks/useMembers'
@@ -13,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Calendar, Clock, MapPin, Phone, PlusCircle, Users, RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { toast } from 'react-hot-toast'
+import { toast } from 'sonner'
 import GroupLeadersList from './GroupLeadersList'
 import GroupMembersList from './GroupMembersList'
 

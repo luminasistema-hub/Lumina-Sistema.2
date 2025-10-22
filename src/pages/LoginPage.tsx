@@ -24,19 +24,16 @@ const LoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('LoginPage: Form submitted for login:', { email })
     
     if (!email || !password) {
       toast.error('Por favor, preencha todos os campos')
       return
     }
 
-    console.log('LoginPage: Attempting login via useAuthStore.login().');
     const success = await login(email, password);
     if (!success) {
-      console.error('LoginPage: Login failed via useAuthStore.login().');
+      // Erro já tratado no authStore
     } else {
-      console.log('LoginPage: Login successful via useAuthStore.login().');
       toast.success('Login realizado com sucesso!')
       navigate('/dashboard')
     }
