@@ -10,7 +10,6 @@ import { Check, ChevronsRight, ExternalLink, X, Info, Loader2 } from 'lucide-rea
 import DescricaoFormatada from '../utils/DescricaoFormatada';
 import { PassoEtapa } from '../../hooks/useJourneyData';
 import { useUserEnrollments } from '../../hooks/useSchools';
-import { useSchoolById } from '../../hooks/useSchool';
 
 interface JourneyActionDialogProps {
   isOpen: boolean;
@@ -135,22 +134,22 @@ const QuizComponent = ({ passo, onQuizComplete }: { passo: PassoEtapa; onQuizCom
 const SchoolConclusionContent = ({ passo }: { passo: PassoEtapa }) => {
   const navigate = useNavigate();
   const schoolId = passo.escola_pre_requisito_id;
+  const schoolName = passo.escola_pre_requisito_nome;
 
-  const { data: school, isLoading: schoolLoading } = useSchoolById(schoolId);
   const { data: enrollments, isLoading: enrollmentsLoading } = useUserEnrollments();
 
-  if (schoolLoading || enrollmentsLoading) {
+  if (enrollmentsLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="ml-2">Carregando informações da escola...</p>
+        <p className="ml-2">Carregando informações de inscrição...</p>
       </div>
     );
   }
 
   const enrollment = enrollments?.find(e => e.escola_id === schoolId);
 
-  if (!school) {
+  if (!schoolName) {
     return <p className="text-red-500 text-center">Escola associada a este passo não foi encontrada.</p>;
   }
 
@@ -160,7 +159,7 @@ const SchoolConclusionContent = ({ passo }: { passo: PassoEtapa }) => {
         <Info className="w-5 h-5 flex-shrink-0" />
         <div>
           <p className="font-semibold">Este passo é concluído automaticamente!</p>
-          <p className="text-sm">Finalize a escola "{school.nome}" para que este passo seja marcado como completo.</p>
+          <p className="text-sm">Finalize a escola "{schoolName}" para que este passo seja marcado como completo.</p>
         </div>
       </div>
 
@@ -168,7 +167,7 @@ const SchoolConclusionContent = ({ passo }: { passo: PassoEtapa }) => {
         <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
           <p className="font-semibold text-green-800">Você está inscrito!</p>
           <p className="text-sm text-green-700">Seu progresso está pendente de conclusão da escola.</p>
-          <Button className="mt-4" onClick={() => navigate(`/escolas/${school.id}`)}>
+          <Button className="mt-4" onClick={() => navigate(`/escolas/${schoolId}`)}>
             Acessar Aulas
           </Button>
         </div>

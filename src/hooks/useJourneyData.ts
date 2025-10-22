@@ -51,6 +51,7 @@ export interface JourneyPassoDisplay extends PassoEtapa {
   progress?: ProgressoMembro | null;
   isLocked: boolean;
   lockReason: string | null;
+  escola_pre_requisito_nome?: string | null;
 }
 
 export interface JourneyEtapaDisplay extends EtapaTrilha {
@@ -192,7 +193,13 @@ export const useJourneyData = () => {
     // 4) Carrega progresso das escolas
     const schoolPrereqIds = etapaArr.flatMap(e => e.passos).map(p => p.escola_pre_requisito_id).filter(Boolean) as string[];
     const completedSchools = new Set<string>();
+    const schoolNames = new Map<string, string>();
     if (schoolPrereqIds.length > 0) {
+        const { data: schoolsData, error: schoolsError } = await supabase.from('escolas').select('id, nome').in('id', schoolPrereqIds);
+        if (!schoolsError && schoolsData) {
+            schoolsData.forEach(s => schoolNames.set(s.id, s.nome));
+        }
+
         const { data: schoolLessons, error: lessonsErr } = await supabase.from('escola_aulas').select('id, escola_id').in('escola_id', schoolPrereqIds);
         const { data: userSchoolProgress, error: progressErr } = await supabase.from('escola_progresso_aulas').select('aula_id').eq('membro_id', user.id);
 
@@ -265,6 +272,7 @@ export const useJourneyData = () => {
 
         return {
           ...p,
+          escola_pre_requisito_nome: p.escola_pre_requisito_id ? schoolNames.get(p.escola_pre_requisito_id) : null,
           completed: isCompleted,
           completedDate: progress?.data_conclusao,
           progress,
