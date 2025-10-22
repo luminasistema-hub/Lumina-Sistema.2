@@ -46,7 +46,7 @@ const BudgetManagement = () => {
   const categories = ['Pessoal', 'Manutenção', 'Utilidades', 'Ministérios', 'Eventos', 'Equipamentos', 'Outros']
 
   // Query para orçamentos
-  const { data: budgets, isLoading } = useQuery({
+  const { data: budgets, isLoading, isFetching } = useQuery({
     queryKey: ['budgets', currentChurchId, selectedMonth],
     queryFn: async () => {
       if (!currentChurchId) return []
@@ -54,17 +54,18 @@ const BudgetManagement = () => {
         .from('orcamentos')
         .select('*')
         .eq('id_igreja', currentChurchId)
-        .eq('mes_ano', selectedMonth)
+        .eq('mes_ao', selectedMonth)
         .order('categoria')
       if (error) throw error
       return data as Budget[]
     },
     enabled: !!currentChurchId,
+    keepPreviousData: true,
     staleTime: 30 * 1000,
   })
 
   // Query para gastos do mês
-  const { data: monthExpenses } = useQuery({
+  const { data: monthExpenses, isFetching: isFetchingMonthExpenses } = useQuery({
     queryKey: ['month-expenses', currentChurchId, selectedMonth],
     queryFn: async () => {
       if (!currentChurchId) return []
@@ -80,6 +81,7 @@ const BudgetManagement = () => {
       return data
     },
     enabled: !!currentChurchId,
+    keepPreviousData: true,
   })
 
   // Atualizar valores gastos
@@ -193,7 +195,7 @@ const BudgetManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Input 
@@ -209,7 +211,7 @@ const BudgetManagement = () => {
       </div>
 
       {/* Resumo Geral */}
-      <Card>
+      <Card className="relative">
         <CardHeader>
           <CardTitle>Resumo do Orçamento - {new Date(selectedMonth).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</CardTitle>
         </CardHeader>
@@ -233,68 +235,79 @@ const BudgetManagement = () => {
             <p className="text-sm text-gray-600 text-center">{totalPercentage.toFixed(1)}% do orçamento utilizado</p>
           </div>
         </CardContent>
+        {(isFetching || isFetchingMonthExpenses) && (
+          <div className="absolute right-3 top-3 text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+          </div>
+        )}
       </Card>
 
-      {/* Lista de Orçamentos */}
-      {isLoading ? (
-        <div className="text-center p-8">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {budgets?.map((budget) => {
-            const percentage = budget.valor_orcado > 0 ? (budget.valor_gasto / budget.valor_orcado) * 100 : 0
-            const remaining = budget.valor_orcado - budget.valor_gasto
-            
-            return (
-              <Card key={budget.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{budget.categoria}</CardTitle>
-                      {budget.subcategoria && <p className="text-sm text-gray-500">{budget.subcategoria}</p>}
+      <div className="relative">
+        {isFetching && budgets && budgets.length > 0 && (
+          <div className="absolute right-3 -top-8 text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+          </div>
+        )}
+        {!budgets || (budgets.length === 0 && isLoading) ? (
+          <div className="text-center p-8">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {budgets?.map((budget) => {
+              const percentage = budget.valor_orcado > 0 ? (budget.valor_gasto / budget.valor_orcado) * 100 : 0
+              const remaining = budget.valor_orcado - budget.valor_gasto
+              
+              return (
+                <Card key={budget.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{budget.categoria}</CardTitle>
+                        {budget.subcategoria && <p className="text-sm text-gray-500">{budget.subcategoria}</p>}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => openDialog(budget)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteBudgetMutation.mutate(budget.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => openDialog(budget)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => deleteBudgetMutation.mutate(budget.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Orçado:</span>
+                      <span className="font-semibold">R$ {budget.valor_orcado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Orçado:</span>
-                    <span className="font-semibold">R$ {budget.valor_orcado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Gasto:</span>
-                    <span className="font-semibold text-red-600">R$ {budget.valor_gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Disponível:</span>
-                    <span className={`font-semibold ${remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      R$ {Math.abs(remaining).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <Progress value={percentage} className={getProgressColor(percentage)} />
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">{percentage.toFixed(1)}% utilizado</span>
-                    {percentage > 100 && (
-                      <Badge variant="destructive" className="flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" />
-                        Excedido
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Gasto:</span>
+                      <span className="font-semibold text-red-600">R$ {budget.valor_gasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Disponível:</span>
+                      <span className={`font-semibold ${remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        R$ {Math.abs(remaining).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <Progress value={percentage} className={getProgressColor(percentage)} />
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">{percentage.toFixed(1)}% utilizado</span>
+                      {percentage > 100 && (
+                        <Badge variant="destructive" className="flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Excedido
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Dialog para criar/editar orçamento */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

@@ -169,7 +169,7 @@ const FinancialPanel = () => {
   })
 
   // Query para transações paginadas
-  const { data: transactionsResponse, isLoading: isLoadingTransactions } = useQuery({
+  const { data: transactionsResponse, isLoading: isLoadingTransactions, isFetching: isFetchingTransactions } = useQuery({
     queryKey: ['transactions', currentChurchId, page, debouncedSearchTerm, selectedCategory, selectedMemberFilter, selectedStatus, selectedType],
     queryFn: async () => {
       if (!currentChurchId) return { data: [], count: 0 }
@@ -201,7 +201,7 @@ const FinancialPanel = () => {
   const transactionCount = transactionsResponse?.count || 0
 
   // Query para resumo financeiro
-  const { data: financialSummary } = useQuery({
+  const { data: financialSummary, isFetching: isFetchingSummary } = useQuery({
     queryKey: ['financial-summary', currentChurchId],
     queryFn: async () => {
       if (!currentChurchId) return { 
@@ -249,7 +249,7 @@ const FinancialPanel = () => {
   })
 
   // Query para metas financeiras
-  const { data: goals = [] } = useQuery({
+  const { data: goals = [], isFetching: isFetchingGoals } = useQuery({
     queryKey: ['financial-goals', currentChurchId],
     queryFn: async () => {
       if (!currentChurchId) return []
@@ -615,7 +615,12 @@ const FinancialPanel = () => {
           <TabsTrigger value="reports"><FileText className="w-4 h-4 mr-2" />Relatórios</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-6">
+        <TabsContent value="dashboard" className="space-y-6 relative">
+          {isFetchingSummary && (
+            <div className="absolute right-2 -top-6 text-gray-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-2">
@@ -716,8 +721,13 @@ const FinancialPanel = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="transactions" className="space-y-4">
-          {isLoadingTransactions && transactions.length === 0 ? (
+        <TabsContent value="transactions" className="space-y-4 relative">
+          {isFetchingTransactions && transactions.length > 0 && (
+            <div className="absolute right-2 -top-6 text-gray-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
+          )}
+          {!transactions || (transactions.length === 0 && isLoadingTransactions) ? (
             <div className="text-center p-8">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
               <p className="text-gray-500">Carregando transações...</p>
@@ -902,7 +912,12 @@ const FinancialPanel = () => {
           <BudgetManagement />
         </TabsContent>
         
-        <TabsContent value="goals" className="space-y-4">
+        <TabsContent value="goals" className="space-y-4 relative">
+          {isFetchingGoals && (
+            <div className="absolute right-2 -top-6 text-gray-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {goals.map((goal) => {
               const percentage = goal.valor_meta > 0 ? (goal.valor_atual / goal.valor_meta) * 100 : 0
