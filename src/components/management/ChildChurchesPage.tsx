@@ -63,6 +63,11 @@ const ChildChurchesPage = () => {
     if (!canManage) return toast.error('Você não tem permissão para criar igrejas filhas.');
     if (parentInfo?.isChild) return toast.error('Igrejas filhas não podem criar novas igrejas.');
 
+    // Verificação do limite
+    if (parentInfo && children.length >= parentInfo.limite_igrejas_filhas) {
+      return toast.error(`Limite de ${parentInfo.limite_igrejas_filhas} igrejas filhas atingido. Para adicionar mais, considere fazer um upgrade do plano.`);
+    }
+
     setCreating(true);
 
     const { error } = await supabase.functions.invoke('register-child-church', {

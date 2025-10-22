@@ -9,6 +9,8 @@ export interface SubscriptionPlan {
   limite_membros: number;
   limite_quizes_por_etapa: number;
   limite_armazenamento_mb: number;
+  limite_igrejas_filhas: number;
+  limite_escolas: number;
   descricao: string;
   link_pagamento?: string;
 }

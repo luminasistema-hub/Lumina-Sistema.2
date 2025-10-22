@@ -55,6 +55,7 @@ export interface Church {
   // Novos campos de gestão
   data_emissao_contrato?: string;
   limite_igrejas_filhas: number;
+  limite_escolas: number;
   parent_church_id?: string | null;
 }
 
@@ -145,6 +146,7 @@ export const useChurchStore = create<ChurchState>()(
           compartilha_devocionais_da_mae: c.compartilha_devocionais_da_mae ?? true,
           data_emissao_contrato: c.data_emissao_contrato,
           limite_igrejas_filhas: c.limite_igrejas_filhas || 0,
+          limite_escolas: c.limite_escolas || 0,
           parent_church_id: c.parent_church_id,
         })) as Church[], isLoadingChurches: false, lastLoadedAt: Date.now() });
       },
@@ -233,6 +235,7 @@ export const useChurchStore = create<ChurchState>()(
         // Novos campos de gestão
         if (updates.data_emissao_contrato) updatePayload.data_emissao_contrato = updates.data_emissao_contrato;
         if (updates.limite_igrejas_filhas !== undefined) updatePayload.limite_igrejas_filhas = updates.limite_igrejas_filhas;
+        if (updates.limite_escolas !== undefined) updatePayload.limite_escolas = updates.limite_escolas;
         if (updates.memberLimit !== undefined) updatePayload.limite_membros = updates.memberLimit;
 
         const { data, error } = await supabase
@@ -284,6 +287,7 @@ export const useChurchStore = create<ChurchState>()(
           compartilha_devocionais_da_mae: data.compartilha_devocionais_da_mae ?? true,
           data_emissao_contrato: data.data_emissao_contrato,
           limite_igrejas_filhas: data.limite_igrejas_filhas,
+          limite_escolas: data.limite_escolas,
           parent_church_id: data.parent_church_id,
         };
 

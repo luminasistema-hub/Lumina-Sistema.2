@@ -6,7 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
-import { Plus, Edit, Link, Users, Database, HardDrive, Loader2 } from 'lucide-react';
+import { Plus, Edit, Link, Users, Database, HardDrive, FolderTree, BookOpen, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../../integrations/supabase/client';
 
@@ -25,6 +25,8 @@ const SubscriptionPlanManagement = () => {
       limite_membros: 0,
       limite_quizes_por_etapa: 5,
       limite_armazenamento_mb: 1024,
+      limite_igrejas_filhas: 0,
+      limite_escolas: 1,
       descricao: '',
       link_pagamento: ''
     });
@@ -40,6 +42,8 @@ const SubscriptionPlanManagement = () => {
         limite_membros: formData.limite_membros,
         limite_quizes_por_etapa: formData.limite_quizes_por_etapa,
         limite_armazenamento_mb: formData.limite_armazenamento_mb,
+        limite_igrejas_filhas: formData.limite_igrejas_filhas,
+        limite_escolas: formData.limite_escolas,
         descricao: formData.descricao,
         link_pagamento: formData.link_pagamento,
       };
@@ -128,6 +132,14 @@ const SubscriptionPlanManagement = () => {
                   <HardDrive className="w-4 h-4 text-gray-500" />
                   <span>{plan.limite_armazenamento_mb} MB de armazenamento</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <FolderTree className="w-4 h-4 text-gray-500" />
+                  <span>Até {plan.limite_igrejas_filhas} igrejas filhas</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-gray-500" />
+                  <span>Até {plan.limite_escolas} escolas</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -159,6 +171,16 @@ const SubscriptionPlanManagement = () => {
               <div className="space-y-2">
                 <Label htmlFor="membros">Limite de Membros</Label>
                 <Input id="membros" type="number" value={formData.limite_membros || 0} onChange={(e) => setFormData({ ...formData, limite_membros: parseInt(e.target.value) })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="child_churches">Limite de Igrejas Filhas</Label>
+                <Input id="child_churches" type="number" value={formData.limite_igrejas_filhas || 0} onChange={(e) => setFormData({ ...formData, limite_igrejas_filhas: parseInt(e.target.value) })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="schools">Limite de Escolas</Label>
+                <Input id="schools" type="number" value={formData.limite_escolas || 0} onChange={(e) => setFormData({ ...formData, limite_escolas: parseInt(e.target.value) })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

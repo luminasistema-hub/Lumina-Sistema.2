@@ -47,6 +47,7 @@ import QuizQuestionsManager from './QuizQuestionsManager'
 import { Progress } from '@/components/ui/progress'
 import { DatePicker } from '@/components/ui/datepicker'
 import { supabase } from '@/integrations/supabase/client'
+import { useChurchStore } from '@/stores/churchStore'
 
 const SchoolsManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
@@ -56,6 +57,7 @@ const SchoolsManagementPage = () => {
   const updateSchoolMutation = useUpdateSchool()
   const deleteSchoolMutation = useDeleteSchool()
   const graduateStudentMutation = useGraduateStudent()
+  const { getChurchById } = useChurchStore()
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
@@ -123,7 +125,14 @@ const SchoolsManagementPage = () => {
   }
 
   const handleOpenDialog = (school?: any) => {
-    if (school) {
+    if (!school) {
+      const currentChurch = getChurchById(currentChurchId!);
+      if (currentChurch && churchSchools.length >= currentChurch.limite_escolas) {
+        toast.error(`Limite de ${currentChurch.limite_escolas} escolas atingido. Para criar mais, o administrador da igreja pode fazer um upgrade do plano.`);
+        return;
+      }
+      resetForm();
+    } else {
       setEditingSchool(school)
       setFormData({
         nome: school.nome || '',
@@ -133,8 +142,6 @@ const SchoolsManagementPage = () => {
         data_inicio: school.data_inicio ? new Date(school.data_inicio) : undefined,
         data_fim: school.data_fim ? new Date(school.data_fim) : undefined
       })
-    } else {
-      resetForm()
     }
     setIsDialogOpen(true)
   }
