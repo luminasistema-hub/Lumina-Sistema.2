@@ -36,6 +36,7 @@ export interface SchoolLesson {
   ordem: number
   created_at: string
   updated_at: string
+  nota_de_corte?: number
 }
 
 export interface StudentAttendance {
@@ -149,6 +150,25 @@ export const useSchoolLessons = (schoolId: string | null) => {
   })
 }
 
+// Função para buscar frequência de uma escola inteira
+const fetchSchoolAttendance = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from('escola_frequencia')
+    .select('*, escola_aulas!inner(escola_id)')
+    .eq('escola_aulas.escola_id', schoolId)
+
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useSchoolAttendance = (schoolId: string | null) => {
+  return useQuery({
+    queryKey: ['school-attendance', schoolId],
+    queryFn: () => fetchSchoolAttendance(schoolId!),
+    enabled: !!schoolId
+  })
+}
+
 // Função para buscar frequência do aluno
 const fetchStudentAttendance = async (userId: string, lessonId: string) => {
   const { data, error } = await supabase
@@ -215,6 +235,28 @@ export const useUserQuizAnswers = (lessonId: string | null) => {
     queryKey: ['user-quiz-answers', user?.id, lessonId],
     queryFn: () => fetchUserQuizAnswers(user!.id, lessonId!),
     enabled: !!user?.id && !!lessonId
+  })
+}
+
+// Função para buscar inscrições de uma escola específica
+const fetchSchoolEnrollments = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from('escola_inscricoes')
+    .select(`
+      *,
+      membros(id, nome_completo, email)
+    `)
+    .eq('escola_id', schoolId)
+
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useSchoolEnrollments = (schoolId: string | null) => {
+  return useQuery({
+    queryKey: ['school-enrollments', schoolId],
+    queryFn: () => fetchSchoolEnrollments(schoolId!),
+    enabled: !!schoolId
   })
 }
 
@@ -368,6 +410,35 @@ export const useRegisterAttendance = () => {
     onSuccess: () => {
       toast.success('Frequência registrada com sucesso!')
       queryClient.invalidateQueries({ queryKey: ['student-attendance'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao registrar frequência: ${error.message}`)
+    }
+  })
+}
+
+// Hook para registrar frequência (professor)
+export const useRegisterStudentAttendance = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ lessonId, memberId, date, present }: { lessonId: string, memberId: string, date: string, present: boolean }) => {
+      const { data, error } = await supabase
+        .from('escola_frequencia')
+        .upsert({
+          aula_id: lessonId,
+          membro_id: memberId,
+          data_aula: date,
+          presente: present
+        }, { onConflict: 'aula_id,membro_id,data_aula' })
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Frequência registrada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['student-attendance-for-lesson', variables.lessonId] })
     },
     onError: (error) => {
       toast.error(`Erro ao registrar frequência: ${error.message}`)

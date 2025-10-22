@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSchools, useCreateSchool, useUpdateSchool, useDeleteSchool, useSchoolLessons, useCreateLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/useSchools'
+import { useSchools, useCreateSchool, useUpdateSchool, useDeleteSchool, useSchoolLessons, useCreateLesson, useUpdateLesson, useDeleteLesson, useSchoolEnrollments, useSchoolAttendance, useRegisterStudentAttendance, useQuizQuestions } from '@/hooks/useSchools'
 import { useMembers } from '@/hooks/useMembers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,8 +31,10 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Users, BookOpen, Play, FileText, CheckSquare, MapPin } from 'lucide-react'
+import { Plus, Pencil, Trash2, Users, BookOpen, Play, FileText, CheckSquare, MapPin, HelpCircle, CheckCircle } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import QuizQuestionsManager from './QuizQuestionsManager'
+import { Progress } from '@/components/ui/progress'
 
 const SchoolsManagementPage = () => {
   const { user, currentChurchId } = useAuthStore()
@@ -44,9 +46,14 @@ const SchoolsManagementPage = () => {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false)
+  const [isStudentsDialogOpen, setIsStudentsDialogOpen] = useState(false)
+  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false)
+  const [isQuizManagerOpen, setIsQuizManagerOpen] = useState(false)
   const [editingSchool, setEditingSchool] = useState<any>(null)
   const [selectedSchool, setSelectedSchool] = useState<any>(null)
   const [editingLesson, setEditingLesson] = useState<any>(null)
+  const [lessonForAttendance, setLessonForAttendance] = useState<any>(null)
+  const [lessonForQuiz, setLessonForQuiz] = useState<any>(null)
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -61,13 +68,17 @@ const SchoolsManagementPage = () => {
     tipo_aula: 'texto' as 'texto' | 'video' | 'quiz' | 'presencial',
     youtube_url: '',
     conteudo_texto: '',
-    ordem: 1
+    ordem: 1,
+    nota_de_corte: 70
   })
 
   const { data: lessons } = useSchoolLessons(selectedSchool?.id || null)
   const createLessonMutation = useCreateLesson()
   const updateLessonMutation = useUpdateLesson()
   const deleteLessonMutation = useDeleteLesson()
+  const { data: enrollments } = useSchoolEnrollments(selectedSchool?.id || null)
+  const { data: schoolAttendance } = useSchoolAttendance(selectedSchool?.id || null)
+  const registerAttendanceMutation = useRegisterStudentAttendance()
 
   const resetForm = () => {
     setFormData({
@@ -86,7 +97,8 @@ const SchoolsManagementPage = () => {
       tipo_aula: 'texto',
       youtube_url: '',
       conteudo_texto: '',
-      ordem: 1
+      ordem: 1,
+      nota_de_corte: 70
     })
     setEditingLesson(null)
   }
@@ -110,6 +122,21 @@ const SchoolsManagementPage = () => {
     setSelectedSchool(school)
   }
 
+  const handleOpenStudentsDialog = (school: any) => {
+    setSelectedSchool(school)
+    setIsStudentsDialogOpen(true)
+  }
+
+  const handleOpenAttendanceDialog = (lesson: any) => {
+    setLessonForAttendance(lesson)
+    setIsAttendanceDialogOpen(true)
+  }
+
+  const handleOpenQuizDialog = (lesson: any) => {
+    setLessonForQuiz(lesson)
+    setIsQuizManagerOpen(true)
+  }
+
   const handleOpenLessonDialog = (lesson?: any) => {
     if (lesson) {
       setEditingLesson(lesson)
@@ -119,7 +146,8 @@ const SchoolsManagementPage = () => {
         tipo_aula: lesson.tipo_aula || 'texto',
         youtube_url: lesson.youtube_url || '',
         conteudo_texto: lesson.conteudo_texto || '',
-        ordem: lesson.ordem || 1
+        ordem: lesson.ordem || 1,
+        nota_de_corte: lesson.nota_de_corte || 70
       })
     } else {
       resetLessonForm()
@@ -184,6 +212,16 @@ const SchoolsManagementPage = () => {
     if (confirm('Tem certeza que deseja remover esta aula?')) {
       deleteLessonMutation.mutate(lessonId)
     }
+  }
+
+  const handleRegisterAttendance = (memberId: string, present: boolean) => {
+    if (!lessonForAttendance) return
+    registerAttendanceMutation.mutate({
+      lessonId: lessonForAttendance.id,
+      memberId,
+      date: new Date().toISOString().split('T')[0],
+      present
+    })
   }
 
   // Filtrar membros que podem ser professores (pastores, admins, líderes de ministério)
@@ -370,6 +408,13 @@ const SchoolsManagementPage = () => {
                         <Button 
                           variant="outline" 
                           size="sm" 
+                          onClick={() => handleOpenStudentsDialog(school)}
+                        >
+                          <Users className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
                           onClick={() => handleOpenDialog(school)}
                         >
                           <Pencil className="w-4 h-4" />
@@ -402,9 +447,55 @@ const SchoolsManagementPage = () => {
         </CardContent>
       </Card>
 
+      {/* Dialog para gerenciar alunos */}
+      {selectedSchool && (
+        <Dialog open={isStudentsDialogOpen} onOpenChange={() => setIsStudentsDialogOpen(false)}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Alunos Inscritos - {selectedSchool.nome}</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              {enrollments && lessons ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Aluno</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Progresso de Frequência</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {enrollments.map((enrollment: any) => {
+                      const presencialLessons = lessons.filter(l => l.tipo_aula === 'presencial')
+                      const attendedLessons = schoolAttendance?.filter(att => att.membro_id === enrollment.membro_id && att.presente && presencialLessons.some(l => l.id === att.aula_id)) || []
+                      const progress = presencialLessons.length > 0 ? (attendedLessons.length / presencialLessons.length) * 100 : 0
+
+                      return (
+                        <TableRow key={enrollment.id}>
+                          <TableCell>{enrollment.membros.nome_completo}</TableCell>
+                          <TableCell>{enrollment.membros.email}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Progress value={progress} className="w-full" />
+                              <span>{Math.round(progress)}%</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p>Carregando alunos...</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Dialog para gerenciar aulas */}
       {selectedSchool && (
-        <Dialog open={!!selectedSchool} onOpenChange={() => setSelectedSchool(null)}>
+        <Dialog open={!!selectedSchool && !isStudentsDialogOpen} onOpenChange={() => setSelectedSchool(null)}>
           <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle>
@@ -450,6 +541,16 @@ const SchoolsManagementPage = () => {
                           <div className="flex justify-end gap-2">
                             {canManageLessons(selectedSchool) && (
                               <>
+                                {lesson.tipo_aula === 'quiz' && (
+                                  <Button variant="outline" size="sm" onClick={() => handleOpenQuizDialog(lesson)}>
+                                    <HelpCircle className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {lesson.tipo_aula === 'presencial' && (
+                                  <Button variant="outline" size="sm" onClick={() => handleOpenAttendanceDialog(lesson)}>
+                                    <CheckCircle className="w-4 h-4" />
+                                  </Button>
+                                )}
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
@@ -477,6 +578,55 @@ const SchoolsManagementPage = () => {
                   Nenhuma aula cadastrada ainda
                 </div>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog para gerenciar quiz */}
+      {lessonForQuiz && (
+        <Dialog open={isQuizManagerOpen} onOpenChange={() => setIsQuizManagerOpen(false)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Gerenciar Quiz - {lessonForQuiz.titulo}</DialogTitle>
+            </DialogHeader>
+            <QuizQuestionsManager lessonId={lessonForQuiz.id} />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog para registrar frequência */}
+      {lessonForAttendance && (
+        <Dialog open={isAttendanceDialogOpen} onOpenChange={() => setIsAttendanceDialogOpen(false)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Registrar Frequência - {lessonForAttendance.titulo}</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Aluno</TableHead>
+                    <TableHead className="text-right">Presente</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {enrollments?.map((enrollment: any) => {
+                    const attendanceRecord = schoolAttendance?.find(att => att.membro_id === enrollment.membro_id && att.aula_id === lessonForAttendance.id)
+                    return (
+                      <TableRow key={enrollment.id}>
+                        <TableCell>{enrollment.membros.nome_completo}</TableCell>
+                        <TableCell className="text-right">
+                          <Switch
+                            checked={attendanceRecord?.presente || false}
+                            onCheckedChange={(checked) => handleRegisterAttendance(enrollment.membro_id, checked)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </div>
           </DialogContent>
         </Dialog>
@@ -554,6 +704,20 @@ const SchoolsManagementPage = () => {
                   onChange={(e) => setLessonFormData({...lessonFormData, conteudo_texto: e.target.value})}
                   placeholder="Digite o conteúdo da aula..."
                   rows={6}
+                />
+              </div>
+            )}
+            
+            {lessonFormData.tipo_aula === 'quiz' && (
+              <div className="space-y-2">
+                <Label htmlFor="nota_de_corte">Nota de Corte (%)</Label>
+                <Input
+                  id="nota_de_corte"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={lessonFormData.nota_de_corte}
+                  onChange={(e) => setLessonFormData({...lessonFormData, nota_de_corte: parseInt(e.target.value) || 0})}
                 />
               </div>
             )}
