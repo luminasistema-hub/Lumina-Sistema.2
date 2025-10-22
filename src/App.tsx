@@ -10,6 +10,7 @@ import SuperAdminRegisterPage from './pages/SuperAdminRegisterPage'
 import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
 import EADPortalPage from './pages/EADPortalPage'
+import SchoolDetailsPage from './pages/SchoolDetailsPage'
 import PaymentSuccessPage from './pages/PaymentSuccessPage'
 import PasswordResetPage from './pages/PasswordResetPage'
 import NewPasswordPage from './pages/NewPasswordPage'
@@ -176,6 +177,14 @@ function App() {
           element={
             <ProtectedRoute requireTenant>
               <EADPortalPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/escolas/:schoolId"
+          element={
+            <ProtectedRoute requireTenant>
+              <SchoolDetailsPage />
             </ProtectedRoute>
           }
         />

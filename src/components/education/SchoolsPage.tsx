@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSchools, useUserEnrollments, useEnrollInSchool, useUnenrollFromSchool } from '@/hooks/useSchools'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ import { BookOpen, Users, Calendar, CheckCircle } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const SchoolsPage = () => {
+  const navigate = useNavigate()
   const { user } = useAuthStore()
   const { data: schools, isLoading: schoolsLoading, error: schoolsError } = useSchools()
   const { data: enrollments, isLoading: enrollmentsLoading, error: enrollmentsError } = useUserEnrollments()
@@ -161,7 +163,7 @@ const SchoolsPage = () => {
                     {enrollment && (
                       <Button 
                         size="sm" 
-                        onClick={() => window.location.href = `/escolas/${school.id}`}
+                        onClick={() => navigate(`/escolas/${school.id}`)}
                       >
                         Acessar Aulas
                       </Button>
