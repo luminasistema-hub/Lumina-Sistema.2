@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
 import { UnifiedReceiptDialog } from '../financial/UnifiedReceiptDialog'
+import BudgetManagement from '../financial/BudgetManagement'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { 
   PieChart,
@@ -122,7 +123,6 @@ const FinancialPanel = () => {
     },
     enabled: !!currentChurchId,
     staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
   })
 
   // Query para transações paginadas
@@ -150,9 +150,8 @@ const FinancialPanel = () => {
       if (error) throw error
       return { data: (data || []) as FinancialTransaction[], count: count || 0 }
     },
-    enabled: !!currentChurchId,
+    enabled: !!currentChurchId && viewMode === 'transactions',
     staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
   })
 
   const transactions = transactionsResponse?.data || []
@@ -202,9 +201,8 @@ const FinancialPanel = () => {
         transacoesHoje
       }
     },
-    enabled: !!currentChurchId,
+    enabled: !!currentChurchId && viewMode === 'dashboard',
     staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
   })
 
   const summary = financialSummary || { 
@@ -383,20 +381,11 @@ const FinancialPanel = () => {
     return <div className="p-6 text-center text-gray-600">Selecione uma igreja para gerenciar o painel financeiro.</div>
   }
 
-  if (isLoadingTransactions && transactions.length === 0) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-green-500" />
-        <p className="ml-3 text-lg text-gray-600">Carregando dados financeiros...</p>
-      </div>
-    )
-  }
-
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Painel Financeiro</h1>
-        {canManageFinancial && (
+        {canManageFinancial && viewMode === 'transactions' && (
           <Button onClick={() => setIsAddTransactionOpen(true)}>
             <Plus className="w-4 h-4 mr-2" /> Nova Transação
           </Button>
@@ -407,7 +396,7 @@ const FinancialPanel = () => {
         <TabsList>
           <TabsTrigger value="dashboard"><PieChart className="w-4 h-4 mr-2" />Dashboard</TabsTrigger>
           <TabsTrigger value="transactions"><BarChart3 className="w-4 h-4 mr-2" />Transações</TabsTrigger>
-          <TabsTrigger value="budget" disabled><Calculator className="w-4 h-4 mr-2" />Orçamento</TabsTrigger>
+          <TabsTrigger value="budget"><Calculator className="w-4 h-4 mr-2" />Orçamento</TabsTrigger>
           <TabsTrigger value="goals" disabled><Target className="w-4 h-4 mr-2" />Metas</TabsTrigger>
           <TabsTrigger value="reports" disabled><FileText className="w-4 h-4 mr-2" />Relatórios</TabsTrigger>
         </TabsList>
@@ -514,191 +503,189 @@ const FinancialPanel = () => {
         </TabsContent>
 
         <TabsContent value="transactions" className="space-y-4">
-          <Card>
-            <CardContent className="p-4 grid gap-3 md:grid-cols-5">
-              <Input 
-                placeholder="Buscar..." 
-                value={searchTerm} 
-                onChange={e => { 
-                  setSearchTerm(e.target.value)
-                  setPage(0) 
-                }} 
-              />
-              <Select value={selectedType} onValueChange={(v) => { 
-                setSelectedType(v)
-                setPage(0) 
-              }}>
-                <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Tipos</SelectItem>
-                  <SelectItem value="Entrada">Entrada</SelectItem>
-                  <SelectItem value="Saída">Saída</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={selectedCategory} onValueChange={(v) => { 
-                setSelectedCategory(v)
-                setPage(0) 
-              }}>
-                <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={selectedStatus} onValueChange={(v) => { 
-                setSelectedStatus(v)
-                setPage(0) 
-              }}>
-                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="Confirmado">Confirmado</SelectItem>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Cancelado">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={selectedMemberFilter} onValueChange={(v) => { 
-                setSelectedMemberFilter(v)
-                setPage(0) 
-              }}>
-                <SelectTrigger><SelectValue placeholder="Membro" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {members.map(m => <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-3">
-            {isLoadingTransactions && (
-              <div className="text-center p-8">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                <p className="text-gray-500">Carregando transações...</p>
-              </div>
-            )}
-            
-            {!isLoadingTransactions && transactions.length === 0 && (
-              <Card className="p-8 text-center text-gray-500">
-                Nenhuma transação encontrada
-              </Card>
-            )}
-            
-            {!isLoadingTransactions && transactions.map((transaction) => (
-              <Card key={transaction.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant={transaction.tipo === 'Entrada' ? 'default' : 'destructive'}>
-                          {transaction.tipo}
-                        </Badge>
-                        <Badge variant="outline">{transaction.categoria}</Badge>
-                        <Badge variant={
-                          transaction.status === 'Confirmado' ? 'default' : 
-                          transaction.status === 'Pendente' ? 'secondary' : 
-                          'destructive'
-                        }>
-                          {transaction.status}
-                        </Badge>
-                        {transaction.recibo_emitido && (
-                          <Badge variant="outline" className="text-green-600">
-                            <Receipt className="w-3 h-3 mr-1" />
-                            Recibo Emitido
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="font-semibold text-lg mb-1">{transaction.descricao}</p>
-                      <div className="flex flex-wrap gap-3 text-sm text-gray-600">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <CreditCard className="w-3 h-3" />
-                          {transaction.metodo_pagamento}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          {transaction.responsavel}
-                        </span>
-                        {transaction.numero_documento && (
-                          <span className="flex items-center gap-1">
-                            <FileText className="w-3 h-3" />
-                            {transaction.numero_documento}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`text-2xl font-bold ${transaction.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                        {transaction.tipo === 'Entrada' ? '+' : '-'} R$ {transaction.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openDetails(transaction)}>
-                          Ver Detalhes
-                        </Button>
-                        {transaction.tipo === 'Entrada' && canManageFinancial && (
-                          <Button variant="ghost" size="sm" onClick={() => generateReceipt(transaction)}>
-                            <Receipt className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {canManageFinancial && (
-                          <>
-                            <Button variant="ghost" size="sm" onClick={() => { 
-                              setTransactionToEdit(transaction)
-                              setIsEditTransactionOpen(true) 
-                            }}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => {
-                              if (confirm('Tem certeza que deseja excluir esta transação?')) {
-                                deleteTransactionMutation.mutate(transaction.id)
-                              }
-                            }}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+          {isLoadingTransactions && transactions.length === 0 ? (
+            <div className="text-center p-8">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+              <p className="text-gray-500">Carregando transações...</p>
+            </div>
+          ) : (
+            <>
+              <Card>
+                <CardContent className="p-4 grid gap-3 md:grid-cols-5">
+                  <Input 
+                    placeholder="Buscar..." 
+                    value={searchTerm} 
+                    onChange={e => { 
+                      setSearchTerm(e.target.value)
+                      setPage(0) 
+                    }} 
+                  />
+                  <Select value={selectedType} onValueChange={(v) => { 
+                    setSelectedType(v)
+                    setPage(0) 
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Tipos</SelectItem>
+                      <SelectItem value="Entrada">Entrada</SelectItem>
+                      <SelectItem value="Saída">Saída</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedCategory} onValueChange={(v) => { 
+                    setSelectedCategory(v)
+                    setPage(0) 
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedStatus} onValueChange={(v) => { 
+                    setSelectedStatus(v)
+                    setPage(0) 
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="Confirmado">Confirmado</SelectItem>
+                      <SelectItem value="Pendente">Pendente</SelectItem>
+                      <SelectItem value="Cancelado">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedMemberFilter} onValueChange={(v) => { 
+                    setSelectedMemberFilter(v)
+                    setPage(0) 
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Membro" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {members.map(m => <SelectItem key={m.id} value={m.id}>{m.nome_completo}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </CardContent>
               </Card>
-            ))}
-          </div>
 
-          {transactionCount > PAGE_SIZE && (
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-sm text-gray-600">
-                Mostrando {page * PAGE_SIZE + 1} - {Math.min((page + 1) * PAGE_SIZE, transactionCount)} de {transactionCount} transações
-              </span>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setPage(p => Math.max(0, p - 1))} 
-                  disabled={page === 0}
-                >
-                  Anterior
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setPage(p => p + 1)} 
-                  disabled={(page + 1) * PAGE_SIZE >= transactionCount}
-                >
-                  Próxima
-                </Button>
+              <div className="space-y-3">
+                {transactions.length === 0 && (
+                  <Card className="p-8 text-center text-gray-500">
+                    Nenhuma transação encontrada
+                  </Card>
+                )}
+                
+                {transactions.map((transaction) => (
+                  <Card key={transaction.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant={transaction.tipo === 'Entrada' ? 'default' : 'destructive'}>
+                              {transaction.tipo}
+                            </Badge>
+                            <Badge variant="outline">{transaction.categoria}</Badge>
+                            <Badge variant={
+                              transaction.status === 'Confirmado' ? 'default' : 
+                              transaction.status === 'Pendente' ? 'secondary' : 
+                              'destructive'
+                            }>
+                              {transaction.status}
+                            </Badge>
+                            {transaction.recibo_emitido && (
+                              <Badge variant="outline" className="text-green-600">
+                                <Receipt className="w-3 h-3 mr-1" />
+                                Recibo Emitido
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="font-semibold text-lg mb-1">{transaction.descricao}</p>
+                          <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <CreditCard className="w-3 h-3" />
+                              {transaction.metodo_pagamento}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {transaction.responsavel}
+                            </span>
+                            {transaction.numero_documento && (
+                              <span className="flex items-center gap-1">
+                                <FileText className="w-3 h-3" />
+                                {transaction.numero_documento}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`text-2xl font-bold ${transaction.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
+                            {transaction.tipo === 'Entrada' ? '+' : '-'} R$ {transaction.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openDetails(transaction)}>
+                              Ver Detalhes
+                            </Button>
+                            {transaction.tipo === 'Entrada' && canManageFinancial && (
+                              <Button variant="ghost" size="sm" onClick={() => generateReceipt(transaction)}>
+                                <Receipt className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canManageFinancial && (
+                              <>
+                                <Button variant="ghost" size="sm" onClick={() => { 
+                                  setTransactionToEdit(transaction)
+                                  setIsEditTransactionOpen(true) 
+                                }}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => {
+                                  if (confirm('Tem certeza que deseja excluir esta transação?')) {
+                                    deleteTransactionMutation.mutate(transaction.id)
+                                  }
+                                }}>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </div>
+
+              {transactionCount > PAGE_SIZE && (
+                <div className="flex items-center justify-between pt-4">
+                  <span className="text-sm text-gray-600">
+                    Mostrando {page * PAGE_SIZE + 1} - {Math.min((page + 1) * PAGE_SIZE, transactionCount)} de {transactionCount} transações
+                  </span>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setPage(p => Math.max(0, p - 1))} 
+                      disabled={page === 0}
+                    >
+                      Anterior
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setPage(p => p + 1)} 
+                      disabled={(page + 1) * PAGE_SIZE >= transactionCount}
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
         <TabsContent value="budget">
-          <Card className="p-8 text-center">
-            <Calculator className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-600 mb-2">Gerenciamento de Orçamento</p>
-            <p className="text-sm text-gray-500">Em breve você poderá criar e gerenciar orçamentos mensais</p>
-          </Card>
+          <BudgetManagement />
         </TabsContent>
         
         <TabsContent value="goals">
