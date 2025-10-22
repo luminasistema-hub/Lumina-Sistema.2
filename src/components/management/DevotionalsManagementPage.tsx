@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Calendar, User, Tag, Pencil, Trash2, Star, Plus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useChurchStore } from '@/stores/churchStore';
+import { Label } from '@/components/ui/label';
 
 type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado';
 type DevotionalCategory = 'Diário' | 'Semanal' | 'Especial' | 'Temático';
