@@ -90,6 +90,25 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
     onSaved();
   };
 
+  const handleResetPastorAccess = async () => {
+    if (!child?.id) return;
+    const { data: sessionRes } = await supabase.auth.getSession();
+    const token = sessionRes?.session?.access_token;
+
+    const { error } = await supabase.functions.invoke('reset-child-pastor-access', {
+      body: { churchId: child.id },
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+
+    if (error) {
+      toast.error('Falha ao resetar acesso do pastor: ' + error.message);
+      return;
+    }
+    toast.success('Acesso do pastor resetado! Use o e-mail da igreja e a "Senha do Painel".');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -129,6 +148,9 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? 'Salvando...' : 'Salvar'}
+            </Button>
+            <Button variant="secondary" onClick={handleResetPastorAccess}>
+              Resetar acesso do Pastor
             </Button>
           </div>
         </div>
