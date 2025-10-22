@@ -874,21 +874,51 @@ const FinancialPanel = () => {
   }
 
   // Cálculos para dashboard
-  const currentMonth = new Date().toISOString().slice(0, 7)
-  const confirmedTransactions = transactions.filter(t => t.status === 'Confirmado')
-  const pendingTransactions = transactions.filter(t => t.status === 'Pendente')
-  
-  const totalEntradas = confirmedTransactions.filter(t => t.tipo === 'Entrada').reduce((sum, t) => sum + t.valor, 0)
-  const totalSaidas = confirmedTransactions.filter(t => t.tipo === 'Saída').reduce((sum, t) => sum + t.valor, 0)
-  const saldoAtual = totalEntradas - totalSaidas
+  const financialSummary = useMemo(() => {
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    const confirmedTransactions = transactions.filter(t => t.status === 'Confirmado')
+    
+    const totalEntradas = confirmedTransactions.filter(t => t.tipo === 'Entrada').reduce((sum, t) => sum + t.valor, 0)
+    const totalSaidas = confirmedTransactions.filter(t => t.tipo === 'Saída').reduce((sum, t) => sum + t.valor, 0)
+    const saldoAtual = totalEntradas - totalSaidas
 
-  const entradasMes = confirmedTransactions.filter(t => t.tipo === 'Entrada' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
-  const saidasMes = confirmedTransactions.filter(t => t.tipo === 'Saída' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
-  const saldoMes = entradasMes - saidasMes
+    const entradasMes = confirmedTransactions.filter(t => t.tipo === 'Entrada' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
+    const saidasMes = confirmedTransactions.filter(t => t.tipo === 'Saída' && t.data_transacao.startsWith(currentMonth)).reduce((sum, t) => sum + t.valor, 0)
+    const saldoMes = entradasMes - saidasMes
 
-  const budgetTotal = budgets.reduce((sum, b) => sum + b.valor_orcado, 0)
-  const budgetUsed = budgets.reduce((sum, b) => sum + b.valor_gasto, 0)
-  const budgetProgress = budgetTotal > 0 ? (budgetUsed / budgetTotal) * 100 : 0
+    const pendingTransactions = transactions.filter(t => t.status === 'Pendente')
+
+    return {
+      totalEntradas,
+      totalSaidas,
+      saldoAtual,
+      entradasMes,
+      saidasMes,
+      saldoMes,
+      pendingTransactionsCount: pendingTransactions.length,
+    }
+  }, [transactions])
+
+  const budgetSummary = useMemo(() => {
+    const budgetTotal = budgets.reduce((sum, b) => sum + b.valor_orcado, 0)
+    const budgetUsed = budgets.reduce((sum, b) => sum + b.valor_gasto, 0)
+    const budgetProgress = budgetTotal > 0 ? (budgetUsed / budgetTotal) * 100 : 0
+    return { budgetTotal, budgetUsed, budgetProgress }
+  }, [budgets])
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => 
+      (selectedCategory === 'all' || t.categoria === selectedCategory) &&
+      (selectedMemberFilter === 'all' || t.membro_id === selectedMemberFilter) &&
+      (searchTerm === '' || 
+        t.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.numero_documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.responsavel.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    )
+  }, [transactions, selectedCategory, selectedMemberFilter, searchTerm])
+
+  const pendingTransactions = useMemo(() => transactions.filter(t => t.status === 'Pendente'), [transactions])
 
   if (!currentChurchId) {
     return (
@@ -1019,8 +1049,8 @@ const FinancialPanel = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Saldo Atual</p>
-                    <p className={`text-xl md:text-2xl font-bold ${saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      R$ {saldoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    <p className={`text-xl md:text-2xl font-bold ${financialSummary.saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      R$ {financialSummary.saldoAtual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-50 rounded-lg flex items-center justify-center">
@@ -1036,7 +1066,7 @@ const FinancialPanel = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Entradas (Mês)</p>
                     <p className="text-xl md:text-2xl font-bold text-green-600">
-                      R$ {entradasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {financialSummary.entradasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="w-10 h-10 md:w-12 md:h-12 bg-green-50 rounded-lg flex items-center justify-center">
@@ -1052,7 +1082,7 @@ const FinancialPanel = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Saídas (Mês)</p>
                     <p className="text-xl md:text-2xl font-bold text-red-600">
-                      R$ {saidasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {financialSummary.saidasMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="w-10 h-10 md:w-12 md:h-12 bg-red-50 rounded-lg flex items-center justify-center">
@@ -1068,7 +1098,7 @@ const FinancialPanel = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Pendências</p>
                     <p className="text-xl md:text-2xl font-bold text-orange-600">
-                      {pendingTransactions.length}
+                      {financialSummary.pendingTransactionsCount}
                     </p>
                   </div>
                   <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-50 rounded-lg flex items-center justify-center">
@@ -1498,16 +1528,7 @@ const FinancialPanel = () => {
 
           {/* All Transactions List */}
           <div className="space-y-4">
-            {transactions
-              .filter(t => 
-                (selectedCategory === 'all' || t.categoria === selectedCategory) &&
-                (selectedMemberFilter === 'all' || t.membro_id === selectedMemberFilter) &&
-                (searchTerm === '' || 
-                  t.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  t.numero_documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  t.responsavel.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-              )
+            {filteredTransactions
               .map((transaction) => (
               <Card key={transaction.id} className="border-0 shadow-sm">
                 <CardContent className="p-4 md:p-6">

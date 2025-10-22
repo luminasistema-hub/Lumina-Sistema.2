@@ -131,26 +131,24 @@ const ConfiguracaoJornada = () => {
         `)
         .eq('id_igreja', currentChurchId)
         .eq('is_ativa', true)
+        .order('ordem', { foreignTable: 'etapas_trilha', ascending: true })
+        .order('ordem', { foreignTable: 'etapas_trilha.passos_etapa', ascending: true })
+        .order('ordem', { foreignTable: 'etapas_trilha.passos_etapa.quiz_perguntas', ascending: true })
         .maybeSingle();
       
       if (error) throw error;
 
       if (trilhaData && trilhaData.etapas_trilha) {
         setTrilhaAtual({ id: trilhaData.id, titulo: trilhaData.titulo, descricao: trilhaData.descricao });
-        const etapasOrdenadas = (trilhaData.etapas_trilha as any[]).map(etapa => {
-          const passosOrdenados = etapa.passos_etapa 
-            ? [...etapa.passos_etapa].sort((a, b) => a.ordem - b.ordem)
-            : [];
-          
-          const passosComQuizCorreto = passosOrdenados.map(passo => ({
+        // Data is now pre-sorted from the query. We just need to map the structure.
+        const etapasProcessadas = (trilhaData.etapas_trilha as any[]).map(etapa => ({
+          ...etapa,
+          passos: (etapa.passos_etapa || []).map(passo => ({
             ...passo,
-            quiz_perguntas: passo.quiz_perguntas ? [...passo.quiz_perguntas].sort((a,b) => a.ordem - b.ordem) : []
-          }));
-          
-          return { ...etapa, passos: passosComQuizCorreto };
-        }).sort((a, b) => a.ordem - b.ordem);
-
-        setEtapasAninhadas(etapasOrdenadas);
+            quiz_perguntas: passo.quiz_perguntas || []
+          }))
+        }));
+        setEtapasAninhadas(etapasProcessadas);
       } else {
         setEtapasAninhadas([]);
         setTrilhaAtual(null);
