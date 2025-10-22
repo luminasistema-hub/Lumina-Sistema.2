@@ -256,7 +256,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
       <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
         {!isCollapsed && (
           <div className="flex items-center gap-3 min-w-0">
-            <img src="/favicon.ico" alt="Lumina Logo" className="h-8 w-8 shrink-0" />
+            <img src="/lumina-symbol.png" alt="Lumina Logo" className="h-8 w-8 shrink-0" />
             <div className="min-w-0">
               <h1 className="font-bold truncate">Lumina</h1>
               <p className="text-xs text-gray-500 truncate">Sistema de Gestão</p>

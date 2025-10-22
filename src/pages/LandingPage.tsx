@@ -132,12 +132,7 @@ const LandingPage = () => {
       <section id="hero" aria-label="Apresentação" className="relative z-10 overflow-hidden bg-primary text-primary-foreground">
         <div className="container mx-auto responsive-section pt-16 md:pt-24 pb-14">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs bg-primary-foreground/10 border-primary-foreground/20">
-              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span>Nova Identidade • Lumina Sistema de Gestão</span>
-            </div>
-
-            <h1 className="mt-5 text-[2rem] md:text-6xl font-extrabold leading-tight tracking-tight">
+            <h1 className="text-[2rem] md:text-6xl font-extrabold leading-tight tracking-tight">
               Lumina Sistema de Gestão
             </h1>
 
