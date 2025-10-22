@@ -231,7 +231,16 @@ const fetchJourneyData = async (userId: string | null, churchId: string | null) 
   const etapasAtualizadas = etapaArr.map((et) => {
     const passosAtualizados = et.passos.map((p) => {
       const progress = progressoData.find(px => px.id_passo === p.id) || null;
-      const isCompleted = completedSet.has(p.id);
+      
+      // A fonte da verdade para a conclusão do passo
+      let isCompleted: boolean;
+      if (p.escola_pre_requisito_id) {
+        // Se o passo depende de uma escola, a conclusão da escola é a única verdade.
+        isCompleted = completedSchools.has(p.escola_pre_requisito_id);
+      } else {
+        // Para outros passos, usamos o registro do banco de dados.
+        isCompleted = completedSet.has(p.id);
+      }
       
       let isPassoLocked = false;
       let passoLockReason = null;
