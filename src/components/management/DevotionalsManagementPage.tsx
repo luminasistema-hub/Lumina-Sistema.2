@@ -54,7 +54,6 @@ const DevotionalsManagementPage = () => {
   const [selectedDevotional, setSelectedDevotional] = useState<Devotional | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const channelRef = useRef<any>(null);
 
   const canManage = user?.role === 'admin' || user?.role === 'pastor';
 
@@ -95,31 +94,23 @@ const DevotionalsManagementPage = () => {
   };
 
   useEffect(() => {
-    if (channelRef.current) {
-      try { supabase.removeChannel(channelRef.current); } catch {}
-      channelRef.current = null;
-    }
-    if (currentChurchId) {
-      const channel = supabase
-        .channel(`devotionals-management-${currentChurchId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'devocionais', filter: `id_igreja=eq.${currentChurchId}` },
-          () => {
-            // Apenas invalidar; React Query decide o refetch
-            qc.invalidateQueries({ queryKey });
-          }
-        )
-        .subscribe();
-      channelRef.current = channel;
-    }
+    if (!currentChurchId) return;
+
+    const channel = supabase
+      .channel(`devotionals-management-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'devocionais', filter: `id_igreja=eq.${currentChurchId}` },
+        () => {
+          qc.invalidateQueries({ queryKey });
+        }
+      )
+      .subscribe();
+
     return () => {
-      if (channelRef.current) {
-        try { supabase.removeChannel(channelRef.current); } catch {}
-        channelRef.current = null;
-      }
+      supabase.removeChannel(channel);
     };
-  }, [currentChurchId, queryKey]);
+  }, [currentChurchId, qc, queryKey]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Devotional | null>(null);

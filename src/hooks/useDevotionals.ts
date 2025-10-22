@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../integrations/supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from 'sonner'
+import { useEffect } from 'react'
 
 // Type Definitions
 export interface DevotionalComment {
@@ -72,8 +73,47 @@ const fetchDevotionals = async (churchId: string, filters: any) => {
 
 export const useDevotionals = (filters: any) => {
   const { user, currentChurchId } = useAuthStore();
+  const queryClient = useQueryClient();
+  const queryKey = ['devotionals', currentChurchId, user?.id, filters];
+
+  useEffect(() => {
+    if (!currentChurchId) return;
+
+    const channel = supabase
+      .channel(`public-devotionals-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'devocionais' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['devotionals'] });
+          queryClient.invalidateQueries({ queryKey: ['devotionalDetails'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'devocional_comentarios' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['devotionals'] });
+          queryClient.invalidateQueries({ queryKey: ['devotionalDetails'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'devocional_curtidas' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['devotionals'] });
+          queryClient.invalidateQueries({ queryKey: ['devotionalDetails'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentChurchId, queryClient]);
+
   return useQuery({
-    queryKey: ['devotionals', currentChurchId, user?.id, filters],
+    queryKey,
     queryFn: () => fetchDevotionals(currentChurchId!, filters),
     enabled: !!currentChurchId && !!user?.id,
   });
