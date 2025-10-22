@@ -18,6 +18,7 @@ import AdminToolsTab from '../components/master-admin/AdminToolsTab'
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
 import SubscriptionPlanManagement from '../components/master-admin/SubscriptionPlanManagement'
 import MasterAdminUpgradeRequestsAlert from '../components/master-admin/MasterAdminUpgradeRequestsAlert'
+import ContractManagementTab from '../components/master-admin/ContractManagementTab';
 import { supabase } from '../integrations/supabase/client'
 import { useSearchParams } from 'react-router-dom'
 
@@ -148,6 +149,7 @@ const MasterAdminPage = () => {
             <TabsTrigger value="overview" className="whitespace-nowrap">Visão Geral</TabsTrigger>
             <TabsTrigger value="churches" className="whitespace-nowrap">Igrejas</TabsTrigger>
             <TabsTrigger value="plans" className="whitespace-nowrap">Planos</TabsTrigger>
+            <TabsTrigger value="contracts" className="whitespace-nowrap">Contratos</TabsTrigger>
             <TabsTrigger value="database" className="whitespace-nowrap">Banco de Dados</TabsTrigger>
             <TabsTrigger value="tools" className="whitespace-nowrap">Ferramentas Admin</TabsTrigger>
           </TabsList>
@@ -235,6 +237,10 @@ const MasterAdminPage = () => {
 
           <TabsContent value="plans" className="space-y-6">
             <SubscriptionPlanManagement />
+          </TabsContent>
+
+          <TabsContent value="contracts" className="space-y-6">
+            <ContractManagementTab churches={churches} />
           </TabsContent>
 
           <TabsContent value="database" className="space-y-6">
