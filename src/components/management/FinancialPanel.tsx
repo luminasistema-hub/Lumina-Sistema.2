@@ -9,7 +9,8 @@ import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Badge } from '../ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
+import { CardDescription } from '../ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
 import { supabase } from '../../integrations/supabase/client'
@@ -143,6 +144,13 @@ const FinancialPanel = () => {
   const metodosPagamento = ['PIX', 'Dinheiro', 'Cartão Débito', 'Cartão Crédito', 'Transferência', 'Cheque', 'Boleto']
 
   const currentChurch = churchStore.getChurchById(currentChurchId!)
+
+  // Garante que os dados da igreja estejam carregados quando necessário
+  useEffect(() => {
+    if (currentChurchId && !currentChurch) {
+      churchStore.loadChurches()
+    }
+  }, [currentChurchId, currentChurch, churchStore])
 
   // Query para membros
   const { data: members = [] } = useQuery({
@@ -1006,9 +1014,9 @@ const FinancialPanel = () => {
           <Card>
             <CardHeader>
               <CardTitle>Gerar Relatório Financeiro</CardTitle>
-              <DialogDescription>
+              <CardDescription>
                 Selecione o período para gerar um relatório detalhado das movimentações financeiras
-              </DialogDescription>
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -1509,6 +1517,7 @@ const FinancialPanel = () => {
           onOpenChange={() => setReceiptTransaction(null)}
           onMarkAsIssued={(id) => markReceiptIssuedMutation.mutate(id)}
           canManage={canManageFinancial}
+          churchId={currentChurchId!}
         />
       )}
 

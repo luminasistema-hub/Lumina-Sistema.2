@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Church } from '@/stores/churchStore'
 import ReceiptGenerator from './ReceiptGenerator'
 import { X, CheckCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/integrations/supabase/client'
 
 interface FinancialTransaction {
   id: string
@@ -30,6 +32,7 @@ interface UnifiedReceiptDialogProps {
   church: Church | null
   onMarkAsIssued?: (transactionId: string) => void
   canManage: boolean
+  churchId?: string
 }
 
 export const UnifiedReceiptDialog = ({
@@ -39,8 +42,74 @@ export const UnifiedReceiptDialog = ({
   church,
   onMarkAsIssued,
   canManage,
+  churchId,
 }: UnifiedReceiptDialogProps) => {
   if (!transaction) return null
+
+  const [resolvedChurch, setResolvedChurch] = useState<Church | null>(church || null)
+
+  useEffect(() => {
+    let isMounted = true
+    // Se não veio a igreja pelo store, tenta buscar direto no Supabase
+    const fetchChurch = async () => {
+      if (resolvedChurch || !churchId) return
+      const { data, error } = await supabase
+        .from('igrejas')
+        .select(`
+          id, nome, endereco, telefone_contato, email, cnpj, plano_id,
+          limite_membros, membros_atuais, status, created_at, updated_at,
+          valor_mensal_assinatura, data_proximo_pagamento, ultimo_pagamento_status,
+          link_pagamento_assinatura, subscription_id_ext, server_memory_limit,
+          server_execution_timeout, db_connection_pool, db_query_cache_mb,
+          nome_responsavel, site, descricao, share_devocionais_to_children,
+          share_eventos_to_children, share_trilha_to_children,
+          compartilha_escolas_da_mae, compartilha_eventos_da_mae,
+          compartilha_jornada_da_mae, compartilha_devocionais_da_mae
+        `)
+        .eq('id', churchId)
+        .maybeSingle()
+      if (!error && data && isMounted) {
+        const mapped: Church = {
+          id: data.id,
+          name: data.nome,
+          address: data.endereco ?? undefined,
+          contactEmail: data.email ?? undefined,
+          contactPhone: data.telefone_contato ?? undefined,
+          subscriptionPlanName: 'N/A',
+          plano_id: data.plano_id ?? null,
+          memberLimit: data.limite_membros ?? 0,
+          currentMembers: data.membros_atuais ?? 0,
+          status: (data.status as any) ?? 'active',
+          created_at: data.created_at ?? new Date().toISOString(),
+          updated_at: data.updated_at ?? undefined,
+          valor_mensal_assinatura: data.valor_mensal_assinatura ?? 0,
+          data_proximo_pagamento: data.data_proximo_pagamento ?? undefined,
+          ultimo_pagamento_status: (data.ultimo_pagamento_status as any) ?? 'N/A',
+          historico_pagamentos: [],
+          link_pagamento_assinatura: data.link_pagamento_assinatura ?? undefined,
+          subscription_id_ext: data.subscription_id_ext ?? undefined,
+          server_memory_limit: data.server_memory_limit ?? undefined,
+          server_execution_timeout: data.server_execution_timeout ?? undefined,
+          db_connection_pool: data.db_connection_pool ?? undefined,
+          db_query_cache_mb: data.db_query_cache_mb ?? undefined,
+          cnpj: data.cnpj ?? undefined,
+          nome_responsavel: data.nome_responsavel ?? undefined,
+          site: data.site ?? undefined,
+          descricao: data.descricao ?? undefined,
+          share_devocionais_to_children: data.share_devocionais_to_children ?? false,
+          share_eventos_to_children: data.share_eventos_to_children ?? false,
+          share_trilha_to_children: data.share_trilha_to_children ?? false,
+          compartilha_escolas_da_mae: data.compartilha_escolas_da_mae ?? true,
+          compartilha_eventos_da_mae: data.compartilha_eventos_da_mae ?? true,
+          compartilha_jornada_da_mae: data.compartilha_jornada_da_mae ?? true,
+          compartilha_devocionais_da_mae: data.compartilha_devocionais_da_mae ?? true,
+        }
+        setResolvedChurch(mapped)
+      }
+    }
+    fetchChurch()
+    return () => { isMounted = false }
+  }, [resolvedChurch, churchId])
 
   const handleDownloadPdf = () => {
     window.print()
@@ -54,10 +123,10 @@ export const UnifiedReceiptDialog = ({
     categoria: transaction.categoria,
     metodo_pagamento: transaction.metodo_pagamento,
     igreja: {
-      nome: church?.name ?? 'Igreja não identificada',
-      endereco: church?.address ?? 'Endereço não informado',
-      cnpj: church?.cnpj ?? 'CNPJ não informado',
-      telefone: church?.contactPhone ?? 'Telefone não informado',
+      nome: resolvedChurch?.name ?? 'Igreja não identificada',
+      endereco: resolvedChurch?.address ?? 'Endereço não informado',
+      cnpj: resolvedChurch?.cnpj ?? 'CNPJ não informado',
+      telefone: resolvedChurch?.contactPhone ?? 'Telefone não informado',
     },
     doador: transaction.membro_nome || 'Doador não identificado',
   }
