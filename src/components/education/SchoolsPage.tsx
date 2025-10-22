@@ -157,6 +157,15 @@ const SchoolsPage = () => {
                         Inscrever-se
                       </Button>
                     )}
+                    
+                    {enrollment && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => window.location.href = `/escolas/${school.id}`}
+                      >
+                        Acessar Aulas
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

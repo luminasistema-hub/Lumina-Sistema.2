@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { 
   useSchools, 
   useSchoolLessons, 
@@ -19,12 +19,14 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { BookOpen, Play, CheckCircle, Calendar, User, FileText, MapPin, CheckSquare } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const SchoolDetailsPage = () => {
   const { schoolId } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuthStore()
   const { data: schools, isLoading: schoolsLoading, error: schoolsError } = useSchools()
   const { data: lessons, isLoading: lessonsLoading, error: lessonsError } = useSchoolLessons(schoolId || null)
@@ -133,38 +135,46 @@ const SchoolDetailsPage = () => {
     }
   }
   
+  if (schoolsLoading || lessonsLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Voltar
+          </Button>
+          <h1 className="text-2xl font-bold">Carregando...</h1>
+        </div>
+        <div className="flex justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
+    )
+  }
+  
+  if (schoolsError || lessonsError) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Voltar
+          </Button>
+          <h1 className="text-2xl font-bold">Erro</h1>
+        </div>
+        <div className="text-red-500 p-4 text-center">
+          Erro ao carregar informações: {schoolsError?.message || lessonsError?.message}
+        </div>
+      </div>
+    )
+  }
+  
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="outline" onClick={() => window.history.back()}>
+        <Button variant="outline" onClick={() => navigate(-1)}>
           Voltar
         </Button>
         <h1 className="text-2xl font-bold">{school?.nome || 'Escola'}</h1>
       </div>
-      
-      {schoolsLoading && (
-        <div className="flex justify-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        </div>
-      )}
-      
-      {schoolsError && (
-        <div className="text-red-500 p-4 text-center">
-          Erro ao carregar informações da escola: {schoolsError.message}
-        </div>
-      )}
-      
-      {lessonsLoading && (
-        <div className="flex justify-center p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        </div>
-      )}
-      
-      {lessonsError && (
-        <div className="text-red-500 p-4 text-center">
-          Erro ao carregar aulas: {lessonsError.message}
-        </div>
-      )}
       
       {lessons && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -296,7 +306,13 @@ const SchoolDetailsPage = () => {
       </Dialog>
       
       {/* Dialog para quiz da aula */}
-      <Dialog open={isQuizDialogOpen} onOpenChange={setIsQuizDialogOpen}>
+      <Dialog open={isQuizDialogOpen} onOpenChange={(open) => {
+        setIsQuizDialogOpen(open)
+        if (!open) {
+          setSelectedAnswer(null)
+          setSelectedQuestion(null)
+        }
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Quiz: {selectedLesson?.titulo}</DialogTitle>
@@ -349,9 +365,9 @@ const SchoolDetailsPage = () => {
                               setSelectedQuestion(question)
                               handleSubmitQuiz()
                             }}
-                            disabled={selectedAnswer === null}
+                            disabled={selectedAnswer === null || submitQuizAnswerMutation.isPending}
                           >
-                            Enviar resposta
+                            {submitQuizAnswerMutation.isPending ? 'Enviando...' : 'Enviar resposta'}
                           </Button>
                         </div>
                       )}

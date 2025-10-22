@@ -149,6 +149,29 @@ export const useSchoolLessons = (schoolId: string | null) => {
   })
 }
 
+// Função para buscar frequência do aluno
+const fetchStudentAttendance = async (userId: string, lessonId: string) => {
+  const { data, error } = await supabase
+    .from('escola_frequencia')
+    .select('*')
+    .eq('membro_id', userId)
+    .eq('aula_id', lessonId)
+    .maybeSingle()
+  
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useStudentAttendance = (lessonId: string | null) => {
+  const { user } = useAuthStore()
+  
+  return useQuery({
+    queryKey: ['student-attendance', user?.id, lessonId],
+    queryFn: () => fetchStudentAttendance(user!.id, lessonId!),
+    enabled: !!user?.id && !!lessonId
+  })
+}
+
 // Função para buscar perguntas do quiz de uma aula
 const fetchQuizQuestions = async (lessonId: string) => {
   const { data, error } = await supabase
@@ -191,29 +214,6 @@ export const useUserQuizAnswers = (lessonId: string | null) => {
   return useQuery({
     queryKey: ['user-quiz-answers', user?.id, lessonId],
     queryFn: () => fetchUserQuizAnswers(user!.id, lessonId!),
-    enabled: !!user?.id && !!lessonId
-  })
-}
-
-// Função para buscar frequência do aluno
-const fetchStudentAttendance = async (userId: string, lessonId: string) => {
-  const { data, error } = await supabase
-    .from('escola_frequencia')
-    .select('*')
-    .eq('membro_id', userId)
-    .eq('aula_id', lessonId)
-    .maybeSingle()
-  
-  if (error) throw new Error(error.message)
-  return data
-}
-
-export const useStudentAttendance = (lessonId: string | null) => {
-  const { user } = useAuthStore()
-  
-  return useQuery({
-    queryKey: ['student-attendance', user?.id, lessonId],
-    queryFn: () => fetchStudentAttendance(user!.id, lessonId!),
     enabled: !!user?.id && !!lessonId
   })
 }
