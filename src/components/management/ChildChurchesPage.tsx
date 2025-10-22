@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Church, Users, Crown, FolderTree, Plus, Eye, Loader2 } from 'lucide-react';
 import ChildChurchDashboardDialog from './ChildChurchDashboardDialog';
 import MemberDetailsDialog from './MemberDetailsDialog';
+import CopyRegisterLinkButton from './CopyRegisterLinkButton';
 
 type ChildForm = {
   nome: string;
@@ -168,7 +169,8 @@ const ChildChurchesPage = () => {
       plano_id: mother?.plano_id || null,
       limite_membros: mother?.limite_membros || null,
       valor_mensal_assinatura: mother?.valor_mensal_assinatura || null,
-      panel_password: form.panel_password || null
+      panel_password: form.panel_password || null,
+      status: 'active', // autoriza o uso imediato do painel da igreja filha
     };
 
     const { error } = await supabase.from('igrejas').insert(payload);
@@ -331,6 +333,7 @@ const ChildChurchesPage = () => {
                       }}>
                         <Eye className="w-4 h-4 mr-1" /> Ir para painel
                       </Button>
+                      <CopyRegisterLinkButton churchId={c.id} />
                     </div>
                   </CardContent>
                 </Card>
