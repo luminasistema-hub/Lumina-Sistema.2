@@ -16,13 +16,24 @@ export const useEvents = (churchId: string | undefined) => {
     queryKey: ['events', churchId],
     enabled: Boolean(churchId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('eventos')
-        .select('id, nome, descricao, data_hora, local, status, tipo')
-        .eq('id_igreja', churchId)
-        .order('data_hora', { ascending: true });
+      if (!churchId) return [];
+      const { data, error } = await supabase.rpc('get_eventos_para_igreja', {
+        id_igreja_atual: churchId,
+      });
       if (error) throw error;
-      return (data || []) as Evento[];
+      const list = (data || []) as any[];
+      // Garantir ordenação por data
+      return list
+        .map((e) => ({
+          id: e.id,
+          nome: e.nome,
+          descricao: e.descricao ?? null,
+          data_hora: e.data_hora,
+          local: e.local ?? null,
+          status: e.status ?? null,
+          tipo: e.tipo ?? null,
+        }))
+        .sort((a, b) => (new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime()));
     },
   });
 };

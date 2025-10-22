@@ -31,32 +31,31 @@ interface Event {
   link_externo?: string; // novo campo para link de inscrição externa
 }
 
-const fetchEvents = async (churchId: string | null, userId: string | null) => {
+const fetchEvents = async (churchId: string | null) => {
   if (!churchId) return [];
-
-  const { data, error } = await supabase.from('eventos')
-    .select(`*, participantes:evento_participantes(count)`)
-    .eq('id_igreja', churchId)
-    .order('data_hora', { ascending: true });
-
+  const { data, error } = await supabase.rpc('get_eventos_para_igreja_com_participacao', {
+    id_igreja_atual: churchId,
+  });
   if (error) throw error;
-
-  let fetchedEvents: Event[] = data.map((event: any) => ({
-    ...event,
-    participantes_count: event.participantes?.[0]?.count || 0,
-    is_registered: false,
+  // Mapear tipos corretamente e garantir números
+  const items: Event[] = (data || []).map((e: any) => ({
+    id: e.id,
+    nome: e.nome,
+    data_hora: e.data_hora,
+    local: e.local ?? '',
+    descricao: e.descricao ?? '',
+    tipo: (e.tipo || 'Outro') as Event['tipo'],
+    capacidade_maxima: e.capacidade_maxima ?? undefined,
+    inscricoes_abertas: Boolean(e.inscricoes_abertas),
+    valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
+    status: (e.status || 'Planejado') as Event['status'],
+    participantes_count: Number(e.participantes_count || 0),
+    is_registered: Boolean(e.is_registered),
+    link_externo: e.link_externo ?? undefined,
   }));
-
-  if (userId) {
-    const { data: userRegistrations } = await supabase.from('evento_participantes')
-      .select('evento_id').eq('membro_id', userId)
-      .in('evento_id', fetchedEvents.map(e => e.id));
-    
-    const registeredEventIds = new Set(userRegistrations?.map(r => r.evento_id));
-    fetchedEvents = fetchedEvents.map(event => ({...event, is_registered: registeredEventIds.has(event.id)}));
-  }
-  
-  return fetchedEvents;
+  // Ordenar por data/hora
+  items.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
+  return items;
 };
 
 const EventsPage = () => {
@@ -64,42 +63,78 @@ const EventsPage = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
+  const [parentChurchId, setParentChurchId] = useState<string | null>(null)
 
   const queryKey = useMemo(() => ['events', currentChurchId, user?.id], [currentChurchId, user?.id]);
 
   const { data: events = [], isLoading } = useQuery({
     queryKey,
-    queryFn: () => fetchEvents(currentChurchId, user?.id),
+    queryFn: () => fetchEvents(currentChurchId),
     enabled: !!currentChurchId,
   });
 
   useEffect(() => {
     if (!currentChurchId) return;
 
-    const channel = supabase
-      .channel(`public-events-page-${currentChurchId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
-        () => queryClient.invalidateQueries({ queryKey })
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
-        () => queryClient.invalidateQueries({ queryKey })
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let parentIdLocal: string | null = null;
+
+    const setupRealtime = async () => {
+      // Descobrir mãe
+      const { data: churchRow } = await supabase
+        .from('igrejas')
+        .select('parent_church_id')
+        .eq('id', currentChurchId)
+        .maybeSingle();
+      parentIdLocal = churchRow?.parent_church_id ?? null;
+      setParentChurchId(parentIdLocal);
+
+      // Canal único com múltiplos listeners
+      channel = supabase
+        .channel(`public-events-page-${currentChurchId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${currentChurchId}` },
+          () => queryClient.invalidateQueries({ queryKey })
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${currentChurchId}` },
+          () => queryClient.invalidateQueries({ queryKey })
+        );
+
+      // Assinar também a igreja-mãe (eventos e participações)
+      if (parentIdLocal) {
+        channel = channel
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'eventos', filter: `id_igreja=eq.${parentIdLocal}` },
+            () => queryClient.invalidateQueries({ queryKey })
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'evento_participantes', filter: `id_igreja=eq.${parentIdLocal}` },
+            () => queryClient.invalidateQueries({ queryKey })
+          );
+      }
+
+      channel.subscribe();
+    };
+
+    setupRealtime();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        try { supabase.removeChannel(channel); } catch {}
+      }
     };
   }, [currentChurchId, queryClient, queryKey]);
 
   const filteredEvents = useMemo(() => {
     return events.filter(event => 
         (filterType === 'all' || event.tipo === filterType) &&
-        (event.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         event.local.toLowerCase().includes(searchTerm.toLowerCase()))
+        ((event.nome || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+         (event.local || '').toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [events, filterType, searchTerm]);
 
