@@ -79,6 +79,33 @@ const PersonalInfo = () => {
 
   const isFirstAccess = !user?.perfil_completo;
 
+  const loadKids = useCallback(async (spouseId: string | null) => {
+    if (!user || !currentChurchId) return;
+
+    const responsibleIds = [user.id];
+    if (spouseId) {
+      responsibleIds.push(spouseId);
+    }
+
+    const { data: kidsData, error: kidsError } = await supabase
+      .from('criancas')
+      .select('id, nome_crianca, data_nascimento')
+      .eq('id_igreja', currentChurchId)
+      .in('responsavel_id', responsibleIds)
+      .order('nome_crianca');
+
+    if (kidsError) {
+      toast.error('Erro ao carregar os filhos.');
+      return;
+    }
+
+    const formattedKids: Kid[] = (kidsData || []).map(k => ({
+      ...k,
+      idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000)
+    }));
+    setUserKids(formattedKids);
+  }, [user, currentChurchId]);
+
   const loadData = useCallback(async () => {
     if (!user || !currentChurchId) return;
 
@@ -124,21 +151,6 @@ const PersonalInfo = () => {
         }
       }
     }
-
-    // Carregar filhos
-    const responsibleIds = [user.id];
-    if (personalInfo?.conjuge_id) responsibleIds.push(personalInfo.conjuge_id);
-    const { data: kidsData } = await supabase
-      .from('criancas')
-      .select('id, nome_crianca, data_nascimento')
-      .eq('id_igreja', currentChurchId)
-      .in('responsavel_id', responsibleIds)
-      .order('nome_crianca');
-    const formattedKids: Kid[] = (kidsData || []).map(k => ({
-      ...k,
-      idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000)
-    }));
-    setUserKids(formattedKids);
 
     // Carregar teste vocacional
     const { data: tests } = await supabase
@@ -186,6 +198,11 @@ const PersonalInfo = () => {
       loadData();
     }
   }, [loadData]);
+
+  useEffect(() => {
+    // Carrega os filhos na montagem inicial e sempre que o cônjuge mudar
+    loadKids(formData.conjugeId);
+  }, [formData.conjugeId, loadKids]);
 
   useEffect(() => {
     if (userKids.length > 0) {
