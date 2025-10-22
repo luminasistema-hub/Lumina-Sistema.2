@@ -94,15 +94,21 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         set({ isLoading: true })
         await supabase.auth.signOut()
+        isCheckingAuth = false; // Garante que o lock seja liberado no logout
         set({ user: null, currentChurchId: null, primaryChurchId: null, isLoading: false })
       },
 
       checkAuth: async () => {
-        if (isCheckingAuth) return
+        if (isCheckingAuth) {
+          console.log('AuthStore: checkAuth call skipped, already in progress.');
+          return;
+        }
+        
+        isCheckingAuth = true
+        // Apenas mostra o loading em tela cheia se o usuário não estiver logado ainda
         if (!get().user) {
           set({ isLoading: true })
         }
-        isCheckingAuth = true
 
         try {
           const {

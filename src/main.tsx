@@ -32,7 +32,7 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 2, // 2 minutos para dados serem considerados "velhos"
       gcTime: 1000 * 60 * 15, // 15 minutos para o cache ser limpo se não usado
-      refetchOnWindowFocus: true,    // **CHAVE**: revalida ao voltar para a aba
+      refetchOnWindowFocus: false,   // **CHAVE**: Previne loading infinito ao trocar de aba
       refetchOnReconnect: true,      // **CHAVE**: revalida ao reconectar a internet
       retry: 1, // Tenta novamente 1 vez em caso de erro
     },
