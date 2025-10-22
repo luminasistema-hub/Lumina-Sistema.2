@@ -29,40 +29,18 @@ import {
   Building,
   Users
 } from 'lucide-react'
-
-// Interface atualizada para corresponder à tabela transacoes_financeiras
-interface Contribution {
-  id: string
-  tipo: 'Entrada' | 'Saída' // Sempre 'Entrada' para contribuições de membros
-  categoria: 'Dízimos' | 'Ofertas' | 'Doações Especiais' | 'Missões' | 'Obras'
-  subcategoria?: string // Pode ser usado para campanhas específicas
-  valor: number
-  data_transacao: string // Renomeado de data_contribuicao
-  descricao: string
-  metodo_pagamento: 'PIX' | 'Cartão' | 'Dinheiro' | 'Transferência'
-  responsavel?: string // Quem registrou (pode ser o próprio membro ou um financeiro)
-  status: 'Pendente' | 'Confirmado' | 'Cancelado'
-  comprovante?: string
-  observacoes?: string
-  membro_id: string // ID do membro que contribuiu
-  membro_nome?: string // Nome do membro
-  recibo_emitido: boolean
-  numero_documento?: string
-  centro_custo?: string
-  aprovado_por?: string
-  data_aprovacao?: string
-  id_igreja: string // ID da igreja
-}
+import { useContributions, Contribution } from '../../hooks/useContributions'
+import { useQueryClient } from '@tanstack/react-query'
 
 const OfferingsPage = () => {
   const { user, currentChurchId } = useAuthStore()
   const { getChurchById } = useChurchStore()
-  const [contributions, setContributions] = useState<Contribution[]>([])
+  const queryClient = useQueryClient()
+  const { contributions, isLoading: loading, markReceiptAsIssued } = useContributions()
   const [isContributeDialogOpen, setIsContributeDialogOpen] = useState(false)
   const [receiptTransaction, setReceiptTransaction] = useState<Contribution | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [selectedType, setSelectedType] = useState('all')
-  const [loading, setLoading] = useState(true)
 
   const canViewFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
   const canManageFinancial = user?.role === 'admin' || user?.role === 'financeiro'
@@ -77,44 +55,6 @@ const OfferingsPage = () => {
 
   const currentChurch = currentChurchId ? getChurchById(currentChurchId) : null
 
-  const loadContributions = async () => {
-    if (!currentChurchId || !user?.id) {
-      setContributions([])
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    try {
-      const query = supabase
-        .from('transacoes_financeiras')
-        .select('*')
-        .eq('id_igreja', currentChurchId)
-        .eq('tipo', 'Entrada')
-        .eq('membro_id', user.id) // Sempre filtra pelo membro logado
-
-      const { data, error } = await query.order('data_transacao', { ascending: false })
-
-      if (error) {
-        console.error('Error loading contributions:', error)
-        toast.error('Erro ao carregar contribuições: ' + error.message)
-        setContributions([])
-        return
-      }
-
-      setContributions(data as Contribution[])
-    } catch (error) {
-      console.error('Unexpected error loading contributions:', error)
-      toast.error('Erro inesperado ao carregar contribuições.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadContributions()
-  }, [currentChurchId, user?.id, canViewFinancial])
-
   const handleContribute = async () => {
     if (newContribution.valor <= 0) {
       toast.error('Por favor, insira um valor válido')
@@ -125,7 +65,6 @@ const OfferingsPage = () => {
       return
     }
 
-    setLoading(true)
     try {
       // Generate a simple receipt/document number for tracking in the panel
       const numeroDocumento = `ENT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(Math.random() * 900 + 100)}`;
@@ -196,40 +135,10 @@ const OfferingsPage = () => {
         observacoes: '',
         campanha: ''
       })
-      loadContributions() // Recarrega a lista
+      queryClient.invalidateQueries({ queryKey: ['contributions', currentChurchId, user?.id] })
     } catch (error) {
       console.error('Unexpected error during contribution:', error)
       toast.error('Erro inesperado ao registrar contribuição.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const markReceiptAsIssued = async (contributionId: string) => {
-    if (!canManageFinancial) {
-      toast.error('Você não tem permissão para emitir recibos.')
-      return
-    }
-    setLoading(true)
-    try {
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .update({ recibo_emitido: true })
-        .eq('id', contributionId)
-
-      if (error) {
-        console.error('Error marking receipt as issued:', error)
-        toast.error('Erro ao marcar recibo como emitido: ' + error.message)
-        return
-      }
-      
-      toast.success('Recibo marcado como emitido!')
-      loadContributions()
-    } catch (error) {
-      console.error('Unexpected error marking receipt:', error)
-      toast.error('Erro inesperado ao marcar recibo.')
-    } finally {
-      setLoading(false)
     }
   }
 
