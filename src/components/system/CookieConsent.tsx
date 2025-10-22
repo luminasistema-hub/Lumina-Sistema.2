@@ -15,7 +15,7 @@ type ConsentPrefs = {
 };
 
 const CONSENT_KEY = "lumina_cookie_consent";
-const POLICY_VERSION = "2025-10-07";
+const POLICY_VERSION = "2024-08-26";
 
 const CookieConsent: React.FC = () => {
   const [showBanner, setShowBanner] = useState(false);
@@ -151,7 +151,7 @@ const CookieConsent: React.FC = () => {
                 <p>Empresa: 49.023.921 INOVA SIMPLES (I.S.)</p>
                 <p>CNPJ: 49.023.921/0001-69</p>
                 <p>Endereço: RUA TOMAS BATISTA, S/N QD45 LT06, LOTEAMENTO MANOEL GOMES DA CUNHA, ARAGUAINA, TO, CEP 77818-030</p>
-                <p>E-mail para contato sobre privacidade: Luminasistema@gmail.com.br</p>
+                <p>E-mail para contato sobre privacidade: Luminasistema@gmail.com</p>
               </div>
 
               <h3 className="font-semibold">2. Dados que Coletamos</h3>
@@ -239,7 +239,7 @@ const CookieConsent: React.FC = () => {
                 <li>Revogar o consentimento, quando o tratamento de dados se basear nele.</li>
               </ul>
               <p className="text-muted-foreground">
-                Para exercer seus direitos, entre em contato através do e-mail: Luminasistema@gmail.com.br.
+                Para exercer seus direitos, entre em contato através do e-mail: Luminasistema@gmail.com.
               </p>
 
               <h3 className="font-semibold">7. Segurança dos Dados</h3>

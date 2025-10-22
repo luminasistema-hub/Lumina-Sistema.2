@@ -17,7 +17,7 @@ if ('caches' in window) {
 }
 
 // Limpa localStorage e sessionStorage (exceto auth)
-const preserveKeys = ['connect-vida-auth', 'connect-vida-churches'];
+const preserveKeys = ['connect-vida-auth', 'connect-vida-churches', 'lumina_cookie_consent'];
 Object.keys(localStorage).forEach(key => {
   if (!preserveKeys.some(preserveKey => key.includes(preserveKey))) {
     localStorage.removeItem(key);
