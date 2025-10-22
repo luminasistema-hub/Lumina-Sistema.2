@@ -180,20 +180,14 @@ const fetchJourneyData = async (userId: string | null, churchId: string | null) 
   const completedSchools = new Set<string>();
   const schoolNames = new Map<string, string>();
   if (schoolPrereqIds.length > 0) {
-    const { data: schoolsData } = await supabase.from('escolas').select('id, nome').in('id', schoolPrereqIds);
-    (schoolsData || []).forEach(s => schoolNames.set(s.id, s.nome));
-
-    const { data: schoolLessons } = await supabase.from('escola_aulas').select('id, escola_id').in('escola_id', schoolPrereqIds);
-    const { data: userSchoolProgress } = await supabase.from('escola_progresso_aulas').select('aula_id').eq('membro_id', userId);
-
-    if (schoolLessons && userSchoolProgress) {
-      const userCompletedLessons = new Set(userSchoolProgress.map(p => p.aula_id));
-      for (const schoolId of schoolPrereqIds) {
-        const lessonsForSchool = schoolLessons.filter(l => l.escola_id === schoolId);
-        if (lessonsForSchool.length > 0 && lessonsForSchool.every(l => userCompletedLessons.has(l.id))) {
-          completedSchools.add(schoolId);
+    const { data: schoolsData } = await supabase.from('escolas').select('id, nome, status').in('id', schoolPrereqIds);
+    if (schoolsData) {
+      schoolsData.forEach(school => {
+        schoolNames.set(school.id, school.nome);
+        if (school.status === 'concluida') {
+          completedSchools.add(school.id);
         }
-      }
+      });
     }
   }
 
