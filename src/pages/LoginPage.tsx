@@ -48,10 +48,10 @@ const LoginPage = () => {
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mb-4">
               <img src="/favicon.ico" alt="Lumina Logo" className="w-10 h-10" />
             </div>
-            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <CardTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent md:text-2xl">
               Lumina
             </CardTitle>
-            <CardDescription className="text-base">
+            <CardDescription className="text-sm md:text-base">
               Entre em sua conta
             </CardDescription>
             {/* O Badge "Sistema em Produção" foi removido daqui */}
