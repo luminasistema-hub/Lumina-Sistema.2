@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
 import { Loader2, Search, UserCog } from 'lucide-react';
+import MemberDetailsDialog from './MemberDetailsDialog';
 
 type MemberRow = {
   id: string;
@@ -38,6 +39,7 @@ const MembersManagementCard = () => {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [search, setSearch] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<MemberRow | null>(null);
 
   const loadData = async () => {
     if (!user?.id || !currentChurchId) {
@@ -121,98 +123,112 @@ const MembersManagementCard = () => {
   };
 
   return (
-    <Card className="bg-white p-6 rounded-xl shadow-lg mt-8">
-      <CardHeader className="p-0 mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
-          <UserCog className="w-5 h-5 text-purple-500" />
-          Gestão de Membros
-        </CardTitle>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Search className="w-4 h-4 text-gray-500" />
-          <Input
-            placeholder="Buscar por nome, email, função, status..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <Button variant="outline" onClick={loadData}>
-            Atualizar
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-            <span className="ml-3 text-gray-600">Carregando membros...</span>
+    <>
+      <Card className="bg-white p-6 rounded-xl shadow-lg mt-8">
+        <CardHeader className="p-0 mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <UserCog className="w-5 h-5 text-purple-500" />
+            Gestão de Membros
+          </CardTitle>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Search className="w-4 h-4 text-gray-500" />
+            <Input
+              placeholder="Buscar por nome, email, função, status..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <Button variant="outline" onClick={loadData}>
+              Atualizar
+            </Button>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-10 text-gray-600">Nenhum membro encontrado.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-600 border-b">
-                  <th className="py-3 px-4">Nome</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Função</th>
-                  <th className="py-3 px-4">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((m) => (
-                  <tr key={m.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4">{m.nome_completo || '—'}</td>
-                    <td className="py-3 px-4">{m.email}</td>
-                    <td className="py-3 px-4">
-                      {isAdmin ? (
-                        <Select
-                          value={m.funcao}
-                          onValueChange={(val) => updateMember(m.id, { funcao: val })}
-                        >
-                          <SelectTrigger className="w-[200px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {roleOptions.map(r => (
-                              <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                          {roleOptions.find(r => r.value === m.funcao)?.label || m.funcao}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      {isAdmin ? (
-                        <Select
-                          value={m.status}
-                          onValueChange={(val) => updateMember(m.id, { status: val })}
-                        >
-                          <SelectTrigger className="w-[160px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statusOptions.map(s => (
-                              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
-                          {statusOptions.find(s => s.value === m.status)?.label || m.status}
-                        </span>
-                      )}
-                    </td>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+              <span className="ml-3 text-gray-600">Carregando membros...</span>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-10 text-gray-600">Nenhum membro encontrado.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-600 border-b">
+                    <th className="py-3 px-4">Nome</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Função</th>
+                    <th className="py-3 px-4">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                </thead>
+                <tbody>
+                  {filtered.map((m) => (
+                    <tr
+                      key={m.id}
+                      className="border-b hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setSelectedMember(m)}
+                    >
+                      <td className="py-3 px-4">{m.nome_completo || '—'}</td>
+                      <td className="py-3 px-4">{m.email}</td>
+                      <td className="py-3 px-4">
+                        {isAdmin ? (
+                          <Select
+                            value={m.funcao}
+                            onValueChange={(val) => updateMember(m.id, { funcao: val })}
+                          >
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {roleOptions.map(r => (
+                                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                            {roleOptions.find(r => r.value === m.funcao)?.label || m.funcao}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        {isAdmin ? (
+                          <Select
+                            value={m.status}
+                            onValueChange={(val) => updateMember(m.id, { status: val })}
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {statusOptions.map(s => (
+                                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                            {statusOptions.find(s => s.value === m.status)?.label || m.status}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      {currentChurchId && (
+        <MemberDetailsDialog
+          churchId={currentChurchId}
+          member={selectedMember}
+          open={!!selectedMember}
+          onOpenChange={(isOpen) => !isOpen && setSelectedMember(null)}
+        />
+      )}
+    </>
   );
 };
 

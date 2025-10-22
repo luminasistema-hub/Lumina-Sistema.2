@@ -19,13 +19,16 @@ import {
   Baby,
   Plus,
   Trash2,
-  UserCheck
+  UserCheck,
+  BookOpen,
+  Shield
 } from 'lucide-react'
 import { Progress } from '../ui/progress'
 import { useNavigate } from 'react-router-dom' 
 import AddKidDialog from './AddKidDialog';
 import PersonalStatusCards from './PersonalStatusCards';
 import { Badge } from '../ui/badge'
+import { useUserEnrollments, SchoolEnrollment } from '../../hooks/useSchools';
 
 // Interfaces para tipagem dos dados
 interface PersonalInfoData {
@@ -55,6 +58,9 @@ interface CheckinRecord {
   responsavel_checkin: { nome_completo: string } | null;
   responsavel_checkout: { nome_completo: string } | null;
 }
+interface MinistryVolunteer {
+  ministerios: { id: string; nome: string; } | null;
+}
 
 const PersonalInfo = () => {
   const { user, currentChurchId, checkAuth } = useAuthStore()
@@ -73,9 +79,11 @@ const PersonalInfo = () => {
   const [latestVocationalTest, setLatestVocationalTest] = useState<VocationalTestResult | null>(null);
   const [userKids, setUserKids] = useState<Kid[]>([]);
   const [checkinHistory, setCheckinHistory] = useState<CheckinRecord[]>([]);
+  const [myMinistries, setMyMinistries] = useState<MinistryVolunteer[]>([]);
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false);
   const [memberOptions, setMemberOptions] = useState<MemberOption[]>([]);
   const hasLoadedRef = useRef(false);
+  const { data: myEnrollments } = useUserEnrollments();
 
   const isFirstAccess = !user?.perfil_completo;
 
@@ -151,6 +159,14 @@ const PersonalInfo = () => {
         }
       }
     }
+
+    // Carregar ministérios do usuário
+    const { data: ministriesData, error: ministriesError } = await supabase
+      .from('ministerio_voluntarios')
+      .select('ministerios(id, nome)')
+      .eq('membro_id', user.id);
+    if (ministriesError) toast.error('Erro ao carregar ministérios.');
+    else setMyMinistries(ministriesData || []);
 
     // Carregar teste vocacional
     const { data: tests } = await supabase
@@ -520,6 +536,38 @@ const PersonalInfo = () => {
           </Card>
         </div>
         <div className="space-y-6">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-xl"><BookOpen className="text-blue-500"/>Minhas Matrículas</CardTitle></CardHeader>
+            <CardContent>
+              {myEnrollments && myEnrollments.length > 0 ? (
+                <ul className="space-y-3">
+                  {myEnrollments.map((enrollment: SchoolEnrollment) => (
+                    <li key={enrollment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                      <div>
+                        <p className="font-medium">{enrollment.escolas?.nome}</p>
+                        <p className="text-sm text-gray-600">Status: <Badge variant="outline" className="text-xs">{enrollment.status}</Badge></p>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => navigate(`/escolas/${enrollment.escola_id}`)}>Ver</Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">Você não está matriculado em nenhuma escola.</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2 text-xl"><Shield className="text-green-500"/>Meus Ministérios</CardTitle></CardHeader>
+            <CardContent>
+              {myMinistries.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {myMinistries.map((m, i) => m.ministerios?.nome && <Badge key={i} variant="secondary">{m.ministerios.nome}</Badge>)}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">Você ainda não participa de um ministério.</p>
+              )}
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2 text-xl"><Target className="text-purple-500"/>Teste Vocacional</CardTitle></CardHeader>
             <CardContent className="space-y-4">
