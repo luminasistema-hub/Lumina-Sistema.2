@@ -26,9 +26,10 @@ import {
   Baby,
   Calendar,
   Headphones,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react'
-import { useLoadingProtection } from '../../hooks/useLoadingProtection'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 interface Question {
   id: number
@@ -48,410 +49,269 @@ interface MinistryResult {
   activities: string[]
 }
 
+const questions: Question[] = [
+  { id: 1, text: "Tenho facilidade com equipamentos eletrônicos e tecnologia", ministry: "midia" },
+  { id: 2, text: "Gosto de trabalhar com câmeras, som e iluminação", ministry: "midia" },
+  { id: 3, text: "Me sinto confortável operando sistemas durante os cultos", ministry: "midia" },
+  { id: 4, text: "Tenho interesse em produzir conteúdo digital para a igreja", ministry: "midia" },
+  { id: 5, text: "Consigo solucionar problemas técnicos com facilidade", ministry: "midia" },
+  { id: 6, text: "Tenho dom musical (canto ou instrumento)", ministry: "louvor" },
+  { id: 7, text: "Me sinto à vontade adorando publicamente", ministry: "louvor" },
+  { id: 8, text: "Consigo conduzir outros em momentos de adoração", ministry: "louvor" },
+  { id: 9, text: "Tenho facilidade para aprender música rapidamente", ministry: "louvor" },
+  { id: 10, text: "A música é uma forma natural de expressar minha fé", ministry: "louvor" },
+  { id: 11, text: "Gosto de servir e ajudar pessoas em necessidade", ministry: "diaconato" },
+  { id: 12, text: "Tenho facilidade para identificar quem precisa de ajuda", ministry: "diaconato" },
+  { id: 13, text: "Me disponho a tarefas práticas de apoio na igreja", ministry: "diaconato" },
+  { id: 14, text: "Consigo organizar e coordenar ações de ajuda", ministry: "diaconato" },
+  { id: 15, text: "Sinto alegria em suprir necessidades dos outros", ministry: "diaconato" },
+  { id: 16, text: "Gosto de receber e conhecer pessoas novas", ministry: "integracao" },
+  { id: 17, text: "Tenho facilidade para fazer novos membros se sentirem bem-vindos", ministry: "integracao" },
+  { id: 18, text: "Consigo identificar visitantes e me aproximar deles", ministry: "integracao" },
+  { id: 19, text: "Me sinto confortável apresentando a igreja para outros", ministry: "integracao" },
+  { id: 20, text: "Tenho dom para criar ambiente acolhedor", ministry: "integracao" },
+  { id: 21, text: "Gosto de estudar e ensinar a Palavra de Deus", ministry: "ensino" },
+  { id: 22, text: "Tenho facilidade para explicar conceitos bíblicos", ministry: "ensino" },
+  { id: 23, text: "Consigo adaptar o ensino para diferentes idades", ministry: "ensino" },
+  { id: 24, text: "Me sinto chamado a discipular outras pessoas", ministry: "ensino" },
+  { id: 25, text: "Tenho paciência para acompanhar o crescimento espiritual dos outros", ministry: "ensino" },
+  { id: 26, text: "Gosto de trabalhar com crianças", ministry: "kids" },
+  { id: 27, text: "Tenho paciência e criatividade para ensinar crianças", ministry: "kids" },
+  { id: 28, text: "Consigo manter a atenção das crianças durante as atividades", ministry: "kids" },
+  { id: 29, text: "Me sinto confortável cuidando de grupos de crianças", ministry: "kids" },
+  { id: 30, text: "Tenho facilidade para criar atividades lúdicas e educativas", ministry: "kids" },
+  { id: 31, text: "Gosto de organizar eventos e atividades", ministry: "organizacao" },
+  { id: 32, text: "Tenho facilidade para planejar e coordenar projetos", ministry: "organizacao" },
+  { id: 33, text: "Consigo gerenciar recursos e logística", ministry: "organizacao" },
+  { id: 34, text: "Me sinto bem liderando equipes de trabalho", ministry: "organizacao" },
+  { id: 35, text: "Tenho atenção aos detalhes e gosto de ver tudo funcionando bem", ministry: "organizacao" },
+  { id: 36, text: "Tenho coração para ajudar pessoas em situação de vulnerabilidade", ministry: "acao_social" },
+  { id: 37, text: "Gosto de participar de projetos sociais e comunitários", ministry: "acao_social" },
+  { id: 38, text: "Tenho facilidade para mobilizar recursos para causas sociais", ministry: "acao_social" },
+  { id: 39, text: "Me sinto chamado a levar esperança para comunidades carentes", ministry: "acao_social" },
+  { id: 40, text: "Consigo ver as necessidades sociais ao meu redor", ministry: "acao_social" }
+]
+
+const ministryData = {
+  midia: {
+    name: 'Mídia e Tecnologia',
+    description: 'Você tem o perfil para trabalhar com equipamentos, tecnologia e produção de conteúdo para amplificar a mensagem do Reino.',
+    icon: <Headphones className="w-6 h-6" />,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50 border-blue-200',
+    characteristics: ['Facilidade com tecnologia', 'Atenção aos detalhes técnicos', 'Criatividade digital', 'Capacidade de trabalhar sob pressão'],
+    activities: ['Operação de som e vídeo', 'Produção de conteúdo digital', 'Transmissão ao vivo', 'Manutenção de equipamentos']
+  },
+  louvor: {
+    name: 'Louvor e Adoração',
+    description: 'Você tem o dom musical e a capacidade de conduzir outros à presença de Deus através da música e adoração.',
+    icon: <Mic className="w-6 h-6" />,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50 border-purple-200',
+    characteristics: ['Dom musical', 'Coração adorador', 'Capacidade de liderança musical', 'Sensibilidade espiritual'],
+    activities: ['Ministração em cultos', 'Ensaios e preparação musical', 'Ministração em eventos especiais', 'Mentoria de novos músicos']
+  },
+  diaconato: {
+    name: 'Diaconato',
+    description: 'Você tem o coração servo e a capacidade de identificar e suprir necessidades práticas das pessoas.',
+    icon: <HandHeart className="w-6 h-6" />,
+    color: 'text-green-600',
+    bgColor: 'bg-green-50 border-green-200',
+    characteristics: ['Coração servo', 'Sensibilidade às necessidades', 'Organização prática', 'Disponibilidade para servir'],
+    activities: ['Apoio em eventos', 'Assistência a necessitados', 'Organização de campanhas', 'Suporte logístico']
+  },
+  integracao: {
+    name: 'Integração',
+    description: 'Você tem o dom da hospitalidade e a capacidade de fazer novos membros se sentirem acolhidos na família da fé.',
+    icon: <Users className="w-6 h-6" />,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50 border-orange-200',
+    characteristics: ['Dom da hospitalidade', 'Facilidade de relacionamento', 'Empatia natural', 'Capacidade de acolhimento'],
+    activities: ['Recepção de visitantes', 'Acompanhamento de novos membros', 'Organização de eventos de integração', 'Criação de vínculos comunitários']
+  },
+  ensino: {
+    name: 'Ensino e Discipulado',
+    description: 'Você tem o dom do ensino e a capacidade de transmitir conhecimento bíblico de forma clara e transformadora.',
+    icon: <BookOpen className="w-6 h-6" />,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50 border-indigo-200',
+    characteristics: ['Dom do ensino', 'Conhecimento bíblico', 'Paciência pedagógica', 'Capacidade de comunicação'],
+    activities: ['Ensino em grupos pequenos', 'Discipulado individual', 'Preparação de materiais didáticos', 'Coordenação de cursos']
+  },
+  kids: {
+    name: 'Kids',
+    description: 'Você tem o coração voltado para as crianças e a capacidade de impactar a próxima geração para Cristo.',
+    icon: <Baby className="w-6 h-6" />,
+    color: 'text-pink-600',
+    bgColor: 'bg-pink-50 border-pink-200',
+    characteristics: ['Amor genuíno por crianças', 'Criatividade pedagógica', 'Paciência especial', 'Energia e dinamismo'],
+    activities: ['Ensino para crianças', 'Organização de atividades lúdicas', 'Desenvolvimento de materiais infantis', 'Eventos especiais kids']
+  },
+  organizacao: {
+    name: 'Organização e Administração',
+    description: 'Você tem o dom administrativo e a capacidade de planejar, organizar e coordenar projetos e eventos.',
+    icon: <Calendar className="w-6 h-6" />,
+    color: 'text-slate-600',
+    bgColor: 'bg-slate-50 border-slate-200',
+    characteristics: ['Dom administrativo', 'Capacidade de planejamento', 'Liderança organizacional', 'Visão estratégica'],
+    activities: ['Planejamento de eventos', 'Coordenação de projetos', 'Gestão de recursos', 'Desenvolvimento de processos']
+  },
+  acao_social: {
+    name: 'Ação Social',
+    description: 'Você tem o coração voltado para a justiça social e a capacidade de levar esperança às comunidades necessitadas.',
+    icon: <Heart className="w-6 h-6" />,
+    color: 'text-red-600',
+    bgColor: 'bg-red-50 border-red-200',
+    characteristics: ['Sensibilidade social', 'Compaixão pelos necessitados', 'Capacidade mobilizadora', 'Visão transformacional'],
+    activities: ['Projetos comunitários', 'Campanhas de arrecadação', 'Visitação e assistência', 'Parcerias sociais']
+  }
+}
+
 const VocationalTest = () => {
   const { user, currentChurchId } = useAuthStore() 
+  const queryClient = useQueryClient()
   const [currentStep, setCurrentStep] = useState<'intro' | 'test' | 'results'>('intro')
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<number, number>>({})
   const [results, setResults] = useState<MinistryResult[]>([])
   const [topMinistry, setTopMinistry] = useState<MinistryResult | null>(null)
-  const [hasPreviousTest, setHasPreviousTest] = useState(false)
-  const [isLoadingResults, setIsLoadingResults] = useState(true)
-  const { protectedFetch, cleanup } = useLoadingProtection({ timeoutMs: 8000 })
 
-  const questions: Question[] = [
-    { id: 1, text: "Tenho facilidade com equipamentos eletrônicos e tecnologia", ministry: "midia" },
-    { id: 2, text: "Gosto de trabalhar com câmeras, som e iluminação", ministry: "midia" },
-    { id: 3, text: "Me sinto confortável operando sistemas durante os cultos", ministry: "midia" },
-    { id: 4, text: "Tenho interesse em produzir conteúdo digital para a igreja", ministry: "midia" },
-    { id: 5, text: "Consigo solucionar problemas técnicos com facilidade", ministry: "midia" },
+  const fetchPreviousTest = async () => {
+    if (!user?.id) return null
 
-    { id: 6, text: "Tenho dom musical (canto ou instrumento)", ministry: "louvor" },
-    { id: 7, text: "Me sinto à vontade adorando publicamente", ministry: "louvor" },
-    { id: 8, text: "Consigo conduzir outros em momentos de adoração", ministry: "louvor" },
-    { id: 9, text: "Tenho facilidade para aprender música rapidamente", ministry: "louvor" },
-    { id: 10, text: "A música é uma forma natural de expressar minha fé", ministry: "louvor" },
+    const { data, error } = await supabase
+      .from('testes_vocacionais')
+      .select('*')
+      .eq('membro_id', user.id)
+      .eq('is_ultimo', true)
+      .maybeSingle()
 
-    { id: 11, text: "Gosto de servir e ajudar pessoas em necessidade", ministry: "diaconato" },
-    { id: 12, text: "Tenho facilidade para identificar quem precisa de ajuda", ministry: "diaconato" },
-    { id: 13, text: "Me disponho a tarefas práticas de apoio na igreja", ministry: "diaconato" },
-    { id: 14, text: "Consigo organizar e coordenar ações de ajuda", ministry: "diaconato" },
-    { id: 15, text: "Sinto alegria em suprir necessidades dos outros", ministry: "diaconato" },
-
-    { id: 16, text: "Gosto de receber e conhecer pessoas novas", ministry: "integracao" },
-    { id: 17, text: "Tenho facilidade para fazer novos membros se sentirem bem-vindos", ministry: "integracao" },
-    { id: 18, text: "Consigo identificar visitantes e me aproximar deles", ministry: "integracao" },
-    { id: 19, text: "Me sinto confortável apresentando a igreja para outros", ministry: "integracao" },
-    { id: 20, text: "Tenho dom para criar ambiente acolhedor", ministry: "integracao" },
-
-    { id: 21, text: "Gosto de estudar e ensinar a Palavra de Deus", ministry: "ensino" },
-    { id: 22, text: "Tenho facilidade para explicar conceitos bíblicos", ministry: "ensino" },
-    { id: 23, text: "Consigo adaptar o ensino para diferentes idades", ministry: "ensino" },
-    { id: 24, text: "Me sinto chamado a discipular outras pessoas", ministry: "ensino" },
-    { id: 25, text: "Tenho paciência para acompanhar o crescimento espiritual dos outros", ministry: "ensino" },
-
-    { id: 26, text: "Gosto de trabalhar com crianças", ministry: "kids" },
-    { id: 27, text: "Tenho paciência e criatividade para ensinar crianças", ministry: "kids" },
-    { id: 28, text: "Consigo manter a atenção das crianças durante as atividades", ministry: "kids" },
-    { id: 29, text: "Me sinto confortável cuidando de grupos de crianças", ministry: "kids" },
-    { id: 30, text: "Tenho facilidade para criar atividades lúdicas e educativas", ministry: "kids" },
-
-    { id: 31, text: "Gosto de organizar eventos e atividades", ministry: "organizacao" },
-    { id: 32, text: "Tenho facilidade para planejar e coordenar projetos", ministry: "organizacao" },
-    { id: 33, text: "Consigo gerenciar recursos e logística", ministry: "organizacao" },
-    { id: 34, text: "Me sinto bem liderando equipes de trabalho", ministry: "organizacao" },
-    { id: 35, text: "Tenho atenção aos detalhes e gosto de ver tudo funcionando bem", ministry: "organizacao" },
-
-    { id: 36, text: "Tenho coração para ajudar pessoas em situação de vulnerabilidade", ministry: "acao_social" },
-    { id: 37, text: "Gosto de participar de projetos sociais e comunitários", ministry: "acao_social" },
-    { id: 38, text: "Tenho facilidade para mobilizar recursos para causas sociais", ministry: "acao_social" },
-    { id: 39, text: "Me sinto chamado a levar esperança para comunidades carentes", ministry: "acao_social" },
-    { id: 40, text: "Consigo ver as necessidades sociais ao meu redor", ministry: "acao_social" }
-  ]
-
-  const ministryData = {
-    midia: {
-      name: 'Mídia e Tecnologia',
-      description: 'Você tem o perfil para trabalhar com equipamentos, tecnologia e produção de conteúdo para amplificar a mensagem do Reino.',
-      icon: <Headphones className="w-6 h-6" />,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50 border-blue-200',
-      characteristics: [
-        'Facilidade com tecnologia',
-        'Atenção aos detalhes técnicos',
-        'Criatividade digital',
-        'Capacidade de trabalhar sob pressão'
-      ],
-      activities: [
-        'Operação de som e vídeo',
-        'Produção de conteúdo digital',
-        'Transmissão ao vivo',
-        'Manutenção de equipamentos'
-      ]
-    },
-    louvor: {
-      name: 'Louvor e Adoração',
-      description: 'Você tem o dom musical e a capacidade de conduzir outros à presença de Deus através da música e adoração.',
-      icon: <Mic className="w-6 h-6" />,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50 border-purple-200',
-      characteristics: [
-        'Dom musical',
-        'Coração adorador',
-        'Capacidade de liderança musical',
-        'Sensibilidade espiritual'
-      ],
-      activities: [
-        'Ministração em cultos',
-        'Ensaios e preparação musical',
-        'Ministração em eventos especiais',
-        'Mentoria de novos músicos'
-      ]
-    },    diaconato: {
-      name: 'Diaconato',
-      description: 'Você tem o coração servo e a capacidade de identificar e suprir necessidades práticas das pessoas.',
-      icon: <HandHeart className="w-6 h-6" />,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50 border-green-200',
-      characteristics: [
-        'Coração servo',
-        'Sensibilidade às necessidades',
-        'Organização prática',
-        'Disponibilidade para servir'
-      ],
-      activities: [
-        'Apoio em eventos',
-        'Assistência a necessitados',
-        'Organização de campanhas',
-        'Suporte logístico'
-      ]
-    },
-    integracao: {
-      name: 'Integração',
-      description: 'Você tem o dom da hospitalidade e a capacidade de fazer novos membros se sentirem acolhidos na família da fé.',
-      icon: <Users className="w-6 h-6" />,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50 border-orange-200',
-      characteristics: [
-        'Dom da hospitalidade',
-        'Facilidade de relacionamento',
-        'Empatia natural',
-        'Capacidade de acolhimento'
-      ],
-      activities: [
-        'Recepção de visitantes',
-        'Acompanhamento de novos membros',
-        'Organização de eventos de integração',
-        'Criação de vínculos comunitários'
-      ]
-    },
-    ensino: {
-      name: 'Ensino e Discipulado',
-      description: 'Você tem o dom do ensino e a capacidade de transmitir conhecimento bíblico de forma clara e transformadora.',
-      icon: <BookOpen className="w-6 h-6" />,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50 border-indigo-200',
-      characteristics: [
-        'Dom do ensino',
-        'Conhecimento bíblico',
-        'Paciência pedagógica',
-        'Capacidade de comunicação'
-      ],
-      activities: [
-        'Ensino em grupos pequenos',
-        'Discipulado individual',
-        'Preparação de materiais didáticos',
-        'Coordenação de cursos'
-      ]
-    },
-    kids: {
-      name: 'Kids',
-      description: 'Você tem o coração voltado para as crianças e a capacidade de impactar a próxima geração para Cristo.',
-      icon: <Baby className="w-6 h-6" />,
-      color: 'text-pink-600',
-      bgColor: 'bg-pink-50 border-pink-200',
-      characteristics: [
-        'Amor genuíno por crianças',
-        'Criatividade pedagógica',
-        'Paciência especial',
-        'Energia e dinamismo'
-      ],
-      activities: [
-        'Ensino para crianças',
-        'Organização de atividades lúdicas',
-        'Desenvolvimento de materiais infantis',
-        'Eventos especiais kids'
-      ]
-    },
-    organizacao: {
-      name: 'Organização e Administração',
-      description: 'Você tem o dom administrativo e a capacidade de planejar, organizar e coordenar projetos e eventos.',
-      icon: <Calendar className="w-6 h-6" />,
-      color: 'text-slate-600',
-      bgColor: 'bg-slate-50 border-slate-200',
-      characteristics: [
-        'Dom administrativo',
-        'Capacidade de planejamento',
-        'Liderança organizacional',
-        'Visão estratégica'
-      ],
-      activities: [
-        'Planejamento de eventos',
-        'Coordenação de projetos',
-        'Gestão de recursos',
-        'Desenvolvimento de processos'
-      ]
-    },
-    acao_social: {
-      name: 'Ação Social',
-      description: 'Você tem o coração voltado para a justiça social e a capacidade de levar esperança às comunidades necessitadas.',
-      icon: <Heart className="w-6 h-6" />,
-      color: 'text-red-600',
-      bgColor: 'bg-red-50 border-red-200',
-      characteristics: [
-        'Sensibilidade social',
-        'Compaixão pelos necessitados',
-        'Capacidade mobilizadora',
-        'Visão transformacional'
-      ],
-      activities: [
-        'Projetos comunitários',
-        'Campanhas de arrecadação',
-        'Visitação e assistência',
-        'Parcerias sociais'
-      ]
+    if (error) {
+      console.error('VocationalTest: Error loading previous test:', error)
+      toast.error('Erro ao carregar teste vocacional anterior.')
+      throw error
     }
+    return data
   }
 
-  useEffect(() => {
-    const loadPreviousTest = () => {
-      if (!user?.id) {
-        setIsLoadingResults(false)
-        return
-      }
-
-      const fetchFn = async () => {
-        // Hidratar de cache local para exibir de imediato
-        try {
-          const cached = localStorage.getItem(`vt_results_${user.id}`)
-          if (cached) {
-            const parsed = JSON.parse(cached)
-            if (parsed?.results?.length) {
-              setResults(parsed.results)
-              setTopMinistry(parsed.topMinistry || parsed.results[0] || null)
-              setHasPreviousTest(true)
-              setCurrentStep('results')
-            }
-          }
-        } catch {}
-
-        console.log('VocationalTest: Loading previous test results for user:', user.id)
-        const { data, error } = await supabase
-          .from('testes_vocacionais')
-          .select('*')
-          .eq('membro_id', user.id)
-          .eq('is_ultimo', true)
-          .maybeSingle()
-
-        if (error) {
-          console.error('VocationalTest: Error loading previous test:', error)
-          toast.error('Erro ao carregar teste vocacional anterior.')
-          throw error
+  const { data: previousTest, isLoading: isLoadingResults } = useQuery({
+    queryKey: ['vocationalTest', user?.id],
+    queryFn: fetchPreviousTest,
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    onSuccess: (data) => {
+      if (data) {
+        const respostas = data.respostas || {}
+        const ministryScores: Record<string, number> = {
+          midia: 0, louvor: 0, diaconato: 0, integracao: 0,
+          ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
         }
-        return data
-      }
+        questions.forEach((q) => {
+          const v = typeof respostas[`q${q.id}`] === 'number' ? respostas[`q${q.id}`] : 0
+          ministryScores[q.ministry] += v
+        })
 
-      const onSuccess = (data: any) => {
-        if (data) {
-          console.log('VocationalTest: Previous test found:', data)
-          setHasPreviousTest(true)
+        const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
+          const score = ministryScores[ministryKey]
+          const maxScore = 25
+          const percentage = (score / maxScore) * 100
           
-          const respostas = data.respostas || {}
-          const ministryScores: Record<string, number> = {
-            midia: 0, louvor: 0, diaconato: 0, integracao: 0,
-            ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
+          return {
+            ...ministryData[ministryKey as keyof typeof ministryData],
+            score,
+            percentage: Math.round(percentage)
           }
-          questions.forEach((q) => {
-            const v = typeof respostas[`q${q.id}`] === 'number' ? respostas[`q${q.id}`] : 0
-            ministryScores[q.ministry] += v
-          })
+        })
 
-          const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
-            const score = ministryScores[ministryKey]
-            const maxScore = 25
-            const percentage = (score / maxScore) * 100
-            
-            return {
-              ...ministryData[ministryKey as keyof typeof ministryData],
-              score,
-              percentage: Math.round(percentage)
-            }
-          })
+        calculatedResults.sort((a, b) => b.score - a.score)
+        setResults(calculatedResults)
+        setTopMinistry(calculatedResults[0])
+        setCurrentStep('results')
+      }
+    },
+  })
 
-          calculatedResults.sort((a, b) => b.score - a.score)
-          setResults(calculatedResults)
-          setTopMinistry(calculatedResults[0])
-          setCurrentStep('results')
-          
-          try {
-            localStorage.setItem(`vt_results_${user.id}`, JSON.stringify({
-              results: calculatedResults,
-              topMinistry: calculatedResults[0],
-              ts: Date.now()
-            }))
-          } catch {}
-        } else {
-          console.log('VocationalTest: No previous test found.')
-          setHasPreviousTest(false)
-        }
+  const saveTestMutation = useMutation({
+    mutationFn: async (recommendedName: string) => {
+      if (!user || !currentChurchId) {
+        throw new Error('Usuário ou igreja não identificados.')
       }
 
-      protectedFetch(fetchFn, onSuccess, undefined, () => {
-        setIsLoadingResults(false)
+      const respostas: Record<string, number> = {}
+      questions.forEach((q) => {
+        respostas[`q${q.id}`] = answers[q.id] ?? 0
       })
-    }
 
-    if (user?.id) {
-      loadPreviousTest()
-    } else {
-      setIsLoadingResults(false)
-    }
+      await supabase
+        .from('testes_vocacionais')
+        .update({ is_ultimo: false })
+        .eq('membro_id', user.id)
 
-    return () => {
-      cleanup()
-    }
-  }, [user?.id, protectedFetch, cleanup, questions, ministryData])
+      const { error } = await supabase
+        .from('testes_vocacionais')
+        .insert([{
+          membro_id: user.id,
+          id_igreja: currentChurchId,
+          is_ultimo: true,
+          data_teste: new Date().toISOString(),
+          respostas,
+          ministerio_recomendado: recommendedName,
+        }])
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Teste vocacional concluído e resultados salvos!')
+      queryClient.invalidateQueries({ queryKey: ['vocationalTest', user?.id] })
+      
+      const ministryScores: Record<string, number> = {
+        midia: 0, louvor: 0, diaconato: 0, integracao: 0,
+        ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
+      }
+      questions.forEach((q) => {
+        ministryScores[q.ministry] += answers[q.id] ?? 0
+      })
+
+      const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
+        const score = ministryScores[ministryKey]
+        const maxScore = 25
+        const percentage = (score / maxScore) * 100
+        
+        return {
+          ...ministryData[ministryKey as keyof typeof ministryData],
+          score,
+          percentage: Math.round(percentage)
+        }
+      })
+
+      calculatedResults.sort((a, b) => b.score - a.score)
+      setResults(calculatedResults)
+      setTopMinistry(calculatedResults[0])
+      setCurrentStep('results')
+    },
+    onError: (error) => {
+      console.error('VocationalTest: Error saving test results:', error)
+      toast.error('Erro ao salvar os resultados do teste.')
+    },
+  })
 
   const handleAnswerChange = (questionId: number, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: parseInt(value) }))
   }
 
-  const calculateAndSaveResults = async () => {
-    if (!user || !currentChurchId) {
-      toast.error('Erro: Usuário ou igreja não identificados.')
-      return
-    }
-
-    console.log('Calculating vocational test results and saving to Supabase...');
-
-    // Monta respostas em JSON e calcula pontuações por ministério
-    const respostas: Record<string, number> = {};
-    questions.forEach((q) => {
-      respostas[`q${q.id}`] = answers[q.id] ?? 0;
-    });
+  const calculateAndSaveResults = () => {
     const ministryScores: Record<string, number> = {
-      midia: 0,
-      louvor: 0,
-      diaconato: 0,
-      integracao: 0,
-      ensino: 0,
-      kids: 0,
-      organizacao: 0,
-      acao_social: 0,
-    };
-    questions.forEach((q) => {
-      ministryScores[q.ministry] += respostas[`q${q.id}`];
-    });
-
-    // Ministério recomendado (maior pontuação)
-    const topKey = Object.keys(ministryScores).sort((a, b) => ministryScores[b] - ministryScores[a])[0];
-    const recommendedName = (ministryData as any)[topKey]?.name ?? topKey;
-
-    // Marca testes anteriores como não-últimos
-    await supabase
-      .from('testes_vocacionais')
-      .update({ is_ultimo: false })
-      .eq('membro_id', user.id);
-
-    // Insere novo teste com respostas JSON e recomendação
-    const { data, error } = await supabase
-      .from('testes_vocacionais')
-      .insert([{
-        membro_id: user.id,
-        id_igreja: currentChurchId,
-        is_ultimo: true,
-        data_teste: new Date().toISOString(),
-        respostas,
-        ministerio_recomendado: recommendedName,
-      }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('VocationalTest: Error saving test results to Supabase:', error);
-      toast.error('Erro ao salvar os resultados do teste.');
-      return;
+      midia: 0, louvor: 0, diaconato: 0, integracao: 0,
+      ensino: 0, kids: 0, organizacao: 0, acao_social: 0,
     }
+    questions.forEach((q) => {
+      ministryScores[q.ministry] += answers[q.id] ?? 0
+    })
 
-    console.log('VocationalTest: Test results saved to Supabase:', data);
+    const topKey = Object.keys(ministryScores).sort((a, b) => ministryScores[b] - ministryScores[a])[0]
+    const recommendedName = (ministryData as any)[topKey]?.name ?? topKey
 
-    const calculatedResults: MinistryResult[] = Object.keys(ministryScores).map(ministryKey => {
-      const score = ministryScores[ministryKey];
-      const maxScore = 25; 
-      const percentage = (score / maxScore) * 100;
-      
-      return {
-        ...ministryData[ministryKey as keyof typeof ministryData],
-        score,
-        percentage: Math.round(percentage)
-      };
-    });
-
-    calculatedResults.sort((a, b) => b.score - a.score);
-    setResults(calculatedResults);
-    setTopMinistry(calculatedResults[0]);
-
-    setHasPreviousTest(true);
-    setCurrentStep('results');
-    // Atualiza cache local imediatamente após salvar
-    try {
-      localStorage.setItem(`vt_results_${user.id}`, JSON.stringify({
-        results: calculatedResults,
-        topMinistry: calculatedResults[0],
-        ts: Date.now()
-      }))
-    } catch {}
-    toast.success('Teste vocacional concluído e resultados salvos!');
+    saveTestMutation.mutate(recommendedName)
   }
 
   const nextQuestion = () => {
@@ -474,7 +334,6 @@ const VocationalTest = () => {
     setAnswers({})
     setResults([])
     setTopMinistry(null)
-    setHasPreviousTest(false)
   }
 
   const progress = ((currentQuestion + 1) / questions.length) * 100
@@ -491,7 +350,7 @@ const VocationalTest = () => {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="ml-4 text-lg text-gray-600">Carregando resultados anteriores...</p>
+        <p className="ml-4 text-lg text-gray-600">Carregando...</p>
       </div>
     );
   }
@@ -679,11 +538,17 @@ const VocationalTest = () => {
               
               <Button
                 onClick={nextQuestion}
-                disabled={!canProceed}
+                disabled={!canProceed || saveTestMutation.isPending}
                 className="bg-purple-500 hover:bg-purple-600"
               >
-                {isLastQuestion ? 'Ver Resultados' : 'Próxima'}
-                <ArrowRight className="w-4 h-4 ml-2" />
+                {saveTestMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    {isLastQuestion ? 'Ver Resultados' : 'Próxima'}
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>
