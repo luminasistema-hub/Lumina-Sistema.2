@@ -141,19 +141,6 @@ export const useAuthStore = create<AuthState>()(
 
               // Verifica status de pagamento da igreja quando aplicável
               if (profile.id_igreja) {
-                const mensalidade = Number(churchRow?.valor_mensal_assinatura ?? 0);
-                const pagamentoOk = churchRow?.ultimo_pagamento_status === 'Confirmado';
-
-                // Para plano pago, exige pagamento confirmado para acessar
-                // Agora todos os usuários entram como ativo, então verificamos o pagamento
-                if (mensalidade > 0 && !pagamentoOk && profile.funcao !== 'admin') {
-                  toast.error('Pagamento pendente: finalize o checkout para acessar.');
-                  await supabase.auth.signOut();
-                  set({ user: null, currentChurchId: null, isLoading: false });
-                  isCheckingAuth = false;
-                  return;
-                }
-
                 // Captura o nome da igreja (se existir)
                 if (churchRow && typeof churchRow.nome === 'string' && churchRow.nome) {
                   resolvedChurchName = churchRow.nome;

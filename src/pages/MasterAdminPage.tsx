@@ -15,7 +15,6 @@ import MasterAdminOverviewCards from '../components/master-admin/MasterAdminOver
 import MasterAdminChurchTable from '../components/master-admin/MasterAdminChurchTable'
 import DatabaseInfoTab from '../components/master-admin/DatabaseInfoTab'
 import AdminToolsTab from '../components/master-admin/AdminToolsTab'
-import SaaSReportsTab from '../components/master-admin/SaaSReportsTab'
 import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSystemOverview';
 import SubscriptionPlanManagement from '../components/master-admin/SubscriptionPlanManagement'
 import MasterAdminUpgradeRequestsAlert from '../components/master-admin/MasterAdminUpgradeRequestsAlert'
@@ -151,7 +150,6 @@ const MasterAdminPage = () => {
             <TabsTrigger value="plans" className="whitespace-nowrap">Planos</TabsTrigger>
             <TabsTrigger value="database" className="whitespace-nowrap">Banco de Dados</TabsTrigger>
             <TabsTrigger value="tools" className="whitespace-nowrap">Ferramentas Admin</TabsTrigger>
-            <TabsTrigger value="reports" className="whitespace-nowrap">Relatórios SaaS</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -245,10 +243,6 @@ const MasterAdminPage = () => {
 
           <TabsContent value="tools" className="space-y-6">
             <AdminToolsTab churches={churches} onUpdateChurch={handleUpdateChurch} />
-          </TabsContent>
-
-          <TabsContent value="reports" className="space-y-6">
-            <SaaSReportsTab />
           </TabsContent>
         </Tabs>
       </div>

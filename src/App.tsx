@@ -11,7 +11,6 @@ import CadastrarIgrejaPage from './pages/CadastrarIgrejaPage'
 import LandingPage from './pages/LandingPage'
 import EADPortalPage from './pages/EADPortalPage'
 import SchoolDetailsPage from './pages/SchoolDetailsPage'
-import PaymentSuccessPage from './pages/PaymentSuccessPage'
 import PasswordResetPage from './pages/PasswordResetPage'
 import NewPasswordPage from './pages/NewPasswordPage'
 import { useEffect } from 'react'
@@ -124,12 +123,6 @@ function App() {
           path="/cadastrar-igreja"
           element={
             <CadastrarIgrejaPage />
-          }
-        />
-        <Route
-          path="/payment-success"
-          element={
-            <PaymentSuccessPage />
           }
         />
 

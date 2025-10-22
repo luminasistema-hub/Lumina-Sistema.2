@@ -90,7 +90,7 @@ const SystemSettings = () => {
           nome_responsavel, site, descricao,
           plano_id, limite_membros, membros_atuais,
           valor_mensal_assinatura, data_proximo_pagamento,
-          ultimo_pagamento_status, link_pagamento_assinatura,
+          ultimo_pagamento_status,
           plano:planos_assinatura ( id, nome, limite_membros, preco_mensal )
         `)
         .eq('id', currentChurchId)
@@ -128,7 +128,7 @@ const SystemSettings = () => {
           valor_mensal_assinatura: church.valor_mensal_assinatura ?? (Array.isArray(church.plano) ? church.plano[0]?.preco_mensal : church.plano?.preco_mensal) ?? null,
           data_proximo_pagamento: church.data_proximo_pagamento ?? null,
           ultimo_pagamento_status: church.ultimo_pagamento_status ?? 'N/A',
-          link_pagamento_assinatura: church.link_pagamento_assinatura ?? null
+          link_pagamento_assinatura: null
         })
       }
     }
@@ -352,13 +352,6 @@ const SystemSettings = () => {
                     <ArrowUpRight className="w-4 h-4 mr-2" />
                     Solicitar Upgrade de Plano
                   </Button>
-                )}
-                {plan.link_pagamento_assinatura && (
-                  <a href={plan.link_pagamento_assinatura} target="_blank" rel="noreferrer">
-                    <Button variant="outline">
-                      Gerenciar Assinatura
-                    </Button>
-                  </a>
                 )}
               </div>
 
