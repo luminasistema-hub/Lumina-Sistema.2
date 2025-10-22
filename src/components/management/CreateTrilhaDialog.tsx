@@ -10,14 +10,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { useChurchStore } from '@/stores/churchStore';
 import { useChildChurches } from '@/hooks/useChildChurches';
 
+interface Trilha {
+  id: string;
+  titulo: string;
+  descricao: string;
+  compartilhar_com_filhas: boolean;
+}
+
 interface CreateTrilhaDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   currentChurchId: string;
   onCreated: () => void;
+  trilhaParaEditar?: Trilha | null;
 }
 
-const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }: CreateTrilhaDialogProps) => {
+const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated, trilhaParaEditar }: CreateTrilhaDialogProps) => {
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,42 +34,62 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
 
   useEffect(() => {
     if (isOpen) {
-      setTitulo('');
-      setDescricao('');
-      setShareWithChildren(true);
+      if (trilhaParaEditar) {
+        setTitulo(trilhaParaEditar.titulo);
+        setDescricao(trilhaParaEditar.descricao);
+        setShareWithChildren(trilhaParaEditar.compartilhar_com_filhas);
+      } else {
+        setTitulo('');
+        setDescricao('');
+        setShareWithChildren(true);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, trilhaParaEditar]);
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!titulo.trim()) {
       toast.error('Informe um título para a trilha.');
       return;
     }
     setLoading(true);
     try {
-      // Desativar trilha ativa anterior da igreja (garante apenas uma ativa)
-      await supabase
-        .from('trilhas_crescimento')
-        .update({ is_ativa: false })
-        .eq('id_igreja', currentChurchId)
-        .eq('is_ativa', true);
+      if (trilhaParaEditar) {
+        // Edita a trilha existente
+        const { error } = await supabase
+          .from('trilhas_crescimento')
+          .update({
+            titulo: titulo.trim(),
+            descricao: descricao.trim(),
+            compartilhar_com_filhas: shareWithChildren,
+          })
+          .eq('id', trilhaParaEditar.id);
+        if (error) throw error;
+        toast.success('Trilha atualizada com sucesso!');
+      } else {
+        // Cria uma nova trilha e desativa a anterior
+        await supabase
+          .from('trilhas_crescimento')
+          .update({ is_ativa: false })
+          .eq('id_igreja', currentChurchId)
+          .eq('is_ativa', true);
 
-      const { error } = await supabase
-        .from('trilhas_crescimento')
-        .insert({
-          id_igreja: currentChurchId,
-          titulo: titulo.trim(),
-          descricao: descricao.trim(),
-          is_ativa: true,
-          compartilhar_com_filhas: shareWithChildren,
-        });
-      if (error) throw error;
-      toast.success('Trilha criada com sucesso!');
+        const { error } = await supabase
+          .from('trilhas_crescimento')
+          .insert({
+            id_igreja: currentChurchId,
+            titulo: titulo.trim(),
+            descricao: descricao.trim(),
+            is_ativa: true,
+            compartilhar_com_filhas: shareWithChildren,
+          });
+        if (error) throw error;
+        toast.success('Trilha criada com sucesso!');
+      }
       onOpenChange(false);
       onCreated();
     } catch (err: any) {
-      console.error('Erro ao criar trilha:', err);
-      toast.error('Não foi possível criar a trilha. Verifique suas permissões.');
+      console.error('Erro ao salvar trilha:', err);
+      toast.error('Não foi possível salvar a trilha. Verifique suas permissões.');
     } finally {
       setLoading(false);
     }
@@ -71,8 +99,10 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Criar Trilha de Crescimento</DialogTitle>
-          <DialogDescription>Defina o título e a descrição da jornada do membro para sua igreja.</DialogDescription>
+          <DialogTitle>{trilhaParaEditar ? 'Editar Trilha' : 'Criar Nova Trilha'}</DialogTitle>
+          <DialogDescription>
+            {trilhaParaEditar ? 'Edite o título, descrição e opções de compartilhamento.' : 'Defina o título e a descrição da jornada do membro para sua igreja.'}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
@@ -105,8 +135,8 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated }
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={loading}>
-              {loading ? 'Criando...' : 'Criar Trilha'}
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? 'Salvando...' : (trilhaParaEditar ? 'Salvar Alterações' : 'Criar Trilha')}
             </Button>
           </div>
         </div>

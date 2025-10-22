@@ -58,7 +58,7 @@ const ConfiguracaoJornada = () => {
   const [loading, setLoading] = useState(true);
   const { currentChurchId } = useAuthStore();
   const [etapaAberta, setEtapaAberta] = useState<string | null>(null);
-  const [trilhaAtual, setTrilhaAtual] = useState<{ id: string; titulo: string; descricao: string } | null>(null);
+  const [trilhaAtual, setTrilhaAtual] = useState<{ id: string; titulo: string; descricao: string; compartilhar_com_filhas: boolean } | null>(null);
 
   const { data: schoolsData } = useSchools();
   const availableSchools = schoolsData || [];
@@ -123,7 +123,7 @@ const ConfiguracaoJornada = () => {
       const { data: trilhaData, error } = await supabase
         .from('trilhas_crescimento')
         .select(`
-          id, titulo, descricao,
+          id, titulo, descricao, compartilhar_com_filhas,
           etapas_trilha (
             *,
             passos_etapa (
@@ -139,7 +139,7 @@ const ConfiguracaoJornada = () => {
       if (error) throw error;
 
       if (trilhaData && trilhaData.etapas_trilha) {
-        setTrilhaAtual({ id: trilhaData.id, titulo: trilhaData.titulo, descricao: trilhaData.descricao });
+        setTrilhaAtual({ id: trilhaData.id, titulo: trilhaData.titulo, descricao: trilhaData.descricao, compartilhar_com_filhas: trilhaData.compartilhar_com_filhas });
         const etapasOrdenadas = (trilhaData.etapas_trilha as any[]).map(etapa => {
           const passosOrdenados = etapa.passos_etapa 
             ? [...etapa.passos_etapa].sort((a, b) => a.ordem - b.ordem)
@@ -639,8 +639,8 @@ const ConfiguracaoJornada = () => {
           </CardTitle>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setIsCreateTrilhaOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Trilha
+              <Edit className="w-4 h-4 mr-2" />
+              Gerenciar Trilha
             </Button>
             <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={handleOpenCreateEtapaModal}>
               <Plus className="w-4 h-4 mr-2" />
@@ -731,6 +731,7 @@ const ConfiguracaoJornada = () => {
         onOpenChange={setIsCreateTrilhaOpen}
         currentChurchId={currentChurchId!}
         onCreated={carregarJornadaCompleta}
+        trilhaParaEditar={trilhaAtual}
       />
 
       {/* Modal para Etapas */}
