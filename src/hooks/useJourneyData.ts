@@ -202,7 +202,6 @@ const fetchJourneyData = async (userId: string | null, churchId: string | null) 
     .flatMap(e => e.passos)
     .filter(p => 
       p.escola_pre_requisito_id && 
-      p.tipo_passo === 'conclusao_escola' &&
       completedSchools.has(p.escola_pre_requisito_id) &&
       !progressoData.some(prog => prog.id_passo === p.id && prog.status === 'concluido')
     )

@@ -282,7 +282,7 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
   const isQuiz = passo.tipo_passo === 'quiz';
   const isBlocked = passo.progress?.quiz_bloqueado || false;
   const canComplete = !isBlocked && (!isQuiz || (isQuiz && quizDetails !== null));
-  const isSchoolConclusionStep = passo.tipo_passo === 'conclusao_escola';
+  const hasSchoolPrerequisite = !!passo.escola_pre_requisito_id;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -292,12 +292,12 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
           <DialogDescription>Complete a tarefa abaixo para avançar na sua jornada.</DialogDescription>
         </DialogHeader>
         <div className="flex-grow overflow-y-auto p-1 pr-4">
-          {(hasSchoolPrerequisite || isSchoolConclusionStep) && (
+          {hasSchoolPrerequisite && (
             <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg mb-4 text-center flex items-center justify-center gap-2">
               <Info className="w-5 h-5" />
               <div>
                 <p className="font-semibold">Este passo é concluído automaticamente!</p>
-                <p className="text-sm">Finalize a escola associada para que este passo seja marcado como completo.</p>
+                <p className="text-sm">Finalize a escola "{passo.escola_pre_requisito_nome || 'associada'}" para que este passo seja marcado como completo.</p>
               </div>
             </div>
           )}
@@ -305,7 +305,7 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Fechar</Button>
-          {!hasSchoolPrerequisite && !isSchoolConclusionStep && (
+          {!hasSchoolPrerequisite && (
             <Button onClick={handleComplete} disabled={!canComplete}>
               <Check className="w-4 h-4 mr-2" />
               Marcar como Concluído
