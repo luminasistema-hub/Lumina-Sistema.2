@@ -223,32 +223,6 @@ const OfferingsPage = () => {
         return
       }
       
-      // Buscar transação para dados e enfileirar WhatsApp
-      const { data: tx } = await supabase
-        .from('transacoes_financeiras')
-        .select('*')
-        .eq('id', contributionId)
-        .maybeSingle();
-      if (tx && currentChurchId) {
-        const { data: telRow } = await supabase
-          .from('informacoes_pessoais')
-          .select('telefone')
-          .eq('membro_id', tx.membro_id)
-          .maybeSingle();
-        const phone = telRow?.telefone || null;
-        if (phone) {
-          await supabase.from('whatsapp_messages').insert({
-            church_id: currentChurchId,
-            recipient_phone: phone,
-            template_key: 'donation_receipt',
-            payload: {
-              valor: tx.valor,
-              numero_documento: tx.numero_documento || '',
-            },
-          });
-        }
-      }
-      
       toast.success('Recibo marcado como emitido!')
       loadContributions()
     } catch (error) {

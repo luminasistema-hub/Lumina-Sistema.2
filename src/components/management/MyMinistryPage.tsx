@@ -357,32 +357,6 @@ const MyMinistryPage = () => {
     toast.success('Voluntário atribuído à escala!');
     loadSchedules(selectedMinistryId!);
     if (membroId === user?.id) loadMyAssignments(selectedMinistryId!);
-    // Enfileirar WhatsApp para o membro
-    if (currentChurchId) {
-      const { data: telRow } = await supabase
-        .from('informacoes_pessoais')
-        .select('telefone')
-        .eq('membro_id', membroId)
-        .maybeSingle();
-      const { data: escalaRow } = await supabase
-        .from('escalas_servico')
-        .select('data_servico, evento:eventos(nome)')
-        .eq('id', escalaId)
-        .maybeSingle();
-      const phone = telRow?.telefone || null;
-      if (phone && escalaRow) {
-        await supabase.from('whatsapp_messages').insert({
-          church_id: currentChurchId,
-          recipient_phone: phone,
-          template_key: 'schedule_assigned',
-          payload: {
-            evento_nome: escalaRow.evento?.nome || 'Escala',
-            data: escalaRow.data_servico,
-            ministerio: selectedMinistry?.nome || '',
-          },
-        });
-      }
-    }
   };
 
   const handleRemoveVolunteerFromSchedule = async (escalaId: string, membroId: string) => {
