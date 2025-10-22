@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -9,16 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Calendar, User, Tag, Pencil, Trash2, Star, Plus } from 'lucide-react';
+import { Calendar, User, Tag, Pencil, Trash2, Star, Plus, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useChurchStore } from '@/stores/churchStore';
 import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado';
 type DevotionalCategory = 'Diário' | 'Semanal' | 'Especial' | 'Temático';
@@ -43,75 +39,19 @@ interface Devotional {
   compartilhar_com_filhas?: boolean;
 }
 
+const PAGE_SIZE = 6;
+
 const DevotionalsManagementPage = () => {
   const { currentChurchId, user } = useAuthStore();
   const qc = useQueryClient();
   const churchStore = useChurchStore();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 500);
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [selectedDevotional, setSelectedDevotional] = useState<Devotional | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-  const canManage = user?.role === 'admin' || user?.role === 'pastor';
-
-  // Defina o queryKey antes de qualquer uso (incluindo em useEffect)
-  const queryKey = useMemo(
-    () => ['devos-mgmt', currentChurchId, { statusFilter, categoryFilter, searchTerm }],
-    [currentChurchId, statusFilter, categoryFilter, searchTerm]
-  );
-
-  const fetchDevotionals = async (
-    churchId: string,
-    statusFilter: string,
-    categoryFilter: string,
-    searchTerm: string
-  ) => {
-    let query = supabase
-      .from('devocionais')
-      .select(`
-        *,
-        membros(nome_completo)
-      `)
-      .eq('id_igreja', churchId)
-      .order('data_publicacao', { ascending: false });
-
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
-    }
-    if (categoryFilter !== 'all') {
-      query = query.eq('categoria', categoryFilter);
-    }
-    if (searchTerm) {
-      query = query.ilike('titulo', `%${searchTerm}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data as Devotional[];
-  };
-
-  useEffect(() => {
-    if (!currentChurchId) return;
-
-    const channel = supabase
-      .channel(`devotionals-management-${currentChurchId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'devocionais', filter: `id_igreja=eq.${currentChurchId}` },
-        () => {
-          qc.invalidateQueries({ queryKey });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentChurchId, qc, queryKey]);
-
+  const [page, setPage] = useState(0);
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Devotional | null>(null);
 
@@ -128,17 +68,53 @@ const DevotionalsManagementPage = () => {
     compartilhar_com_filhas: churchStore.getChurchById(currentChurchId!)?.share_devocionais_to_children ?? false,
   });
 
-  // queryKey já foi definido acima
+  const queryKey = useMemo(
+    () => ['devos-mgmt', currentChurchId, { statusFilter, categoryFilter, debouncedSearchTerm, page }],
+    [currentChurchId, statusFilter, categoryFilter, debouncedSearchTerm, page]
+  );
 
-  const { data: devotionalsData, isLoading, error } = useQuery({
+  const fetchDevotionals = async (
+    churchId: string,
+    status: string,
+    category: string,
+    search: string,
+    currentPage: number
+  ) => {
+    let query = supabase
+      .from('devocionais')
+      .select('*, membros(nome_completo)', { count: 'exact' })
+      .eq('id_igreja', churchId)
+      .order('created_at', { ascending: false })
+      .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
+
+    if (status !== 'all') query = query.eq('status', status);
+    if (category !== 'all') query = query.eq('categoria', category);
+    if (search) query = query.ilike('titulo', `%${search}%`);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+    return { data: data as Devotional[], count };
+  };
+
+  const { data: devotionalsResponse, isLoading, error } = useQuery({
     queryKey,
-    queryFn: () => fetchDevotionals(currentChurchId!, statusFilter, categoryFilter, searchTerm),
+    queryFn: () => fetchDevotionals(currentChurchId!, statusFilter, categoryFilter, debouncedSearchTerm, page),
     enabled: !!currentChurchId,
-    staleTime: 30000, // 30 segundos de cache
-    gcTime: 5 * 60 * 1000, // 5 minutos no cache
-    refetchOnWindowFocus: false, // Evita refetch ao focar janela
-    retry: 1, // Apenas 1 retry em caso de erro
   });
+
+  const devotionalsData = devotionalsResponse?.data || [];
+  const devotionalsCount = devotionalsResponse?.count || 0;
+
+  useEffect(() => {
+    if (!currentChurchId) return;
+    const channel = supabase
+      .channel(`devotionals-management-${currentChurchId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devocionais', filter: `id_igreja=eq.${currentChurchId}` },
+        () => { qc.invalidateQueries({ queryKey: ['devos-mgmt'] }); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentChurchId, qc]);
 
   const resetForm = () => {
     setForm({
@@ -156,59 +132,36 @@ const DevotionalsManagementPage = () => {
     setEditingItem(null);
   };
 
+  const mutationOptions = {
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['devos-mgmt'] });
+      setIsDialogOpen(false);
+      resetForm();
+    },
+  };
+
   const createMutation = useMutation({
-    mutationFn: async () => {
-      if (!user || !currentChurchId) throw new Error('Usuário não autenticado.');
-      if (!form.titulo || !form.conteudo || !form.versiculo_referencia) throw new Error('Preencha os campos obrigatórios.');
-      const tempo = Math.ceil((form.conteudo?.length || 0) / 200);
-      const payload = {
-        ...form,
-        id_igreja: currentChurchId,
-        autor_id: user.id,
-        tempo_leitura: tempo,
-        data_publicacao: form.status === 'Publicado' ? new Date().toISOString() : null,
-        compartilhar_com_filhas: form.compartilhar_com_filhas ?? (churchStore.getChurchById(currentChurchId!)?.share_devocionais_to_children ?? false),
-      };
+    mutationFn: async (payload: any) => {
       const { error } = await supabase.from('devocionais').insert(payload);
       if (error) throw new Error(error.message);
     },
+    ...mutationOptions,
     onSuccess: () => {
       toast.success('Devocional criado com sucesso!');
-      qc.invalidateQueries({ queryKey });
-      setIsDialogOpen(false);
-      resetForm();
+      mutationOptions.onSuccess();
     },
     onError: (err: any) => toast.error(`Erro ao criar: ${err.message}`),
   });
 
   const updateMutation = useMutation({
-    mutationFn: async () => {
-      if (!editingItem) return;
-      const tempo = Math.ceil((form.conteudo?.length || editingItem.conteudo.length || 0) / 200);
-      const payload: Partial<Devotional> = {
-        titulo: form.titulo ?? editingItem.titulo,
-        conteudo: form.conteudo ?? editingItem.conteudo,
-        versiculo_referencia: form.versiculo_referencia ?? editingItem.versiculo_referencia,
-        versiculo_texto: form.versiculo_texto ?? editingItem.versiculo_texto,
-        categoria: (form.categoria as DevotionalCategory) ?? editingItem.categoria,
-        tags: form.tags ?? editingItem.tags,
-        status: (form.status as DevotionalStatus) ?? editingItem.status,
-        imagem_capa: form.imagem_capa ?? editingItem.imagem_capa,
-        featured: form.featured ?? editingItem.featured,
-        tempo_leitura: tempo,
-        data_publicacao: (form.status ?? editingItem.status) === 'Publicado'
-          ? (editingItem.data_publicacao || new Date().toISOString())
-          : null,
-        compartilhar_com_filhas: form.compartilhar_com_filhas ?? editingItem.compartilhar_com_filhas ?? false,
-      };
-      const { error } = await supabase.from('devocionais').update(payload).eq('id', editingItem.id);
+    mutationFn: async ({ payload, id }: { payload: any, id: string }) => {
+      const { error } = await supabase.from('devocionais').update(payload).eq('id', id);
       if (error) throw new Error(error.message);
     },
+    ...mutationOptions,
     onSuccess: () => {
       toast.success('Devocional atualizado!');
-      qc.invalidateQueries({ queryKey });
-      setIsDialogOpen(false);
-      resetForm();
+      mutationOptions.onSuccess();
     },
     onError: (err: any) => toast.error(`Erro ao atualizar: ${err.message}`),
   });
@@ -220,36 +173,36 @@ const DevotionalsManagementPage = () => {
     },
     onSuccess: () => {
       toast.success('Devocional removido.');
-      qc.invalidateQueries({ queryKey });
+      qc.invalidateQueries({ queryKey: ['devos-mgmt'] });
     },
     onError: (err: any) => toast.error(`Erro ao remover: ${err.message}`),
   });
 
-  const toggleFeaturedMutation = useMutation({
-    mutationFn: async (item: Devotional) => {
-      const { error } = await supabase.from('devocionais').update({ featured: !item.featured }).eq('id', item.id);
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey });
-    },
-    onError: (err: any) => toast.error(`Erro ao alterar destaque: ${err.message}`),
-  });
-
-  const setStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: DevotionalStatus }) => {
-      const payload: Partial<Devotional> = {
-        status,
-        data_publicacao: status === 'Publicado' ? new Date().toISOString() : null,
+  const handleSave = () => {
+    const tempo = Math.ceil((form.conteudo?.length || 0) / 200);
+    const isPublishing = form.status === 'Publicado';
+    
+    if (editingItem) {
+      const payload = {
+        ...form,
+        tempo_leitura: tempo,
+        data_publicacao: isPublishing ? (editingItem.data_publicacao || new Date().toISOString()) : null,
       };
-      const { error } = await supabase.from('devocionais').update(payload).eq('id', id);
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey });
-    },
-    onError: (err: any) => toast.error(`Erro ao alterar status: ${err.message}`),
-  });
+      updateMutation.mutate({ payload, id: editingItem.id });
+    } else {
+      if (!user || !currentChurchId) { toast.error('Usuário não autenticado.'); return; }
+      if (!form.titulo || !form.conteudo || !form.versiculo_referencia) { toast.error('Preencha os campos obrigatórios.'); return; }
+      const payload = {
+        ...form,
+        id_igreja: currentChurchId,
+        autor_id: user.id,
+        tempo_leitura: tempo,
+        data_publicacao: isPublishing ? new Date().toISOString() : null,
+        compartilhar_com_filhas: form.compartilhar_com_filhas ?? (churchStore.getChurchById(currentChurchId!)?.share_devocionais_to_children ?? false),
+      };
+      createMutation.mutate(payload);
+    }
+  };
 
   const openNewDialog = () => {
     resetForm();
@@ -274,7 +227,7 @@ const DevotionalsManagementPage = () => {
   };
 
   const stripHtml = (html: string) => {
-    if (typeof window === 'undefined') return html;
+    if (typeof window === 'undefined' || !html) return '';
     const tmp = document.createElement('DIV');
     tmp.innerHTML = html;
     return tmp.textContent || tmp.innerText || '';
@@ -295,104 +248,78 @@ const DevotionalsManagementPage = () => {
       <Card>
         <CardContent className="p-4 grid gap-3 md:grid-cols-4">
           <div className="md:col-span-2">
-            <div className="relative">
-              <Input
-                placeholder="Pesquisar título ou conteúdo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+            <Input
+              placeholder="Pesquisar por título..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+            />
           </div>
           <div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(0); }}>
               <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
               <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c === 'all' ? 'Todas' : c}
-                  </SelectItem>
-                ))}
+                {categories.map((c) => <SelectItem key={c} value={c}>{c === 'all' ? 'Todas' : c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
               <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
-                {statusOptions.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s === 'all' ? 'Todos' : s}
-                  </SelectItem>
-                ))}
+                {statusOptions.map((s) => <SelectItem key={s} value={s}>{s === 'all' ? 'Todos' : s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      {isLoading && <div className="p-8 text-center text-gray-500">Carregando...</div>}
+      {isLoading && <div className="p-8 text-center text-gray-500 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Carregando...</div>}
       {error && <div className="p-8 text-center text-red-500">Erro ao carregar: {(error as any).message}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {(devotionalsData || []).map((d) => (
-          <Card key={d.id} className="border hover:shadow-sm transition">
-            {d.imagem_capa && (
-              <img src={d.imagem_capa} alt={d.titulo} className="h-40 w-full object-cover rounded-t-lg" />
-            )}
+        {devotionalsData.map((d) => (
+          <Card key={d.id} className="border hover:shadow-sm transition flex flex-col">
+            {d.imagem_capa && <img src={d.imagem_capa} alt={d.titulo} className="h-40 w-full object-cover rounded-t-lg" />}
             <CardHeader>
               <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg line-clamp-2">{d.titulo}</CardTitle>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                    <Badge variant="outline">{d.status}</Badge>
-                    <Badge className="bg-blue-100 text-blue-800">{d.categoria}</Badge>
-                    <div className="flex items-center gap-1">
-                      <User className="w-4 h-4" />
-                      <span>{d.membros?.nome_completo || 'Autor'}</span>
-                    </div>
-                    {d.data_publicacao && (
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(d.data_publicacao).toLocaleDateString('pt-BR')}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant={d.featured ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFeaturedMutation.mutate(d)}>
-                    <Star className="w-4 h-4 mr-1" /> {d.featured ? 'Destacado' : 'Destacar'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => openEditDialog(d)}>
-                    <Pencil className="w-4 h-4 mr-1" /> Editar
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setStatusMutation.mutate({ id: d.id, status: d.status === 'Publicado' ? 'Arquivado' : 'Publicado' })}>
-                    {d.status === 'Publicado' ? 'Arquivar' : 'Publicar'}
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteMutation.mutate(d.id)}>
-                    <Trash2 className="w-4 h-4 mr-1" /> Remover
-                  </Button>
-                </div>
+                <CardTitle className="text-lg line-clamp-2">{d.titulo}</CardTitle>
+                <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteMutation.mutate(d.id)}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-4">
-              <p className="text-sm text-gray-700 line-clamp-3">{stripHtml(d.conteudo)}</p>
-              <div className="flex flex-wrap gap-1 mt-2">
-                {(d.tags || []).slice(0, 4).map((t) => (
-                  <Badge key={t} variant="outline" className="text-xs">
-                    <Tag className="w-3 h-3 mr-1" /> {t}
-                  </Badge>
-                ))}
+            <CardContent className="p-4 pt-0 flex-grow">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mb-2">
+                <Badge variant="outline">{d.status}</Badge>
+                <Badge className="bg-blue-100 text-blue-800">{d.categoria}</Badge>
+                <div className="flex items-center gap-1"><User className="w-4 h-4" /><span>{d.membros?.nome_completo || 'Autor'}</span></div>
+                {d.data_publicacao && <div className="flex items-center gap-1"><Calendar className="w-4 h-4" /><span>{new Date(d.data_publicacao).toLocaleDateString('pt-BR')}</span></div>}
+              </div>
+              <p className="text-sm text-gray-700 line-clamp-3 mb-2">{stripHtml(d.conteudo)}</p>
+              <div className="flex flex-wrap gap-1">
+                {(d.tags || []).slice(0, 4).map((t) => <Badge key={t} variant="secondary" className="text-xs"><Tag className="w-3 h-3 mr-1" />{t}</Badge>)}
               </div>
             </CardContent>
+            <div className="p-4 pt-0 flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => openEditDialog(d)}><Pencil className="w-4 h-4 mr-1" /> Editar</Button>
+            </div>
           </Card>
         ))}
       </div>
 
+      <div className="flex items-center justify-between pt-4">
+        <span className="text-sm text-gray-600">
+          Página {page + 1} de {Math.ceil(devotionalsCount / PAGE_SIZE)}
+        </span>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Anterior</Button>
+          <Button variant="outline" onClick={() => setPage(p => p + 1)} disabled={(page + 1) * PAGE_SIZE >= devotionalsCount}>Próxima</Button>
+        </div>
+      </div>
+
       <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingItem ? 'Editar Devocional' : 'Novo Devocional'}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem ? 'Editar Devocional' : 'Novo Devocional'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <Input placeholder="Título *" value={form.titulo || ''} onChange={(e) => setForm({ ...form, titulo: e.target.value })} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -410,11 +337,7 @@ const DevotionalsManagementPage = () => {
             <Textarea placeholder="Texto do Versículo (opcional)" value={form.versiculo_texto || ''} onChange={(e) => setForm({ ...form, versiculo_texto: e.target.value })} rows={2} />
             <Textarea placeholder="Conteúdo * (HTML básico suportado)" value={form.conteudo || ''} onChange={(e) => setForm({ ...form, conteudo: e.target.value })} rows={10} />
             <Input placeholder="Imagem de capa (URL)" value={form.imagem_capa || ''} onChange={(e) => setForm({ ...form, imagem_capa: e.target.value })} />
-            <Input
-              placeholder="Tags separadas por vírgula"
-              value={(form.tags || []).join(', ')}
-              onChange={(e) => setForm({ ...form, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
-            />
+            <Input placeholder="Tags separadas por vírgula" value={(form.tags || []).join(', ')} onChange={(e) => setForm({ ...form, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Select value={(form.status as string) || 'Rascunho'} onValueChange={(v) => setForm({ ...form, status: v as DevotionalStatus })}>
                 <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
@@ -432,30 +355,18 @@ const DevotionalsManagementPage = () => {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="p-3 border rounded-md flex items-center justify-between">
               <div className="space-y-1">
                 <Label>Compartilhar com igrejas filhas</Label>
                 <p className="text-xs text-gray-600">Se ativado, este devocional ficará visível para igrejas filhas.</p>
               </div>
-              <Switch
-                checked={!!form.compartilhar_com_filhas}
-                onCheckedChange={(v) => setForm({ ...form, compartilhar_com_filhas: v })}
-                aria-label="Compartilhar devocional com igrejas filhas"
-              />
+              <Switch checked={!!form.compartilhar_com_filhas} onCheckedChange={(v) => setForm({ ...form, compartilhar_com_filhas: v })} aria-label="Compartilhar devocional com igrejas filhas" />
             </div>
-
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
-              {editingItem ? (
-                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
-                </Button>
-              ) : (
-                <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Criando...' : 'Criar Devocional'}
-                </Button>
-              )}
+              <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
+                {(createMutation.isPending || updateMutation.isPending) ? 'Salvando...' : 'Salvar'}
+              </Button>
             </div>
           </div>
         </DialogContent>
