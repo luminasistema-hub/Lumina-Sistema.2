@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
+import { MemberProfile } from './useMembers'
 
 export type GrowthGroup = {
   id: string
@@ -82,8 +83,9 @@ export const useAddLeaderToGroup = () => {
       if (error) throw new Error(error.message)
       return true
     },
-    onSuccess: () => {
+    onSuccess: (_, { groupId }) => {
       toast.success('Líder adicionado')
+      qc.invalidateQueries({ queryKey: ['gc-group-leaders', groupId] })
       qc.invalidateQueries({ queryKey: ['gc-groups', currentChurchId] })
     },
     onError: (e: any) => toast.error(e.message || 'Falha ao adicionar líder')
@@ -101,44 +103,81 @@ export const useAddMemberToGroup = () => {
       if (error) throw new Error(error.message)
       return true
     },
-    onSuccess: () => {
+    onSuccess: (_, { groupId }) => {
       toast.success('Membro adicionado ao grupo')
       qc.invalidateQueries({ queryKey: ['gc-my-groups'] })
+      qc.invalidateQueries({ queryKey: ['gc-group-members', groupId] })
     },
     onError: (e: any) => toast.error(e.message || 'Falha ao adicionar membro')
   })
 }
 
+export const useRemoveLeaderFromGroup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ groupId, membroId }: { groupId: string; membroId: string }) => {
+      const { error } = await supabase
+        .from('gc_group_leaders')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('membro_id', membroId)
+      if (error) throw new Error(error.message)
+      return true
+    },
+    onSuccess: (_, { groupId }) => {
+      toast.success('Líder removido')
+      qc.invalidateQueries({ queryKey: ['gc-group-leaders', groupId] })
+    },
+    onError: (e: any) => toast.error(e.message || 'Falha ao remover líder')
+  })
+}
+
+export const useRemoveMemberFromGroup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ groupId, membroId }: { groupId: string; membroId: string }) => {
+      const { error } = await supabase
+        .from('gc_group_members')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('membro_id', membroId)
+      if (error) throw new Error(error.message)
+      return true
+    },
+    onSuccess: (_, { groupId }) => {
+      toast.success('Membro removido do grupo')
+      qc.invalidateQueries({ queryKey: ['gc-group-members', groupId] })
+    },
+    onError: (e: any) => toast.error(e.message || 'Falha ao remover membro')
+  })
+}
+
 export const useGroupLeaders = (groupId: string | null) => {
-  const { currentChurchId } = useAuthStore()
   return useQuery({
-    queryKey: ['gc-group-leaders', groupId, currentChurchId],
-    enabled: !!groupId && !!currentChurchId,
-    queryFn: async (): Promise<{ membro_id: string }[]> => {
+    queryKey: ['gc-group-leaders', groupId],
+    enabled: !!groupId,
+    queryFn: async (): Promise<MemberProfile[]> => {
       const { data, error } = await supabase
         .from('gc_group_leaders')
-        .select('membro_id')
+        .select('membro:membros(*)')
         .eq('group_id', groupId!)
-        .eq('id_igreja', currentChurchId!)
       if (error) throw new Error(error.message)
-      return (data || []) as { membro_id: string }[]
+      return (data?.map(item => item.membro).filter(Boolean) as MemberProfile[]) || []
     }
   })
 }
 
 export const useGroupMembers = (groupId: string | null) => {
-  const { currentChurchId } = useAuthStore()
   return useQuery({
-    queryKey: ['gc-group-members', groupId, currentChurchId],
-    enabled: !!groupId && !!currentChurchId,
-    queryFn: async (): Promise<{ membro_id: string }[]> => {
+    queryKey: ['gc-group-members', groupId],
+    enabled: !!groupId,
+    queryFn: async (): Promise<MemberProfile[]> => {
       const { data, error } = await supabase
         .from('gc_group_members')
-        .select('membro_id')
+        .select('membro:membros(*)')
         .eq('group_id', groupId!)
-        .eq('id_igreja', currentChurchId!)
       if (error) throw new Error(error.message)
-      return (data || []) as { membro_id: string }[]
+      return (data?.map(item => item.membro).filter(Boolean) as MemberProfile[]) || []
     }
   })
 }

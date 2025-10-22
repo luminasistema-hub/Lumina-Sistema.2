@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Calendar, Clock, MapPin, Phone, PlusCircle, Users } from 'lucide-react'
-import { useGroupLeaders, useGroupMembers } from '@/hooks/useGrowthGroups'
+import GroupLeadersList from './GroupLeadersList'
+import GroupMembersList from './GroupMembersList'
 
 const weekdays = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado']
 
@@ -330,7 +331,7 @@ const GrowthGroupsPage: React.FC = () => {
             <DialogDescription>Lista de líderes vinculados a este grupo.</DialogDescription>
           </DialogHeader>
           {leaderListDialog && (
-            <LeadersList groupId={leaderListDialog} membersList={membersList || []} />
+            <GroupLeadersList groupId={leaderListDialog} />
           )}
         </DialogContent>
       </Dialog>
@@ -343,44 +344,10 @@ const GrowthGroupsPage: React.FC = () => {
             <DialogDescription>Lista de participantes vinculados a este grupo.</DialogDescription>
           </DialogHeader>
           {memberListDialog && (
-            <MembersList groupId={memberListDialog} membersList={membersList || []} />
+            <GroupMembersList groupId={memberListDialog} />
           )}
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-const LeadersList: React.FC<{ groupId: string; membersList: any[] }> = ({ groupId, membersList }) => {
-  const { data } = useGroupLeaders(groupId)
-  const ids = (data || []).map(r => r.membro_id)
-  const items = membersList.filter(m => ids.includes(m.id))
-  return (
-    <div className="space-y-2">
-      {items.length === 0 && <p className="text-sm text-muted-foreground">Nenhum líder cadastrado.</p>}
-      {items.map(m => (
-        <div key={m.id} className="flex items-center justify-between rounded-md border p-2">
-          <span className="text-sm">{m.nome_completo || m.email}</span>
-          <span className="text-xs text-muted-foreground">{m.funcao}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-const MembersList: React.FC<{ groupId: string; membersList: any[] }> = ({ groupId, membersList }) => {
-  const { data } = useGroupMembers(groupId)
-  const ids = (data || []).map(r => r.membro_id)
-  const items = membersList.filter(m => ids.includes(m.id))
-  return (
-    <div className="space-y-2">
-      {items.length === 0 && <p className="text-sm text-muted-foreground">Nenhum membro cadastrado.</p>}
-      {items.map(m => (
-        <div key={m.id} className="flex items-center justify-between rounded-md border p-2">
-          <span className="text-sm">{m.nome_completo || m.email}</span>
-          <span className="text-xs text-muted-foreground">{m.funcao}</span>
-        </div>
-      ))}
     </div>
   )
 }
