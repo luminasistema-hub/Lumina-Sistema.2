@@ -103,12 +103,12 @@ const ChildChurchesPage = () => {
         .from('membros')
         .select('id', { count: 'exact', head: true })
         .eq('id_igreja', ch.id);
-      // líderes (admin/pastor/lider_ministerio)
+      // líderes (admin/pastor/lider)
       const { count: leaders } = await supabase
         .from('membros')
         .select('id', { count: 'exact', head: true })
         .eq('id_igreja', ch.id)
-        .in('funcao', ['admin', 'pastor', 'lider_ministerio']);
+        .in('funcao', ['admin', 'pastor', 'lider']);
       // ministérios
       const { count: ministries } = await supabase
         .from('ministerios')

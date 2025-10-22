@@ -49,7 +49,7 @@ const ChildChurchDashboardDialog: React.FC<Props> = ({ churchId, churchName, ope
           .from('membros')
           .select('id', { count: 'exact', head: true })
           .eq('id_igreja', churchId)
-          .in('funcao', ['admin', 'pastor', 'lider_ministerio']);
+          .in('funcao', ['admin', 'pastor', 'lider']);
         if (lErr) throw lErr;
 
         // Contagem de crianças
