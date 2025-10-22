@@ -17,6 +17,7 @@ type ChildForm = {
   telefone_contato: string;
   endereco: string;
   cnpj?: string;
+  panel_password?: string;
 };
 
 type ChurchRow = {
@@ -52,7 +53,8 @@ const ChildChurchesPage = () => {
     email: '',
     telefone_contato: '',
     endereco: '',
-    cnpj: ''
+    cnpj: '',
+    panel_password: ''
   });
   const canManage = useMemo(() => user?.role === 'admin' || user?.role === 'pastor', [user?.role]);
 
@@ -159,10 +161,10 @@ const ChildChurchesPage = () => {
       endereco: form.endereco,
       cnpj: form.cnpj?.replace(/[^\d]+/g, '') || null,
       parent_church_id: currentChurchId,
-      status: 'active',
       plano_id: mother?.plano_id || null,
       limite_membros: mother?.limite_membros || null,
-      valor_mensal_assinatura: mother?.valor_mensal_assinatura || null
+      valor_mensal_assinatura: mother?.valor_mensal_assinatura || null,
+      panel_password: form.panel_password || null
     };
 
     const { error } = await supabase.from('igrejas').insert(payload);
@@ -172,7 +174,7 @@ const ChildChurchesPage = () => {
     }
     toast.success('Igreja filha criada com sucesso!');
     setOpenCreate(false);
-    setForm({ nome: '', nome_responsavel: '', email: '', telefone_contato: '', endereco: '', cnpj: '' });
+    setForm({ nome: '', nome_responsavel: '', email: '', telefone_contato: '', endereco: '', cnpj: '', panel_password: '' });
     load();
   };
 
@@ -210,6 +212,37 @@ const ChildChurchesPage = () => {
             <Church className="w-4 h-4 text-gray-700" />
             <span>Tipo: {parentInfo?.isChild ? 'Igreja Filha' : 'Igreja Mãe'}</span>
           </div>
+          {parentInfo?.isChild && canManage && (
+            <div className="mt-4 p-3 border rounded-md space-y-3">
+              <h3 className="font-medium">Configurações da Igreja Filha</h3>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <Input
+                  placeholder="Nova senha do painel"
+                  value={(form as any).novaSenhaFilha || ''}
+                  onChange={(e) => setForm({ ...form, panel_password: e.target.value, novaSenhaFilha: e.target.value } as any)}
+                />
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (!currentChurchId) return toast.error('Nenhuma igreja selecionada.');
+                    if (!form.panel_password) return toast.error('Digite a nova senha.');
+                    const { error } = await supabase
+                      .from('igrejas')
+                      .update({ panel_password: form.panel_password })
+                      .eq('id', currentChurchId);
+                    if (error) {
+                      return toast.error('Erro ao alterar a senha: ' + error.message);
+                    }
+                    toast.success('Senha atualizada com sucesso!');
+                    setForm({ ...form, panel_password: '', novaSenhaFilha: '' } as any);
+                  }}
+                >
+                  Salvar nova senha
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">A senha é utilizada para acesso/gestão específica desta igreja. Guarde-a com segurança.</p>
+            </div>
+          )}
           {!parentInfo?.isChild && canManage && (
             <Dialog open={openCreate} onOpenChange={setOpenCreate}>
               <DialogTrigger asChild>
@@ -243,6 +276,11 @@ const ChildChurchesPage = () => {
                   <div className="space-y-2">
                     <Label>CNPJ (opcional)</Label>
                     <Input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Senha da Igreja Filha</Label>
+                    <Input value={form.panel_password} onChange={(e) => setForm({ ...form, panel_password: e.target.value })} />
+                    <p className="text-xs text-gray-500">O pastor da igreja filha poderá alterar esta senha depois, no próprio painel.</p>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
                     <Button variant="outline" onClick={() => setOpenCreate(false)}>Cancelar</Button>
