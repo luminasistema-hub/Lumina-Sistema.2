@@ -6,6 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
+// Helper: localizar usuário pelo e-mail (pagina até 1000 usuários)
+async function findUserByEmail(admin: ReturnType<typeof createClient>, email: string) {
+  const perPage = 200
+  for (let page = 1; page <= 5; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) throw new Error(`listUsers: ${error.message}`)
+    const found = data.users?.find((u: any) => (u.email || "").toLowerCase() === email.toLowerCase())
+    if (found) return found
+    if (!data.users || data.users.length < perPage) break
+  }
+  return null
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -90,35 +103,63 @@ serve(async (req) => {
       },
     })
 
+    let pastorUserId = authCreated?.user?.id || null
+
     if (authErr) {
-      // Rollback da igreja se falhar a criação de usuário
-      await supabaseAdmin.from("igrejas").delete().eq("id", childChurchId)
-      if (authErr.message.includes("User already registered")) {
-        return new Response(JSON.stringify({ error: "Este e-mail já está cadastrado." }), {
-          status: 409,
+      // Se o e-mail já estiver cadastrado, reutiliza o usuário existente
+      if (/already|in use|registered/i.test(authErr.message)) {
+        const existing = await findUserByEmail(supabaseAdmin, child.email)
+        if (!existing?.id) {
+          // Falhou localizar ID; desfaz a igreja para evitar órfãos
+          await supabaseAdmin.from("igrejas").delete().eq("id", childChurchId)
+          return new Response(JSON.stringify({ error: "E-mail já existe, mas não foi possível localizar o usuário." }), {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          })
+        }
+        pastorUserId = existing.id
+
+        // Ajusta senha e metadados para esta igreja filha
+        const { error: updExistingErr } = await supabaseAdmin.auth.admin.updateUserById(pastorUserId, {
+          password: child.panel_password,
+          email_confirm: true,
+          user_metadata: {
+            full_name: child.nome_responsavel,
+            church_id: childChurchId,
+            church_name: createdChurch.nome,
+            initial_role: "pastor",
+          },
+        })
+        if (updExistingErr) {
+          await supabaseAdmin.from("igrejas").delete().eq("id", childChurchId)
+          return new Response(JSON.stringify({ error: `Falha ao ajustar usuário existente: ${updExistingErr.message}` }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          })
+        }
+      } else {
+        // Outros erros: desfaz a igreja e retorna mensagem
+        await supabaseAdmin.from("igrejas").delete().eq("id", childChurchId)
+        return new Response(JSON.stringify({ error: authErr.message }), {
+          status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         })
       }
-      return new Response(JSON.stringify({ error: authErr.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      })
     }
 
-    const pastorUserId = authCreated.user?.id
     if (!pastorUserId) {
       // Segurança: se por algum motivo não houver id, desfaz
       await supabaseAdmin.from("igrejas").delete().eq("id", childChurchId)
-      return new Response(JSON.stringify({ error: "Falha ao criar usuário pastor." }), {
+      return new Response(JSON.stringify({ error: "Falha ao criar/associar usuário pastor." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       })
     }
 
-    // 3) Garantir registro no membros como 'pastor' e 'ativo'
+    // 3) Garantir registro no membros como 'pastor' e 'ativo' (upsert para reaproveitar se já existir)
     const { error: memberErr } = await supabaseAdmin
       .from("membros")
-      .insert({
+      .upsert({
         id: pastorUserId,
         id_igreja: childChurchId,
         nome_completo: child.nome_responsavel,
@@ -126,10 +167,10 @@ serve(async (req) => {
         funcao: "pastor",
         status: "ativo",
         perfil_completo: false,
-      })
+      }, { onConflict: "id" })
 
     if (memberErr) {
-      // Se falhar, remover usuário e igreja para evitar dados órfãos
+      // Se falhar, remover vínculo do usuário e igreja para evitar dados órfãos
       await supabaseAdmin.auth.admin.deleteUser(pastorUserId)
       await supabaseAdmin.from("igrejas").delete().eq("id", childChurchId)
       return new Response(JSON.stringify({ error: memberErr.message }), {

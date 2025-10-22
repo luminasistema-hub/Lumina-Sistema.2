@@ -153,7 +153,6 @@ const ChildChurchesPage = () => {
 
     setCreating(true);
 
-    // Invoca Edge Function que cria a igreja filha e o usuário pastor
     const { data, error } = await supabase.functions.invoke('register-child-church', {
       body: {
         motherChurchId: currentChurchId,
@@ -172,7 +171,17 @@ const ChildChurchesPage = () => {
     setCreating(false);
 
     if (error) {
-      return toast.error('Erro ao criar igreja filha: ' + error.message);
+      let serverMsg = error.message;
+      const raw = (error as any)?.context?.body;
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed?.error) serverMsg = parsed.error;
+        } catch {
+          serverMsg = raw;
+        }
+      }
+      return toast.error('Erro ao criar igreja filha: ' + serverMsg);
     }
 
     toast.success('Igreja filha criada e pastor habilitado para login!');

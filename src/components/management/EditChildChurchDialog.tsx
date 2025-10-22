@@ -69,22 +69,40 @@ const EditChildChurchDialog: React.FC<Props> = ({ open, onOpenChange, child, onS
       return toast.error('Preencha ao menos nome, responsável e email.');
     }
     setSaving(true);
-    const payload: any = {
-      nome: form.nome,
-      nome_responsavel: form.nome_responsavel,
-      email: form.email,
-      telefone_contato: form.telefone_contato,
-      endereco: form.endereco,
-      cnpj: form.cnpj?.replace(/[^\d]+/g, '') || null,
-      panel_password: form.panel_password || null,
-    };
-    const { error } = await supabase
-      .from('igrejas')
-      .update(payload)
-      .eq('id', child.id);
+
+    const { data: sessionRes } = await supabase.auth.getSession();
+    const token = sessionRes?.session?.access_token;
+
+    const { data, error } = await supabase.functions.invoke('update-child-church', {
+      body: {
+        churchId: child.id,
+        nome: form.nome,
+        nome_responsavel: form.nome_responsavel,
+        email: form.email,
+        telefone_contato: form.telefone_contato,
+        endereco: form.endereco,
+        cnpj: form.cnpj,
+        panel_password: form.panel_password,
+      },
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+
     setSaving(false);
+
     if (error) {
-      return toast.error('Erro ao salvar alterações: ' + error.message);
+      let serverMsg = error.message;
+      const raw = (error as any)?.context?.body;
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed?.error) serverMsg = parsed.error;
+        } catch {
+          serverMsg = raw;
+        }
+      }
+      return toast.error('Erro ao salvar alterações: ' + serverMsg);
     }
     toast.success('Igreja atualizada com sucesso!');
     onOpenChange(false);
