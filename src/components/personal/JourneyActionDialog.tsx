@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 import { Progress } from '../ui/progress';
 import { toast } from 'sonner';
-import { Check, ChevronsRight, ExternalLink, X, Info } from 'lucide-react';
+import { Check, ChevronsRight, ExternalLink, X, Info, Loader2 } from 'lucide-react';
 import DescricaoFormatada from '../utils/DescricaoFormatada';
 import { PassoEtapa } from '../../hooks/useJourneyData';
+import { useSchools, useUserEnrollments } from '../../hooks/useSchools';
 
 interface JourneyActionDialogProps {
   isOpen: boolean;
@@ -129,6 +131,60 @@ const QuizComponent = ({ passo, onQuizComplete }: { passo: PassoEtapa; onQuizCom
   );
 };
 
+const SchoolConclusionContent = ({ passo }: { passo: PassoEtapa }) => {
+  const navigate = useNavigate();
+  const schoolId = passo.escola_pre_requisito_id;
+
+  const { data: schools, isLoading: schoolsLoading } = useSchools();
+  const { data: enrollments, isLoading: enrollmentsLoading } = useUserEnrollments();
+
+  if (schoolsLoading || enrollmentsLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <p className="ml-2">Carregando informações da escola...</p>
+      </div>
+    );
+  }
+
+  const school = schools?.find(s => s.id === schoolId);
+  const enrollment = enrollments?.find(e => e.escola_id === schoolId);
+
+  if (!school) {
+    return <p className="text-red-500 text-center">Escola associada a este passo não foi encontrada.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg text-center flex items-center justify-center gap-2">
+        <Info className="w-5 h-5 flex-shrink-0" />
+        <div>
+          <p className="font-semibold">Este passo é concluído automaticamente!</p>
+          <p className="text-sm">Finalize a escola "{school.nome}" para que este passo seja marcado como completo.</p>
+        </div>
+      </div>
+
+      {enrollment ? (
+        <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="font-semibold text-green-800">Você está inscrito!</p>
+          <p className="text-sm text-green-700">Seu progresso está pendente de conclusão da escola.</p>
+          <Button className="mt-4" onClick={() => navigate(`/escolas/${school.id}`)}>
+            Acessar Aulas
+          </Button>
+        </div>
+      ) : (
+        <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="font-semibold text-yellow-800">Inscrição necessária</p>
+          <p className="text-sm text-yellow-700">Você precisa se inscrever na escola para continuar.</p>
+          <Button className="mt-4" onClick={() => navigate('/escolas')}>
+            Ver Escolas
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClose, passo, onCompletePasso }) => {
   const [quizDetails, setQuizDetails] = useState<any>(null);
 
@@ -211,6 +267,9 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
 
       case 'acao':
         return <p>{passo.conteudo || 'Complete a ação prática descrita.'}</p>;
+
+      case 'conclusao_escola':
+        return <SchoolConclusionContent passo={passo} />;
 
       default:
         return <p>Tipo de passo não reconhecido.</p>;
