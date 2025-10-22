@@ -119,7 +119,7 @@ const ConfiguracaoJornada = () => {
       const { data: trilhaData, error } = await supabase
         .from('trilhas_crescimento')
         .select(`
-          id, titulo, descricao, escola_pre_requisito_id,
+          id, titulo, descricao,
           etapas_trilha (
             *,
             passos_etapa (
