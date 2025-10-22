@@ -3,7 +3,7 @@ import { supabase } from '../../integrations/supabase/client';
 import { useAuthStore } from '../../stores/authStore';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2, GripVertical, Video, FileText, HelpCircle, Link, CheckCircle, BookOpen, X } from 'lucide-react';
+import { Plus, Loader2, ListOrdered, AlertCircle, Edit, Trash2, GripVertical, Video, FileText, HelpCircle, Link, CheckCircle, BookOpen, X, GraduationCap } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
@@ -33,7 +33,7 @@ interface PassoEtapa {
   id_etapa: string;
   ordem: number;
   titulo: string;
-  tipo_passo: 'video' | 'quiz' | 'leitura' | 'acao' | 'link_externo';
+  tipo_passo: 'video' | 'quiz' | 'leitura' | 'acao' | 'link_externo' | 'conclusao_escola';
   conteudo?: string;
   created_at: string;
   quiz_perguntas?: QuizPergunta[];
@@ -98,6 +98,7 @@ const ConfiguracaoJornada = () => {
     { value: 'quiz', name: 'Quiz', icon: <HelpCircle className="w-4 h-4" /> },
     { value: 'acao', name: 'Ação Prática', icon: <CheckCircle className="w-4 h-4" /> },
     { value: 'link_externo', name: 'Link Externo', icon: <Link className="w-4 h-4" /> },
+    { value: 'conclusao_escola', name: 'Conclusão de Escola', icon: <GraduationCap className="w-4 h-4" /> },
   ];
 
   const sensors = useSensors(
@@ -805,7 +806,7 @@ const ConfiguracaoJornada = () => {
                   setFormPassoData(prev => ({
                     ...prev,
                     tipo_passo: value as PassoEtapa['tipo_passo'],
-                    conteudo: value === 'quiz' ? '' : prev.conteudo,
+                    conteudo: value === 'quiz' || value === 'conclusao_escola' ? '' : prev.conteudo,
                     quiz_perguntas: value === 'quiz' ? (prev.quiz_perguntas?.length ? prev.quiz_perguntas : []) : [],
                   }));
                 }}
@@ -826,27 +827,27 @@ const ConfiguracaoJornada = () => {
               </Select>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="passo-escola-requisito">Escola como Pré-requisito (Opcional)</Label>
-              <Select
-                value={formPassoData.escola_pre_requisito_id || ''}
-                onValueChange={(value) => setFormPassoData({...formPassoData, escola_pre_requisito_id: value === 'none' ? null : value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Nenhuma escola como requisito" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma</SelectItem>
-                  {availableSchools.map((school: School) => (
-                    <SelectItem key={school.id} value={school.id}>
-                      {school.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formPassoData.tipo_passo !== 'quiz' && (
+            {formPassoData.tipo_passo === 'conclusao_escola' ? (
+              <div className="space-y-2">
+                <Label htmlFor="passo-escola-requisito">Escola a ser Concluída *</Label>
+                <Select
+                  value={formPassoData.escola_pre_requisito_id || ''}
+                  onValueChange={(value) => setFormPassoData({...formPassoData, escola_pre_requisito_id: value === 'none' ? null : value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a escola" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma</SelectItem>
+                    {availableSchools.map((school: School) => (
+                      <SelectItem key={school.id} value={school.id}>
+                        {school.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : formPassoData.tipo_passo !== 'quiz' && (
               <div className="space-y-2">
                 <Label htmlFor="passo-conteudo">Conteúdo (URL ou Texto)</Label>
                 <Textarea

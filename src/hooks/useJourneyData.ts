@@ -16,7 +16,7 @@ export interface PassoEtapa {
   id_etapa: string;
   ordem: number;
   titulo: string;
-  tipo_passo: 'video' | 'quiz' | 'leitura' | 'acao' | 'link_externo';
+  tipo_passo: 'video' | 'quiz' | 'leitura' | 'acao' | 'link_externo' | 'conclusao_escola';
   conteudo?: string;
   created_at?: string;
   quiz_perguntas?: QuizPergunta[];
@@ -212,6 +212,7 @@ export const useJourneyData = () => {
       .flatMap(e => e.passos)
       .filter(p => 
         p.escola_pre_requisito_id && 
+        p.tipo_passo === 'conclusao_escola' &&
         completedSchools.has(p.escola_pre_requisito_id) &&
         !progressoData.some(prog => prog.id_passo === p.id && prog.status === 'concluido')
       )
@@ -257,7 +258,7 @@ export const useJourneyData = () => {
         let isPassoLocked = false;
         let passoLockReason = null;
 
-        if (p.escola_pre_requisito_id && !completedSchools.has(p.escola_pre_requisito_id)) {
+        if (p.tipo_passo === 'conclusao_escola' && p.escola_pre_requisito_id && !completedSchools.has(p.escola_pre_requisito_id)) {
           isPassoLocked = true;
           passoLockReason = `Você precisa concluir a escola associada para liberar este passo.`;
         }
