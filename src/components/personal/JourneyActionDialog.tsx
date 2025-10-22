@@ -282,7 +282,6 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
   const isQuiz = passo.tipo_passo === 'quiz';
   const isBlocked = passo.progress?.quiz_bloqueado || false;
   const canComplete = !isBlocked && (!isQuiz || (isQuiz && quizDetails !== null));
-  const hasSchoolPrerequisite = !!passo.escola_pre_requisito_id;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
