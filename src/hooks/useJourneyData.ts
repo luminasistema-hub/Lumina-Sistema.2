@@ -21,6 +21,7 @@ export interface PassoEtapa {
   created_at?: string;
   quiz_perguntas?: QuizPergunta[];
   nota_de_corte_quiz?: number;
+  escola_pre_requisito_id?: string | null;
 }
 
 interface EtapaTrilha {
@@ -31,7 +32,6 @@ interface EtapaTrilha {
   descricao: string;
   cor: string;
   created_at?: string;
-  escola_pre_requisito_id?: string | null;
 }
 
 interface ProgressoMembro {
@@ -49,6 +49,8 @@ export interface JourneyPassoDisplay extends PassoEtapa {
   completed: boolean;
   completedDate?: string;
   progress?: ProgressoMembro | null;
+  isLocked: boolean;
+  lockReason: string | null;
 }
 
 export interface JourneyEtapaDisplay extends EtapaTrilha {
@@ -127,7 +129,6 @@ export const useJourneyData = () => {
           titulo: r.etapa_titulo || '',
           descricao: r.etapa_descricao || '',
           cor: r.etapa_cor || '#e5e7eb',
-          escola_pre_requisito_id: r.escola_pre_requisito_id,
           passos: [],
           allPassosCompleted: false,
           isLocked: false,
@@ -146,8 +147,11 @@ export const useJourneyData = () => {
         conteudo: r.passo_conteudo || '',
         quiz_perguntas: quizList,
         nota_de_corte_quiz: r.nota_de_corte_quiz,
+        escola_pre_requisito_id: r.escola_pre_requisito_id,
         completed: false,
         progress: null,
+        isLocked: false,
+        lockReason: null,
       };
 
       const list = passosPorEtapa.get(etapaId) || [];
@@ -210,11 +214,23 @@ export const useJourneyData = () => {
     const etapasAtualizadas = etapaArr.map((et) => {
       const passosAtualizados = et.passos.map((p) => {
         const progress = progressoData.find(px => px.id_passo === p.id) || null;
+        const isCompleted = completedSet.has(p.id);
+        
+        let isPassoLocked = false;
+        let passoLockReason = null;
+
+        if (p.escola_pre_requisito_id && !completedSchools.has(p.escola_pre_requisito_id)) {
+          isPassoLocked = true;
+          passoLockReason = `Você precisa concluir a escola associada para liberar este passo.`;
+        }
+
         return {
           ...p,
-          completed: completedSet.has(p.id),
+          completed: isCompleted,
           completedDate: progress?.data_conclusao,
           progress,
+          isLocked: isPassoLocked,
+          lockReason: passoLockReason,
         };
       });
       const allDone = passosAtualizados.length > 0 && passosAtualizados.every(p => p.completed);
@@ -225,9 +241,6 @@ export const useJourneyData = () => {
       if (!previousEtapaCompleted) {
         isLocked = true;
         lockReason = 'Conclua a etapa anterior para liberar esta.';
-      } else if (et.escola_pre_requisito_id && !completedSchools.has(et.escola_pre_requisito_id)) {
-        isLocked = true;
-        lockReason = `Você precisa concluir a escola associada para liberar esta etapa.`;
       }
 
       previousEtapaCompleted = allDone;

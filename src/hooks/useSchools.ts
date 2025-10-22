@@ -515,6 +515,55 @@ export const useRegisterStudentAttendance = () => {
   })
 }
 
+// Hook para graduar um aluno de uma escola
+export const useGraduateStudent = () => {
+  const queryClient = useQueryClient()
+  const { currentChurchId } = useAuthStore()
+
+  return useMutation({
+    mutationFn: async ({ schoolId, memberId }: { schoolId: string, memberId: string }) => {
+      if (!currentChurchId) throw new Error('ID da Igreja não encontrado.')
+
+      // 1. Buscar todas as aulas da escola
+      const { data: lessons, error: lessonsError } = await supabase
+        .from('escola_aulas')
+        .select('id')
+        .eq('escola_id', schoolId)
+
+      if (lessonsError) throw new Error(`Erro ao buscar aulas: ${lessonsError.message}`)
+      if (!lessons || lessons.length === 0) {
+        // Se a escola não tem aulas, não há o que fazer, mas consideramos sucesso.
+        return;
+      }
+
+      const lessonIds = lessons.map(l => l.id)
+
+      // 2. Criar os registros de progresso para todas as aulas
+      const progressRecords = lessonIds.map(lessonId => ({
+        aula_id: lessonId,
+        membro_id: memberId,
+        id_igreja: currentChurchId,
+      }))
+
+      const { error: progressError } = await supabase
+        .from('escola_progresso_aulas')
+        .upsert(progressRecords, { onConflict: 'aula_id,membro_id' })
+
+      if (progressError) throw new Error(`Erro ao registrar progresso: ${progressError.message}`)
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Aluno concluído na escola com sucesso! O progresso na jornada será atualizado.')
+      // Invalida queries para atualizar a lista de alunos e a jornada do membro
+      queryClient.invalidateQueries({ queryKey: ['school-enrollments', variables.schoolId] })
+      queryClient.invalidateQueries({ queryKey: ['student-progress'] })
+      queryClient.invalidateQueries({ queryKey: ['journey-data'] }) // Forçar recarregamento da jornada
+    },
+    onError: (error) => {
+      toast.error(`Erro ao concluir aluno: ${error.message}`)
+    }
+  })
+}
+
 // Hook para responder quiz
 export const useSubmitQuizAnswer = () => {
   const queryClient = useQueryClient()

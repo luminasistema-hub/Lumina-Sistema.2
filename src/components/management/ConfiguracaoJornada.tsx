@@ -38,6 +38,7 @@ interface PassoEtapa {
   created_at: string;
   quiz_perguntas?: QuizPergunta[];
   nota_de_corte_quiz?: number;
+  escola_pre_requisito_id?: string | null;
 }
 
 interface EtapaTrilha {
@@ -49,7 +50,6 @@ interface EtapaTrilha {
   cor: string;
   created_at: string;
   passos: PassoEtapa[];
-  escola_pre_requisito_id?: string | null;
 }
 
 const ConfiguracaoJornada = () => {
@@ -68,7 +68,6 @@ const ConfiguracaoJornada = () => {
     titulo: '',
     descricao: '',
     cor: '#e0f2fe',
-    escola_pre_requisito_id: null,
   });
 
   const [isPassoModalOpen, setIsPassoModalOpen] = useState(false);
@@ -79,6 +78,7 @@ const ConfiguracaoJornada = () => {
     conteudo: '',
     quiz_perguntas: [],
     nota_de_corte_quiz: 70,
+    escola_pre_requisito_id: null,
   });
 
   const [isCreateTrilhaOpen, setIsCreateTrilhaOpen] = useState(false);
@@ -174,7 +174,6 @@ const ConfiguracaoJornada = () => {
       titulo: '',
       descricao: '',
       cor: '#e0f2fe',
-      escola_pre_requisito_id: null,
     });
     setIsEtapaModalOpen(true);
   };
@@ -185,7 +184,6 @@ const ConfiguracaoJornada = () => {
       titulo: etapa.titulo,
       descricao: etapa.descricao,
       cor: etapa.cor,
-      escola_pre_requisito_id: etapa.escola_pre_requisito_id,
     });
     setIsEtapaModalOpen(true);
   };
@@ -216,7 +214,6 @@ const ConfiguracaoJornada = () => {
             titulo: formEtapaData.titulo,
             descricao: formEtapaData.descricao,
             cor: formEtapaData.cor,
-            escola_pre_requisito_id: formEtapaData.escola_pre_requisito_id,
           })
           .eq('id', etapaParaEditar.id);
 
@@ -233,7 +230,6 @@ const ConfiguracaoJornada = () => {
             descricao: formEtapaData.descricao,
             cor: formEtapaData.cor,
             id_igreja: currentChurchId,
-            escola_pre_requisito_id: formEtapaData.escola_pre_requisito_id,
           });
 
         if (error) throw error;
@@ -279,6 +275,7 @@ const ConfiguracaoJornada = () => {
       conteudo: '',
       quiz_perguntas: [],
       nota_de_corte_quiz: 70,
+      escola_pre_requisito_id: null,
       ordem: etapa.passos.length > 0 ? Math.max(...etapa.passos.map(p => p.ordem)) + 1 : 1,
     });
     setIsPassoModalOpen(true);
@@ -295,6 +292,7 @@ const ConfiguracaoJornada = () => {
       ordem: passo.ordem,
       quiz_perguntas: passo.tipo_passo === 'quiz' ? (passo.quiz_perguntas || []) : [],
       nota_de_corte_quiz: passo.nota_de_corte_quiz || 70,
+      escola_pre_requisito_id: passo.escola_pre_requisito_id,
     });
     setIsPassoModalOpen(true);
   };
@@ -349,6 +347,7 @@ const ConfiguracaoJornada = () => {
             tipo_passo: passoDataToSave.tipo_passo,
             conteudo: passoDataToSave.conteudo,
             nota_de_corte_quiz: passoDataToSave.tipo_passo === 'quiz' ? passoDataToSave.nota_de_corte_quiz : null,
+            escola_pre_requisito_id: passoDataToSave.escola_pre_requisito_id,
           })
           .eq('id', passoDataToSave.id)
           .select('id')
@@ -369,6 +368,7 @@ const ConfiguracaoJornada = () => {
             conteudo: passoDataToSave.conteudo,
             id_igreja: currentChurchId,
             nota_de_corte_quiz: passoDataToSave.tipo_passo === 'quiz' ? passoDataToSave.nota_de_corte_quiz : null,
+            escola_pre_requisito_id: passoDataToSave.escola_pre_requisito_id,
           })
           .select('id')
           .maybeSingle();
@@ -826,6 +826,26 @@ const ConfiguracaoJornada = () => {
               </Select>
             </div>
             
+            <div className="space-y-2">
+              <Label htmlFor="passo-escola-requisito">Escola como Pré-requisito (Opcional)</Label>
+              <Select
+                value={formPassoData.escola_pre_requisito_id || ''}
+                onValueChange={(value) => setFormPassoData({...formPassoData, escola_pre_requisito_id: value === 'none' ? null : value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhuma escola como requisito" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {availableSchools.map((school: School) => (
+                    <SelectItem key={school.id} value={school.id}>
+                      {school.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {formPassoData.tipo_passo !== 'quiz' && (
               <div className="space-y-2">
                 <Label htmlFor="passo-conteudo">Conteúdo (URL ou Texto)</Label>
