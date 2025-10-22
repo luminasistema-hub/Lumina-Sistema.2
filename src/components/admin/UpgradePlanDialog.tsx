@@ -44,16 +44,29 @@ export default function UpgradePlanDialog({
       return
     }
 
-    // Cria uma solicitação de mudança de plano para aprovação do Super Admin
-    const { error } = await supabase
-      .from('plan_change_requests')
-      .insert({
-        church_id: churchId,
-        requested_plan_id: chosen.id,
-        requested_by: user?.id,
-        status: 'pending',
-        note: null,
-      })
+    // Se o plano for gratuito (ou preço zero), envia para aprovação do Super Admin
+    if (chosen.preco_mensal <= 0) {
+      const { error } = await supabase
+        .from('plan_change_requests')
+        .insert({
+          church_id: churchId,
+          requested_plan_id: chosen.id,
+          membro_id: user?.id,
+          status: 'pending',
+          note: 'Solicitação de plano gratuito.',
+        })
+    } else {
+      // Cria uma solicitação de mudança de plano para aprovação do Super Admin
+      const { error } = await supabase
+        .from('plan_change_requests')
+        .insert({
+          church_id: churchId,
+          requested_plan_id: chosen.id,
+          requested_by: user?.id,
+          status: 'pending',
+          note: null,
+        })
+    }
 
     if (error) {
       console.error('UpgradePlanDialog: erro ao atualizar plano:', error.message)

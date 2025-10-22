@@ -5,12 +5,15 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Copy, Link as LinkIcon } from 'lucide-react';
 import copy from 'copy-to-clipboard';
+import { toast } from 'react-toastify';
 
-const WEBHOOK_URL = 'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/abacatepay-webhook';
+const ABACATEPAY_WEBHOOK_URL = 'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/abacatepay-webhook';
+const ASAAS_WEBHOOK_URL = 'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/asaas-webhook-handler';
 
 const PaymentIntegrationSettings = () => {
-  const handleCopy = () => {
-    copy(WEBHOOK_URL);
+  const handleCopy = (url: string) => {
+    copy(url);
+    toast.success('URL do Webhook copiada!');
   };
 
   return (
@@ -24,35 +27,35 @@ const PaymentIntegrationSettings = () => {
           Configure o webhook da Abacate PAY para receber confirmações de pagamento e atualizar a assinatura automaticamente.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {/* Abacate PAY */}
         <div className="space-y-2">
-          <Label>URL do Webhook</Label>
+          <Label className="font-semibold text-base">Abacate PAY</Label>
           <div className="flex items-center gap-2">
-            <Input value={WEBHOOK_URL} readOnly className="bg-gray-100" />
-            <Button variant="outline" size="icon" onClick={handleCopy}>
+            <Input value={ABACATEPAY_WEBHOOK_URL} readOnly className="bg-gray-100" />
+            <Button variant="outline" size="icon" onClick={() => handleCopy(ABACATEPAY_WEBHOOK_URL)}>
               <Copy className="w-4 h-4" />
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Cole esta URL no painel da Abacate PAY como destino de webhooks (eventos de pagamento/assinatura).
+            Cole esta URL no painel da Abacate PAY como destino de webhooks.
           </p>
         </div>
 
-        <div className="space-y-2">
-          <Label>Segredos da Abacate PAY</Label>
-          <ul className="text-sm list-disc pl-6 space-y-1 text-muted-foreground">
-            <li>ABACATEPAY_API_URL (opcional, padrão https://api.abacatepay.com/v1)</li>
-            <li>ABACATEPAY_API_KEY</li>
-            <li>ABACATEPAY_WEBHOOK_SECRET (opcional para validar assinatura)</li>
-          </ul>
-        </div>
-
         {/* ASAAS */}
-        <div className="space-y-2 pt-4 border-t">
-          <CardTitle className="text-base">Integração ASAAS (API Oficial)</CardTitle>
-          <CardDescription>
-            Para habilitar PIX via ASAAS, configure os segredos e, se desejar, use o ambiente de sandbox.
+        <div className="space-y-2 pt-6 border-t">
+          <Label className="font-semibold text-base">ASAAS (API Oficial)</Label>
+          <div className="flex items-center gap-2">
+            <Input value={ASAAS_WEBHOOK_URL} readOnly className="bg-gray-100" />
+            <Button variant="outline" size="icon" onClick={() => handleCopy(ASAAS_WEBHOOK_URL)}>
+              <Copy className="w-4 h-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Cole esta URL no painel da ASAAS em Integrações → Webhooks. Evento recomendado: "Cobrança Recebida".
+          </p>
+          <CardDescription className="pt-2">
+            Para habilitar a integração, configure os segredos e, se desejar, use o ambiente de sandbox.
           </CardDescription>
           <ul className="text-sm list-disc pl-6 space-y-1 text-muted-foreground">
             <li>ASAAS_API_URL: 
@@ -61,11 +64,7 @@ const PaymentIntegrationSettings = () => {
             <li>ASAAS_API_TOKEN: sua token de acesso ASAAS</li>
           </ul>
           <p className="text-xs text-muted-foreground">
-            Defina estes segredos em Supabase → Edge Functions → Manage Secrets. 
-            O QRCode Pix será gerado via função create-asaas-pixqrcode.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Observação: a ASAAS exige cliente vinculado ao pagamento. Informe nome, email, CPF/CNPJ e celular no diálogo ao gerar o PIX.
+            Defina estes segredos em Supabase → Edge Functions → Manage Secrets.
           </p>
         </div>
       </CardContent>
