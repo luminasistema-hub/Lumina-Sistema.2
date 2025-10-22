@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuthStore } from '../stores/authStore';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { useEffect } from 'react';
 
 const fetchDashboardStats = async (churchId: string | null, _userId: string | null) => {
   if (!churchId || !_userId) return null;
