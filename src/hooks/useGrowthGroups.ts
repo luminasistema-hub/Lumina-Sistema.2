@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useEffect } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
@@ -185,6 +185,25 @@ export const useGroupMembers = (groupId: string | null) => {
 export const useMyGrowthGroups = () => {
   const { user } = useAuthStore()
   const userId = user?.id || null
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`my-growth-groups-changes-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gc_group_members', filter: `membro_id=eq.${userId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['gc-my-groups', userId] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gc_group_leaders', filter: `membro_id=eq.${userId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['gc-my-groups', userId] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
 
   return useQuery({
     queryKey: ['gc-my-groups', userId],
