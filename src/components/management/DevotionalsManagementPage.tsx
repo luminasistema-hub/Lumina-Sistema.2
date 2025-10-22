@@ -13,7 +13,12 @@ import { Calendar, User, Tag, Pencil, Trash2, Star, Plus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useChurchStore } from '@/stores/churchStore';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado';
 type DevotionalCategory = 'Diário' | 'Semanal' | 'Especial' | 'Temático';
@@ -67,7 +72,10 @@ const DevotionalsManagementPage = () => {
   ) => {
     let query = supabase
       .from('devocionais')
-      .select('*')
+      .select(`
+        *,
+        membros(nome_completo)
+      `)
       .eq('id_igreja', churchId)
       .order('data_publicacao', { ascending: false });
 
@@ -281,8 +289,8 @@ const DevotionalsManagementPage = () => {
     return tmp.textContent || tmp.innerText || '';
   };
 
-  const categories: string[] = ['Todos', 'Diário', 'Semanal', 'Especial', 'Temático'];
-  const statusOptions: string[] = ['Todos', 'Publicado', 'Rascunho', 'Arquivado'];
+  const categories: string[] = ['all', 'Diário', 'Semanal', 'Especial', 'Temático'];
+  const statusOptions: string[] = ['all', 'Publicado', 'Rascunho', 'Arquivado'];
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -308,7 +316,11 @@ const DevotionalsManagementPage = () => {
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger><SelectValue placeholder="Categoria" /></SelectTrigger>
               <SelectContent>
-                {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c === 'all' ? 'Todas' : c}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -316,7 +328,11 @@ const DevotionalsManagementPage = () => {
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
-                {statusOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {statusOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s === 'all' ? 'Todos' : s}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
