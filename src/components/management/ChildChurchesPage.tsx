@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Church, Users, Crown, FolderTree, Plus, Eye, Loader2 } from 'lucide-react';
 import ChildChurchDashboardDialog from './ChildChurchDashboardDialog';
-import MemberDetailsDialog from './MemberDetailsDialog';
 import CopyRegisterLinkButton from './CopyRegisterLinkButton';
+import EditChildChurchDialog from './EditChildChurchDialog';
+import DeleteChildChurchDialog from './DeleteChildChurchDialog';
 
 type ChildForm = {
   nome: string;
@@ -49,6 +50,8 @@ const ChildChurchesPage = () => {
   const [parentInfo, setParentInfo] = useState<{ isChild: boolean; motherId: string | null; motherName?: string } | null>(null);
   const [children, setChildren] = useState<ChildItem[]>([]);
   const [openCreate, setOpenCreate] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [openDelete, setOpenDelete] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<ChildForm>({
     nome: '',
@@ -334,6 +337,12 @@ const ChildChurchesPage = () => {
                         <Eye className="w-4 h-4 mr-1" /> Ir para painel
                       </Button>
                       <CopyRegisterLinkButton churchId={c.id} />
+                      <Button variant="outline" size="sm" onClick={() => { setSelectedChild(c); setOpenEdit(true); }}>
+                        Editar
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => { setSelectedChild(c); setOpenDelete(true); }}>
+                        Excluir
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -349,6 +358,21 @@ const ChildChurchesPage = () => {
         churchName={selectedChild?.nome || 'Igreja Filha'}
         open={openDashboard}
         onOpenChange={(o) => setOpenDashboard(o)}
+      />
+
+      <EditChildChurchDialog
+        open={openEdit}
+        onOpenChange={setOpenEdit}
+        child={selectedChild}
+        onSaved={load}
+      />
+
+      <DeleteChildChurchDialog
+        open={openDelete}
+        onOpenChange={setOpenDelete}
+        churchId={selectedChild?.id || null}
+        churchName={selectedChild?.nome || ''}
+        onDeleted={load}
       />
     </div>
   );
