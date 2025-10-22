@@ -9,7 +9,8 @@ import { toast } from 'sonner';
 import { Check, ChevronsRight, ExternalLink, X, Info, Loader2 } from 'lucide-react';
 import DescricaoFormatada from '../utils/DescricaoFormatada';
 import { PassoEtapa } from '../../hooks/useJourneyData';
-import { useSchools, useUserEnrollments } from '../../hooks/useSchools';
+import { useUserEnrollments } from '../../hooks/useSchools';
+import { useSchoolById } from '../../hooks/useSchool';
 
 interface JourneyActionDialogProps {
   isOpen: boolean;
@@ -135,10 +136,10 @@ const SchoolConclusionContent = ({ passo }: { passo: PassoEtapa }) => {
   const navigate = useNavigate();
   const schoolId = passo.escola_pre_requisito_id;
 
-  const { data: schools, isLoading: schoolsLoading } = useSchools();
+  const { data: school, isLoading: schoolLoading } = useSchoolById(schoolId);
   const { data: enrollments, isLoading: enrollmentsLoading } = useUserEnrollments();
 
-  if (schoolsLoading || enrollmentsLoading) {
+  if (schoolLoading || enrollmentsLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="w-6 h-6 animate-spin" />
@@ -147,7 +148,6 @@ const SchoolConclusionContent = ({ passo }: { passo: PassoEtapa }) => {
     );
   }
 
-  const school = schools?.find(s => s.id === schoolId);
   const enrollment = enrollments?.find(e => e.escola_id === schoolId);
 
   if (!school) {
