@@ -2,7 +2,7 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { QRCode } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { Baby, User, Printer } from 'lucide-react';
 import type { Kid } from '@/hooks/useKidsData';
 
@@ -31,7 +31,7 @@ const KidCredentialDialog: React.FC<KidCredentialDialogProps> = ({ open, onClose
             <Card className="w-64 text-center p-4 border-2 border-dashed">
               <CardContent className="flex flex-col items-center gap-4">
                 <div className="mt-4">
-                  <QRCode value={kid.id} size={160} />
+                  <QRCodeCanvas value={kid.id} size={160} />
                 </div>
                 <div className="text-center">
                   <h3 className="text-lg font-bold flex items-center justify-center gap-2">
