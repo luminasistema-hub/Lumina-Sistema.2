@@ -82,12 +82,13 @@ const DevotionalsManagementPage = () => {
         .from('devocionais')
         .select('*, membros(nome_completo)', { count: 'exact' })
         .eq('id_igreja', currentChurchId)
-        .order('created_at', { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
       if (statusFilter !== 'all') query = query.eq('status', statusFilter)
       if (categoryFilter !== 'all') query = query.eq('categoria', categoryFilter)
       if (debouncedSearchTerm) query = query.ilike('titulo', `%${debouncedSearchTerm}%`)
+
+      query = query.order('created_at', { ascending: false })
+      query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
       const { data, error, count } = await query
       if (error) throw error

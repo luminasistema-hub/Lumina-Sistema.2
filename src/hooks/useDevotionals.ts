@@ -44,69 +44,122 @@ export interface DevotionalDetails extends Devotional {
 }
 
 const fetchDevotionals = async (churchId: string, filters: any) => {
-  // Usa a função RPC para retornar devocionais da igreja atual
-  // incluindo os da igreja-mãe com compartilhar_com_filhas = true
-  const { data, error } = await supabase.rpc('get_devocionais_para_igreja', { id_igreja_atual: churchId })
-  if (error) throw new Error(error.message)
-  let rows = (data as any[]) as Devotional[]
+  if (!churchId) return [];
 
-  // Filtros aplicados no cliente
-  if (filters.status) rows = rows.filter(d => d.status === filters.status)
-  if (filters.authorId) rows = rows.filter(d => d.autor_id === filters.authorId)
-  if (filters.category && filters.category !== 'all') rows = rows.filter(d => d.categoria === filters.category)
-  if (filters.tag && filters.tag !== 'all') rows = rows.filter(d => Array.isArray(d.tags) && d.tags.includes(filters.tag))
-  if (filters.searchTerm) {
-    const t = String(filters.searchTerm).toLowerCase()
-    rows = rows.filter(d => (d.titulo?.toLowerCase().includes(t) || d.conteudo?.toLowerCase().includes(t)))
-  }
+  try {
+    // Buscar devocionais da própria igreja
+    let query = supabase
+      .from('devocionais')
+      .select(`
+        *,
+        membros!devocionais_autor_id_fkey(nome_completo)
+      `)
+      .eq('id_igreja', churchId);
 
-  // Adiciona dados de autor e contagens
-  const authorIds = [...new Set(rows.map(d => d.autor_id).filter(Boolean))];
-  let authors = new Map<string, { nome_completo: string }>();
-  if (authorIds.length > 0) {
-    const { data: authorData, error: authorError } = await supabase.from('membros').select('id, nome_completo').in('id', authorIds);
-    if (!authorError) {
-      authorData.forEach(a => authors.set(a.id, { nome_completo: a.nome_completo }));
-    }
-  }
-
-  const devotionalIds = rows.map(d => d.id);
-  let likes = new Map<string, string[]>();
-  let commentsCount = new Map<string, number>();
-
-  if (devotionalIds.length > 0) {
-    const { data: likesData, error: likesError } = await supabase.from('devocional_curtidas').select('devocional_id, membro_id').in('devocional_id', devotionalIds);
-    if (!likesError) {
-      likesData.forEach(l => {
-        if (!likes.has(l.devocional_id)) likes.set(l.devocional_id, []);
-        likes.get(l.devocional_id)!.push(l.membro_id);
-      });
+    // Aplicar filtros
+    if (filters.status) query = query.eq('status', filters.status);
+    if (filters.authorId) query = query.eq('autor_id', filters.authorId);
+    if (filters.category && filters.category !== 'all') query = query.eq('categoria', filters.category);
+    if (filters.searchTerm) {
+      query = query.or(`titulo.ilike.%${filters.searchTerm}%,conteudo.ilike.%${filters.searchTerm}%`);
     }
 
-    const { data: commentsData, error: commentsError } = await supabase.from('devocional_comentarios').select('devocional_id, id', { count: 'exact', head: true }).in('devocional_id', devotionalIds);
-    if (!commentsError) {
-      // A contagem é retornada de forma diferente com head: true, então precisamos processar isso
-      // Este é um paliativo, o ideal seria uma RPC para agregar
+    const { data: ownDevotionals, error: ownError } = await query.order('created_at', { ascending: false });
+    if (ownError) throw ownError;
+
+    let allDevotionals = ownDevotionals || [];
+
+    // Buscar devocionais compartilhados da igreja-mãe (se aplicável)
+    try {
+      const { data: churchData } = await supabase
+        .from('igrejas')
+        .select('parent_church_id, compartilha_devocionais_da_mae')
+        .eq('id', churchId)
+        .single();
+
+      if (churchData?.parent_church_id && churchData?.compartilha_devocionais_da_mae) {
+        const { data: sharedDevotionals, error: sharedError } = await supabase
+          .from('devocionais')
+          .select(`
+            *,
+            membros!devocionais_autor_id_fkey(nome_completo)
+          `)
+          .eq('id_igreja', churchData.parent_church_id)
+          .eq('compartilhar_com_filhas', true)
+          .eq('status', 'Publicado');
+
+        if (!sharedError && sharedDevotionals) {
+          allDevotionals = [...allDevotionals, ...sharedDevotionals];
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao buscar devocionais compartilhados:', err);
     }
+
+    // Buscar curtidas e comentários para todos os devocionais
+    const devotionalIds = allDevotionals.map(d => d.id);
+    
+    let likesMap = new Map<string, string[]>();
+    let commentsCountMap = new Map<string, number>();
+
+    if (devotionalIds.length > 0) {
+      // Buscar curtidas
+      const { data: likesData } = await supabase
+        .from('devocional_curtidas')
+        .select('devocional_id, membro_id')
+        .in('devocional_id', devotionalIds);
+
+      if (likesData) {
+        likesData.forEach(like => {
+          if (!likesMap.has(like.devocional_id)) {
+            likesMap.set(like.devocional_id, []);
+          }
+          likesMap.get(like.devocional_id)!.push(like.membro_id);
+        });
+      }
+
+      // Buscar contagem de comentários
+      const { data: commentsData } = await supabase
+        .from('devocional_comentarios')
+        .select('devocional_id')
+        .in('devocional_id', devotionalIds);
+
+      if (commentsData) {
+        commentsData.forEach(comment => {
+          const count = commentsCountMap.get(comment.devocional_id) || 0;
+          commentsCountMap.set(comment.devocional_id, count + 1);
+        });
+      }
+    }
+
+    // Mapear dados completos
+    const devotionals: Devotional[] = allDevotionals.map(d => ({
+      ...d,
+      membros: d.membros || { nome_completo: 'Desconhecido' },
+      devocional_curtidas: (likesMap.get(d.id) || []).map(membro_id => ({ membro_id })),
+      devocional_comentarios: [{ count: commentsCountMap.get(d.id) || 0 }],
+    }));
+
+    // Filtrar por tag se necessário
+    let filtered = devotionals;
+    if (filters.tag && filters.tag !== 'all') {
+      filtered = filtered.filter(d => Array.isArray(d.tags) && d.tags.includes(filters.tag));
+    }
+
+    // Ordenar: featured primeiro, depois por data
+    filtered.sort((a, b) => {
+      if (a.featured !== b.featured) return a.featured ? -1 : 1;
+      const da = a.data_publicacao ? new Date(a.data_publicacao).getTime() : 0;
+      const db = b.data_publicacao ? new Date(b.data_publicacao).getTime() : 0;
+      return db - da;
+    });
+
+    return filtered;
+  } catch (error: any) {
+    console.error('Erro ao buscar devocionais:', error);
+    toast.error(`Erro ao carregar devocionais: ${error.message}`);
+    return [];
   }
-
-  rows = rows.map(d => ({
-    ...d,
-    membros: authors.get(d.autor_id) || { nome_completo: 'Desconhecido' },
-    devocional_curtidas: (likes.get(d.id) || []).map(membro_id => ({ membro_id })),
-    devocional_comentarios: [{ count: commentsCount.get(d.id) || 0 }],
-  }));
-
-
-  // Ordenação similar à anterior
-  rows.sort((a, b) => {
-    if (a.featured !== b.featured) return a.featured ? -1 : 1
-    const da = a.data_publicacao ? new Date(a.data_publicacao).getTime() : 0
-    const db = b.data_publicacao ? new Date(b.data_publicacao).getTime() : 0
-    return db - da
-  })
-
-  return rows
 }
 
 export const useDevotionals = (filters: any) => {
@@ -160,6 +213,8 @@ export const useDevotionals = (filters: any) => {
     queryKey,
     queryFn: () => fetchDevotionals(currentChurchId!, memoizedFilters),
     enabled: !!currentChurchId && !!user?.id,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
   });
 }
 
