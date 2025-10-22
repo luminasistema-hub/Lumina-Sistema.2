@@ -19,6 +19,8 @@ import MasterAdminSystemOverview from '../components/master-admin/MasterAdminSys
 import SubscriptionPlanManagement from '../components/master-admin/SubscriptionPlanManagement'
 import MasterAdminUpgradeRequestsAlert from '../components/master-admin/MasterAdminUpgradeRequestsAlert'
 import ContractManagementTab from '../components/master-admin/ContractManagementTab';
+import SaaSReportsTab from '../components/master-admin/SaaSReportsTab';
+import AddChurchDialog from '../components/master-admin/AddChurchDialog';
 import { supabase } from '../integrations/supabase/client'
 import { useSearchParams } from 'react-router-dom'
 
@@ -152,6 +154,7 @@ const MasterAdminPage = () => {
             <TabsTrigger value="contracts" className="whitespace-nowrap">Contratos</TabsTrigger>
             <TabsTrigger value="database" className="whitespace-nowrap">Banco de Dados</TabsTrigger>
             <TabsTrigger value="tools" className="whitespace-nowrap">Ferramentas Admin</TabsTrigger>
+            <TabsTrigger value="reports" className="whitespace-nowrap">Relatórios SaaS</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -166,66 +169,10 @@ const MasterAdminPage = () => {
                   <ChurchIcon className="w-6 h-6 text-purple-500" />
                   Igrejas Cadastradas
                 </CardTitle>
-                <Dialog open={isAddChurchDialogOpen} onOpenChange={setIsAddChurchDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-purple-500 hover:bg-purple-600">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Adicionar Igreja
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Adicionar Nova Igreja</DialogTitle>
-                      <DialogDescription>
-                        Preencha os detalhes para cadastrar uma nova igreja.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="churchName">Nome da Igreja</Label>
-                        <Input
-                          id="churchName"
-                          value={newChurch.name}
-                          onChange={(e) => setNewChurch({...newChurch, name: e.target.value})}
-                          placeholder="Nome da Igreja"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="subscriptionPlan">Plano de Assinatura</Label>
-                        <Select
-                          value={newChurch.subscriptionPlan}
-                          onValueChange={(value) => setNewChurch({...newChurch, subscriptionPlan: value as SubscriptionPlan})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione um plano" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {getSubscriptionPlans().map(plan => (
-                              <SelectItem key={plan.value} value={plan.value}>
-                                {plan.label} (R$ {plan.monthlyValue.toFixed(2)}/mês)
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setIsAddChurchDialogOpen(false)} disabled={isLoading}>
-                          Cancelar
-                        </Button>
-                        <Button onClick={handleAddChurch} disabled={isLoading}>
-                          {isLoading ? (
-                            <div className="flex items-center gap-2">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Adicionando...
-                            </div>
-                          ) : (
-                            'Adicionar Igreja'
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <Button className="bg-purple-500 hover:bg-purple-600" onClick={() => setIsAddChurchDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Igreja
+                </Button>
               </CardHeader>
               <MasterAdminChurchTable 
                 churches={churches} 
@@ -250,7 +197,17 @@ const MasterAdminPage = () => {
           <TabsContent value="tools" className="space-y-6">
             <AdminToolsTab churches={churches} onUpdateChurch={handleUpdateChurch} />
           </TabsContent>
+
+          <TabsContent value="reports" className="space-y-6">
+            <SaaSReportsTab />
+          </TabsContent>
         </Tabs>
+
+        <AddChurchDialog
+          isOpen={isAddChurchDialogOpen}
+          onClose={() => setIsAddChurchDialogOpen(false)}
+          onChurchAdded={loadChurches}
+        />
       </div>
     </MainLayout>
   )

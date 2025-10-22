@@ -290,81 +290,77 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
         {user?.role === "super_admin" && (
           <div className="px-4 mb-2">
             <Button
-              variant={activeModule === "master-admin" ? "secondary" : "ghost"}
-              className="w-full justify-start py-3 text-base md:py-2 md:text-sm"
-              onClick={() => handleModuleClick("master-admin")}
+              variant="ghost"
+              className="w-full justify-between mt-1 py-3 text-base md:py-2 md:text-sm"
+              onClick={() => setIsMasterMenuOpen((v) => !v)}
             >
-              <Shield className="w-5 h-5 md:w-4 md:h-4" />
-              {!isCollapsed && <span className="ml-3">Painel Master</span>}
+              <div className="flex items-center gap-3">
+                <Shield className="w-5 h-5 md:w-4 md:h-4" />
+                {!isCollapsed && <span className="truncate">Painel Master</span>}
+              </div>
+              {!isCollapsed && (isMasterMenuOpen ? <ChevronUp className="w-5 h-5 md:w-4 md:h-4" /> : <ChevronDown className="w-5 h-5 md:w-4 md:h-4" />)}
             </Button>
 
             {/* Submenu com módulos do Painel Master */}
-            {!isCollapsed && (
-              <>
+            {(!isCollapsed && isMasterMenuOpen) && (
+              <div className="pl-6 space-y-1">
                 <Button
-                  variant="ghost"
-                  className="w-full justify-between mt-1 py-3 text-base md:py-2 md:text-sm"
-                  onClick={() => setIsMasterMenuOpen((v) => !v)}
+                  variant={activeModule === "master-admin" && window.location.search.includes("tab=overview") ? "secondary" : "ghost"}
+                  className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                  onClick={() => { navigate("/master-admin?tab=overview"); if (isMobileView) onClose?.(); }}
                 >
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 md:w-4 md:h-4" />
-                    <span className="truncate">Módulos do Painel Master</span>
-                  </div>
-                  {isMasterMenuOpen ? <ChevronUp className="w-5 h-5 md:w-4 md:h-4" /> : <ChevronDown className="w-5 h-5 md:w-4 md:h-4" />}
+                  <Activity className="w-5 h-5 md:w-4 md:h-4" />
+                  <span className="ml-2">Visão Geral</span>
                 </Button>
-                {isMasterMenuOpen && (
-                  <div className="px-2 ml-6 space-y-1">
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
-                      onClick={() => { navigate("/master-admin?tab=overview"); if (isMobileView) onClose?.(); }}
-                    >
-                      <Activity className="w-5 h-5 md:w-4 md:h-4" />
-                      <span className="ml-2">Visão Geral</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
-                      onClick={() => { navigate("/master-admin?tab=churches"); if (isMobileView) onClose?.(); }}
-                    >
-                      <Church className="w-5 h-5 md:w-4 md:h-4" />
-                      <span className="ml-2">Igrejas</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
-                      onClick={() => { navigate("/master-admin?tab=plans"); if (isMobileView) onClose?.(); }}
-                    >
-                      <ClipboardList className="w-5 h-5 md:w-4 md:h-4" />
-                      <span className="ml-2">Planos</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
-                      onClick={() => { navigate("/master-admin?tab=database"); if (isMobileView) onClose?.(); }}
-                    >
-                      <Link2 className="w-5 h-5 md:w-4 md:h-4" />
-                      <span className="ml-2">Banco de Dados</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
-                      onClick={() => { navigate("/master-admin?tab=tools"); if (isMobileView) onClose?.(); }}
-                    >
-                      <Settings className="w-5 h-5 md:w-4 md:h-4" />
-                      <span className="ml-2">Ferramentas Admin</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
-                      onClick={() => { navigate("/master-admin?tab=reports"); if (isMobileView) onClose?.(); }}
-                    >
-                      <ClipboardList className="w-5 h-5 md:w-4 md:h-4" />
-                      <span className="ml-2">Relatórios SaaS</span>
-                    </Button>
-                  </div>
-                )}
-              </>
+                <Button
+                  variant={activeModule === "master-admin" && window.location.search.includes("tab=churches") ? "secondary" : "ghost"}
+                  className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                  onClick={() => { navigate("/master-admin?tab=churches"); if (isMobileView) onClose?.(); }}
+                >
+                  <Church className="w-5 h-5 md:w-4 md:h-4" />
+                  <span className="ml-2">Igrejas</span>
+                </Button>
+                <Button
+                  variant={activeModule === "master-admin" && window.location.search.includes("tab=plans") ? "secondary" : "ghost"}
+                  className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                  onClick={() => { navigate("/master-admin?tab=plans"); if (isMobileView) onClose?.(); }}
+                >
+                  <ClipboardList className="w-5 h-5 md:w-4 md:h-4" />
+                  <span className="ml-2">Planos</span>
+                </Button>
+                 <Button
+                  variant={activeModule === "master-admin" && window.location.search.includes("tab=contracts") ? "secondary" : "ghost"}
+                  className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                  onClick={() => { navigate("/master-admin?tab=contracts"); if (isMobileView) onClose?.(); }}
+                >
+                  <ClipboardSignature className="w-5 h-5 md:w-4 md:h-4" />
+                  <span className="ml-2">Contratos</span>
+                </Button>
+                <Button
+                  variant={activeModule === "master-admin" && window.location.search.includes("tab=database") ? "secondary" : "ghost"}
+                  className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                  onClick={() => { navigate("/master-admin?tab=database"); if (isMobileView) onClose?.(); }}
+                >
+                  <Link2 className="w-5 h-5 md:w-4 md:h-4" />
+                  <span className="ml-2">Banco de Dados</span>
+                </Button>
+                <Button
+                  variant={activeModule === "master-admin" && window.location.search.includes("tab=tools") ? "secondary" : "ghost"}
+                  className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                  onClick={() => { navigate("/master-admin?tab=tools"); if (isMobileView) onClose?.(); }}
+                >
+                  <Settings className="w-5 h-5 md:w-4 md:h-4" />
+                  <span className="ml-2">Ferramentas Admin</span>
+                </Button>
+                <Button
+                  variant={activeModule === "master-admin" && window.location.search.includes("tab=reports") ? "secondary" : "ghost"}
+                  className="w-full justify-start text-base md:text-sm truncate py-3 md:py-2"
+                  onClick={() => { navigate("/master-admin?tab=reports"); if (isMobileView) onClose?.(); }}
+                >
+                  <ClipboardList className="w-5 h-5 md:w-4 md:h-4" />
+                  <span className="ml-2">Relatórios SaaS</span>
+                </Button>
+              </div>
             )}
           </div>
         )}
