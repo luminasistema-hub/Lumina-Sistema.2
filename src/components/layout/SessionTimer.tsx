@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '../ui/button'
 import { Clock, RefreshCw } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
@@ -12,10 +12,10 @@ export const SessionTimer = () => {
   const { logout } = useAuthStore()
   const [timeLeft, setTimeLeft] = useState<number>(SESSION_DURATION)
   const [showWarning, setShowWarning] = useState(false)
+  const [lastRenewal, setLastRenewal] = useState<number>(Date.now())
 
   useEffect(() => {
-    // Inicializar timer
-    const startTime = Date.now()
+    const startTime = lastRenewal
     
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime
@@ -37,21 +37,22 @@ export const SessionTimer = () => {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [logout, showWarning])
+  }, [logout, showWarning, lastRenewal])
 
-  const handleRenewSession = async () => {
+  const handleRenewSession = useCallback(async () => {
     try {
       const { error } = await supabase.auth.refreshSession()
       if (error) throw error
       
       // Resetar timer
+      setLastRenewal(Date.now())
       setTimeLeft(SESSION_DURATION)
       setShowWarning(false)
       toast.success('Sessão renovada com sucesso!')
     } catch (error: any) {
       toast.error('Erro ao renovar sessão: ' + error.message)
     }
-  }
+  }, [])
 
   const formatTime = (ms: number) => {
     const minutes = Math.floor(ms / 60000)

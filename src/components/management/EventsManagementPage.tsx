@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import CreateEventDialog from './CreateEventDialog'
 import EditEventDialog from './EditEventDialog'
 import EventCard from './EventCard'
-import useDebouncedValue from '@/hooks/useDebouncedValue'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 interface Event {
   id: string

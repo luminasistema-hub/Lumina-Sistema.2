@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BookOpen, Plus, Search, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import useDebouncedValue from '@/hooks/useDebouncedValue'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 interface Devotional {
   id: string

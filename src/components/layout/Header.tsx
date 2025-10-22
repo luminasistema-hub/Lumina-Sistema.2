@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react' 
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
-import { useNotifications } from '@/hooks/useNotifications'
+import { useNotifications, type Notification } from '@/hooks/useNotifications'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
@@ -30,7 +30,7 @@ type HeaderProps = {
   onOpenMobileMenu?: () => void;
 }
 
-const NotificationItem = ({ notification, onClick }: { notification: any, onClick: () => void }) => {
+const NotificationItem = ({ notification, onClick }: { notification: Notification, onClick: () => void }) => {
   return (
     <div onClick={onClick} className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
       <p className="font-semibold text-sm text-gray-800">{notification.titulo}</p>
@@ -45,16 +45,16 @@ const NotificationItem = ({ notification, onClick }: { notification: any, onClic
 const Header = ({ onOpenMobileMenu }: HeaderProps) => {
   const { user, logout } = useAuthStore()
   // removido modo escuro
-  const { notifications, unreadCount, markAllAsRead, markOneAsRead, isLoading } = useNotifications();
+  const { notifications, unreadCount, markAllAsRead, markOneAsRead, isLoading: isLoadingNotifications } = useNotifications();
   const navigate = useNavigate();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const isMobile = useIsMobile();
 
-  const unreadNotifications = notifications.filter(n => !n.lido);
+  const unreadNotifications = notifications.filter(n => !n.lida);
 
-  const handleNotificationClick = (notification: any) => {
+  const handleNotificationClick = (notification: Notification) => {
     setSelectedNotification(notification);
     setDialogOpen(true);
     setPopoverOpen(false);
@@ -151,7 +151,7 @@ const Header = ({ onOpenMobileMenu }: HeaderProps) => {
                 )}
               </div>
               <div className="max-h-96 overflow-y-auto">
-                {isLoading ? (
+                {isLoadingNotifications ? (
                   <div className="flex items-center justify-center p-8">
                     <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
                   </div>

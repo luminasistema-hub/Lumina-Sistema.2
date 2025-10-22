@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useAuthStore } from '../../stores/authStore'
 import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
