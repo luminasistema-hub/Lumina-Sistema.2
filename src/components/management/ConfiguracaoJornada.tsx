@@ -730,13 +730,13 @@ const ConfiguracaoJornada = () => {
               <Label htmlFor="etapa-escola-requisito">Escola como Pré-requisito (Opcional)</Label>
               <Select
                 value={formEtapaData.escola_pre_requisito_id || ''}
-                onValueChange={(value) => setFormEtapaData({...formEtapaData, escola_pre_requisito_id: value || null})}
+                onValueChange={(value) => setFormEtapaData({...formEtapaData, escola_pre_requisito_id: value === 'none' ? null : value})}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Nenhuma escola como requisito" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="none">Nenhuma</SelectItem>
                   {availableSchools.map((school: School) => (
                     <SelectItem key={school.id} value={school.id}>
                       {school.nome}
