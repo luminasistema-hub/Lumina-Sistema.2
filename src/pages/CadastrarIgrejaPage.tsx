@@ -196,7 +196,8 @@ const CadastrarIgrejaPage = () => {
     const fullAddress = `${endereco}, ${numero}${complemento ? ` - ${complemento}` : ''}, ${bairro}, ${cidade} - ${estado}`;
 
     try {
-      const { data, error } = await supabase.functions.invoke('register-church', {
+      // 1. Registra a igreja e o usuário admin
+      const { data: registerData, error: registerError } = await supabase.functions.invoke('register-church', {
         body: {
           adminName,
           adminEmail,
@@ -210,25 +211,42 @@ const CadastrarIgrejaPage = () => {
         },
       });
 
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
+      if (registerError) throw new Error(registerError.message);
+      if (registerData.error) throw new Error(registerData.error);
 
-      const newChurchId = data.churchId;
+      const newChurchId = registerData.churchId;
+      toast.success('Igreja e administrador cadastrados com sucesso!');
 
-      toast.success('Conta criada! Verifique seu email para confirmar o cadastro.');
-      
+      // 2. Lida com o pagamento
       if (planDetails.monthlyValue === 0) {
-        toast.info('Seu plano é gratuito! Acesso liberado após a confirmação do e-mail.');
+        toast.info('Seu plano é gratuito! Acesso liberado. Faça o login para começar.');
         navigate('/login');
         return;
       }
 
-      if (newChurchId && planDetails.link_pagamento) {
-        toast.loading('Redirecionando para o checkout de pagamento...');
-        const finalPaymentLink = planDetails.link_pagamento.replace('{CHURCH_ID}', newChurchId);
-        window.location.href = finalPaymentLink;
+      // Para planos pagos, cria a assinatura na ASAAS
+      toast.loading('Criando sua assinatura e redirecionando para o pagamento...');
+
+      const { data: subscriptionData, error: subscriptionError } = await supabase.functions.invoke('create-asaas-subscription', {
+        body: {
+          churchId: newChurchId,
+          planId: selectedPlan,
+        },
+      });
+
+      if (subscriptionError || (subscriptionData && subscriptionData.error)) {
+        const errorMessage = subscriptionError?.message || subscriptionData?.error;
+        console.error('Erro ao criar assinatura ASAAS:', errorMessage);
+        toast.error('Houve um problema ao criar sua assinatura.');
+        toast.info('Seu cadastro foi concluído. Você pode configurar o pagamento na área do administrador.');
+        navigate('/login');
+        return;
+      }
+
+      if (subscriptionData.paymentLink) {
+        window.location.href = subscriptionData.paymentLink;
       } else {
-        toast.info('Cadastro concluído. O link de pagamento não foi configurado. Faça login para gerenciar sua assinatura.');
+        toast.error('Não foi possível obter o link de pagamento. Por favor, entre em contato com o suporte.');
         navigate('/login');
       }
 

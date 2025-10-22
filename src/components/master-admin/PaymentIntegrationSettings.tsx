@@ -7,7 +7,6 @@ import { Copy, Link as LinkIcon } from 'lucide-react';
 import copy from 'copy-to-clipboard';
 import { toast } from 'sonner';
 
-const ABACATEPAY_WEBHOOK_URL = 'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/abacatepay-webhook';
 const ASAAS_WEBHOOK_URL = 'https://qsynfgjwjxmswwcpajxz.supabase.co/functions/v1/asaas-webhook-handler';
 
 const PaymentIntegrationSettings = () => {
@@ -21,29 +20,15 @@ const PaymentIntegrationSettings = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <LinkIcon className="w-5 h-5 text-green-500" />
-          Integração de Pagamento (Abacate PAY)
+          Integração de Pagamento (ASAAS)
         </CardTitle>
         <CardDescription>
-          Configure o webhook da Abacate PAY para receber confirmações de pagamento e atualizar a assinatura automaticamente.
+          Configure o webhook da ASAAS para receber confirmações de pagamento e atualizar a assinatura automaticamente.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Abacate PAY */}
-        <div className="space-y-2">
-          <Label className="font-semibold text-base">Abacate PAY</Label>
-          <div className="flex items-center gap-2">
-            <Input value={ABACATEPAY_WEBHOOK_URL} readOnly className="bg-gray-100" />
-            <Button variant="outline" size="icon" onClick={() => handleCopy(ABACATEPAY_WEBHOOK_URL)}>
-              <Copy className="w-4 h-4" />
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Cole esta URL no painel da Abacate PAY como destino de webhooks.
-          </p>
-        </div>
-
         {/* ASAAS */}
-        <div className="space-y-2 pt-6 border-t">
+        <div className="space-y-2">
           <Label className="font-semibold text-base">ASAAS (API Oficial)</Label>
           <div className="flex items-center gap-2">
             <Input value={ASAAS_WEBHOOK_URL} readOnly className="bg-gray-100" />
