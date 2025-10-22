@@ -1,0 +1,557 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../integrations/supabase/client'
+import { useAuthStore } from '../stores/authStore'
+import { toast } from 'sonner'
+
+export interface School {
+  id: string
+  id_igreja: string
+  nome: string
+  descricao: string
+  professor_id: string
+  professor_nome?: string
+  compartilhar_com_filhas: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SchoolEnrollment {
+  id: string
+  escola_id: string
+  membro_id: string
+  status: string
+  data_inscricao: string
+  created_at: string
+  escolas?: School
+}
+
+export interface SchoolLesson {
+  id: string
+  escola_id: string
+  titulo: string
+  descricao: string
+  youtube_url: string
+  ordem: number
+  created_at: string
+  updated_at: string
+}
+
+export interface StudentAttendance {
+  id: string
+  aula_id: string
+  membro_id: string
+  presente: boolean
+  data_aula: string
+  created_at: string
+}
+
+export interface QuizQuestion {
+  id: string
+  aula_id: string
+  pergunta_texto: string
+  opcoes: string[]
+  resposta_correta: number
+  pontuacao: number
+  ordem: number
+  created_at: string
+}
+
+export interface QuizAnswer {
+  id: string
+  pergunta_id: string
+  membro_id: string
+  resposta_escolhida: number
+  pontuacao_obtida: number
+  created_at: string
+}
+
+// Função para buscar escolas (incluindo as compartilhadas com igrejas filhas)
+const fetchSchools = async (churchId: string) => {
+  const { data, error } = await supabase.rpc('get_devocionais_para_igreja', { id_igreja_atual: churchId })
+  
+  if (error) throw new Error(error.message)
+  
+  // Para escolas, vamos buscar diretamente da tabela com as condições corretas
+  const { data: schoolsData, error: schoolsError } = await supabase
+    .from('escolas')
+    .select(`
+      *,
+      membros(nome_completo)
+    `)
+    .or(`id_igreja.eq.${churchId},and(compartilhar_com_filhas.eq.true,id_igreja.in.(SELECT parent_church_id FROM igrejas WHERE id.eq.${churchId}))`)
+    .order('nome')
+  
+  if (schoolsError) throw new Error(schoolsError.message)
+  
+  return schoolsData.map(school => ({
+    ...school,
+    professor_nome: school.membros?.nome_completo || 'Professor não definido'
+  }))
+}
+
+export const useSchools = () => {
+  const { currentChurchId } = useAuthStore()
+  
+  return useQuery({
+    queryKey: ['schools', currentChurchId],
+    queryFn: () => fetchSchools(currentChurchId!),
+    enabled: !!currentChurchId
+  })
+}
+
+// Função para buscar inscrições do usuário
+const fetchUserEnrollments = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('escola_inscricoes')
+    .select(`
+      *,
+      escolas(nome, descricao)
+    `)
+    .eq('membro_id', userId)
+    .order('data_inscricao', { ascending: false })
+  
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useUserEnrollments = () => {
+  const { user } = useAuthStore()
+  
+  return useQuery({
+    queryKey: ['user-enrollments', user?.id],
+    queryFn: () => fetchUserEnrollments(user!.id),
+    enabled: !!user?.id
+  })
+}
+
+// Função para buscar aulas de uma escola
+const fetchSchoolLessons = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from('escola_aulas')
+    .select('*')
+    .eq('escola_id', schoolId)
+    .order('ordem')
+  
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useSchoolLessons = (schoolId: string | null) => {
+  return useQuery({
+    queryKey: ['school-lessons', schoolId],
+    queryFn: () => fetchSchoolLessons(schoolId!),
+    enabled: !!schoolId
+  })
+}
+
+// Função para buscar perguntas do quiz de uma aula
+const fetchQuizQuestions = async (lessonId: string) => {
+  const { data, error } = await supabase
+    .from('escola_quiz_perguntas')
+    .select('*')
+    .eq('aula_id', lessonId)
+    .order('ordem')
+  
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useQuizQuestions = (lessonId: string | null) => {
+  return useQuery({
+    queryKey: ['quiz-questions', lessonId],
+    queryFn: () => fetchQuizQuestions(lessonId!),
+    enabled: !!lessonId
+  })
+}
+
+// Função para buscar respostas do usuário para um quiz
+const fetchUserQuizAnswers = async (userId: string, lessonId: string) => {
+  const { data, error } = await supabase
+    .from('escola_quiz_respostas')
+    .select(`
+      *,
+      escola_quiz_perguntas(pergunta_texto, opcoes, resposta_correta, pontuacao)
+    `)
+    .eq('membro_id', userId)
+    .eq('escola_quiz_perguntas.aula_id', lessonId)
+    .order('created_at')
+  
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useUserQuizAnswers = (lessonId: string | null) => {
+  const { user } = useAuthStore()
+  
+  return useQuery({
+    queryKey: ['user-quiz-answers', user?.id, lessonId],
+    queryFn: () => fetchUserQuizAnswers(user!.id, lessonId!),
+    enabled: !!user?.id && !!lessonId
+  })
+}
+
+// Função para buscar frequência do aluno
+const fetchStudentAttendance = async (userId: string, lessonId: string) => {
+  const { data, error } = await supabase
+    .from('escola_frequencia')
+    .select('*')
+    .eq('membro_id', userId)
+    .eq('aula_id', lessonId)
+    .maybeSingle()
+  
+  if (error) throw new Error(error.message)
+  return data
+}
+
+export const useStudentAttendance = (lessonId: string | null) => {
+  const { user } = useAuthStore()
+  
+  return useQuery({
+    queryKey: ['student-attendance', user?.id, lessonId],
+    queryFn: () => fetchStudentAttendance(user!.id, lessonId!),
+    enabled: !!user?.id && !!lessonId
+  })
+}
+
+// Hook para criar/editar/deletar escolas
+export const useCreateSchool = () => {
+  const queryClient = useQueryClient()
+  const { currentChurchId } = useAuthStore()
+  
+  return useMutation({
+    mutationFn: async (school: Partial<School>) => {
+      const { data, error } = await supabase
+        .from('escolas')
+        .insert({
+          ...school,
+          id_igreja: currentChurchId
+        })
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: () => {
+      toast.success('Escola criada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao criar escola: ${error.message}`)
+    }
+  })
+}
+
+export const useUpdateSchool = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<School> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('escolas')
+        .update(updates)
+        .eq('id', id)
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: () => {
+      toast.success('Escola atualizada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao atualizar escola: ${error.message}`)
+    }
+  })
+}
+
+export const useDeleteSchool = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('escolas')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      toast.success('Escola removida com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao remover escola: ${error.message}`)
+    }
+  })
+}
+
+// Hook para inscrever/desinscrever em escolas
+export const useEnrollInSchool = () => {
+  const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  
+  return useMutation({
+    mutationFn: async (schoolId: string) => {
+      const { data, error } = await supabase
+        .from('escola_inscricoes')
+        .insert({
+          escola_id: schoolId,
+          membro_id: user?.id
+        })
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: () => {
+      toast.success('Inscrição realizada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['user-enrollments'] })
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao se inscrever: ${error.message}`)
+    }
+  })
+}
+
+export const useUnenrollFromSchool = () => {
+  const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  
+  return useMutation({
+    mutationFn: async (enrollmentId: string) => {
+      const { error } = await supabase
+        .from('escola_inscricoes')
+        .delete()
+        .eq('id', enrollmentId)
+      
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      toast.success('Inscrição cancelada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['user-enrollments'] })
+      queryClient.invalidateQueries({ queryKey: ['schools'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao cancelar inscrição: ${error.message}`)
+    }
+  })
+}
+
+// Hook para registrar frequência
+export const useRegisterAttendance = () => {
+  const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  
+  return useMutation({
+    mutationFn: async ({ lessonId, date, present }: { lessonId: string, date: string, present: boolean }) => {
+      const { data, error } = await supabase
+        .from('escola_frequencia')
+        .upsert({
+          aula_id: lessonId,
+          membro_id: user?.id,
+          data_aula: date,
+          presente: present
+        }, { onConflict: 'aula_id,membro_id,data_aula' })
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: () => {
+      toast.success('Frequência registrada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['student-attendance'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao registrar frequência: ${error.message}`)
+    }
+  })
+}
+
+// Hook para responder quiz
+export const useSubmitQuizAnswer = () => {
+  const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  
+  return useMutation({
+    mutationFn: async ({ questionId, chosenAnswer }: { questionId: string, chosenAnswer: number }) => {
+      // Buscar a pergunta para verificar a resposta correta
+      const { data: question, error: questionError } = await supabase
+        .from('escola_quiz_perguntas')
+        .select('resposta_correta, pontuacao')
+        .eq('id', questionId)
+        .single()
+      
+      if (questionError) throw new Error(questionError.message)
+      
+      // Calcular pontuação obtida
+      const score = chosenAnswer === question.resposta_correta ? question.pontuacao : 0
+      
+      const { data, error } = await supabase
+        .from('escola_quiz_respostas')
+        .upsert({
+          pergunta_id: questionId,
+          membro_id: user?.id,
+          resposta_escolhida: chosenAnswer,
+          pontuacao_obtida: score
+        }, { onConflict: 'pergunta_id,membro_id' })
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: () => {
+      toast.success('Resposta registrada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['user-quiz-answers'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao registrar resposta: ${error.message}`)
+    }
+  })
+}
+
+// Hook para criar aulas
+export const useCreateLesson = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (lesson: Partial<SchoolLesson>) => {
+      const { data, error } = await supabase
+        .from('escola_aulas')
+        .insert(lesson)
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Aula criada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['school-lessons', variables.escola_id] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao criar aula: ${error.message}`)
+    }
+  })
+}
+
+// Hook para atualizar aulas
+export const useUpdateLesson = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<SchoolLesson> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('escola_aulas')
+        .update(updates)
+        .eq('id', id)
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Aula atualizada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['school-lessons'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao atualizar aula: ${error.message}`)
+    }
+  })
+}
+
+// Hook para deletar aulas
+export const useDeleteLesson = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('escola_aulas')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      toast.success('Aula removida com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['school-lessons'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao remover aula: ${error.message}`)
+    }
+  })
+}
+
+// Hook para criar perguntas do quiz
+export const useCreateQuizQuestion = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (question: Partial<QuizQuestion>) => {
+      const { data, error } = await supabase
+        .from('escola_quiz_perguntas')
+        .insert(question)
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Pergunta criada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['quiz-questions', variables.aula_id] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao criar pergunta: ${error.message}`)
+    }
+  })
+}
+
+// Hook para atualizar perguntas do quiz
+export const useUpdateQuizQuestion = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<QuizQuestion> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('escola_quiz_perguntas')
+        .update(updates)
+        .eq('id', id)
+        .select()
+      
+      if (error) throw new Error(error.message)
+      return data[0]
+    },
+    onSuccess: (_, variables) => {
+      toast.success('Pergunta atualizada com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['quiz-questions'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao atualizar pergunta: ${error.message}`)
+    }
+  })
+}
+
+// Hook para deletar perguntas do quiz
+export const useDeleteQuizQuestion = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('escola_quiz_perguntas')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      toast.success('Pergunta removida com sucesso!')
+      queryClient.invalidateQueries({ queryKey: ['quiz-questions'] })
+    },
+    onError: (error) => {
+      toast.error(`Erro ao remover pergunta: ${error.message}`)
+    }
+  })
+}

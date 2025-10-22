@@ -146,7 +146,8 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
       defaultOpen: true,
       modules: [
         { id: "events", title: "Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
-        { id: "devotionals", title: "Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" }
+        { id: "devotionals", title: "Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" },
+        { id: "schools", title: "Escolas", icon: <GraduationCap className="w-4 h-4" />, roles: ["membro","lider_ministerio","pastor","admin","financeiro","voluntario","midia_tecnologia","integra"], status: "complete" }
       ]
     },
     {
@@ -173,6 +174,7 @@ const Sidebar = ({ activeModule = "dashboard", onModuleSelect, onClose }: Sideba
         { id: "kids-management", title: "Gestão Kids", icon: <Baby className="w-4 h-4" />, roles: ["admin","pastor","lider_ministerio","gestao_kids"], status: "complete" },
         { id: "events-management", title: "Gestão de Eventos", icon: <Calendar className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
         { id: "devotionals-management", title: "Gestão de Devocionais", icon: <BookOpen className="w-4 h-4" />, roles: ["pastor","admin","lider_ministerio"], status: "complete" },
+        { id: "schools-management", title: "Gestão de Escolas", icon: <GraduationCap className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" },
         { id: "child-churches", title: "Igrejas Filhas", icon: <Church className="w-4 h-4" />, roles: ["pastor","admin"], status: "complete" }
       ]
     },
