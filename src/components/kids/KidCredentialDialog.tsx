@@ -2,7 +2,7 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { default as QRCode } from 'qrcode.react';
+import { QRCode } from 'qrcode.react';
 import { Baby, User, Printer } from 'lucide-react';
 import type { Kid } from '@/hooks/useKidsData';
 
