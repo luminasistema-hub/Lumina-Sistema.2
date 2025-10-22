@@ -190,7 +190,7 @@ export const useJourneyData = () => {
     }
 
     // 4) Carrega progresso das escolas
-    const schoolPrereqIds = etapaArr.map(e => e.escola_pre_requisito_id).filter(Boolean) as string[];
+    const schoolPrereqIds = etapaArr.flatMap(e => e.passos).map(p => p.escola_pre_requisito_id).filter(Boolean) as string[];
     const completedSchools = new Set<string>();
     if (schoolPrereqIds.length > 0) {
         const { data: schoolLessons, error: lessonsErr } = await supabase.from('escola_aulas').select('id, escola_id').in('escola_id', schoolPrereqIds);
@@ -205,6 +205,44 @@ export const useJourneyData = () => {
                 }
             }
         }
+    }
+
+    // Auto-complete steps based on school completion
+    const stepsToAutoComplete = etapaArr
+      .flatMap(e => e.passos)
+      .filter(p => 
+        p.escola_pre_requisito_id && 
+        completedSchools.has(p.escola_pre_requisito_id) &&
+        !progressoData.some(prog => prog.id_passo === p.id && prog.status === 'concluido')
+      )
+      .map(p => p.id);
+
+    if (stepsToAutoComplete.length > 0) {
+      const recordsToUpsert = stepsToAutoComplete.map(passoId => ({
+        id_membro: user.id,
+        id_passo: passoId,
+        id_igreja: currentChurchId,
+        status: 'concluido' as const,
+        data_conclusao: new Date().toISOString(),
+      }));
+
+      const { error: autoCompleteError } = await supabase
+        .from('progresso_membros')
+        .upsert(recordsToUpsert, { onConflict: 'id_membro,id_passo' });
+
+      if (autoCompleteError) {
+        toast.error('Erro ao atualizar progresso da jornada automaticamente.');
+      } else {
+        // Refetch progress data to include the newly completed steps
+        const { data: newProgresso, error: newProgErr } = await supabase
+          .from('progresso_membros')
+          .select('*')
+          .eq('id_membro', user.id)
+          .in('id_passo', passoIds);
+        if (!newProgErr && newProgresso) {
+          progressoData = newProgresso;
+        }
+      }
     }
 
     // 5) Aplica progresso e lógica de bloqueio

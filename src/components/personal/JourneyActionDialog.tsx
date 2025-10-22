@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 import { Progress } from '../ui/progress';
 import { toast } from 'sonner';
-import { Check, ChevronsRight, ExternalLink, X } from 'lucide-react';
+import { Check, ChevronsRight, ExternalLink, X, Info } from 'lucide-react';
 import DescricaoFormatada from '../utils/DescricaoFormatada';
 import { PassoEtapa } from '../../hooks/useJourneyData';
 
@@ -140,6 +140,7 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
 
   if (!passo) return null;
 
+  const hasSchoolPrerequisite = !!passo.escola_pre_requisito_id;
   const videoId = passo.tipo_passo === 'video' ? getYoutubeVideoId(passo.conteudo || '') : null;
 
   const renderContent = () => {
@@ -232,14 +233,25 @@ const JourneyActionDialog: React.FC<JourneyActionDialogProps> = ({ isOpen, onClo
           <DialogDescription>Complete a tarefa abaixo para avançar na sua jornada.</DialogDescription>
         </DialogHeader>
         <div className="flex-grow overflow-y-auto p-1 pr-4">
+          {hasSchoolPrerequisite && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg mb-4 text-center flex items-center justify-center gap-2">
+              <Info className="w-5 h-5" />
+              <div>
+                <p className="font-semibold">Este passo é concluído automaticamente!</p>
+                <p className="text-sm">Finalize a escola associada para que este passo seja marcado como completo.</p>
+              </div>
+            </div>
+          )}
           {renderContent()}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Fechar</Button>
-          <Button onClick={handleComplete} disabled={!canComplete}>
-            <Check className="w-4 h-4 mr-2" />
-            Marcar como Concluído
-          </Button>
+          {!hasSchoolPrerequisite && (
+            <Button onClick={handleComplete} disabled={!canComplete}>
+              <Check className="w-4 h-4 mr-2" />
+              Marcar como Concluído
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
