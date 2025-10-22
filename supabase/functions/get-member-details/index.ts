@@ -39,15 +39,51 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "member_id and church_id are required." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: callerProfile, error: callerError } = await admin
-      .from('membros')
-      .select('funcao')
+    // Check permissions
+    const { data: superAdmin, error: superAdminError } = await admin
+      .from('super_admins')
+      .select('id')
       .eq('id', caller.id)
-      .eq('id_igreja', church_id)
-      .single();
+      .maybeSingle();
 
-    if (callerError || !['admin', 'pastor', 'super_admin', 'integra'].includes(callerProfile.funcao)) {
-       return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    let hasPermission = superAdmin && !superAdminError;
+
+    if (!hasPermission) {
+      const { data: callerMemberInfo, error: callerMemberError } = await admin
+        .from('membros')
+        .select('id_igreja, funcao')
+        .eq('id', caller.id)
+        .single();
+
+      if (callerMemberError || !callerMemberInfo) {
+        return new Response(JSON.stringify({ error: "Forbidden: Caller profile not found." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const { id_igreja: callerChurchId, funcao: callerRole } = callerMemberInfo;
+      const allowedRoles = ['admin', 'pastor', 'integra'];
+
+      if (callerChurchId === church_id && allowedRoles.includes(callerRole)) {
+        hasPermission = true;
+      } else {
+        const { data: targetChurch, error: targetChurchError } = await admin
+          .from('igrejas')
+          .select('parent_church_id')
+          .eq('id', church_id)
+          .single();
+
+        if (targetChurchError) {
+          console.error("Error fetching target church:", targetChurchError);
+          return new Response(JSON.stringify({ error: "Could not verify permissions." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        
+        if (targetChurch && targetChurch.parent_church_id === callerChurchId && ['admin', 'pastor'].includes(callerRole)) {
+          hasPermission = true;
+        }
+      }
+    }
+
+    if (!hasPermission) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const [
