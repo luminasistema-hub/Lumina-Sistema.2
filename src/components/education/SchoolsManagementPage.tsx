@@ -222,12 +222,13 @@ const SchoolsManagementPage = () => {
   }
 
   const handleRegisterAttendance = (memberId: string, present: boolean) => {
-    if (!lessonForAttendance) return
+    if (!lessonForAttendance || !selectedSchool) return
     registerAttendanceMutation.mutate({
       lessonId: lessonForAttendance.id,
       memberId,
       date: new Date().toISOString().split('T')[0],
-      present
+      present,
+      schoolId: selectedSchool.id
     })
   }
 

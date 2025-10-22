@@ -253,20 +253,11 @@ const SchoolDetailsPage = () => {
                     </div>
                     
                     <div className="flex gap-2">
-                      {lesson.tipo_aula === 'presencial' && (
-                        <>
-                          {userAttendance ? (
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                          ) : (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleRegisterAttendance(lesson.id)}
-                            >
-                              Registrar presença
-                            </Button>
-                          )}
-                        </>
+                      {lesson.tipo_aula === 'presencial' && isCompleted && (
+                        <div className="flex items-center gap-1 text-sm font-medium text-green-600">
+                          <CheckCircle className="w-5 h-5" />
+                          <span>Presença Registrada</span>
+                        </div>
                       )}
                     </div>
                   </div>

@@ -461,10 +461,12 @@ export const useRegisterAttendance = () => {
 // Hook para registrar frequência (professor)
 export const useRegisterStudentAttendance = () => {
   const queryClient = useQueryClient()
+  const { currentChurchId } = useAuthStore()
 
   return useMutation({
-    mutationFn: async ({ lessonId, memberId, date, present }: { lessonId: string, memberId: string, date: string, present: boolean }) => {
-      const { data, error } = await supabase
+    mutationFn: async ({ lessonId, memberId, date, present, schoolId }: { lessonId: string, memberId: string, date: string, present: boolean, schoolId: string }) => {
+      // Etapa 1: Atualizar o registro de frequência
+      const { data: attendanceData, error: attendanceError } = await supabase
         .from('escola_frequencia')
         .upsert({
           aula_id: lessonId,
@@ -473,13 +475,39 @@ export const useRegisterStudentAttendance = () => {
           presente: present
         }, { onConflict: 'aula_id,membro_id,data_aula' })
         .select()
+        .single()
       
-      if (error) throw new Error(error.message)
-      return data[0]
+      if (attendanceError) throw new Error(`Erro de Frequência: ${attendanceError.message}`)
+
+      // Etapa 2: Atualizar o progresso do aluno com base na frequência
+      if (present) {
+        // Se presente, marca a aula como concluída
+        const { error: progressError } = await supabase
+          .from('escola_progresso_aulas')
+          .insert({
+            aula_id: lessonId,
+            membro_id: memberId,
+            id_igreja: currentChurchId!
+          }, { onConflict: 'aula_id,membro_id' })
+        
+        if (progressError) throw new Error(`Erro de Progresso: ${progressError.message}`)
+      } else {
+        // Se ausente, remove o registro de conclusão
+        const { error: progressError } = await supabase
+          .from('escola_progresso_aulas')
+          .delete()
+          .match({ aula_id: lessonId, membro_id: memberId })
+        
+        if (progressError) throw new Error(`Erro de Progresso: ${progressError.message}`)
+      }
+      
+      return attendanceData
     },
     onSuccess: (_, variables) => {
       toast.success('Frequência registrada com sucesso!')
-      queryClient.invalidateQueries({ queryKey: ['student-attendance-for-lesson', variables.lessonId] })
+      // Invalida todas as queries relevantes para atualizar a interface
+      queryClient.invalidateQueries({ queryKey: ['school-attendance', variables.schoolId] })
+      queryClient.invalidateQueries({ queryKey: ['student-progress'] })
     },
     onError: (error) => {
       toast.error(`Erro ao registrar frequência: ${error.message}`)
