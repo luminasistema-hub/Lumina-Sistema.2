@@ -484,7 +484,7 @@ export const useRegisterStudentAttendance = () => {
         // Se presente, marca a aula como concluída
         const { error: progressError } = await supabase
           .from('escola_progresso_aulas')
-          .insert({
+          .upsert({
             aula_id: lessonId,
             membro_id: memberId,
             id_igreja: currentChurchId!
@@ -566,25 +566,21 @@ export const useMarkLessonAsCompleted = () => {
     mutationFn: async ({ lessonId }: { lessonId: string }) => {
       const { data, error } = await supabase
         .from('escola_progresso_aulas')
-        .insert({
+        .upsert({
           aula_id: lessonId,
           membro_id: user!.id,
           id_igreja: currentChurchId!
-        })
+        }, { onConflict: 'aula_id,membro_id' })
         .select()
       
       if (error) throw new Error(error.message)
-      return data[0]
+      return data?.[0]
     },
     onSuccess: (_, variables) => {
       toast.success('Aula concluída!')
       queryClient.invalidateQueries({ queryKey: ['student-progress', user?.id] })
     },
     onError: (error) => {
-      if (error.message.includes('duplicate key value')) {
-        // Não mostrar erro se já estiver concluída
-        return
-      }
       toast.error(`Erro ao marcar aula como concluída: ${error.message}`)
     }
   })
