@@ -15,10 +15,12 @@ import { supabase } from '../../integrations/supabase/client'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { useKidsData, Kid, CheckinRecord } from '@/hooks/useKidsData'
 import { 
-  Baby, Plus, Users, Clock, Shield, Heart, AlertTriangle, CheckCircle, UserCheck, UserX, Search, Filter, Calendar, Phone, Mail, MapPin, Edit, Eye, QrCode, Loader2, Trash2
+  Baby, Plus, Users, Clock, Shield, Heart, AlertTriangle, CheckCircle, UserCheck, UserX, Search, Filter, Calendar, Phone, Mail, MapPin, Edit, Eye, QrCode, Loader2, Trash2, ScanLine, CreditCard
 } from 'lucide-react'
 import AddKidDialog from '../personal/AddKidDialog'
 import KidDetailsDialog from '@/components/kids/KidDetailsDialog'
+import KidCredentialDialog from '@/components/kids/KidCredentialDialog'
+import CheckinScanner from '@/components/kids/CheckinScanner'
 
 interface MemberOption {
   id: string
@@ -35,6 +37,9 @@ const KidsPage = () => {
   const [isEditKidDialogOpen, setIsEditKidDialogOpen] = useState(false)
   const [kidToEdit, setKidToEdit] = useState<Kid | null>(null)
   const [selectedKidDetails, setSelectedKidDetails] = useState<Kid | null>(null)
+  const [selectedKidCredential, setSelectedKidCredential] = useState<Kid | null>(null)
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterAge, setFilterAge] = useState('all')
   const [viewMode, setViewMode] = useState<'kids' | 'checkin' | 'reports'>('kids')
@@ -129,6 +134,37 @@ const KidsPage = () => {
     }
   });
 
+  const handleScan = async (kidId: string) => {
+    if (isScanning) return;
+    setIsScanning(true);
+
+    const kid = kids.find(k => k.id === kidId);
+    if (!kid) {
+      toast.error('QR Code inválido ou criança não encontrada.');
+      setIsScanning(false);
+      return;
+    }
+
+    try {
+      if (kid.status_checkin === 'Presente') {
+        await checkoutMutation.mutateAsync(kid);
+      } else {
+        await checkinMutation.mutateAsync(kid);
+      }
+      // Fecha o scanner após sucesso
+      setTimeout(() => {
+        setIsScannerOpen(false);
+      }, 1000);
+    } catch (error) {
+      // O toast de erro já é tratado na mutação
+    } finally {
+      // Adiciona um pequeno delay para o usuário ver a mensagem de sucesso
+      setTimeout(() => {
+        setIsScanning(false);
+      }, 1000);
+    }
+  };
+
   const handleEditKid = () => {
     if (!kidToEdit) return;
     const responsibleMember = memberOptions.find(m => m.id === editKidForm.responsavel_id);
@@ -204,6 +240,14 @@ const KidsPage = () => {
                 <Plus className="w-4 h-4 mr-2" />Adicionar
               </Button>
             )}
+             {canManageKids && (
+              <Button
+                variant="outline"
+                onClick={() => setIsScannerOpen(true)}
+              >
+                <ScanLine className="w-4 h-4 mr-2" />Ler QR Code
+              </Button>
+            )}
           </div>
         </div>
 
@@ -222,10 +266,11 @@ const KidsPage = () => {
                       </div>
                       {(kid.alergias || kid.medicamentos || kid.informacoes_especiais) && <div className="space-y-2">{kid.alergias && <div className="flex items-start gap-2 p-2 bg-red-50 rounded-lg"><AlertTriangle className="w-4 h-4 text-red-500 mt-0.5" /><div><span className="text-sm font-medium text-red-800">Alergias:</span><span className="text-sm text-red-700 ml-1">{kid.alergias}</span></div></div>}{kid.medicamentos && <div className="flex items-start gap-2 p-2 bg-yellow-50 rounded-lg"><Shield className="w-4 h-4 text-yellow-500 mt-0.5" /><div><span className="text-sm font-medium text-yellow-800">Medicamentos:</span><span className="text-sm text-yellow-700 ml-1">{kid.medicamentos}</span></div></div>}{kid.informacoes_especiais && <div className="flex items-start gap-2 p-2 bg-blue-50 rounded-lg"><Heart className="w-4 h-4 text-blue-500 mt-0.5" /><div><span className="text-sm font-medium text-blue-800">Info:</span><span className="text-sm text-blue-700 ml-1">{kid.informacoes_especiais}</span></div></div>}</div>}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {kid.status_checkin === 'Ausente' && canManageKids && <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => checkinMutation.mutate(kid)}><UserCheck className="w-4 h-4 mr-2" />Check-in</Button>}
                       {kid.status_checkin === 'Presente' && canManageKids && <Button size="sm" variant="outline" onClick={() => checkoutMutation.mutate(kid)}><UserX className="w-4 h-4 mr-2" />Check-out</Button>}
                       <Button variant="outline" size="sm" onClick={() => setSelectedKidDetails(kid)}><Eye className="w-4 h-4 mr-2" />Ver</Button>
+                      <Button variant="outline" size="sm" onClick={() => setSelectedKidCredential(kid)}><CreditCard className="w-4 h-4 mr-2" />Credencial</Button>
                       {canManageKids && <Button variant="outline" size="sm" onClick={() => { setKidToEdit(kid); setEditKidForm({ ...kid, contato_emergencia_nome: kid.contato_emergencia?.nome || '', contato_emergencia_telefone: kid.contato_emergencia?.telefone || '', contato_emergencia_parentesco: kid.contato_emergencia?.parentesco || '' }); setIsEditKidDialogOpen(true); }}><Edit className="w-4 h-4 mr-2" />Editar</Button>}
                       {canDeleteKids && <Button variant="destructive" size="sm" onClick={() => handleDeleteKid(kid.id)}><Trash2 className="w-4 h-4" /></Button>}
                     </div>
@@ -255,6 +300,13 @@ const KidsPage = () => {
           kid={selectedKidDetails}
         />
       )}
+      {selectedKidCredential && (
+        <KidCredentialDialog
+          open={!!selectedKidCredential}
+          onClose={() => setSelectedKidCredential(null)}
+          kid={selectedKidCredential}
+        />
+      )}
       {kidToEdit && (
         <Dialog open={isEditKidDialogOpen} onOpenChange={setIsEditKidDialogOpen}>
           <DialogContent>
@@ -266,6 +318,16 @@ const KidsPage = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Scanner de Check-in/Check-out</DialogTitle>
+            <DialogDescription>Aponte a câmera para o QR code da credencial da criança.</DialogDescription>
+          </DialogHeader>
+          <CheckinScanner onScan={handleScan} isProcessing={isScanning} />
+        </DialogContent>
+      </Dialog>
 
       {/* NOVO: diálogo de cadastro de criança */}
       {user && currentChurchId && (

@@ -91,17 +91,26 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
   body {
-    @apply bg-background text-foreground font-sans;
-    /* Impede rolagem horizontal em toda a aplicação */
-    overflow-x: hidden;
+    @apply bg-background text-foreground;
   }
+}
 
-  /* Mídias fluidas: impedem estouro do layout em telas pequenas */
-  img, svg, video, canvas {
-    max-width: 100%;
-    height: auto;
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none;
   }
 }
 
