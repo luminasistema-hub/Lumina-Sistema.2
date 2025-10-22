@@ -13,8 +13,8 @@ import EADPortalPage from './pages/EADPortalPage'
 import SchoolDetailsPage from './pages/SchoolDetailsPage'
 import PasswordResetPage from './pages/PasswordResetPage'
 import NewPasswordPage from './pages/NewPasswordPage'
+import NotFound from './pages/NotFound'
 import { useEffect } from 'react'
-import CookieConsent from './components/system/CookieConsent'
 import ErrorBoundary from './components/shared/ErrorBoundary'
 
 // ----------------------------
@@ -24,10 +24,12 @@ function ProtectedRoute({
   children,
   requireTenant = false,
   onlySuperAdmin = false,
+  requireSuperAdmin = false,
 }: {
   children: JSX.Element
   requireTenant?: boolean
   onlySuperAdmin?: boolean
+  requireSuperAdmin?: boolean
 }) {
   const { user, isLoading, currentChurchId } = useAuthStore()
   const loc = useLocation()
@@ -47,7 +49,7 @@ function ProtectedRoute({
     return <Navigate to="/login" state={{ from: loc }} replace />
   }
 
-  if (onlySuperAdmin && user.role !== 'super_admin') {
+  if ((onlySuperAdmin || requireSuperAdmin) && user.role !== 'super_admin') {
     return <Navigate to="/" replace />
   }
 
