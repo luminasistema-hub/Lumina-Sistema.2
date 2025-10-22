@@ -26,11 +26,11 @@ import { useAuthStore } from '@/stores/authStore'
 const SchoolDetailsPage = () => {
   const { schoolId } = useParams()
   const { user } = useAuthStore()
-  const { data: schools } = useSchools()
-  const { data: lessons, isLoading: lessonsLoading } = useSchoolLessons(schoolId || null)
+  const { data: schools, isLoading: schoolsLoading, error: schoolsError } = useSchools()
+  const { data: lessons, isLoading: lessonsLoading, error: lessonsError } = useSchoolLessons(schoolId || null)
   const [selectedLesson, setSelectedLesson] = useState<any>(null)
   const [selectedQuestion, setSelectedQuestion] = useState<any>(null)
-  const { data: quizQuestions } = useQuizQuestions(selectedLesson?.id || null)
+  const { data: quizQuestions, error: quizError } = useQuizQuestions(selectedLesson?.id || null)
   const { data: userQuizAnswers } = useUserQuizAnswers(selectedLesson?.id || null)
   const { data: attendance } = useStudentAttendance(selectedLesson?.id || null)
   
@@ -106,9 +106,27 @@ const SchoolDetailsPage = () => {
         <h1 className="text-2xl font-bold">{school?.nome || 'Escola'}</h1>
       </div>
       
+      {schoolsLoading && (
+        <div className="flex justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      )}
+      
+      {schoolsError && (
+        <div className="text-red-500 p-4 text-center">
+          Erro ao carregar informações da escola: {schoolsError.message}
+        </div>
+      )}
+      
       {lessonsLoading && (
         <div className="flex justify-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      )}
+      
+      {lessonsError && (
+        <div className="text-red-500 p-4 text-center">
+          Erro ao carregar aulas: {lessonsError.message}
         </div>
       )}
       

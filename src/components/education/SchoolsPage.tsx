@@ -16,8 +16,8 @@ import { useAuthStore } from '@/stores/authStore'
 
 const SchoolsPage = () => {
   const { user } = useAuthStore()
-  const { data: schools, isLoading: schoolsLoading } = useSchools()
-  const { data: enrollments, isLoading: enrollmentsLoading } = useUserEnrollments()
+  const { data: schools, isLoading: schoolsLoading, error: schoolsError } = useSchools()
+  const { data: enrollments, isLoading: enrollmentsLoading, error: enrollmentsError } = useUserEnrollments()
   const enrollMutation = useEnrollInSchool()
   const unenrollMutation = useUnenrollFromSchool()
   
@@ -52,6 +52,18 @@ const SchoolsPage = () => {
       {(schoolsLoading || enrollmentsLoading) && (
         <div className="flex justify-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      )}
+
+      {schoolsError && (
+        <div className="text-red-500 p-4 text-center">
+          Erro ao carregar escolas: {schoolsError.message}
+        </div>
+      )}
+
+      {enrollmentsError && (
+        <div className="text-red-500 p-4 text-center">
+          Erro ao carregar inscrições: {enrollmentsError.message}
         </div>
       )}
 
@@ -153,7 +165,7 @@ const SchoolsPage = () => {
         </div>
       )}
 
-      {schools && schools.length === 0 && (
+      {schools && schools.length === 0 && !schoolsLoading && (
         <Card className="border-0 shadow-sm">
           <CardContent className="p-12 text-center">
             <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />

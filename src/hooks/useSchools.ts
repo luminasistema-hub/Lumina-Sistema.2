@@ -67,23 +67,26 @@ export interface QuizAnswer {
 
 // Função para buscar escolas (incluindo as compartilhadas com igrejas filhas)
 const fetchSchools = async (churchId: string) => {
-  const { data, error } = await supabase.rpc('get_devocionais_para_igreja', { id_igreja_atual: churchId })
+  // Usar a função RPC correta para buscar escolas
+  const { data, error } = await supabase.rpc('get_escolas_para_igreja', { id_igreja_atual: churchId })
   
   if (error) throw new Error(error.message)
   
-  // Para escolas, vamos buscar diretamente da tabela com as condições corretas
-  const { data: schoolsData, error: schoolsError } = await supabase
+  // Buscar nomes dos professores
+  const schoolIds = data.map((school: any) => school.id)
+  if (schoolIds.length === 0) return []
+  
+  const { data: schoolsWithProfessors, error: professorError } = await supabase
     .from('escolas')
     .select(`
       *,
       membros(nome_completo)
     `)
-    .or(`id_igreja.eq.${churchId},and(compartilhar_com_filhas.eq.true,id_igreja.in.(SELECT parent_church_id FROM igrejas WHERE id.eq.${churchId}))`)
-    .order('nome')
+    .in('id', schoolIds)
   
-  if (schoolsError) throw new Error(schoolsError.message)
+  if (professorError) throw new Error(professorError.message)
   
-  return schoolsData.map(school => ({
+  return schoolsWithProfessors.map((school: any) => ({
     ...school,
     professor_nome: school.membros?.nome_completo || 'Professor não definido'
   }))

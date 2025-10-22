@@ -35,7 +35,7 @@ import { Plus, Pencil, Trash2, Users } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const SchoolsManagementPage = () => {
-  const { user } = useAuthStore()
+  const { user, currentChurchId } = useAuthStore()
   const { data: schools, isLoading, error } = useSchools()
   const { data: members } = useMembers()
   const createSchoolMutation = useCreateSchool()
@@ -109,6 +109,9 @@ const SchoolsManagementPage = () => {
     member.funcao === 'admin' || 
     member.funcao === 'lider_ministerio'
   ) || []
+
+  // Filtrar apenas as escolas da igreja atual para gestão
+  const churchSchools = schools?.filter(school => school.id_igreja === currentChurchId) || []
 
   return (
     <div className="p-6 space-y-6">
@@ -220,7 +223,7 @@ const SchoolsManagementPage = () => {
             </div>
           )}
           
-          {schools && schools.length > 0 ? (
+          {churchSchools && churchSchools.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -231,7 +234,7 @@ const SchoolsManagementPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {schools.map((school) => (
+                {churchSchools.map((school) => (
                   <TableRow key={school.id}>
                     <TableCell className="font-medium">{school.nome}</TableCell>
                     <TableCell>
