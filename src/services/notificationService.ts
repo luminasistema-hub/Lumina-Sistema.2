@@ -5,6 +5,7 @@ interface EmailPayload {
   to: string;
   subject: string;
   htmlContent: string;
+  attachments?: { filename: string; content: string }[];
 }
 
 /**
@@ -13,7 +14,7 @@ interface EmailPayload {
  * @returns true se o e-mail foi enviado com sucesso, false caso contrário.
  */
 export const sendEmailNotification = async (payload: EmailPayload): Promise<boolean> => {
-  const { to, subject, htmlContent } = payload;
+  const { to, subject, htmlContent, attachments } = payload;
 
   if (!to || !subject || !htmlContent) {
     console.error('Dados insuficientes para enviar o e-mail.');
@@ -23,7 +24,7 @@ export const sendEmailNotification = async (payload: EmailPayload): Promise<bool
 
   try {
     const { data, error } = await supabase.functions.invoke('send-email', {
-      body: { to, subject, htmlContent },
+      body: { to, subject, htmlContent, attachments },
     });
 
     if (error) {

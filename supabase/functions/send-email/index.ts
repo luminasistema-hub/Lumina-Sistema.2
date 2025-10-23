@@ -19,7 +19,7 @@ serve(async (req) => {
     }
     const resend = new Resend(RESEND_API_KEY)
 
-    const { to, subject, htmlContent } = await req.json()
+    const { to, subject, htmlContent, attachments } = await req.json()
 
     if (!to || !subject || !htmlContent) {
       return new Response(JSON.stringify({ error: 'Missing required fields: to, subject, htmlContent' }), {
@@ -33,6 +33,7 @@ serve(async (req) => {
       to: [to],
       subject: subject,
       html: htmlContent,
+      attachments: attachments,
     })
 
     if (error) {

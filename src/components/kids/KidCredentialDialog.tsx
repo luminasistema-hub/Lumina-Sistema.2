@@ -38,14 +38,14 @@ const KidCredentialDialog: React.FC<KidCredentialDialogProps> = ({ open, onClose
 
     setIsSending(true);
     const qrCodeDataUrl = canvas.toDataURL('image/png');
+    const qrCodeBase64 = qrCodeDataUrl.split(',')[1];
 
     const emailHtmlContent = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
         <h1 style="color: #333; font-size: 24px;">Credencial de Acesso - Ministério Infantil</h1>
         <p style="font-size: 16px; color: #555;">Olá ${kid.responsavel_nome || 'Responsável'},</p>
-        <p style="font-size: 16px; color: #555;">Esta é a credencial de acesso para <strong>${kid.nome_crianca}</strong>. Apresente este QR Code na recepção do Ministério Infantil para realizar o check-in e o check-out de forma rápida e segura.</p>
+        <p style="font-size: 16px; color: #555;">Esta é a credencial de acesso para <strong>${kid.nome_crianca}</strong>. Apresente o QR Code em anexo na recepção do Ministério Infantil para realizar o check-in e o check-out de forma rápida e segura.</p>
         <div style="text-align: center; margin: 30px 0; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
-          <img src="${qrCodeDataUrl}" alt="QR Code para ${kid.nome_crianca}" style="width: 200px; height: 200px; border: 1px solid #eee;" />
           <h2 style="margin-top: 15px; margin-bottom: 5px; color: #333;">${kid.nome_crianca}</h2>
           <p style="margin: 0; color: #777;">Responsável: ${kid.responsavel_nome}</p>
         </div>
@@ -59,6 +59,12 @@ const KidCredentialDialog: React.FC<KidCredentialDialogProps> = ({ open, onClose
       to: kid.email_responsavel,
       subject: `Credencial de Acesso Kids - ${kid.nome_crianca}`,
       htmlContent: emailHtmlContent,
+      attachments: [
+        {
+          filename: `credencial-${kid.nome_crianca.toLowerCase().replace(/ /g, '-')}.png`,
+          content: qrCodeBase64,
+        },
+      ],
     });
 
     toast.promise(promise, {
