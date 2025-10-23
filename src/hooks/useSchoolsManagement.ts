@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/sonner';
 
 export interface School {
   id?: string;

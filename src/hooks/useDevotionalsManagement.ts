@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/sonner';
 import { useMemo, useEffect } from 'react';
 import { createInAppNotification } from '@/services/notificationService';
 import { useChurchStore } from '@/stores/churchStore';

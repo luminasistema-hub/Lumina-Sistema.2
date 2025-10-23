@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Label } from '../components/ui/label'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/sonner'
 import { Lock, ArrowLeft } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 

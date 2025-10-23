@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Baby, User, Printer, Mail } from 'lucide-react';
 import type { Kid } from '@/hooks/useKidsData';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/sonner';
 import { sendEmailNotification } from '@/services/notificationService';
 import { toPng } from 'html-to-image';
 

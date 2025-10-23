@@ -11,7 +11,7 @@ import { Badge } from '../ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Checkbox } from '../ui/checkbox'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/sonner'
 import { supabase } from '../../integrations/supabase/client' 
 import { 
   Users, 
