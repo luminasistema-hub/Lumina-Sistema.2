@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Users, Crown, Baby, Church, Eye, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import MemberDetailsDialog from './MemberDetailsDialog';
+import { useChildChurchDashboardData } from '@/hooks/useChildChurchDashboardData';
 
 type MemberRow = {
   id: string;
@@ -26,70 +27,12 @@ interface Props {
 }
 
 const ChildChurchDashboardDialog: React.FC<Props> = ({ churchId, churchName, open, onOpenChange }) => {
-  const [loading, setLoading] = useState(false);
-  const [counts, setCounts] = useState({ members: 0, leaders: 0, kids: 0, ministries: 0 });
-  const [members, setMembers] = useState<MemberRow[]>([]);
+  const { data, isLoading, isError } = useChildChurchDashboardData(churchId, open);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MemberRow | null>(null);
 
-  useEffect(() => {
-    if (!open || !churchId) return;
-    const load = async () => {
-      setLoading(true);
-      try {
-        // Contagem de membros
-        const { count: membersCount, error: mErr } = await supabase
-          .from('membros')
-          .select('id', { count: 'exact', head: true })
-          .eq('id_igreja', churchId);
-        if (mErr) throw mErr;
-
-        // Contagem de líderes
-        const { count: leadersCount, error: lErr } = await supabase
-          .from('membros')
-          .select('id', { count: 'exact', head: true })
-          .eq('id_igreja', churchId)
-          .in('funcao', ['admin', 'pastor', 'lider']);
-        if (lErr) throw lErr;
-
-        // Contagem de crianças
-        const { count: kidsCount, error: kErr } = await supabase
-          .from('criancas')
-          .select('id', { count: 'exact', head: true })
-          .eq('id_igreja', churchId);
-        if (kErr) throw kErr;
-
-        // Contagem de ministérios
-        const { count: ministriesCount, error: minErr } = await supabase
-          .from('ministerios')
-          .select('id', { count: 'exact', head: true })
-          .eq('id_igreja', churchId);
-        if (minErr) throw minErr;
-
-        setCounts({
-          members: membersCount || 0,
-          leaders: leadersCount || 0,
-          kids: kidsCount || 0,
-          ministries: ministriesCount || 0,
-        });
-
-        // Lista de membros
-        const { data: membersRows, error: listErr } = await supabase
-          .from('membros')
-          .select('id, nome_completo, email, funcao, status, created_at')
-          .eq('id_igreja', churchId)
-          .order('nome_completo', { ascending: true });
-        if (listErr) throw listErr;
-        setMembers((membersRows || []) as MemberRow[]);
-      } catch (e: any) {
-        console.error('ChildChurchDashboardDialog load error:', e?.message || e);
-        toast.error('Falha ao carregar dados da igreja filha.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [open, churchId]);
+  const counts = data?.counts || { members: 0, leaders: 0, kids: 0, ministries: 0 };
+  const members = data?.members || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,10 +44,14 @@ const ChildChurchDashboardDialog: React.FC<Props> = ({ churchId, churchName, ope
           </DialogTitle>
         </DialogHeader>
 
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 animate-spin" />
             <span className="ml-2 text-gray-600">Carregando dados...</span>
+          </div>
+        ) : isError ? (
+          <div className="flex items-center justify-center h-64 text-red-600 bg-red-50 rounded-md">
+            <p>Ocorreu um erro ao carregar os dados do campus.</p>
           </div>
         ) : (
           <div className="space-y-6">
