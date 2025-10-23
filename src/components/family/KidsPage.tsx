@@ -23,6 +23,7 @@ import KidCredentialDialog from '@/components/kids/KidCredentialDialog'
 import CheckinScanner from '@/components/kids/CheckinScanner'
 import { createInAppNotification, sendEmailNotification } from '@/services/notificationService'
 import { createStandardEmailHtml } from '@/lib/emailTemplates'
+import { getChurchName } from '@/services/churchService';
 
 interface MemberOption {
   id: string
@@ -127,7 +128,7 @@ const KidsPage = () => {
         });
 
         if (data.kid.email_responsavel) {
-          const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
+          const churchName = await getChurchName(currentChurchId);
           const emailHtml = createStandardEmailHtml({
             title: notificationTitle,
             description: notificationDesc,
@@ -176,7 +177,7 @@ const KidsPage = () => {
         });
 
         if (kid.email_responsavel) {
-          const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
+          const churchName = await getChurchName(currentChurchId);
           const emailHtml = createStandardEmailHtml({
             title: notificationTitle,
             description: notificationDesc,

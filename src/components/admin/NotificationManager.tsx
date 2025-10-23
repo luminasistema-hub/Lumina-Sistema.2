@@ -19,6 +19,7 @@ import { Badge } from '../ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { sendEmailNotification } from '@/services/notificationService';
 import { createStandardEmailHtml } from '@/lib/emailTemplates';
+import { getChurchName } from '@/services/churchService';
 
 const NotificationManager = () => {
   const { currentChurchId } = useAuthStore();
@@ -111,23 +112,7 @@ const NotificationManager = () => {
           return;
         }
 
-        let churchName = useAuthStore.getState().churchName;
-        if (!churchName && currentChurchId) {
-          try {
-            const { data: churchResult, error: functionError } = await supabase.functions.invoke('get-church-public', {
-              body: { churchId: currentChurchId },
-            });
-
-            if (functionError) throw functionError;
-            if (churchResult.error) throw new Error(churchResult.error);
-            
-            churchName = churchResult.nome;
-            useAuthStore.getState().setCurrentChurch(currentChurchId, churchName);
-          } catch (e) {
-            console.error("Falha ao buscar nome da igreja, usando fallback:", e);
-          }
-        }
-        const finalChurchName = churchName || 'Sua Igreja';
+        const finalChurchName = await getChurchName(currentChurchId!);
 
         const emailHtmlContent = createStandardEmailHtml({
           title,

@@ -11,6 +11,7 @@ import { Switch } from "../ui/switch";
 import { sendEmailNotification } from "@/services/notificationService";
 import { createStandardEmailHtml } from "@/lib/emailTemplates";
 import { useAuthStore } from "@/stores/authStore";
+import { getChurchName } from "@/services/churchService";
 
 export function CreateEventDialog({
   open,
@@ -96,7 +97,7 @@ export function CreateEventDialog({
       if (membersError) {
         toast.warning("Notificação por e-mail não enviada: falha ao buscar membros.");
       } else if (members && members.length > 0) {
-        const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
+        const churchName = await getChurchName(igrejaId);
         const emailHtml = createStandardEmailHtml({
           title: notificationTitle,
           description: notificationDesc,

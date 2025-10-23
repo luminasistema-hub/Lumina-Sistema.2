@@ -33,6 +33,7 @@ import { Checkbox } from '../ui/checkbox'
 import { AVAILABLE_PERMISSIONS } from '@/constants/permissions'
 import { createInAppNotification, sendEmailNotification } from '@/services/notificationService'
 import { createStandardEmailHtml } from '@/lib/emailTemplates'
+import { getChurchName } from '@/services/churchService'
 
 interface UserManagementProps {}
 
@@ -167,7 +168,7 @@ const UserManagement = ({}: UserManagementProps) => {
       });
 
       if (selectedUser.email) {
-        const churchName = currentChurch?.name || 'Sua Igreja';
+        const churchName = await getChurchName(currentChurchId);
         const emailHtml = createStandardEmailHtml({
           title: notificationTitle,
           description: notificationDesc,
