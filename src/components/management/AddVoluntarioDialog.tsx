@@ -7,6 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { useAddVoluntario, useMinistryVolunteers } from "@/hooks/useMinistryVolunteers";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 interface AddVoluntarioDialogProps {
   open: boolean;
@@ -23,75 +26,54 @@ export default function AddVoluntarioDialog({
   idIgreja,
   onAdded
 }: AddVoluntarioDialogProps) {
-  const [membros, setMembros] = useState<any[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { mutate: addVoluntario, isPending: isAdding } = useAddVoluntario();
 
-  // Buscar membros disponíveis
-  useEffect(() => {
-    if (!open) return;
+  // 1. Buscar todos os membros da igreja (será cacheado)
+  const { data: todosOsMembros, isLoading: isLoadingMembros } = useQuery({
+    queryKey: ['members', idIgreja],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("membros")
+        .select("id, nome_completo, email")
+        .eq("id_igreja", idIgreja)
+        .eq("status", "ativo");
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
 
-    const fetchMembros = async () => {
-      setLoading(true);
+  // 2. Buscar voluntários que já estão no ministério (será cacheado)
+  const { data: voluntarios, isLoading: isLoadingVoluntarios } = useMinistryVolunteers(idMinisterio);
 
-      try {
-        // 1. buscar membros da igreja
-        const { data: todos, error: errMembros } = await supabase
-          .from("membros")
-          .select("id, nome_completo, email")
-          .eq("id_igreja", idIgreja)
-          .eq("status", "ativo");
+  // 3. Calcular membros disponíveis usando useMemo
+  const membrosDisponiveis = useMemo(() => {
+    if (!todosOsMembros || !voluntarios) return [];
+    const idsVoluntarios = voluntarios.map(v => v.membro_id);
+    return todosOsMembros.filter(m => !idsVoluntarios.includes(m.id));
+  }, [todosOsMembros, voluntarios]);
 
-        if (errMembros) throw errMembros;
-
-        // 2. buscar voluntários já no ministério
-        const { data: voluntarios, error: errVol } = await supabase
-          .from("ministerio_voluntarios")
-          .select("membro_id")
-          .eq("ministerio_id", idMinisterio);
-
-        if (errVol) throw errVol;
-
-        const usados = voluntarios?.map(v => v.membro_id) || [];
-        const filtrados = todos?.filter(m => !usados.includes(m.id)) || [];
-
-        setMembros(filtrados);
-      } catch (err: any) {
-        console.error("Erro ao carregar membros:", err);
-        toast.error("Erro ao carregar lista de membros");
-        setMembros([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMembros();
-  }, [open, idIgreja, idMinisterio]);
+  const isLoading = isLoadingMembros || isLoadingVoluntarios;
 
   // Adicionar voluntário
-  const handleAdd = async () => {
+  const handleAdd = () => {
     if (!selected) {
       toast.error("Selecione um membro");
       return;
     }
 
-    try {
-      const { error } = await supabase.from("ministerio_voluntarios").insert({
-        ministerio_id: idMinisterio,
-        membro_id: selected,
-        id_igreja: idIgreja,
-      });
-
-      if (error) throw error;
-
-      toast.success("Voluntário adicionado com sucesso!");
-      if (onAdded) onAdded();
-      onOpenChange(false);
-      setSelected(null);
-    } catch (err: any) {
-      console.error("Erro ao adicionar voluntário:", err);
-      toast.error("Erro ao adicionar voluntário: " + err.message);
-    }
+    addVoluntario({
+      ministerio_id: idMinisterio,
+      membro_id: selected,
+      id_igreja: idIgreja,
+    }, {
+      onSuccess: () => {
+        onOpenChange(false);
+        setSelected(null);
+        if (onAdded) onAdded();
+      }
+    });
   };
 
   return (
@@ -102,7 +84,7 @@ export default function AddVoluntarioDialog({
           <DialogDescription>Selecione um membro da igreja para adicioná-lo ao ministério.</DialogDescription>
         </DialogHeader>
 
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="w-6 h-6 animate-spin" />
             <span className="ml-2">Carregando membros...</span>
@@ -114,12 +96,12 @@ export default function AddVoluntarioDialog({
                 <SelectValue placeholder="Selecione um membro" />
               </SelectTrigger>
               <SelectContent>
-                {membros.length === 0 ? (
+                {membrosDisponiveis.length === 0 ? (
                   <SelectItem value="" disabled>
                     Nenhum membro disponível
                   </SelectItem>
                 ) : (
-                  membros.map((m) => (
+                  membrosDisponiveis.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.nome_completo} ({m.email})
                     </SelectItem>
@@ -128,8 +110,8 @@ export default function AddVoluntarioDialog({
               </SelectContent>
             </Select>
 
-            <Button onClick={handleAdd} disabled={!selected} className="w-full">
-              Adicionar Voluntário
+            <Button onClick={handleAdd} disabled={!selected || isAdding} className="w-full">
+              {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Adicionar Voluntário'}
             </Button>
           </div>
         )}

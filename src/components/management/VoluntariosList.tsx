@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import AddVoluntarioDialog from "./AddVoluntarioDialog";
-import { getVoluntarios, removeVoluntario } from "@/services/voluntariosService";
+import { useMinistryVolunteers, useRemoveVoluntario } from "@/hooks/useMinistryVolunteers";
+import { Loader2 } from "lucide-react";
 
 interface VoluntariosListProps {
   idMinisterio: string;
@@ -9,35 +10,12 @@ interface VoluntariosListProps {
 }
 
 export default function VoluntariosList({ idMinisterio, idIgreja }: VoluntariosListProps) {
-  const [voluntarios, setVoluntarios] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [openAdd, setOpenAdd] = useState(false);
+  const { data: voluntarios = [], isLoading } = useMinistryVolunteers(idMinisterio);
+  const { mutate: remove, isPending: isRemoving } = useRemoveVoluntario(idMinisterio);
 
-  // Buscar voluntários
-  const fetchVoluntarios = async () => {
-    setLoading(true);
-    try {
-      const data = await getVoluntarios(idMinisterio);
-      setVoluntarios(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchVoluntarios();
-  }, [idMinisterio]);
-
-  // Remover voluntário
-  const handleRemove = async (idVol: string) => {
-    try {
-      await removeVoluntario(idVol);
-      fetchVoluntarios();
-    } catch (error) {
-      console.error(error);
-    }
+  const handleRemove = (idVol: string) => {
+    remove(idVol);
   };
 
   return (
@@ -47,8 +25,11 @@ export default function VoluntariosList({ idMinisterio, idIgreja }: VoluntariosL
         <Button onClick={() => setOpenAdd(true)}>+ Adicionar</Button>
       </div>
 
-      {loading ? (
-        <p>Carregando...</p>
+      {isLoading ? (
+        <div className="flex items-center justify-center p-4">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="ml-2">Carregando voluntários...</span>
+        </div>
       ) : voluntarios.length === 0 ? (
         <p>Nenhum voluntário adicionado ainda.</p>
       ) : (
@@ -63,8 +44,9 @@ export default function VoluntariosList({ idMinisterio, idIgreja }: VoluntariosL
                 variant="destructive"
                 size="sm"
                 onClick={() => handleRemove(v.id)}
+                disabled={isRemoving}
               >
-                Remover
+                {isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Remover'}
               </Button>
             </li>
           ))}
@@ -76,9 +58,8 @@ export default function VoluntariosList({ idMinisterio, idIgreja }: VoluntariosL
         onOpenChange={setOpenAdd}
         idMinisterio={idMinisterio}
         idIgreja={idIgreja}
-        onAdded={fetchVoluntarios}
+        onAdded={() => {}} // O hook já cuida da atualização
       />
     </div>
   );
 }
-

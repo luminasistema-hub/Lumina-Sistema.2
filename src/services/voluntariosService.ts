@@ -2,33 +2,34 @@
 import { supabase } from "@/integrations/supabase/client"
 
 // Buscar voluntários de um ministério
-export const fetchVoluntarios = async (idMinisterio: string) => {
+export const getVoluntarios = async (ministerioId: string) => {
   const { data, error } = await supabase
     .from("ministerio_voluntarios")
     .select(`
       id,
+      membro_id,
       usuario:membros(id, nome_completo, email)
     `)
-    .eq("id_ministerio", idMinisterio)
+    .eq("ministerio_id", ministerioId)
 
   if (error) {
     console.error("Erro ao buscar voluntários:", error)
-    return []
+    throw error;
   }
 
   return data || []
 }
 
 // Adicionar voluntário a um ministério
-export const addVoluntario = async (idMinisterio: string, idMembro: string) => {
-  const { error } = await supabase.from("ministerio_voluntarios").insert([
-    {
-      id_ministerio: idMinisterio,
-      id_membro: idMembro,
-    },
-  ])
+export const addVoluntario = async (payload: { ministerio_id: string; membro_id: string; id_igreja: string }) => {
+  const { data, error } = await supabase
+    .from("ministerio_voluntarios")
+    .insert(payload)
+    .select()
+    .single();
 
-  if (error) throw error
+  if (error) throw error;
+  return data;
 }
 
 // Remover voluntário do ministério
