@@ -81,6 +81,7 @@ const PastorAreaPage = () => {
       const { error } = await supabase.from('pastor_area_items').insert({
         id_igreja: currentChurchId,
         pastor_id: user.id,
+        pastor_nome: user.name,
         titulo: newItem.titulo,
         tipo: newItem.tipo,
         conteudo: newItem.tipo !== 'documento_pdf' ? newItem.conteudo : null,

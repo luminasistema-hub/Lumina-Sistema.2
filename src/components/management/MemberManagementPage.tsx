@@ -74,6 +74,7 @@ const MemberManagementPage = () => {
   const [filterMinistry, setFilterMinistry] = useState('all')
   const [filterBirthday, setFilterBirthday] = useState('all')
   const [filterWedding, setFilterWedding] = useState('all')
+  const [memberDetailsOpen, setMemberDetailsOpen] = useState(false);
   // Dados extras para o popup
   const [memberExtra, setMemberExtra] = useState<{
     loading: boolean;
@@ -291,6 +292,11 @@ const MemberManagementPage = () => {
     setSelectedMember(member);
     setEditMemberData({ ...member });
     setIsEditMemberDialogOpen(true);
+  }, []);
+
+  const handleOpenDetailsDialog = useCallback((member: Member) => {
+    setSelectedMember(member);
+    setMemberDetailsOpen(true);
   }, []);
 
   const handleGenerateRegistrationLink = useCallback(() => {
@@ -730,7 +736,7 @@ const MemberManagementPage = () => {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 justify-end">
-                  <Button variant="outline" size="sm" onClick={() => setSelectedMember(member)}>
+                  <Button variant="outline" size="sm" onClick={() => handleOpenDetailsDialog(member)}>
                     <Eye className="w-4 h-4 mr-2" />Ver Perfil
                   </Button>
                   {(canApprove && member.status !== 'ativo') && (
@@ -776,156 +782,17 @@ const MemberManagementPage = () => {
       )}
 
       {selectedMember && (
-        <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
-          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">{selectedMember.nome_completo}</span>
-                <Badge className={getRoleColor(selectedMember.funcao)}>
-                  {getRoleIcon(selectedMember.funcao)}
-                  <span className="ml-1">{selectedMember.funcao}</span>
-                </Badge>
-                <Badge className={getStatusColor(selectedMember.status)}>
-                  {selectedMember.status}
-                </Badge>
-              </DialogTitle>
-              <DialogDescription>
-                Membro desde {new Date(selectedMember.created_at).toLocaleDateString('pt-BR')}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Email</Label>
-                  <div className="text-sm break-all">{selectedMember.email}</div>
-                </div>
-                {selectedMember.telefone && (
-                  <div>
-                    <Label>Telefone</Label>
-                    <div className="text-sm">{selectedMember.telefone}</div>
-                  </div>
-                )}
-                {selectedMember.data_nascimento && (
-                  <div>
-                    <Label>Data de Nascimento</Label>
-                    <div className="text-sm">
-                      {new Date(selectedMember.data_nascimento).toLocaleDateString('pt-BR')} ({calculateAge(selectedMember.data_nascimento)} anos)
-                    </div>
-                  </div>
-                )}
-                {selectedMember.estado_civil && (
-                  <div>
-                    <Label>Estado Civil</Label>
-                    <div className="text-sm">{selectedMember.estado_civil}</div>
-                  </div>
-                )}
-                {selectedMember.profissao && (
-                  <div>
-                    <Label>Profissão</Label>
-                    <div className="text-sm">{selectedMember.profissao}</div>
-                  </div>
-                )}
-                {selectedMember.endereco && (
-                  <div className="md:col-span-2">
-                    <Label>Endereço</Label>
-                    <div className="text-sm">{selectedMember.endereco}</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Jornada */}
-              <div className="p-3 rounded-lg border bg-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <h4 className="font-medium">Jornada</h4>
-                </div>
-                {memberExtra.loading ? (
-                  <div className="text-sm text-gray-500">Carregando...</div>
-                ) : memberExtra.journey ? (
-                  <div className="space-y-2">
-                    <Progress value={memberExtra.journey.percent} />
-                    <div className="text-xs text-gray-600">
-                      {memberExtra.journey.completed} de {memberExtra.journey.total} passos concluídos • {memberExtra.journey.percent}% • {memberExtra.journey.levels} etapa(s) concluída(s)
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">Sem trilha ativa ou sem progresso.</div>
-                )}
-              </div>
-
-              {/* Teste vocacional */}
-              <div className="p-3 rounded-lg border bg-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="w-4 h-4 text-purple-600" />
-                  <h4 className="font-medium">Teste Vocacional</h4>
-                </div>
-                {memberExtra.loading ? (
-                  <div className="text-sm text-gray-500">Carregando...</div>
-                ) : memberExtra.vocational ? (
-                  <div className="text-sm">
-                    Ministério recomendado: <span className="font-medium">{memberExtra.vocational.recommendation}</span>
-                    {memberExtra.vocational.date && (
-                      <span className="text-gray-500"> • {new Date(memberExtra.vocational.date).toLocaleDateString('pt-BR')}</span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">Sem teste registrado.</div>
-                )}
-              </div>
-
-              {/* Filhos */}
-              <div className="p-3 rounded-lg border bg-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <Baby className="w-4 h-4 text-pink-600" />
-                  <h4 className="font-medium">Filhos</h4>
-                </div>
-                {memberExtra.loading ? (
-                  <div className="text-sm text-gray-500">Carregando...</div>
-                ) : memberExtra.kids.length > 0 ? (
-                  <ul className="text-sm text-gray-800 list-disc pl-5">
-                    {memberExtra.kids.map(k => (
-                      <li key={k.id}>{k.nome} — {k.idade} anos</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="text-sm text-gray-500">Nenhum filho cadastrado.</div>
-                )}
-              </div>
-
-              {/* Ministérios */}
-              <div className="p-3 rounded-lg border bg-white">
-                <div className="flex items-center gap-2 mb-2">
-                  <Church className="w-4 h-4 text-indigo-600" />
-                  <h4 className="font-medium">Ministérios</h4>
-                </div>
-                {memberExtra.loading ? (
-                  <div className="text-sm text-gray-500">Carregando...</div>
-                ) : memberExtra.ministries.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {memberExtra.ministries.map(m => (
-                      <Badge key={m.id} variant="outline">
-                        {m.nome}{m.funcao ? ` — ${m.funcao}` : ''}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">Sem vinculação a ministérios.</div>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2">
-                {(canManageMembers || selectedMember.id === user?.id) && (
-                  <Button variant="outline" onClick={() => handleOpenEditMemberDialog(selectedMember)}>
-                    <Edit className="w-4 h-4 mr-2" />Editar
-                  </Button>
-                )}
-                <Button variant="ghost" onClick={() => setSelectedMember(null)}>
-                  Fechar
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <MemberDetailsDialog
+          churchId={currentChurchId}
+          member={selectedMember}
+          open={memberDetailsOpen}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              setSelectedMember(null);
+            }
+            setMemberDetailsOpen(isOpen);
+          }}
+        />
       )}
 
       {selectedMember && (

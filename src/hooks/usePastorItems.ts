@@ -15,8 +15,8 @@ export interface PastorAreaItem {
   updated_at: string;
 }
 
-const fetchPastorItems = async (churchId: string | null, _userId?: string | null): Promise<PastorAreaItem[]> => {
-  if (!churchId) return [];
+const fetchPastorItems = async (churchId: string | null, userId?: string | null): Promise<PastorAreaItem[]> => {
+  if (!churchId || !userId) return [];
 
   try {
     const { data, error } = await supabase
@@ -34,6 +34,7 @@ const fetchPastorItems = async (churchId: string | null, _userId?: string | null
         updated_at
       `)
       .eq('id_igreja', churchId)
+      .eq('pastor_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) {
