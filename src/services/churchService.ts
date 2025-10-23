@@ -9,11 +9,11 @@ import { useAuthStore } from '@/stores/authStore';
  * @returns O nome da igreja ou um nome padrão 'Sua Igreja' em caso de falha.
  */
 export const getChurchName = async (churchId: string): Promise<string> => {
-  const { churchName: storedChurchName, currentChurchId: storedChurchId } = useAuthStore.getState();
+  const { user, currentChurchId } = useAuthStore.getState();
 
   // Retorna o nome do store se já estiver lá e for da igreja correta
-  if (storedChurchName && storedChurchId === churchId) {
-    return storedChurchName;
+  if (user?.churchName && currentChurchId === churchId) {
+    return user.churchName;
   }
 
   try {
@@ -27,8 +27,8 @@ export const getChurchName = async (churchId: string): Promise<string> => {
     const fetchedChurchName = churchResult.nome;
     
     // Atualiza o store para usos futuros se o nome for encontrado
-    if (fetchedChurchName) {
-        useAuthStore.getState().setCurrentChurch(churchId, fetchedChurchName);
+    if (fetchedChurchName && churchId === currentChurchId) {
+        useAuthStore.getState().setChurchName(fetchedChurchName);
     }
 
     return fetchedChurchName || 'Sua Igreja';

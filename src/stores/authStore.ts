@@ -56,6 +56,7 @@ interface AuthState {
   setCurrentChurchId: (churchId: string | null) => void
   initializeAuthListener: () => void
   updateUserProfile: (personalInfo: Partial<PersonalInfo>) => void
+  setChurchName: (churchName: string) => void
 }
 
 // Controle para evitar chamadas duplicadas
@@ -269,6 +270,20 @@ export const useAuthStore = create<AuthState>()(
           }
           return state
         })
+      },
+
+      setChurchName: (churchName: string) => {
+        set((state) => {
+          if (state.user) {
+            return {
+              user: {
+                ...state.user,
+                churchName: churchName,
+              },
+            };
+          }
+          return state;
+        });
       },
     }),
     {

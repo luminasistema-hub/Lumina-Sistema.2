@@ -34,8 +34,9 @@ export const sendEmailNotification = async (payload: EmailPayload): Promise<bool
     return true;
   } catch (err: any) {
     console.error('Erro ao invocar a Edge Function de e-mail:', err);
-    toast.error(`Falha ao enviar e-mail para ${to}.`);
-    throw err;
+    // Não notifica o usuário na UI, apenas loga o erro.
+    // Retorna false para indicar falha, mas não lança exceção.
+    return false;
   }
 };
 
