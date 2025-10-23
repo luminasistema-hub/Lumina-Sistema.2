@@ -1,7 +1,7 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase } from '../integrations/supabase/client'
 import { useAuthStore } from '../stores/authStore'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/sonner'
 import { useEffect } from 'react'
 
 export interface School {
