@@ -21,31 +21,76 @@ interface Template {
 const TEMPLATE_CONFIG: Record<string, Omit<Template, 'titulo'|'descricao'|'link'>> = {
   'ANIVERSARIO': {
     tipo: 'Aniversário de Membro',
-    placeholders: [],
+    placeholders: ['{{nome_membro}}'],
   },
   'ANIVERSARIO_CASAMENTO': {
     tipo: 'Aniversário de Casamento',
-    placeholders: [],
+    placeholders: ['{{nome_casal}}'],
   },
   'NOVA_ESCALA': {
     tipo: 'Nova Escala de Serviço',
     placeholders: ['{{nome_evento}}', '{{data_evento}}'],
   },
+  'ACCESS_GRANTED': {
+    tipo: 'Aprovação de Novo Membro',
+    placeholders: ['{{nome_membro}}'],
+  },
+  'KIDS_CHECKIN': {
+    tipo: 'Check-in no Ministério Infantil',
+    placeholders: ['{{nome_crianca}}', '{{codigo_seguranca}}'],
+  },
+  'KIDS_CHECKOUT': {
+    tipo: 'Check-out no Ministério Infantil',
+    placeholders: ['{{nome_crianca}}'],
+  },
+  'NOVO_EVENTO': {
+    tipo: 'Notificação de Novo Evento',
+    placeholders: ['{{nome_evento}}', '{{data_evento}}'],
+  },
+  'NEW_DEVOTIONAL': {
+    tipo: 'Publicação de Novo Devocional',
+    placeholders: ['{{titulo_devocional}}'],
+  },
 };
 
 const DEFAULT_TEMPLATES: Record<string, Omit<Template, 'tipo'>> = {
     'ANIVERSARIO': {
-        titulo: 'Feliz Aniversário! 🎉',
+        titulo: 'Feliz Aniversário, {{nome_membro}}! 🎉',
         descricao: 'Hoje é um dia especial! Desejamos a você um feliz aniversário, que Deus te abençoe grandemente.',
     },
     'ANIVERSARIO_CASAMENTO': {
         titulo: 'Feliz Aniversário de Casamento! 💑',
-        descricao: 'Parabéns por mais um ano de união! Que Deus continue abençoando o casamento de vocês.',
+        descricao: 'Parabéns por mais um ano de união, {{nome_casal}}! Que Deus continue abençoando o casamento de vocês.',
     },
     'NOVA_ESCALA': {
         titulo: 'Você foi escalado para um evento!',
         descricao: 'Você foi adicionado à equipe de serviço do evento "{{nome_evento}}", que acontecerá em {{data_evento}}.',
         link: '/dashboard?module=my-ministry',
+    },
+    'ACCESS_GRANTED': {
+        titulo: 'Bem-vindo(a) à nossa igreja!',
+        descricao: 'Olá, {{nome_membro}}! Seu acesso à nossa plataforma foi liberado. Explore os recursos e conecte-se com a comunidade.',
+        link: '/dashboard',
+    },
+    'KIDS_CHECKIN': {
+        titulo: 'Check-in realizado!',
+        descricao: '{{nome_crianca}} foi recebido(a) no ministério infantil. O código de segurança para retirada é: {{codigo_seguranca}}.',
+        link: '/dashboard?module=kids-management',
+    },
+    'KIDS_CHECKOUT': {
+        titulo: 'Check-out realizado!',
+        descricao: '{{nome_crianca}} foi retirado(a) com segurança do ministério infantil.',
+        link: '/dashboard?module=kids-management',
+    },
+    'NOVO_EVENTO': {
+        titulo: 'Temos um novo evento!',
+        descricao: 'Não perca! O evento "{{nome_evento}}" acontecerá em {{data_evento}}. Participe conosco!',
+        link: '/dashboard?module=events',
+    },
+    'NEW_DEVOTIONAL': {
+        titulo: 'Novo Devocional Disponível',
+        descricao: 'Um novo devocional, "{{titulo_devocional}}", foi publicado para sua leitura e meditação. Acesse agora!',
+        link: '/dashboard?module=devotionals',
     },
 }
 
@@ -132,7 +177,7 @@ const TemplateEditor = ({ templateKey }: { templateKey: string }) => {
             rows={4}
           />
         </div>
-        {templateKey === 'NOVA_ESCALA' && (
+        {DEFAULT_TEMPLATES[templateKey]?.link !== undefined && (
             <div className="space-y-2">
                 <Label>Link (Opcional)</Label>
                 <Input
