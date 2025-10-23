@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useChurchStore } from '@/stores/churchStore';
 import { useChildChurches } from '@/hooks/useChildChurches';
+import { useSaveTrilha } from '@/hooks/useJourneyAdminData';
 
 interface Trilha {
   id: string;
@@ -28,9 +29,9 @@ interface CreateTrilhaDialogProps {
 const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated, trilhaParaEditar }: CreateTrilhaDialogProps) => {
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
-  const [loading, setLoading] = useState(false);
   const { parentInfo } = useChildChurches();
   const [shareWithChildren, setShareWithChildren] = useState(true);
+  const { mutate: saveTrilha, isPending: loading } = useSaveTrilha();
 
   useEffect(() => {
     if (isOpen) {
@@ -51,48 +52,20 @@ const CreateTrilhaDialog = ({ isOpen, onOpenChange, currentChurchId, onCreated, 
       toast.error('Informe um título para a trilha.');
       return;
     }
-    setLoading(true);
-    try {
-      if (trilhaParaEditar) {
-        // Edita a trilha existente
-        const { error } = await supabase
-          .from('trilhas_crescimento')
-          .update({
-            titulo: titulo.trim(),
-            descricao: descricao.trim(),
-            compartilhar_com_filhas: shareWithChildren,
-          })
-          .eq('id', trilhaParaEditar.id);
-        if (error) throw error;
-        toast.success('Trilha atualizada com sucesso!');
-      } else {
-        // Cria uma nova trilha e desativa a anterior
-        await supabase
-          .from('trilhas_crescimento')
-          .update({ is_ativa: false })
-          .eq('id_igreja', currentChurchId)
-          .eq('is_ativa', true);
+    
+    const trilhaData = {
+      id: trilhaParaEditar?.id,
+      titulo: titulo.trim(),
+      descricao: descricao.trim(),
+      compartilhar_com_filhas: shareWithChildren,
+    };
 
-        const { error } = await supabase
-          .from('trilhas_crescimento')
-          .insert({
-            id_igreja: currentChurchId,
-            titulo: titulo.trim(),
-            descricao: descricao.trim(),
-            is_ativa: true,
-            compartilhar_com_filhas: shareWithChildren,
-          });
-        if (error) throw error;
-        toast.success('Trilha criada com sucesso!');
+    saveTrilha({ trilha: trilhaData, currentChurchId }, {
+      onSuccess: () => {
+        onOpenChange(false);
+        onCreated(); // Mantido para garantir que a lista principal seja atualizada
       }
-      onOpenChange(false);
-      onCreated();
-    } catch (err: any) {
-      console.error('Erro ao salvar trilha:', err);
-      toast.error('Não foi possível salvar a trilha. Verifique suas permissões.');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   return (

@@ -15,9 +15,19 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { SortableEtapaItem } from './SortableEtapaItem';
 import { SortablePassoItem } from './SortablePassoItem';
 import CreateTrilhaDialog from './CreateTrilhaDialog';
-import MembersManagementCard from './MembersManagementCard';
 import { useSchools, School } from '../../hooks/useSchools';
 import { useChildChurches } from '@/hooks/useChildChurches';
+import { 
+  useJourneyAdminData, 
+  useSaveEtapa, 
+  useDeleteEtapa, 
+  useSavePasso, 
+  useDeletePasso, 
+  useUpdateOrder,
+  EtapaTrilha,
+  PassoEtapa,
+  QuizPergunta,
+} from '@/hooks/useJourneyAdminData';
 
 interface QuizPergunta {
   id?: string;
@@ -54,11 +64,11 @@ interface EtapaTrilha {
 }
 
 const ConfiguracaoJornada = () => {
-  const [etapasAninhadas, setEtapasAninhadas] = useState<EtapaTrilha[]>([]);
-  const [loading, setLoading] = useState(true);
   const { currentChurchId } = useAuthStore();
+  const { data: trilhaAtual, isLoading: loading, refetch: carregarJornadaCompleta } = useJourneyAdminData(currentChurchId);
+  const etapasAninhadas = trilhaAtual?.etapas_trilha || [];
+
   const [etapaAberta, setEtapaAberta] = useState<string | null>(null);
-  const [trilhaAtual, setTrilhaAtual] = useState<{ id: string; titulo: string; descricao: string; compartilhar_com_filhas: boolean } | null>(null);
 
   const { data: schoolsData } = useSchools();
   const availableSchools = schoolsData || [];
@@ -86,6 +96,12 @@ const ConfiguracaoJornada = () => {
 
   const [isCreateTrilhaOpen, setIsCreateTrilhaOpen] = useState(false);
 
+  const { mutate: saveEtapa, isPending: isSavingEtapa } = useSaveEtapa();
+  const { mutate: deleteEtapa, isPending: isDeletingEtapa } = useDeleteEtapa();
+  const { mutate: savePasso, isPending: isSavingPasso } = useSavePasso();
+  const { mutate: deletePasso, isPending: isDeletingPasso } = useDeletePasso();
+  const { mutate: updateOrder, isPending: isUpdatingOrder } = useUpdateOrder();
+
   const coresDisponiveis = [
     { value: '#e0f2fe', name: 'Azul Claro' },
     { value: '#dcfce7', name: 'Verde Claro' },
@@ -109,67 +125,6 @@ const ConfiguracaoJornada = () => {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-
-  const carregarJornadaCompleta = async () => {
-    if (!currentChurchId) {
-      setLoading(false);
-      setEtapasAninhadas([]);
-      setTrilhaAtual(null);
-      return;
-    }
-    setLoading(true);
-    try {
-      const { data: trilhaData, error } = await supabase
-        .from('trilhas_crescimento')
-        .select(`
-          id, titulo, descricao, compartilhar_com_filhas,
-          etapas_trilha (
-            *,
-            passos_etapa (
-              *,
-              quiz_perguntas (*)
-            )
-          )
-        `)
-        .eq('id_igreja', currentChurchId)
-        .eq('is_ativa', true)
-        .maybeSingle();
-      
-      if (error) throw error;
-
-      if (trilhaData && trilhaData.etapas_trilha) {
-        setTrilhaAtual({ id: trilhaData.id, titulo: trilhaData.titulo, descricao: trilhaData.descricao, compartilhar_com_filhas: trilhaData.compartilhar_com_filhas });
-        const etapasOrdenadas = (trilhaData.etapas_trilha as any[]).map(etapa => {
-          const passosOrdenados = etapa.passos_etapa 
-            ? [...etapa.passos_etapa].sort((a, b) => a.ordem - b.ordem)
-            : [];
-          
-          const passosComQuizCorreto = passosOrdenados.map(passo => ({
-            ...passo,
-            quiz_perguntas: passo.quiz_perguntas ? [...passo.quiz_perguntas].sort((a,b) => a.ordem - b.ordem) : []
-          }));
-          
-          return { ...etapa, passos: passosComQuizCorreto };
-        }).sort((a, b) => a.ordem - b.ordem);
-
-        setEtapasAninhadas(etapasOrdenadas);
-      } else {
-        setEtapasAninhadas([]);
-        setTrilhaAtual(null);
-      }
-    } catch (error: any) {
-      console.error("Erro ao carregar a jornada completa:", error);
-      toast.error("Erro ao carregar a jornada. Tente novamente.");
-      setEtapasAninhadas([]);
-      setTrilhaAtual(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    carregarJornadaCompleta();
-  }, [currentChurchId]);
 
   const handleOpenCreateEtapaModal = () => {
     setEtapaParaEditar(null);
@@ -201,73 +156,27 @@ const ConfiguracaoJornada = () => {
       return;
     }
 
-    setLoading(true);
-    try {
-      if (!trilhaAtual) {
-        toast.error('Nenhuma trilha ativa. Crie a trilha antes de adicionar etapas.');
-        setLoading(false);
-        setIsCreateTrilhaOpen(true);
-        return;
-      }
-
-      if (etapaParaEditar) {
-        const { error } = await supabase
-          .from('etapas_trilha')
-          .update({
-            titulo: formEtapaData.titulo,
-            descricao: formEtapaData.descricao,
-            cor: formEtapaData.cor,
-          })
-          .eq('id', etapaParaEditar.id);
-
-        if (error) throw error;
-        toast.success('Etapa atualizada com sucesso!');
-      } else {
-        const novaOrdem = etapasAninhadas.length > 0 ? Math.max(...etapasAninhadas.map(e => e.ordem)) + 1 : 1;
-        const { error } = await supabase
-          .from('etapas_trilha')
-          .insert({
-            id_trilha: trilhaAtual.id,
-            ordem: novaOrdem,
-            titulo: formEtapaData.titulo,
-            descricao: formEtapaData.descricao,
-            cor: formEtapaData.cor,
-            id_igreja: currentChurchId,
-          });
-
-        if (error) throw error;
-        toast.success('Nova etapa criada com sucesso!');
-      }
-      setIsEtapaModalOpen(false);
-      carregarJornadaCompleta();
-    } catch (error: any) {
-      console.error("Erro ao salvar etapa:", error);
-      toast.error('Erro ao salvar etapa: ' + error.message);
-    } finally {
-      setLoading(false);
+    if (!trilhaAtual) {
+      toast.error('Nenhuma trilha ativa. Crie a trilha antes de adicionar etapas.');
+      setIsCreateTrilhaOpen(true);
+      return;
     }
+
+    saveEtapa({
+      etapa: { ...formEtapaData, id: etapaParaEditar?.id },
+      churchId: currentChurchId,
+      trilhaId: trilhaAtual.id,
+      totalEtapas: etapasAninhadas.length,
+    }, {
+      onSuccess: () => setIsEtapaModalOpen(false)
+    });
   };
 
   const handleDeleteEtapa = async (etapaId: string) => {
     if (!confirm('Tem certeza que deseja apagar esta etapa e todos os seus passos? Esta ação é irreversível.')) {
       return;
     }
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('etapas_trilha')
-        .delete()
-        .eq('id', etapaId);
-
-      if (error) throw error;
-      toast.success('Etapa e seus passos apagados com sucesso!');
-      carregarJornadaCompleta();
-    } catch (error: any) {
-      console.error("Erro ao apagar etapa:", error);
-      toast.error('Erro ao apagar etapa: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    deleteEtapa(etapaId);
   };
 
   const handleOpenCreatePassoModal = (etapa: EtapaTrilha) => {
@@ -301,7 +210,7 @@ const ConfiguracaoJornada = () => {
   };
 
   const handleSavePasso = async () => {
-    if (!etapaAtualParaPasso) {
+    if (!etapaAtualParaPasso || !currentChurchId) {
       toast.error('Nenhuma etapa selecionada para adicionar o passo.');
       return;
     }
@@ -338,106 +247,21 @@ const ConfiguracaoJornada = () => {
       passoDataToSave.quiz_perguntas = cleanedPerguntas;
     }
 
-    setLoading(true);
-    try {
-      let passoId: string;
-      if (passoDataToSave.id) {
-        // Atualizar passo existente
-        const { data, error } = await supabase
-          .from('passos_etapa')
-          .update({
-            titulo: passoDataToSave.titulo,
-            tipo_passo: passoDataToSave.tipo_passo,
-            conteudo: passoDataToSave.conteudo,
-            nota_de_corte_quiz: passoDataToSave.tipo_passo === 'quiz' ? passoDataToSave.nota_de_corte_quiz : null,
-            escola_pre_requisito_id: passoDataToSave.escola_pre_requisito_id,
-          })
-          .eq('id', passoDataToSave.id)
-          .select('id')
-          .maybeSingle();
-        if (error) throw error;
-        passoId = data!.id;
-        toast.success('Passo atualizado com sucesso!');
-      } else {
-        // Criar novo passo
-        const novaOrdem = etapaAtualParaPasso.passos.length > 0 ? Math.max(...etapaAtualParaPasso.passos.map(p => p.ordem)) + 1 : 1;
-        const { data, error } = await supabase
-          .from('passos_etapa')
-          .insert({
-            id_etapa: etapaAtualParaPasso.id,
-            ordem: novaOrdem,
-            titulo: passoDataToSave.titulo,
-            tipo_passo: passoDataToSave.tipo_passo,
-            conteudo: passoDataToSave.conteudo,
-            id_igreja: currentChurchId,
-            nota_de_corte_quiz: passoDataToSave.tipo_passo === 'quiz' ? passoDataToSave.nota_de_corte_quiz : null,
-            escola_pre_requisito_id: passoDataToSave.escola_pre_requisito_id,
-          })
-          .select('id')
-          .maybeSingle();
-        if (error) throw error;
-        passoId = data!.id;
-        toast.success('Novo passo criado com sucesso!');
-      }
-
-      // Lógica para salvar perguntas do quiz
-      if (passoDataToSave.tipo_passo === 'quiz' && passoDataToSave.quiz_perguntas) {
-        const { error: deleteError } = await supabase
-          .from('quiz_perguntas')
-          .delete()
-          .eq('passo_id', passoId)
-          .eq('id_igreja', currentChurchId);
-        if (deleteError) throw deleteError;
-
-        const perguntasToInsert = passoDataToSave.quiz_perguntas.map((q, index) => ({
-          passo_id: passoId,
-          ordem: index + 1,
-          pergunta_texto: q.pergunta_texto,
-          opcoes: q.opcoes,
-          resposta_correta: q.resposta_correta,
-          pontuacao: q.pontuacao || 1,
-          id_igreja: currentChurchId,
-        }));
-
-        if (perguntasToInsert.length > 0) {
-            const { error: insertQuizError } = await supabase
-                .from('quiz_perguntas')
-                .insert(perguntasToInsert);
-            if (insertQuizError) throw insertQuizError;
-            toast.success('Perguntas do quiz salvas!');
-        }
-      }
-      
-      setIsPassoModalOpen(false);
-      carregarJornadaCompleta();
-    } catch (error: any) {
-      console.error("Erro ao salvar passo:", error);
-      toast.error('Erro ao salvar passo: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    savePasso({
+      passo: passoDataToSave,
+      churchId: currentChurchId,
+      etapaId: etapaAtualParaPasso.id,
+      totalPassos: etapaAtualParaPasso.passos.length,
+    }, {
+      onSuccess: () => setIsPassoModalOpen(false)
+    });
   };
 
   const handleDeletePasso = async (passoId: string) => {
     if (!confirm('Tem certeza que deseja apagar este passo? Esta ação é irreversível.')) {
       return;
     }
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('passos_etapa')
-        .delete()
-        .eq('id', passoId);
-
-      if (error) throw error;
-      toast.success('Passo apagado com sucesso!');
-      carregarJornadaCompleta();
-    } catch (error: any) {
-      console.error("Erro ao apagar passo:", error);
-      toast.error('Erro ao apagar passo: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+    deletePasso(passoId);
   };
 
   const handleDragEnd = async (event: any) => {
@@ -453,22 +277,9 @@ const ConfiguracaoJornada = () => {
         const newEtapas = Array.from(etapasAninhadas);
         const [movedEtapa] = newEtapas.splice(oldIndex, 1);
         newEtapas.splice(newIndex, 0, movedEtapa);
-        setEtapasAninhadas(newEtapas);
-
-        setLoading(true);
-        try {
-          const updates = newEtapas.map((etapa, index) => ({ id: etapa.id, ordem: index + 1 }));
-          const { error } = await supabase.from('etapas_trilha').upsert(updates);
-          if (error) throw error;
-          toast.success('Ordem das etapas atualizada!');
-          await carregarJornadaCompleta();
-        } catch (error: any) {
-          console.error("Erro ao atualizar ordem das etapas:", error);
-          toast.error('Erro ao salvar a nova ordem das etapas: ' + error.message);
-          carregarJornadaCompleta(); // Reverter em caso de erro
-        } finally {
-          setLoading(false);
-        }
+        
+        const updates = newEtapas.map((etapa, index) => ({ id: etapa.id, ordem: index + 1 }));
+        updateOrder({ items: updates, tableName: 'etapas_trilha' });
       }
     } else {
       const etapaId = etapasAninhadas.find(etapa => etapa.passos.some(passo => passo.id === active.id))?.id;
@@ -480,27 +291,12 @@ const ConfiguracaoJornada = () => {
       const newIndex = etapasAninhadas[etapaIndex].passos.findIndex(passo => passo.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1) {
-        const newEtapasAninhadas = [...etapasAninhadas];
-        const newPassos = [...newEtapasAninhadas[etapaIndex].passos];
+        const newPassos = [...etapasAninhadas[etapaIndex].passos];
         const [movedPasso] = newPassos.splice(oldIndex, 1);
         newPassos.splice(newIndex, 0, movedPasso);
-        newEtapasAninhadas[etapaIndex] = { ...newEtapasAninhadas[etapaIndex], passos: newPassos };
-        setEtapasAninhadas(newEtapasAninhadas);
 
-        setLoading(true);
-        try {
-          const updates = newPassos.map((passo, index) => ({ id: passo.id, ordem: index + 1 }));
-          const { error } = await supabase.from('passos_etapa').upsert(updates);
-          if (error) throw error;
-          toast.success('Ordem dos passos atualizada!');
-          await carregarJornadaCompleta();
-        } catch (error: any) {
-          console.error("Erro ao atualizar ordem dos passos:", error);
-          toast.error('Erro ao salvar a nova ordem dos passos: ' + error.message);
-          carregarJornadaCompleta(); // Reverter em caso de erro
-        } finally {
-          setLoading(false);
-        }
+        const updates = newPassos.map((passo, index) => ({ id: passo.id, ordem: index + 1 }));
+        updateOrder({ items: updates, tableName: 'passos_etapa' });
       }
     }
   };
@@ -729,7 +525,7 @@ const ConfiguracaoJornada = () => {
         isOpen={isCreateTrilhaOpen}
         onOpenChange={setIsCreateTrilhaOpen}
         currentChurchId={currentChurchId!}
-        onCreated={carregarJornadaCompleta}
+        onCreated={() => carregarJornadaCompleta()}
         trilhaParaEditar={trilhaAtual}
       />
 
@@ -807,8 +603,8 @@ const ConfiguracaoJornada = () => {
             <Button variant="outline" onClick={() => setIsEtapaModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveEtapa} disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (etapaParaEditar ? 'Salvar Alterações' : 'Criar Etapa')}
+            <Button onClick={handleSaveEtapa} disabled={isSavingEtapa}>
+              {isSavingEtapa ? <Loader2 className="w-4 h-4 animate-spin" /> : (etapaParaEditar ? 'Salvar Alterações' : 'Criar Etapa')}
             </Button>
           </div>
         </DialogContent>
@@ -985,8 +781,8 @@ const ConfiguracaoJornada = () => {
             <Button variant="outline" onClick={() => setIsPassoModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSavePasso} disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (formPassoData.id ? 'Salvar Alterações' : 'Criar Passo')}
+            <Button onClick={handleSavePasso} disabled={isSavingPasso}>
+              {isSavingPasso ? <Loader2 className="w-4 h-4 animate-spin" /> : (formPassoData.id ? 'Salvar Alterações' : 'Criar Passo')}
             </Button>
           </div>
         </DialogContent>
