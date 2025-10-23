@@ -111,12 +111,29 @@ const NotificationManager = () => {
           return;
         }
 
-        const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
+        let churchName = useAuthStore.getState().churchName;
+        if (!churchName && currentChurchId) {
+          try {
+            const { data: churchResult, error: functionError } = await supabase.functions.invoke('get-church-public', {
+              body: { churchId: currentChurchId },
+            });
+
+            if (functionError) throw functionError;
+            if (churchResult.error) throw new Error(churchResult.error);
+            
+            churchName = churchResult.nome;
+            useAuthStore.getState().setCurrentChurch(currentChurchId, churchName);
+          } catch (e) {
+            console.error("Falha ao buscar nome da igreja, usando fallback:", e);
+          }
+        }
+        const finalChurchName = churchName || 'Sua Igreja';
+
         const emailHtmlContent = createStandardEmailHtml({
           title,
           description,
           link,
-          churchName,
+          churchName: finalChurchName,
           notificationType: 'Comunicado da Igreja',
         });
 
@@ -125,7 +142,7 @@ const NotificationManager = () => {
           .map((member) =>
             sendEmailNotification({
               to: member.email,
-              subject: `[${churchName}] ${title}`,
+              subject: `[${finalChurchName}] ${title}`,
               htmlContent: emailHtmlContent,
             })
           );
