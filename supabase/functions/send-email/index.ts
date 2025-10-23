@@ -37,8 +37,10 @@ serve(async (req) => {
 
     if (error) {
       console.error('Resend API Error:', error)
-      return new Response(JSON.stringify(error), {
-        status: 500,
+      // Mesmo com erro, retornamos 200 para não quebrar o fluxo no cliente.
+      // O erro é logado no servidor para depuração.
+      return new Response(JSON.stringify({ message: 'Email processed, but failed to send.', error: error }), {
+        status: 200, // Retorna sucesso para o cliente
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
