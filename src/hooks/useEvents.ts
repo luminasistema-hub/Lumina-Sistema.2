@@ -26,7 +26,7 @@ export interface Event {
 const fetchEvents = async (churchId: string | null, userId: string | null): Promise<Event[]> => {
   if (!churchId || !userId) return [];
 
-  // 1. Pega os eventos da igreja atual e os compartilhados pela mãe (via RPC)
+  // A função RPC agora faz todo o trabalho pesado de buscar todos os eventos visíveis.
   const { data: rpcData, error: rpcError } = await supabase.rpc('get_eventos_para_igreja_com_participacao', {
     id_igreja_atual: churchId,
   });
@@ -36,19 +36,8 @@ const fetchEvents = async (churchId: string | null, userId: string | null): Prom
     return [];
   }
 
-  // 2. Pega todos os eventos públicos, que não são da igreja atual (para não duplicar)
-  const { data: publicData, error: publicError } = await supabase
-    .from('eventos')
-    .select('*, participantes:evento_participantes(count), inscricoes:evento_participantes!inner(membro_id)')
-    .eq('visibilidade', 'publica')
-    .neq('id_igreja', churchId);
-
-  if (publicError) {
-    toast.warning(`Falha ao carregar eventos públicos: ${publicError.message}`);
-  }
-
-  // Mapeia os resultados do RPC
-  const rpcEvents: Event[] = (rpcData || []).map((e: any) => ({
+  // Mapeia os resultados do RPC para o formato esperado pela interface
+  const events: Event[] = (rpcData || []).map((e: any) => ({
     id: e.evento_id,
     id_igreja: e.id_igreja,
     nome: e.nome,
@@ -67,36 +56,9 @@ const fetchEvents = async (churchId: string | null, userId: string | null): Prom
     visibilidade: e.visibilidade ?? 'privada',
   }));
 
-  // Mapeia os eventos públicos
-  const publicEvents: Event[] = (publicData || []).map((e: any) => ({
-    id: e.id,
-    id_igreja: e.id_igreja,
-    nome: e.nome,
-    data_hora: e.data_hora,
-    local: e.local ?? '',
-    descricao: e.descricao ?? '',
-    tipo: (e.tipo || 'Outro') as Event['tipo'],
-    capacidade_maxima: e.capacidade_maxima ?? undefined,
-    inscricoes_abertas: Boolean(e.inscricoes_abertas),
-    valor_inscricao: e.valor_inscricao != null ? Number(e.valor_inscricao) : undefined,
-    status: (e.status || 'Planejado') as Event['status'],
-    participantes_count: e.participantes[0]?.count || 0,
-    is_registered: e.inscricoes.some((i: any) => i.membro_id === userId),
-    link_externo: e.link_externo ?? undefined,
-    compartilhar_com_filhas: e.compartilhar_com_filhas,
-    visibilidade: e.visibilidade ?? 'privada',
-  }));
+  events.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
 
-  // Combina e remove duplicados
-  const allEvents = new Map<string, Event>();
-  [...rpcEvents, ...publicEvents].forEach(event => {
-    allEvents.set(event.id, event);
-  });
-
-  const combinedList = Array.from(allEvents.values());
-  combinedList.sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
-
-  return combinedList;
+  return events;
 };
 
 export const useEvents = () => {
