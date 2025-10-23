@@ -167,25 +167,57 @@ const OfferingsPage = () => {
     }
   }
 
+  const getPeriodRange = () => {
+    const now = new Date();
+    let start = new Date();
+    const end = new Date();
+    end.setHours(23, 59, 59, 999); // Fim do dia de hoje
+
+    switch (selectedPeriod) {
+      case 'month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'quarter':
+        const quarter = Math.floor(now.getMonth() / 3);
+        start = new Date(now.getFullYear(), quarter * 3, 1);
+        break;
+      case 'year':
+        start = new Date(now.getFullYear(), 0, 1);
+        break;
+      case 'all':
+        return { start: null, end: null };
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    start.setHours(0, 0, 0, 0);
+    return { start, end };
+  };
+
+  const { start, end } = getPeriodRange();
+
   const filteredContributions = contributions.filter(c => {
-    const matchesPeriod = true // Lógica de filtro de período mais complexa, deixada para depois
-    const matchesType = selectedType === 'all' || c.categoria === selectedType
-    return matchesPeriod && matchesType
-  })
+    const [year, month, day] = c.data_transacao.split('-').map(Number);
+    const transactionDate = new Date(year, month - 1, day);
+
+    const matchesPeriod = !start || (transactionDate >= start && transactionDate <= end);
+    const matchesType = selectedType === 'all' || c.categoria === selectedType;
+    return matchesPeriod && matchesType;
+  });
 
   const totalContributionsValue = filteredContributions
     .filter(c => c.status === 'Confirmado')
-    .reduce((sum, c) => sum + c.valor, 0)
+    .reduce((sum, c) => sum + c.valor, 0);
 
-  const monthlyContributionsValue = filteredContributions
+  const monthlyContributionsValue = contributions
     .filter(c => {
-      const date = new Date(c.data_transacao)
-      const now = new Date()
-      return date.getMonth() === now.getMonth() && 
-             date.getFullYear() === now.getFullYear() &&
-             c.status === 'Confirmado'
+      const [year, month, day] = c.data_transacao.split('-').map(Number);
+      const transactionDate = new Date(year, month - 1, day);
+      const now = new Date();
+      return transactionDate.getMonth() === now.getMonth() &&
+             transactionDate.getFullYear() === now.getFullYear() &&
+             c.status === 'Confirmado';
     })
-    .reduce((sum, c) => sum + c.valor, 0)
+    .reduce((sum, c) => sum + c.valor, 0);
 
   const openOfferingsReport = () => {
     const { startStr, endStr, start, end } = getPeriodRange()
