@@ -49,7 +49,8 @@ import { Progress } from '../ui/progress'
 import { trackEvent } from '../../lib/analytics';
 import copy from 'copy-to-clipboard';
 import { useMembers, MemberProfile } from '@/hooks/useMembers';
-import { useQueryClient, useMutation } from '@tanstack/react-query'
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import MemberDetailsDialog from '../management/MemberDetailsDialog';
 
 type Member = MemberProfile;
 
