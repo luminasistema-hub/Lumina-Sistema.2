@@ -31,6 +31,7 @@ import PersonalStatusCards from './PersonalStatusCards';
 import { Badge } from '../ui/badge'
 import { useUserEnrollments, SchoolEnrollment } from '../../hooks/useSchools';
 import { usePersonalInfo } from '../../hooks/usePersonalInfo'
+import { useKidsData, Kid, CheckinRecord } from '../../hooks/useKidsData'
 
 // Interfaces para tipagem dos dados
 interface PersonalInfoData {
@@ -45,20 +46,8 @@ interface PersonalInfoData {
 interface VocationalTestResult {
   id: string; data_teste: string; ministerio_recomendado: string; is_ultimo: boolean;
 }
-interface Kid {
-  id: string; nome_crianca: string; data_nascimento: string; idade: number;
-  alergias?: string; medicamentos?: string; informacoes_especiais?: string;
-}
 interface MemberOption {
   id: string; nome_completo: string; email: string;
-}
-interface CheckinRecord {
-  id: string;
-  data_checkin: string;
-  data_checkout?: string;
-  criancas: { nome_crianca: string };
-  responsavel_checkin: { nome_completo: string } | null;
-  responsavel_checkout: { nome_completo: string } | null;
 }
 interface MinistryVolunteer {
   ministerios: { id: string; nome: string; } | null;
@@ -78,8 +67,6 @@ const PersonalInfo = () => {
     experienciaAnterior: '', dataConversao: '', diasDisponiveis: [],
     horariosDisponiveis: ''
   })
-  const [userKids, setUserKids] = useState<Kid[]>([]);
-  const [checkinHistory, setCheckinHistory] = useState<CheckinRecord[]>([]);
   const [isAddKidDialogOpen, setIsAddKidDialogOpen] = useState(false);
   const { data: myEnrollments } = useUserEnrollments();
 
@@ -92,10 +79,19 @@ const PersonalInfo = () => {
   } = usePersonalInfo();
 
   const { 
+    data: kidsAndCheckinData, 
+    isLoading: isLoadingKids, 
+    refetch: refetchKidsData 
+  } = useKidsData();
+
+  const { 
     myMinistries = [], 
     latestVocationalTest = null, 
     memberOptions = [] 
   } = personalData || {};
+
+  const userKids: Kid[] = kidsAndCheckinData?.kids.filter(k => k.responsavel_id === user?.id || k.responsavel_id === personalData?.personalInfo?.conjuge_id) || [];
+  const checkinHistory: CheckinRecord[] = kidsAndCheckinData?.checkinRecords || [];
 
   useEffect(() => {
     if (personalData) {
@@ -126,67 +122,6 @@ const PersonalInfo = () => {
       }
     }
   }, [personalData, user]);
-
-  const loadKids = useCallback(async () => {
-    if (!user || !currentChurchId) return;
-
-    const responsibleIds = [user.id];
-    if (formData.conjugeId) {
-      responsibleIds.push(formData.conjugeId);
-    }
-
-    const { data: kidsData, error: kidsError } = await supabase
-      .from('criancas')
-      .select('id, nome_crianca, data_nascimento')
-      .eq('id_igreja', currentChurchId)
-      .in('responsavel_id', responsibleIds)
-      .order('nome_crianca');
-
-    if (kidsError) {
-      toast.error('Erro ao carregar os filhos.');
-      return;
-    }
-
-    const formattedKids: Kid[] = (kidsData || []).map(k => ({
-      ...k,
-      idade: Math.floor((new Date().getTime() - new Date(k.data_nascimento).getTime()) / 31557600000)
-    }));
-    setUserKids(formattedKids);
-  }, [user, currentChurchId, formData.conjugeId]);
-
-  useEffect(() => {
-    loadKids();
-  }, [loadKids]);
-
-  const loadCheckinHistory = useCallback(async () => {
-    if (userKids.length === 0) {
-      setCheckinHistory([]);
-      return;
-    }
-    const kidIds = userKids.map(k => k.id);
-    const { data, error } = await supabase
-      .from('kids_checkin')
-      .select(`
-        id, data_checkin, data_checkout,
-        criancas ( nome_crianca ),
-        responsavel_checkin:membros!kids_checkin_responsavel_checkin_id_fkey( nome_completo ),
-        responsavel_checkout:membros!kids_checkin_responsavel_checkout_id_fkey( nome_completo )
-      `)
-      .in('crianca_id', kidIds)
-      .order('data_checkin', { ascending: false })
-      .limit(5);
-
-    if (error) toast.error('Erro ao carregar histórico de check-in.');
-    else setCheckinHistory(data as CheckinRecord[]);
-  }, [userKids]);
-
-  useEffect(() => {
-    if (userKids.length > 0) {
-      loadCheckinHistory();
-    } else {
-      setCheckinHistory([]);
-    }
-  }, [userKids, loadCheckinHistory]);
 
   useEffect(() => {
     if (isFirstAccess) {
@@ -244,7 +179,7 @@ const PersonalInfo = () => {
       toast.error(`Falha ao remover: ${error.message}`);
       return;
     }
-    await loadKids();
+    await refetchKidsData();
     toast.dismiss(loadingId);
     toast.success('Criança removida!');
   };
@@ -425,7 +360,7 @@ const PersonalInfo = () => {
           </div>
         </form>
         {user && currentChurchId && (
-          <AddKidDialog isOpen={isAddKidDialogOpen} onClose={() => setIsAddKidDialogOpen(false)} responsibleId={user.id} responsibleName={user.name} responsibleEmail={user.email} churchId={currentChurchId} onKidAdded={loadKids} />
+          <AddKidDialog isOpen={isAddKidDialogOpen} onClose={() => setIsAddKidDialogOpen(false)} responsibleId={user.id} responsibleName={user.name} responsibleEmail={user.email} churchId={currentChurchId} onKidAdded={refetchKidsData} />
         )}
       </div>
     )
@@ -439,7 +374,7 @@ const PersonalInfo = () => {
     </div>
   );
 
-  if (isLoadingPersonalInfo) {
+  if (isLoadingPersonalInfo || isLoadingKids) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
