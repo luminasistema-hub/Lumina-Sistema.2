@@ -218,14 +218,10 @@ const KidsPage = () => {
       } else {
         await checkinMutation.mutateAsync(kid);
       }
-      // Fecha o scanner após sucesso
-      setTimeout(() => {
-        setIsScannerOpen(false);
-      }, 1000);
     } catch (error) {
       // O toast de erro já é tratado na mutação
     } finally {
-      // Adiciona um pequeno delay para o usuário ver a mensagem de sucesso
+      // Adiciona um pequeno delay para o usuário ver a mensagem de sucesso e permitir a próxima leitura
       setTimeout(() => {
         setIsScanning(false);
       }, 1000);
