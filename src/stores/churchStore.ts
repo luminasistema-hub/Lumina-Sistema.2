@@ -118,7 +118,7 @@ export const useChurchStore = create<ChurchState>()(
           memberLimit: c.limite_membros,
           currentMembers: c.membros_atuais,
           status: c.status,
-          created_at: c.criado_em,
+          created_at: c.created_at,
           adminUserId: c.admin_user_id,
           updated_at: c.updated_at,
           valor_mensal_assinatura: c.valor_mensal_assinatura || 0,

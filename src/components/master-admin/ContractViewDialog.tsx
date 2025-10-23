@@ -3,26 +3,63 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Church } from '@/stores/churchStore';
 import { ScrollArea } from '../ui/scroll-area';
-import { Printer } from 'lucide-react';
+import { Mail, Printer } from 'lucide-react';
+import { toast } from 'sonner';
+import { sendEmailNotification } from '@/services/notificationService';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 interface ContractViewDialogProps {
   isOpen: boolean;
   onClose: () => void;
   church: Church | null;
+  onUpdateChurch: (churchId: string, updates: Partial<Church>) => Promise<void>;
 }
 
 const ContractViewDialog: React.FC<ContractViewDialogProps> = ({ isOpen, onClose, church }) => {
+  const [isSendingEmail, setIsSendingEmail] = React.useState(false);
   if (!church) return null;
 
   const handlePrint = () => {
-    const printContent = document.getElementById('contract-content');
-    if (printContent) {
-      const originalContents = document.body.innerHTML;
-      document.body.innerHTML = printContent.innerHTML;
-      window.print();
-      document.body.innerHTML = originalContents;
-      window.location.reload(); // Recarrega para restaurar os scripts e o estado
+    window.print();
+  };
+
+  const handleSendEmail = async () => {
+    if (!church.contactEmail) {
+      toast.error('A igreja não possui um e-mail de contato cadastrado.');
+      return;
     }
+
+    setIsSendingEmail(true);
+    const promise = new Promise(async (resolve, reject) => {
+      const contractContent = document.getElementById('contract-content')?.innerHTML;
+      if (!contractContent) {
+        return reject(new Error('Não foi possível encontrar o conteúdo do contrato.'));
+      }
+
+      const success = await sendEmailNotification({
+        to: church.contactEmail!,
+        subject: `Seu Contrato de Serviço com a Lumina - ${church.name}`,
+        htmlContent: contractContent,
+      });
+
+      if (success) {
+        resolve('E-mail enviado com sucesso!');
+      } else {
+        reject(new Error('Falha ao enviar o e-mail.'));
+      }
+    });
+
+    toast.promise(promise, {
+      loading: 'Enviando e-mail...',
+      success: (message) => {
+        setIsSendingEmail(false);
+        return message as string;
+      },
+      error: (err) => {
+        setIsSendingEmail(false);
+        return err.message;
+      },
+    });
   };
 
   const luminaData = {
@@ -36,12 +73,12 @@ const ContractViewDialog: React.FC<ContractViewDialogProps> = ({ isOpen, onClose
   const isPlanoPago = church.valor_mensal_assinatura > 0;
   const dataAceite = church.data_emissao_contrato 
     ? new Date(church.data_emissao_contrato + 'T00:00:00').toLocaleDateString('pt-BR') 
-    : new Date(church.created_at).toLocaleDateString('pt-BR');
+    : church.created_at ? new Date(church.created_at).toLocaleDateString('pt-BR') : 'Data não disponível';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col print-contract-dialog">
+        <DialogHeader className="print:hidden">
           <DialogTitle>Contrato de Serviço - {church.name}</DialogTitle>
           <DialogDescription>
             Contrato gerado em {new Date().toLocaleDateString('pt-BR')} para a igreja {church.name}.
@@ -49,6 +86,22 @@ const ContractViewDialog: React.FC<ContractViewDialogProps> = ({ isOpen, onClose
         </DialogHeader>
         <ScrollArea className="flex-grow pr-6">
           <div id="contract-content" className="prose prose-sm max-w-none">
+            <style>{`
+              @media print {
+                body {
+                  background-color: white;
+                }
+                .prose {
+                  font-size: 10pt !important;
+                }
+                .prose h2 {
+                  font-size: 14pt !important;
+                }
+                .prose h3 {
+                  font-size: 12pt !important;
+                }
+              }
+            `}</style>
             <h2 className="text-center">Contrato de Licenciamento de Uso de Software (SaaS) e Termos de Serviço – Plataforma Lumina</h2>
             
             <p><strong>CONTRATANTE (IGREJA):</strong> {church.name}, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {church.cnpj || 'Não informado'}, com sede em {church.address || 'Endereço não informado'}.</p>
@@ -121,14 +174,58 @@ const ContractViewDialog: React.FC<ContractViewDialogProps> = ({ isOpen, onClose
             <p className="text-center">Araguaína - TO, {dataAceite}.</p>
           </div>
         </ScrollArea>
-        <DialogFooter className="pt-4 border-t">
+        <DialogFooter className="pt-4 border-t print:hidden">
           <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  onClick={handleSendEmail} 
+                  disabled={!church.contactEmail || isSendingEmail}
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  {isSendingEmail ? 'Enviando...' : 'Enviar por E-mail'}
+                </Button>
+              </TooltipTrigger>
+              {!church.contactEmail && (
+                <TooltipContent>
+                  <p>A igreja não possui um e-mail de contato cadastrado.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
           <Button onClick={handlePrint}>
             <Printer className="w-4 h-4 mr-2" />
             Imprimir / Salvar PDF
           </Button>
         </DialogFooter>
       </DialogContent>
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-contract-dialog, .print-contract-dialog * {
+            visibility: visible;
+          }
+          .print-contract-dialog {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: auto;
+            min-height: 100%;
+            border: none;
+            box-shadow: none;
+            border-radius: 0;
+            padding: 2cm; /* Margens de impressão */
+          }
+          .print-contract-dialog .flex-grow {
+            flex-grow: 0 !important;
+            overflow: visible !important;
+          }
+        }
+      `}</style>
     </Dialog>
   );
 };
