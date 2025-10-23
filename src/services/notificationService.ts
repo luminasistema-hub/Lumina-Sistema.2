@@ -18,7 +18,7 @@ export const sendEmailNotification = async (payload: EmailPayload): Promise<bool
   if (!to || !subject || !htmlContent) {
     console.error('Dados insuficientes para enviar o e-mail.');
     toast.error('Falha ao preparar notificação por e-mail.');
-    return false;
+    throw new Error('Dados insuficientes para enviar o e-mail.');
   }
 
   try {
@@ -35,7 +35,7 @@ export const sendEmailNotification = async (payload: EmailPayload): Promise<bool
   } catch (err: any) {
     console.error('Erro ao invocar a Edge Function de e-mail:', err);
     toast.error(`Falha ao enviar e-mail para ${to}.`);
-    return false;
+    throw err;
   }
 };
 

@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts'
 import { Resend } from 'npm:resend@3.5.0'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
@@ -12,7 +12,7 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders, status: 200 })
   }
 
   try {
