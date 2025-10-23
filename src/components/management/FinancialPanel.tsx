@@ -16,6 +16,23 @@ import { supabase } from '../../integrations/supabase/client'
 import { UnifiedReceiptDialog } from '../financial/UnifiedReceiptDialog'
 import { useChurchStore } from '../../stores/churchStore'
 import { 
+  useFinancialData,
+  useCreateTransaction,
+  useUpdateTransaction,
+  useDeleteTransaction,
+  useUpdateTransactionStatus,
+  useMarkReceiptAsIssued,
+  useCreateBudget,
+  useUpdateBudget,
+  useDeleteBudget,
+  useCreateGoal,
+  useUpdateGoal,
+  useDeleteGoal,
+  FinancialTransaction,
+  Budget,
+  FinancialGoal,
+} from '../../hooks/useFinancialData'
+import { 
   DollarSign, 
   TrendingUp, 
   TrendingDown,
@@ -57,59 +74,6 @@ import { ScrollArea } from '../ui/scroll-area'
 import TransactionDetailsDialog from '../financial/TransactionDetailsDialog'
 import ReportViewerDialog from '../financial/ReportViewerDialog'
 
-interface FinancialTransaction {
-  id: string
-  tipo: 'Entrada' | 'Saída'
-  categoria: string
-  subcategoria?: string
-  valor: number
-  data_transacao: string
-  descricao: string
-  metodo_pagamento: string
-  responsavel: string
-  status: 'Pendente' | 'Confirmado' | 'Cancelado'
-  comprovante?: string
-  observacoes?: string
-  membro_id?: string
-  membro_nome?: string
-  recibo_emitido?: boolean
-  numero_documento?: string
-  centro_custo?: string
-  aprovado_por?: string
-  data_aprovacao?: string
-  id_igreja: string
-}
-
-interface Budget {
-  id: string
-  categoria: string
-  subcategoria?: string
-  valor_orcado: number
-  valor_gasto: number
-  valor_disponivel: number
-  mes_ano: string
-  descricao?: string
-  responsavel: string
-  status: 'Ativo' | 'Excedido' | 'Finalizado'
-  alertas_configurados: boolean
-  id_igreja: string
-}
-
-interface FinancialGoal {
-  id: string
-  nome: string
-  valor_meta: number
-  valor_atual: number
-  data_inicio: string
-  data_limite: string
-  categoria: string
-  descricao: string
-  status: 'Ativo' | 'Concluído' | 'Pausado' | 'Cancelado'
-  contribuidores: number
-  campanha_ativa: boolean
-  id_igreja: string
-}
-
 interface FinancialReport {
   id: string
   tipo: 'Mensal' | 'Trimestral' | 'Anual' | 'Personalizado'
@@ -131,12 +95,31 @@ interface FinancialReport {
 const FinancialPanel = () => {
   const { user, currentChurchId } = useAuthStore()
   const { getChurchById } = useChurchStore()
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>([])
-  const [budgets, setBudgets] = useState<Budget[]>([])
-  const [goals, setGoals] = useState<FinancialGoal[]>([])
+  
+  const [filters, setFilters] = useState({
+    searchTerm: '',
+    category: 'all',
+    memberId: 'all',
+    period: null as { start: string; end: string } | null,
+  })
+
+  const { data: financialData, isLoading: loadingData, error } = useFinancialData(filters)
+  const { transactions = [], budgets = [], goals = [], members = [], pendingNotifications = [] } = financialData || {}
+
+  const createTransactionMutation = useCreateTransaction()
+  const updateTransactionMutation = useUpdateTransaction()
+  const deleteTransactionMutation = useDeleteTransaction()
+  const updateStatusMutation = useUpdateTransactionStatus()
+  const markReceiptMutation = useMarkReceiptAsIssued()
+  const createBudgetMutation = useCreateBudget()
+  const updateBudgetMutation = useUpdateBudget()
+  const deleteBudgetMutation = useDeleteBudget()
+  const createGoalMutation = useCreateGoal()
+  const updateGoalMutation = useUpdateGoal()
+  const deleteGoalMutation = useDeleteGoal()
+
   const [reports, setReports] = useState<FinancialReport[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState('month')
-  const [selectedCategory, setSelectedCategory] = useState('all')
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
   const [isEditTransactionOpen, setIsEditTransactionOpen] = useState(false)
   const [transactionToEdit, setTransactionToEdit] = useState<FinancialTransaction | null>(null)
@@ -147,17 +130,12 @@ const FinancialPanel = () => {
   const [isEditGoalOpen, setIsEditGoalOpen] = useState(false)
   const [goalToEdit, setGoalToEdit] = useState<FinancialGoal | null>(null)
   const [isGenerateReportOpen, setIsGenerateReportOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
   const [viewMode, setViewMode] = useState<'dashboard' | 'transactions' | 'budget' | 'goals' | 'reports'>('dashboard')
-  const [loadingData, setLoadingData] = useState(true)
-  const [pendingNotifications, setPendingNotifications] = useState<any[]>([])
   const [receiptTransaction, setReceiptTransaction] = useState<FinancialTransaction | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [detailsTransaction, setDetailsTransaction] = useState<FinancialTransaction | null>(null)
   const [reportViewerOpen, setReportViewerOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<FinancialReport | null>(null)
-  const [members, setMembers] = useState<Array<{ id: string; nome_completo: string }>>([])
-  const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>('all')
 
   const canManageFinancial = user?.role === 'admin' || user?.role === 'pastor' || user?.role === 'financeiro'
 
@@ -251,107 +229,11 @@ const FinancialPanel = () => {
 
   const metodosPagamento = ['PIX', 'Dinheiro', 'Cartão Débito', 'Cartão Crédito', 'Transferência', 'Cheque', 'Boleto']
 
-  const loadFinancialData = useCallback(async () => {
-    if (!currentChurchId) {
-      setTransactions([])
-      setBudgets([])
-      setGoals([])
-      setReports([])
-      setLoadingData(false)
-      return
-    }
-
-    setLoadingData(true)
-    try {
-      // Load Transactions
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from('transacoes_financeiras')
-        .select('*')
-        .eq('id_igreja', currentChurchId)
-        .order('data_transacao', { ascending: false })
-
-      if (transactionsError) throw transactionsError
-      setTransactions(transactionsData as FinancialTransaction[])
-
-      // Load pending contributions notifications
-      const { data: notificationsData, error: notificationsError } = await supabase
-        .from('eventos_aplicacao')
-        .select('*')
-        .eq('church_id', currentChurchId)
-        .eq('event_name', 'nova_contribuicao_pendente')
-        .order('created_at', { ascending: false })
-
-      if (notificationsError) {
-        console.error('Error loading notifications:', notificationsError)
-      }
-      setPendingNotifications(notificationsData || [])
-
-      // Load Budgets
-      const { data: budgetsData, error: budgetsError } = await supabase
-        .from('orcamentos')
-        .select('*')
-        .eq('id_igreja', currentChurchId)
-        .order('mes_ano', { ascending: false })
-
-      if (budgetsError) throw budgetsError
-      setBudgets(budgetsData.map(b => ({
-        ...b,
-        valor_disponivel: b.valor_orcado - b.valor_gasto
-      })) as Budget[])
-
-      // Load Members (para filtros e vínculo em lançamentos)
-      const { data: membersData, error: membersError } = await supabase
-        .from('membros')
-        .select('id, nome_completo')
-        .eq('id_igreja', currentChurchId)
-        .order('nome_completo', { ascending: true })
-      if (membersError) {
-        console.error('Error loading members:', membersError)
-      } else {
-        setMembers(membersData || [])
-      }
-
-      // Load Reports
-      setReports([])
-
-    } catch (error: any) {
-      console.error('Error loading financial data:', error.message)
-      toast.error('Erro ao carregar dados financeiros: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
-  }, [currentChurchId])
-
   useEffect(() => {
-    loadFinancialData()
-  }, [loadFinancialData])
-
-  const markReceiptAsIssued = async (transactionId: string) => {
-    if (!canManageFinancial) {
-      toast.error('Você não tem permissão para emitir recibos.')
-      return
+    if (error) {
+      toast.error(`Erro ao carregar dados: ${error.message}`)
     }
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .update({ recibo_emitido: true })
-        .eq('id', transactionId)
-
-      if (error) {
-        console.error('Error marking receipt as issued:', error)
-        toast.error('Erro ao marcar recibo como emitido: ' + error.message)
-        return
-      }
-      toast.success('Recibo marcado como emitido!')
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Unexpected error marking receipt:', error.message)
-      toast.error('Erro inesperado ao marcar recibo.')
-    } finally {
-      setLoadingData(false)
-    }
-  }
+  }, [error])
 
   const handleAddTransaction = async () => {
     if (!newTransaction.categoria || !newTransaction.valor || !newTransaction.descricao || !currentChurchId) {
@@ -359,47 +241,34 @@ const FinancialPanel = () => {
       return
     }
 
-    setLoadingData(true)
-    try {
-      const numeroDocumento = `${newTransaction.tipo === 'Entrada' ? 'ENT' : 'SAI'}-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(transactions.length + 1).padStart(3, '0')}`
+    const numeroDocumento = `${newTransaction.tipo === 'Entrada' ? 'ENT' : 'SAI'}-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(transactions.length + 1).padStart(3, '0')}`
+    const selectedMember = members.find(m => m.id === newTransaction.membro_id)
 
-      // Se tipo for Entrada e houver membro selecionado, buscar o nome para integrar ao painel do membro
-      const selectedMember = members.find(m => m.id === newTransaction.membro_id)
-
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .insert({
-          id_igreja: currentChurchId,
-          tipo: newTransaction.tipo,
-          categoria: newTransaction.categoria,
-          subcategoria: newTransaction.subcategoria || null,
-          valor: newTransaction.valor,
-          data_transacao: newTransaction.data_transacao,
-          descricao: newTransaction.descricao,
-          metodo_pagamento: newTransaction.metodo_pagamento,
-          responsavel: user?.name || 'Sistema',
-          status: 'Pendente',
-          observacoes: newTransaction.observacoes || null,
-          numero_documento: numeroDocumento,
-          centro_custo: newTransaction.centro_custo || null,
-          membro_id: newTransaction.tipo === 'Entrada' && newTransaction.membro_id ? newTransaction.membro_id : null,
-          membro_nome: newTransaction.tipo === 'Entrada' && selectedMember ? selectedMember.nome_completo : null
+    createTransactionMutation.mutate({
+      id_igreja: currentChurchId,
+      tipo: newTransaction.tipo,
+      categoria: newTransaction.categoria,
+      subcategoria: newTransaction.subcategoria || null,
+      valor: newTransaction.valor,
+      data_transacao: newTransaction.data_transacao,
+      descricao: newTransaction.descricao,
+      metodo_pagamento: newTransaction.metodo_pagamento,
+      responsavel: user?.name || 'Sistema',
+      status: 'Pendente',
+      observacoes: newTransaction.observacoes || null,
+      numero_documento: numeroDocumento,
+      centro_custo: newTransaction.centro_custo || null,
+      membro_id: newTransaction.tipo === 'Entrada' && newTransaction.membro_id ? newTransaction.membro_id : null,
+      membro_nome: newTransaction.tipo === 'Entrada' && selectedMember ? selectedMember.nome_completo : null
+    }, {
+      onSuccess: () => {
+        setIsAddTransactionOpen(false)
+        setNewTransaction({
+          tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
+          descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: '', membro_id: ''
         })
-
-      if (error) throw error
-      toast.success('Transação adicionada com sucesso!')
-      setIsAddTransactionOpen(false)
-      setNewTransaction({
-        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
-        descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: '', membro_id: ''
-      })
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error adding transaction:', error.message)
-      toast.error('Erro ao adicionar transação: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+      }
+    })
   }
 
   const handleEditTransaction = async () => {
@@ -412,156 +281,40 @@ const FinancialPanel = () => {
       return
     }
 
-    setLoadingData(true)
-    try {
-      const selectedMember = members.find(m => m.id === newTransaction.membro_id)
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .update({
-          tipo: newTransaction.tipo,
-          categoria: newTransaction.categoria,
-          subcategoria: newTransaction.subcategoria || null,
-          valor: newTransaction.valor,
-          data_transacao: newTransaction.data_transacao,
-          descricao: newTransaction.descricao,
-          metodo_pagamento: newTransaction.metodo_pagamento,
-          observacoes: newTransaction.observacoes || null,
-          centro_custo: newTransaction.centro_custo || null,
-          numero_documento: newTransaction.numero_documento || null,
-          status: transactionToEdit.status, // Manter status atual
-          aprovado_por: transactionToEdit.aprovado_por,
-          data_aprovacao: transactionToEdit.data_aprovacao,
-          recibo_emitido: transactionToEdit.recibo_emitido,
-          membro_id: newTransaction.tipo === 'Entrada' ? (newTransaction.membro_id || null) : transactionToEdit.membro_id || null,
-          membro_nome: newTransaction.tipo === 'Entrada' && selectedMember ? selectedMember.nome_completo : transactionToEdit.membro_nome || null
-        })
-        .eq('id', transactionToEdit.id)
-
-      if (error) throw error
-      toast.success('Transação atualizada com sucesso!')
-      setIsEditTransactionOpen(false)
-      setTransactionToEdit(null)
-      setNewTransaction({
-        tipo: 'Entrada', categoria: '', subcategoria: '', valor: 0, data_transacao: new Date().toISOString().split('T')[0],
-        descricao: '', metodo_pagamento: 'PIX', observacoes: '', centro_custo: '', numero_documento: ''
-      })
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error editing transaction:', error.message)
-      toast.error('Erro ao editar transação: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    const selectedMember = members.find(m => m.id === newTransaction.membro_id)
+    updateTransactionMutation.mutate({
+      id: transactionToEdit.id,
+      tipo: newTransaction.tipo,
+      categoria: newTransaction.categoria,
+      subcategoria: newTransaction.subcategoria || null,
+      valor: newTransaction.valor,
+      data_transacao: newTransaction.data_transacao,
+      descricao: newTransaction.descricao,
+      metodo_pagamento: newTransaction.metodo_pagamento,
+      observacoes: newTransaction.observacoes || null,
+      centro_custo: newTransaction.centro_custo || null,
+      numero_documento: newTransaction.numero_documento || null,
+      membro_id: newTransaction.tipo === 'Entrada' ? (newTransaction.membro_id || null) : transactionToEdit.membro_id || null,
+      membro_nome: newTransaction.tipo === 'Entrada' && selectedMember ? selectedMember.nome_completo : transactionToEdit.membro_nome || null
+    }, {
+      onSuccess: () => {
+        setIsEditTransactionOpen(false)
+        setTransactionToEdit(null)
+      }
+    })
   }
 
   const handleDeleteTransaction = async (transactionId: string) => {
     if (!confirm('Tem certeza que deseja excluir esta transação?')) return
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
-    }
-
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .delete()
-        .eq('id', transactionId)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) throw error
-      toast.success('Transação excluída com sucesso!')
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error deleting transaction:', error.message)
-      toast.error('Erro ao excluir transação: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    deleteTransactionMutation.mutate(transactionId)
   }
 
   const approveTransaction = async (transactionId: string) => {
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
-    }
-    setLoadingData(true)
-    try {
-      // Update transaction status
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .update({ 
-          status: 'Confirmado',
-          aprovado_por: user?.name || 'Admin',
-          data_aprovacao: new Date().toISOString().split('T')[0]
-        })
-        .eq('id', transactionId)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) throw error
-
-      // Delete related notification
-      const { error: notificationError } = await supabase
-        .from('eventos_aplicacao')
-        .delete()
-        .eq('event_details->>transaction_id', transactionId)
-        .eq('event_name', 'nova_contribuicao_pendente')
-        .eq('church_id', currentChurchId)
-
-      if (notificationError) {
-        console.error('Error deleting notification:', notificationError)
-      }
-
-      toast.success('Transação aprovada com sucesso!')
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error approving transaction:', error.message)
-      toast.error('Erro ao aprovar transação: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    updateStatusMutation.mutate({ transactionId, status: 'Confirmado' })
   }
 
   const rejectTransaction = async (transactionId: string) => {
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
-    }
-    setLoadingData(true)
-    try {
-      // Update transaction status
-      const { error } = await supabase
-        .from('transacoes_financeiras')
-        .update({ 
-          status: 'Cancelado',
-          aprovado_por: user?.name || 'Admin',
-          data_aprovacao: new Date().toISOString().split('T')[0]
-        })
-        .eq('id', transactionId)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) throw error
-
-      // Delete related notification
-      const { error: notificationError } = await supabase
-        .from('eventos_aplicacao')
-        .delete()
-        .eq('event_details->>transaction_id', transactionId)
-        .eq('event_name', 'nova_contribuicao_pendente')
-        .eq('church_id', currentChurchId)
-
-      if (notificationError) {
-        console.error('Error deleting notification:', notificationError)
-      }
-
-      toast.success('Transação rejeitada com sucesso!')
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error rejecting transaction:', error.message)
-      toast.error('Erro ao rejeitar transação: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    updateStatusMutation.mutate({ transactionId, status: 'Cancelado' })
   }
 
   const generateReceipt = async (transaction: FinancialTransaction) => {
@@ -619,37 +372,26 @@ const FinancialPanel = () => {
       return
     }
 
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('orcamentos')
-        .insert({
-          id_igreja: currentChurchId,
-          categoria: newBudget.categoria,
-          subcategoria: newBudget.subcategoria || null,
-          valor_orcado: newBudget.valor_orcado,
-          valor_gasto: 0, // Sempre inicia com 0
-          mes_ano: newBudget.mes_ano,
-          descricao: newBudget.descricao || null,
-          responsavel: user?.name || 'Sistema',
-          status: 'Ativo',
-          alertas_configurados: newBudget.alertas_configurados
+    createBudgetMutation.mutate({
+      id_igreja: currentChurchId,
+      categoria: newBudget.categoria,
+      subcategoria: newBudget.subcategoria || null,
+      valor_orcado: newBudget.valor_orcado,
+      valor_gasto: 0,
+      mes_ano: newBudget.mes_ano,
+      descricao: newBudget.descricao || null,
+      responsavel: user?.name || 'Sistema',
+      status: 'Ativo',
+      alertas_configurados: newBudget.alertas_configurados
+    }, {
+      onSuccess: () => {
+        setIsAddBudgetOpen(false)
+        setNewBudget({
+          categoria: '', subcategoria: '', valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
+          descricao: '', alertas_configurados: true
         })
-
-      if (error) throw error
-      toast.success('Orçamento criado com sucesso!')
-      setIsAddBudgetOpen(false)
-      setNewBudget({
-        categoria: undefined, subcategoria: undefined, valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
-        descricao: '', alertas_configurados: true
-      })
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error adding budget:', error.message)
-      toast.error('Erro ao criar orçamento: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+      }
+    })
   }
 
   const handleEditBudget = async () => {
@@ -662,65 +404,25 @@ const FinancialPanel = () => {
       return
     }
 
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('orcamentos')
-        .update({
-          categoria: newBudget.categoria,
-          subcategoria: newBudget.subcategoria || null,
-          valor_orcado: newBudget.valor_orcado,
-          mes_ano: newBudget.mes_ano,
-          descricao: newBudget.descricao || null,
-          alertas_configurados: newBudget.alertas_configurados,
-          // Recalcular valor_disponivel e status com base no valor_gasto existente
-          valor_disponivel: newBudget.valor_orcado - budgetToEdit.valor_gasto,
-          status: (newBudget.valor_orcado - budgetToEdit.valor_gasto) < 0 ? 'Excedido' : 'Ativo',
-        })
-        .eq('id', budgetToEdit.id)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) throw error
-      toast.success('Orçamento atualizado com sucesso!')
-      setIsEditBudgetOpen(false)
-      setBudgetToEdit(null)
-      setNewBudget({
-        categoria: undefined, subcategoria: undefined, valor_orcado: 0, mes_ano: new Date().toISOString().slice(0, 7),
-        descricao: '', alertas_configurados: true
-      })
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error editing budget:', error.message)
-      toast.error('Erro ao editar orçamento: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    updateBudgetMutation.mutate({
+      id: budgetToEdit.id,
+      categoria: newBudget.categoria,
+      subcategoria: newBudget.subcategoria || null,
+      valor_orcado: newBudget.valor_orcado,
+      mes_ano: newBudget.mes_ano,
+      descricao: newBudget.descricao || null,
+      alertas_configurados: newBudget.alertas_configurados,
+    }, {
+      onSuccess: () => {
+        setIsEditBudgetOpen(false)
+        setBudgetToEdit(null)
+      }
+    })
   }
 
   const handleDeleteBudget = async (budgetId: string) => {
     if (!confirm('Tem certeza que deseja excluir este orçamento?')) return
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
-    }
-
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('orcamentos')
-        .delete()
-        .eq('id', budgetId)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) throw error
-      toast.success('Orçamento excluído com sucesso!')
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error deleting budget:', error.message)
-      toast.error('Erro ao excluir orçamento: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    deleteBudgetMutation.mutate(budgetId)
   }
 
   const handleAddGoal = async () => {
@@ -729,38 +431,27 @@ const FinancialPanel = () => {
       return
     }
 
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('metas_financeiras')
-        .insert({
-          id_igreja: currentChurchId,
-          nome: newGoal.nome,
-          valor_meta: newGoal.valor_meta,
-          valor_atual: 0, // Sempre inicia com 0
-          data_inicio: new Date().toISOString().split('T')[0],
-          data_limite: newGoal.data_limite,
-          categoria: newGoal.categoria || null,
-          descricao: newGoal.descricao || null,
-          status: 'Ativo',
-          contribuidores: 0,
-          campanha_ativa: newGoal.campanha_ativa
+    createGoalMutation.mutate({
+      id_igreja: currentChurchId,
+      nome: newGoal.nome,
+      valor_meta: newGoal.valor_meta,
+      valor_atual: 0,
+      data_inicio: new Date().toISOString().split('T')[0],
+      data_limite: newGoal.data_limite,
+      categoria: newGoal.categoria || null,
+      descricao: newGoal.descricao || null,
+      status: 'Ativo',
+      contribuidores: 0,
+      campanha_ativa: newGoal.campanha_ativa
+    }, {
+      onSuccess: () => {
+        setIsAddGoalOpen(false)
+        setNewGoal({
+          nome: '', valor_meta: 0, data_limite: '', categoria: '',
+          descricao: '', campanha_ativa: false, status: 'Ativo'
         })
-
-      if (error) throw error
-      toast.success('Meta financeira criada com sucesso!')
-      setIsAddGoalOpen(false)
-      setNewGoal({
-        nome: '', valor_meta: 0, data_limite: '', categoria: undefined,
-        descricao: '', campanha_ativa: false, status: 'Ativo'
-      })
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error adding goal:', error.message)
-      toast.error('Erro ao criar meta: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+      }
+    })
   }
 
   const handleEditGoal = async () => {
@@ -773,64 +464,26 @@ const FinancialPanel = () => {
       return
     }
 
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('metas_financeiras')
-        .update({
-          nome: newGoal.nome,
-          valor_meta: newGoal.valor_meta,
-          data_limite: newGoal.data_limite,
-          categoria: newGoal.categoria || null,
-          descricao: newGoal.descricao || null,
-          status: newGoal.status || 'Ativo', // Permitir editar status
-          campanha_ativa: newGoal.campanha_ativa,
-          // valor_atual e contribuidores não são editáveis diretamente aqui
-        })
-        .eq('id', goalToEdit.id)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) throw error
-      toast.success('Meta financeira atualizada com sucesso!')
-      setIsEditGoalOpen(false)
-      setGoalToEdit(null)
-      setNewGoal({
-        nome: '', valor_meta: 0, data_limite: '', categoria: undefined,
-        descricao: '', campanha_ativa: false, status: 'Ativo'
-      })
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error editing goal:', error.message)
-      toast.error('Erro ao editar meta: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    updateGoalMutation.mutate({
+      id: goalToEdit.id,
+      nome: newGoal.nome,
+      valor_meta: newGoal.valor_meta,
+      data_limite: newGoal.data_limite,
+      categoria: newGoal.categoria || null,
+      descricao: newGoal.descricao || null,
+      status: newGoal.status || 'Ativo',
+      campanha_ativa: newGoal.campanha_ativa,
+    }, {
+      onSuccess: () => {
+        setIsEditGoalOpen(false)
+        setGoalToEdit(null)
+      }
+    })
   }
 
   const handleDeleteGoal = async (goalId: string) => {
     if (!confirm('Tem certeza que deseja excluir esta meta?')) return
-    if (!currentChurchId) {
-      toast.error('Nenhuma igreja ativa selecionada.')
-      return
-    }
-
-    setLoadingData(true)
-    try {
-      const { error } = await supabase
-        .from('metas_financeiras')
-        .delete()
-        .eq('id', goalId)
-        .eq('id_igreja', currentChurchId)
-
-      if (error) throw error
-      toast.success('Meta financeira excluída com sucesso!')
-      loadFinancialData()
-    } catch (error: any) {
-      console.error('Error deleting goal:', error.message)
-      toast.error('Erro ao excluir meta: ' + error.message)
-    } finally {
-      setLoadingData(false)
-    }
+    deleteGoalMutation.mutate(goalId)
   }
 
   const generateReport = () => {
@@ -1234,12 +887,12 @@ const FinancialPanel = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   placeholder="Buscar transações..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={filters.searchTerm}
+                  onChange={(e) => setFilters(f => ({ ...f, searchTerm: e.target.value }))}
                   className="pl-10"
                 />
               </div>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <Select value={filters.category} onValueChange={(v) => setFilters(f => ({ ...f, category: v }))}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
@@ -1252,7 +905,7 @@ const FinancialPanel = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={selectedMemberFilter} onValueChange={setSelectedMemberFilter}>
+              <Select value={filters.memberId} onValueChange={(v) => setFilters(f => ({ ...f, memberId: v }))}>
                 <SelectTrigger className="w-56">
                   <SelectValue placeholder="Filtrar por membro" />
                 </SelectTrigger>
@@ -1507,15 +1160,6 @@ const FinancialPanel = () => {
           {/* All Transactions List */}
           <div className="space-y-4">
             {transactions
-              .filter(t => 
-                (selectedCategory === 'all' || t.categoria === selectedCategory) &&
-                (selectedMemberFilter === 'all' || t.membro_id === selectedMemberFilter) &&
-                (searchTerm === '' || 
-                  t.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  t.numero_documento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  t.responsavel.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-              )
               .map((transaction) => (
               <Card key={transaction.id} className="border-0 shadow-sm">
                 <CardContent className="p-4 md:p-6">
@@ -1603,7 +1247,7 @@ const FinancialPanel = () => {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => generateReceipt(transaction)}
+                          onClick={() => markReceiptMutation.mutate(transaction.id)}
                         >
                           <Receipt className="w-4 h-4 mr-2" />
                           {transaction.recibo_emitido ? 'Ver Recibo' : 'Emitir Recibo'}
@@ -2267,7 +1911,7 @@ const FinancialPanel = () => {
         onOpenChange={(isOpen) => !isOpen && setReceiptTransaction(null)}
         transaction={receiptTransaction}
         church={currentChurchId ? getChurchById(currentChurchId) : null}
-        onMarkAsIssued={markReceiptAsIssued}
+        onMarkAsIssued={(id) => markReceiptMutation.mutate(id)}
         canManage={canManageFinancial}
       />
 
