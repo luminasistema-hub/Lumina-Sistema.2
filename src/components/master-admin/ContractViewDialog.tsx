@@ -93,6 +93,7 @@ const ContractViewDialog: React.FC<ContractViewDialogProps> = ({ isOpen, onClose
                 }
                 .prose {
                   font-size: 10pt !important;
+                  max-width: none !important;
                 }
                 .prose h2 {
                   font-size: 14pt !important;
@@ -213,6 +214,7 @@ const ContractViewDialog: React.FC<ContractViewDialogProps> = ({ isOpen, onClose
             left: 0;
             top: 0;
             width: 100%;
+            max-width: none !important;
             height: auto;
             min-height: 100%;
             border: none;
