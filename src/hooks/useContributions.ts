@@ -75,6 +75,7 @@ export const useContributions = () => {
     queryKey,
     queryFn: () => fetchContributions(currentChurchId!, user!.id),
     enabled: !!currentChurchId && !!user?.id,
+    refetchOnWindowFocus: false,
   })
 
   if (error) {

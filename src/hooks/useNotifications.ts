@@ -24,6 +24,7 @@ export const useNotifications = () => {
       return data;
     },
     enabled: !!user?.id && !!currentChurchId,
+    refetchOnWindowFocus: false,
   });
 
   const unreadCount = notifications.filter(n => !n.lida).length;
