@@ -59,12 +59,14 @@ export const useChildChurches = () => {
     queryKey: ['childChurches', currentChurchId],
     queryFn: () => fetchChildChurches(currentChurchId!),
     enabled: !!currentChurchId,
+    refetchOnWindowFocus: false,
   });
 
   const parentInfoQuery = useQuery({
     queryKey: ['parentInfo', currentChurchId],
     queryFn: () => fetchParentInfo(currentChurchId!),
     enabled: !!currentChurchId,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {

@@ -105,5 +105,6 @@ export const useMinistries = () => {
     queryFn: () => fetchMinistriesAndMembers(currentChurchId!),
     enabled: !!currentChurchId,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: false,
   })
 }

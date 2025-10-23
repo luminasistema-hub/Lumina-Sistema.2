@@ -83,5 +83,6 @@ export const useKidsData = () => {
     queryKey: ['kidsData', currentChurchId, user?.id],
     queryFn: () => fetchKidsData(currentChurchId, user?.id, canManageKids),
     enabled: !!currentChurchId && !!user?.id,
+    refetchOnWindowFocus: false,
   });
 };

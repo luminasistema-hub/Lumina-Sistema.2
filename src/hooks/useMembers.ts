@@ -90,5 +90,6 @@ export const useMembers = () => {
     queryKey: ['members', currentChurchId, user?.id],
     queryFn: () => fetchMembers(currentChurchId, getChurchById, user?.id || null),
     enabled: !!currentChurchId && !!user?.id,
+    refetchOnWindowFocus: false,
   });
 };

@@ -29,5 +29,6 @@ export const useMinistryVolunteers = (ministryId: string | null) => {
     queryFn: () => fetchVolunteers(ministryId),
     enabled: !!ministryId,
     staleTime: 1000 * 60, // 1 minute
+    refetchOnWindowFocus: false,
   })
 }

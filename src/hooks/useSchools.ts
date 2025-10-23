@@ -121,7 +121,8 @@ export const useSchools = () => {
   return useQuery({
     queryKey: ['schools', currentChurchId],
     queryFn: () => fetchSchools(currentChurchId!),
-    enabled: !!currentChurchId
+    enabled: !!currentChurchId,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -146,7 +147,8 @@ export const useUserEnrollments = () => {
   return useQuery({
     queryKey: ['user-enrollments', user?.id],
     queryFn: () => fetchUserEnrollments(user!.id),
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -166,7 +168,8 @@ export const useSchoolLessons = (schoolId: string | null) => {
   return useQuery({
     queryKey: ['school-lessons', schoolId],
     queryFn: () => fetchSchoolLessons(schoolId!),
-    enabled: !!schoolId
+    enabled: !!schoolId,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -185,7 +188,8 @@ export const useSchoolAttendance = (schoolId: string | null) => {
   return useQuery({
     queryKey: ['school-attendance', schoolId],
     queryFn: () => fetchSchoolAttendance(schoolId!),
-    enabled: !!schoolId
+    enabled: !!schoolId,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -208,7 +212,8 @@ export const useStudentAttendance = (lessonId: string | null) => {
   return useQuery({
     queryKey: ['student-attendance', user?.id, lessonId],
     queryFn: () => fetchStudentAttendance(user!.id, lessonId!),
-    enabled: !!user?.id && !!lessonId
+    enabled: !!user?.id && !!lessonId,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -228,7 +233,8 @@ export const useQuizQuestions = (lessonId: string | null) => {
   return useQuery({
     queryKey: ['quiz-questions', lessonId],
     queryFn: () => fetchQuizQuestions(lessonId!),
-    enabled: !!lessonId
+    enabled: !!lessonId,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -254,7 +260,8 @@ export const useUserQuizAnswers = (lessonId: string | null) => {
   return useQuery({
     queryKey: ['user-quiz-answers', user?.id, lessonId],
     queryFn: () => fetchUserQuizAnswers(user!.id, lessonId!),
-    enabled: !!user?.id && !!lessonId
+    enabled: !!user?.id && !!lessonId,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -285,7 +292,8 @@ export const useStudentProgress = (schoolId: string | null) => {
   return useQuery({
     queryKey: ['student-progress', user?.id, schoolId],
     queryFn: () => fetchStudentProgress(user!.id, schoolId!),
-    enabled: !!user?.id && !!schoolId
+    enabled: !!user?.id && !!schoolId,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -307,7 +315,8 @@ export const useSchoolEnrollments = (schoolId: string | null) => {
   return useQuery({
     queryKey: ['school-enrollments', schoolId],
     queryFn: () => fetchSchoolEnrollments(schoolId!),
-    enabled: !!schoolId
+    enabled: !!schoolId,
+    refetchOnWindowFocus: false,
   })
 }
 

@@ -140,6 +140,7 @@ export const useDevotionals = (filters: any) => {
     queryKey,
     queryFn: () => fetchDevotionals(currentChurchId!, filters),
     enabled: !!currentChurchId && !!user?.id,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -175,6 +176,7 @@ export const useDevotionalDetails = (devotionalId: string | null) => {
     queryKey: ['devotionalDetails', devotionalId, user?.id],
     queryFn: () => fetchDevotionalDetails(devotionalId!),
     enabled: !!devotionalId && !!user?.id,
+    refetchOnWindowFocus: false,
   });
 }
 

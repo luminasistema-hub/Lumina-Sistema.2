@@ -30,7 +30,8 @@ export const useChurchGrowthGroups = () => {
         .order('created_at', { ascending: false })
       if (error) throw new Error(error.message)
       return (data || []) as GrowthGroup[]
-    }
+    },
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -163,7 +164,8 @@ export const useGroupLeaders = (groupId: string | null) => {
         .eq('group_id', groupId!)
       if (error) throw new Error(error.message)
       return (data?.map(item => item.membro).filter(Boolean) as MemberProfile[]) || []
-    }
+    },
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -178,7 +180,8 @@ export const useGroupMembers = (groupId: string | null) => {
         .eq('group_id', groupId!)
       if (error) throw new Error(error.message)
       return (data?.map(item => item.membro).filter(Boolean) as MemberProfile[]) || []
-    }
+    },
+    refetchOnWindowFocus: false,
   })
 }
 

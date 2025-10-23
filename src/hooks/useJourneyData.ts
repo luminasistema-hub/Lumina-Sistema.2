@@ -296,6 +296,7 @@ export const useJourneyData = () => {
     queryKey,
     queryFn: () => fetchJourneyData(user?.id, currentChurchId),
     enabled: !!user?.id && !!currentChurchId,
+    refetchOnWindowFocus: false,
   });
 
   const markPassoMutation = useMutation({

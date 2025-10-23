@@ -130,6 +130,7 @@ export const useEvents = () => {
     queryKey,
     queryFn: () => fetchEvents(currentChurchId, user?.id || null),
     enabled: !!currentChurchId && !!user?.id,
+    refetchOnWindowFocus: false,
   });
 
   const registerMutation = useMutation({
