@@ -1,7 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../integrations/supabase/client'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from 'sonner'
+import { useEffect } from 'react'
 
 export interface School {
   id: string
@@ -15,7 +16,9 @@ export interface School {
   updated_at: string
   data_inicio?: string
   data_fim?: string
-  status: 'aberta' | 'fechada' | 'concluida'
+  status: 'aberta' | 'fechada' | 'em_andamento'
+  professor_nome?: string
+  inscricoes_count?: number
 }
 
 export interface SchoolEnrollment {
@@ -87,44 +90,59 @@ const fetchSchools = async (churchId: string) => {
   if (error) throw new Error(error.message)
   if (!data || data.length === 0) return []
 
-  const schools = data as School[]
-  
-  // Coletar IDs dos professores para buscar os nomes em uma única query
-  const professorIds = [...new Set(schools.map(school => school.professor_id).filter(Boolean))]
-  
-  let professorNames = new Map<string, string>()
-  if (professorIds.length > 0) {
-    const { data: professors, error: professorError } = await supabase
-      .from('membros')
-      .select('id, nome_completo')
-      .in('id', professorIds)
-    
-    if (professorError) {
-      console.error("Erro ao buscar nomes de professores:", professorError.message)
-    } else {
-      professors.forEach(p => {
-        professorNames.set(p.id, p.nome_completo)
-      })
-    }
-  }
-  
-  // Mapear os nomes dos professores de volta para as escolas
-  return schools.map(school => ({
+  const schoolIds = data.map(s => s.id)
+
+  const { data: professors, error: profError } = await supabase
+    .from('membros')
+    .select('id, nome_completo')
+    .in('id', data.map(s => s.professor_id).filter(Boolean));
+  if (profError) console.error("Error fetching professors:", profError);
+  const professorMap = new Map(professors?.map(p => [p.id, p.nome_completo]));
+
+  const { data: inscriptions, error: inscError } = await supabase
+    .from('escola_inscricoes')
+    .select('escola_id, count:id')
+    .in('escola_id', schoolIds);
+  if (inscError) console.error("Error fetching inscriptions count:", inscError);
+  const inscriptionsMap = new Map(inscriptions?.map(i => [i.escola_id, i.count]));
+
+  return data.map(school => ({
     ...school,
-    professor_nome: school.professor_id ? professorNames.get(school.professor_id) || 'Professor não definido' : 'Professor não definido'
-  }))
-}
+    professor_nome: professorMap.get(school.professor_id) || 'Não definido',
+    inscricoes_count: inscriptionsMap.get(school.id) || 0,
+  }));
+};
 
 export const useSchools = () => {
-  const { currentChurchId } = useAuthStore()
-  
+  const { currentChurchId } = useAuthStore();
+  const queryClient = useQueryClient();
+  const queryKey = ['schools', currentChurchId];
+
+  useEffect(() => {
+    if (!currentChurchId) return;
+
+    const channel = supabase
+      .channel(`public-escolas-${currentChurchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'escolas', filter: `id_igreja=eq.${currentChurchId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentChurchId, queryClient, queryKey]);
+
   return useQuery({
-    queryKey: ['schools', currentChurchId],
+    queryKey,
     queryFn: () => fetchSchools(currentChurchId!),
     enabled: !!currentChurchId,
-    refetchOnWindowFocus: false,
-  })
-}
+  });
+};
 
 // Função para buscar inscrições do usuário
 const fetchUserEnrollments = async (userId: string) => {

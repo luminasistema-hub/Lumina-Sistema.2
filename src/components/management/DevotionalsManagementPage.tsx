@@ -19,102 +19,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { createInAppNotification } from '@/services/notificationService';
+import { useDevotionalsManagement, Devotional } from '@/hooks/useDevotionalsManagement';
 
 type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado' | 'Pendente';
 type DevotionalCategory = 'Diário' | 'Semanal' | 'Especial' | 'Temático';
 
-interface Devotional {
-  id: string;
-  id_igreja: string;
-  titulo: string;
-  conteudo: string;
-  versiculo_referencia: string;
-  versiculo_texto?: string | null;
-  categoria: DevotionalCategory;
-  tags: string[];
-  autor_id: string;
-  data_publicacao: string | null;
-  status: DevotionalStatus;
-  imagem_capa?: string | null;
-  tempo_leitura: number;
-  featured: boolean;
-  membros?: { nome_completo: string | null };
-  created_at: string;
-  compartilhar_com_filhas?: boolean;
-}
-
 const DevotionalsManagementPage = () => {
   const { currentChurchId, user } = useAuthStore();
-  const qc = useQueryClient();
   const churchStore = useChurchStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [selectedDevotional, setSelectedDevotional] = useState<Devotional | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Devotional | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const canManage = user?.role === 'admin' || user?.role === 'pastor' || user?.extraPermissions?.includes('devotional-approver');
 
-  // Defina o queryKey antes de qualquer uso (incluindo em useEffect)
-  const queryKey = useMemo(
-    () => ['devos-mgmt', currentChurchId, { statusFilter, categoryFilter, searchTerm }],
-    [currentChurchId, statusFilter, categoryFilter, searchTerm]
-  );
-
-  const fetchDevotionals = async (
-    churchId: string,
-    statusFilter: string,
-    categoryFilter: string,
-    searchTerm: string
-  ) => {
-    let query = supabase
-      .from('devocionais')
-      .select(`
-        *,
-        membros(nome_completo)
-      `)
-      .eq('id_igreja', churchId)
-      .order('data_publicacao', { ascending: false });
-
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
-    }
-    if (categoryFilter !== 'all') {
-      query = query.eq('categoria', categoryFilter);
-    }
-    if (searchTerm) {
-      query = query.ilike('titulo', `%${searchTerm}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data as Devotional[];
-  };
-
-  useEffect(() => {
-    if (!currentChurchId) return;
-
-    const channel = supabase
-      .channel(`devotionals-management-${currentChurchId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'devocionais', filter: `id_igreja=eq.${currentChurchId}` },
-        () => {
-          qc.invalidateQueries({ queryKey });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentChurchId, qc, queryKey]);
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<Devotional | null>(null);
+  const {
+    devotionals: devotionalsData,
+    isLoading,
+    error,
+    createDevotional,
+    updateDevotional,
+    deleteDevotional,
+    toggleFeatured,
+    setStatus,
+  } = useDevotionalsManagement({ statusFilter, categoryFilter, searchTerm });
 
   const [form, setForm] = useState<Partial<Devotional>>({
     titulo: '',
@@ -127,18 +58,6 @@ const DevotionalsManagementPage = () => {
     imagem_capa: '',
     featured: false,
     compartilhar_com_filhas: churchStore.getChurchById(currentChurchId!)?.share_devocionais_to_children ?? false,
-  });
-
-  // queryKey já foi definido acima
-
-  const { data: devotionalsData, isLoading, error } = useQuery({
-    queryKey,
-    queryFn: () => fetchDevotionals(currentChurchId!, statusFilter, categoryFilter, searchTerm),
-    enabled: !!currentChurchId,
-    staleTime: 30000, // 30 segundos de cache
-    gcTime: 5 * 60 * 1000, // 5 minutos no cache
-    refetchOnWindowFocus: false, // Evita refetch ao focar janela
-    retry: 1, // Apenas 1 retry em caso de erro
   });
 
   const resetForm = () => {
@@ -157,150 +76,17 @@ const DevotionalsManagementPage = () => {
     setEditingItem(null);
   };
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      if (!user || !currentChurchId) throw new Error('Usuário não autenticado.');
-      if (!form.titulo || !form.conteudo || !form.versiculo_referencia) throw new Error('Preencha os campos obrigatórios.');
-      const tempo = Math.ceil((form.conteudo?.length || 0) / 200);
-      const payload = {
-        ...form,
-        id_igreja: currentChurchId,
-        autor_id: user.id,
-        tempo_leitura: tempo,
-        data_publicacao: form.status === 'Publicado' ? new Date().toISOString() : null,
-        compartilhar_com_filhas: form.compartilhar_com_filhas ?? (churchStore.getChurchById(currentChurchId!)?.share_devocionais_to_children ?? false),
-      };
-      const { error } = await supabase.from('devocionais').insert(payload);
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: (_, variables) => {
-      toast.success('Devocional criado com sucesso!');
-      qc.invalidateQueries({ queryKey });
-      setIsDialogOpen(false);
-      resetForm();
-
-      if (form.status === 'Publicado' && currentChurchId) {
-        createInAppNotification({
-          id_igreja: currentChurchId,
-          membro_id: null, // Broadcast
-          titulo: `Novo Devocional: ${form.titulo}`,
-          descricao: 'Um novo devocional foi publicado para sua leitura e meditação.',
-          link: '/dashboard?module=devotionals',
-          tipo: 'NEW_DEVOTIONAL'
-        });
+  const handleSave = () => {
+    const mutation = editingItem ? updateDevotional : createDevotional;
+    const payload = editingItem ? { form, editingItem } : form;
+    
+    mutation.mutate(payload as any, {
+      onSuccess: () => {
+        setIsDialogOpen(false);
+        resetForm();
       }
-    },
-    onError: (err: any) => toast.error(`Erro ao criar: ${err.message}`),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async () => {
-      if (!editingItem) return;
-      const tempo = Math.ceil((form.conteudo?.length || editingItem.conteudo.length || 0) / 200);
-      const payload: Partial<Devotional> = {
-        titulo: form.titulo ?? editingItem.titulo,
-        conteudo: form.conteudo ?? editingItem.conteudo,
-        versiculo_referencia: form.versiculo_referencia ?? editingItem.versiculo_referencia,
-        versiculo_texto: form.versiculo_texto ?? editingItem.versiculo_texto,
-        categoria: (form.categoria as DevotionalCategory) ?? editingItem.categoria,
-        tags: form.tags ?? editingItem.tags,
-        status: (form.status as DevotionalStatus) ?? editingItem.status,
-        imagem_capa: form.imagem_capa ?? editingItem.imagem_capa,
-        featured: form.featured ?? editingItem.featured,
-        tempo_leitura: tempo,
-        data_publicacao: (form.status ?? editingItem.status) === 'Publicado'
-          ? (editingItem.data_publicacao || new Date().toISOString())
-          : null,
-        compartilhar_com_filhas: form.compartilhar_com_filhas ?? editingItem.compartilhar_com_filhas ?? false,
-      };
-      const { error } = await supabase.from('devocionais').update(payload).eq('id', editingItem.id);
-      if (error) throw new Error(error.message);
-      return { oldStatus: editingItem.status, newStatus: payload.status, title: payload.titulo };
-    },
-    onSuccess: (result) => {
-      toast.success('Devocional atualizado!');
-      qc.invalidateQueries({ queryKey });
-      setIsDialogOpen(false);
-      resetForm();
-
-      if (result && result.oldStatus !== 'Publicado' && result.newStatus === 'Publicado' && currentChurchId) {
-        createInAppNotification({
-          id_igreja: currentChurchId,
-          membro_id: null, // Broadcast
-          titulo: `Novo Devocional: ${result.title}`,
-          descricao: 'Um novo devocional foi publicado para sua leitura e meditação.',
-          link: '/dashboard?module=devotionals',
-          tipo: 'NEW_DEVOTIONAL'
-        });
-      }
-    },
-    onError: (err: any) => toast.error(`Erro ao atualizar: ${err.message}`),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('devocionais').delete().eq('id', id);
-      if (error) throw new Error(error.message);
-      return { status: 'Publicado', id };
-    },
-    onSuccess: async ({ status, id }) => {
-      qc.invalidateQueries({ queryKey });
-      if (status === 'Publicado' && currentChurchId) {
-        const { data: devotional } = await supabase.from('devocionais').select('titulo').eq('id', id).single();
-        if (devotional) {
-          createInAppNotification({
-            id_igreja: currentChurchId,
-            membro_id: null, // Broadcast
-            titulo: `Novo Devocional: ${devotional.titulo}`,
-            descricao: 'Um novo devocional foi publicado para sua leitura e meditação.',
-            link: '/dashboard?module=devotionals',
-            tipo: 'NEW_DEVOTIONAL'
-          });
-        }
-      }
-    },
-    onError: (err: any) => toast.error(`Erro ao remover: ${err.message}`),
-  });
-
-  const toggleFeaturedMutation = useMutation({
-    mutationFn: async (item: Devotional) => {
-      const { error } = await supabase.from('devocionais').update({ featured: !item.featured }).eq('id', item.id);
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey });
-    },
-    onError: (err: any) => toast.error(`Erro ao alterar destaque: ${err.message}`),
-  });
-
-  const setStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: DevotionalStatus }) => {
-      const payload: Partial<Devotional> = {
-        status,
-        data_publicacao: status === 'Publicado' ? new Date().toISOString() : null,
-      };
-      const { error } = await supabase.from('devocionais').update(payload).eq('id', id);
-      if (error) throw new Error(error.message);
-      return { status, id };
-    },
-    onSuccess: async ({ status, id }) => {
-      qc.invalidateQueries({ queryKey });
-      if (status === 'Publicado' && currentChurchId) {
-        const { data: devotional } = await supabase.from('devocionais').select('titulo').eq('id', id).single();
-        if (devotional) {
-          createInAppNotification({
-            id_igreja: currentChurchId,
-            membro_id: null, // Broadcast
-            titulo: `Novo Devocional: ${devotional.titulo}`,
-            descricao: 'Um novo devocional foi publicado para sua leitura e meditação.',
-            link: '/dashboard?module=devotionals',
-            tipo: 'NEW_DEVOTIONAL'
-          });
-        }
-      }
-    },
-    onError: (err: any) => toast.error(`Erro ao alterar status: ${err.message}`),
-  });
+    });
+  };
 
   const openNewDialog = () => {
     resetForm();
@@ -411,21 +197,21 @@ const DevotionalsManagementPage = () => {
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-2">
-                    <Button variant={d.featured ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFeaturedMutation.mutate(d)}>
+                    <Button variant={d.featured ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFeatured.mutate(d)}>
                       <Star className="w-4 h-4 mr-1" /> {d.featured ? 'Destacado' : 'Destacar'}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openEditDialog(d)}>
                       <Pencil className="w-4 h-4 mr-1" /> Editar
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteMutation.mutate(d.id)}>
+                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => deleteDevotional.mutate(d.id)}>
                       <Trash2 className="w-4 h-4 mr-1" /> Remover
                     </Button>
                   </div>
                   {d.status === 'Pendente' && canManage && (
                     <div className="flex items-center gap-2 mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
                       <p className="text-sm font-medium text-yellow-800">Aguardando aprovação</p>
-                      <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => setStatusMutation.mutate({ id: d.id, status: 'Publicado' })}>Aprovar</Button>
-                      <Button size="sm" variant="destructive" onClick={() => setStatusMutation.mutate({ id: d.id, status: 'Arquivado' })}>Rejeitar</Button>
+                      <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => setStatus.mutate({ id: d.id, status: 'Publicado' })}>Aprovar</Button>
+                      <Button size="sm" variant="destructive" onClick={() => setStatus.mutate({ id: d.id, status: 'Arquivado' })}>Rejeitar</Button>
                     </div>
                   )}
                 </div>
@@ -505,15 +291,9 @@ const DevotionalsManagementPage = () => {
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>Cancelar</Button>
-              {editingItem ? (
-                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
-                </Button>
-              ) : (
-                <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Criando...' : 'Criar Devocional'}
-                </Button>
-              )}
+              <Button onClick={handleSave} disabled={createDevotional.isPending || updateDevotional.isPending}>
+                {createDevotional.isPending || updateDevotional.isPending ? 'Salvando...' : (editingItem ? 'Salvar Alterações' : 'Criar Devocional')}
+              </Button>
             </div>
           </div>
         </DialogContent>
