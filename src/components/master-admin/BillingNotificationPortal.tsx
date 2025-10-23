@@ -11,6 +11,8 @@ import { toast } from 'sonner'
 import { supabase } from '@/integrations/supabase/client'
 import { Loader2, Send, ChevronsUpDown, Check } from 'lucide-react'
 import type { Church } from '@/stores/churchStore'
+import { Switch } from '@/components/ui/switch'
+import { sendEmailNotification } from '@/services/notificationService'
 
 type Props = {
   churches: Church[]
@@ -29,6 +31,7 @@ const BillingNotificationPortal: React.FC<Props> = ({ churches }) => {
   const [link, setLink] = useState('')
   const [loadingAdmins, setLoadingAdmins] = useState(false)
   const [sending, setSending] = useState(false)
+  const [sendEmail, setSendEmail] = useState(false)
 
   const selectedChurch = useMemo(() => churches.find(c => c.id === selectedChurchId), [churches, selectedChurchId])
 
@@ -84,40 +87,73 @@ const BillingNotificationPortal: React.FC<Props> = ({ churches }) => {
     }
     setSending(true)
     const rows: any[] = []
+    let emailRecipients: Member[] = []
+
     if (selectedAdmins.length > 0) {
       selectedAdmins.forEach(admin => {
         rows.push({
           id_igreja: selectedChurchId,
-          user_id: admin.id,
+          membro_id: admin.id,
           tipo: type,
           titulo: title,
           descricao: description,
           link: link || null
         })
       })
+      emailRecipients = selectedAdmins
     } else {
-      // Broadcast para admins será enviado como user_id nulo
+      // Broadcast para admins será enviado como membro_id nulo
       rows.push({
         id_igreja: selectedChurchId,
-        user_id: null,
+        membro_id: null,
         tipo: type,
         titulo: title,
         descricao: description,
         link: link || null
       })
+      emailRecipients = admins
     }
     const { error } = await supabase.from('notificacoes').insert(rows)
-    setSending(false)
+    
     if (error) {
+      setSending(false)
       console.error('BillingPortal: erro ao enviar:', error.message)
       toast.error('Falha ao enviar notificações.')
       return
     }
+
+    if (sendEmail) {
+      const churchName = selectedChurch?.name || 'Lumina'
+      const emailHtmlContent = `
+        <div style="font-family: sans-serif; line-height: 1.6;">
+          <h2>${title}</h2>
+          <p>${description.replace(/\n/g, '<br>')}</p>
+          ${link ? `<p><a href="${window.location.origin}${link}" style="display: inline-block; padding: 10px 15px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px;">Acessar link</a></p>` : ''}
+          <br>
+          <p style="font-size: 0.9em; color: #666;"><em>Esta é uma notificação administrativa do sistema Lumina.</em></p>
+        </div>
+      `;
+
+      const emailPromises = emailRecipients
+        .filter(admin => admin.email)
+        .map(admin =>
+          sendEmailNotification({
+            to: admin.email,
+            subject: `[${churchName}] ${title}`,
+            htmlContent: emailHtmlContent,
+          })
+        );
+      await Promise.all(emailPromises);
+      toast.info('Os e-mails estão sendo processados em segundo plano.');
+    }
+
+    setSending(false)
     toast.success(`Notificação enviada ${selectedAdmins.length > 0 ? `para ${selectedAdmins.length} admin(s)` : 'para a igreja'}.`)
     setTitle('')
     setDescription('')
     setLink('')
     setSelectedAdmins([])
+    setSendEmail(false)
   }
 
   return (
@@ -200,6 +236,11 @@ const BillingNotificationPortal: React.FC<Props> = ({ churches }) => {
         <div className="space-y-2">
           <Label>Link (opcional)</Label>
           <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ex: /master-admin?tab=plans" />
+        </div>
+
+        <div className="flex items-center space-x-2 pt-2">
+          <Switch id="send-email-billing" checked={sendEmail} onCheckedChange={setSendEmail} />
+          <Label htmlFor="send-email-billing">Enviar também por e-mail</Label>
         </div>
 
         <Button onClick={send} disabled={sending || !selectedChurchId || !title || !description}>

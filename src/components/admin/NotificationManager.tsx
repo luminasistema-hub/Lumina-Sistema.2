@@ -16,6 +16,8 @@ import NotificationTemplateEditor from './NotificationTemplateEditor';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '../ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { sendEmailNotification } from '@/services/notificationService';
 
 const NotificationManager = () => {
   const { currentChurchId } = useAuthStore();
@@ -25,6 +27,7 @@ const NotificationManager = () => {
   const [link, setLink] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<any[]>([]);
   const [openCombobox, setOpenCombobox] = useState(false);
+  const [sendEmail, setSendEmail] = useState(false);
 
   const historyQueryKey = ['all-notifications', currentChurchId];
   const membersQueryKey = ['church-members', currentChurchId];
@@ -51,7 +54,7 @@ const NotificationManager = () => {
       if (!currentChurchId) return [];
       const { data, error } = await supabase
         .from('membros')
-        .select('id, nome_completo')
+        .select('id, nome_completo, email')
         .eq('id_igreja', currentChurchId)
         .order('nome_completo');
       if (error) throw error;
@@ -61,47 +64,89 @@ const NotificationManager = () => {
   });
 
   const sendMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ sendAsEmail }: { sendAsEmail: boolean }) => {
       if (!currentChurchId || !title || !description) {
         throw new Error('Título e descrição são obrigatórios.');
       }
 
-      let notificationsToSend: any[] = [];
+      let inAppPayload: any[];
+      let emailRecipients: { id: string; nome_completo: string; email: string }[] = [];
 
       if (selectedMembers.length > 0) {
-        // Enviar para membros selecionados
-        notificationsToSend = selectedMembers.map(member => ({
+        inAppPayload = selectedMembers.map((member) => ({
           id_igreja: currentChurchId,
-          user_id: member.id,
+          membro_id: member.id,
           tipo: 'CUSTOM_ADMIN',
           titulo: title,
           descricao: description,
           link: link || null,
         }));
+        emailRecipients = selectedMembers;
       } else {
         // Enviar para todos
-        notificationsToSend.push({
-          id_igreja: currentChurchId,
-          user_id: null, // Para todos
-          tipo: 'CUSTOM_ADMIN',
-          titulo: title,
-          descricao: description,
-          link: link || null,
-        });
+        inAppPayload = [
+          {
+            id_igreja: currentChurchId,
+            membro_id: null, // Broadcast in-app
+            tipo: 'CUSTOM_ADMIN',
+            titulo: title,
+            descricao: description,
+            link: link || null,
+          },
+        ];
+        emailRecipients = members || [];
       }
 
-      const { error } = await supabase.from('notificacoes').insert(notificationsToSend);
-      if (error) throw error;
+      // 1. Enviar Notificações In-App
+      const { error: inAppError } = await supabase.from('notificacoes').insert(inAppPayload);
+      if (inAppError) {
+        throw new Error(`Erro ao criar notificações no app: ${inAppError.message}`);
+      }
+
+      // 2. Enviar E-mails se solicitado
+      if (sendAsEmail) {
+        if (!emailRecipients || emailRecipients.length === 0) {
+          toast.warning('Nenhum destinatário com e-mail encontrado para enviar.');
+          return;
+        }
+
+        const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
+        const emailHtmlContent = `
+          <div style="font-family: sans-serif; line-height: 1.6;">
+            <h2>${title}</h2>
+            <p>${description.replace(/\n/g, '<br>')}</p>
+            ${link ? `<p><a href="${window.location.origin}${link}" style="display: inline-block; padding: 10px 15px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px;">Acessar link</a></p>` : ''}
+            <br>
+            <p style="font-size: 0.9em; color: #666;"><em>Esta é uma notificação de ${churchName}.</em></p>
+          </div>
+        `;
+
+        const emailPromises = emailRecipients
+          .filter((member) => member.email)
+          .map((member) =>
+            sendEmailNotification({
+              to: member.email,
+              subject: `[${churchName}] ${title}`,
+              htmlContent: emailHtmlContent,
+            })
+          );
+
+        await Promise.all(emailPromises);
+      }
     },
     onSuccess: () => {
       const target = selectedMembers.length > 0 ? `${selectedMembers.length} membro(s)` : 'toda a igreja';
       toast.success(`Notificação enviada para ${target}!`);
+      if (sendEmail) {
+        toast.info('Os e-mails estão sendo processados em segundo plano.');
+      }
       queryClient.invalidateQueries({ queryKey: historyQueryKey });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       setTitle('');
       setDescription('');
       setLink('');
       setSelectedMembers([]);
+      setSendEmail(false);
     },
     onError: (err: any) => {
       toast.error(`Erro ao enviar: ${err.message}`);
@@ -188,7 +233,11 @@ const NotificationManager = () => {
                 <Label htmlFor="link">Link (Opcional)</Label>
                 <Input id="link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ex: /dashboard?module=events" />
               </div>
-              <Button onClick={() => sendMutation.mutate()} disabled={sendMutation.isPending || !title || !description}>
+              <div className="flex items-center space-x-2 pt-2">
+                <Switch id="send-email" checked={sendEmail} onCheckedChange={setSendEmail} />
+                <Label htmlFor="send-email">Enviar também por e-mail</Label>
+              </div>
+              <Button onClick={() => sendMutation.mutate({ sendAsEmail: sendEmail })} disabled={sendMutation.isPending || !title || !description}>
                 {sendMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
                 {sendMutation.isPending ? 'Enviando...' : (selectedMembers.length > 0 ? `Enviar para ${selectedMembers.length} Membro(s)` : 'Enviar para Todos')}
               </Button>
@@ -223,7 +272,7 @@ const NotificationManager = () => {
                       <p className="text-sm text-gray-600">{n.descricao}</p>
                       <p className="text-xs text-gray-400 mt-1">
                         Enviado {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
-                        {n.user_id ? ` para um usuário específico` : ' para toda a igreja'}
+                        {n.membro_id ? ` para um usuário específico` : ' para toda a igreja'}
                       </p>
                     </div>
                   ))}
