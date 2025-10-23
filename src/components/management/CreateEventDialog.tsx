@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { EventItem } from "./EditEventDialog";
+import { Switch } from "../ui/switch";
+import { sendEmailNotification } from "@/services/notificationService";
+import { createStandardEmailHtml } from "@/lib/emailTemplates";
+import { useAuthStore } from "@/stores/authStore";
 
 export function CreateEventDialog({
   open,
@@ -32,6 +36,7 @@ export function CreateEventDialog({
   const [saving, setSaving] = useState(false);
   const [paidType, setPaidType] = useState<'gratuito' | 'pago'>('gratuito');
   const [visibilidade, setVisibilidade] = useState<'privada' | 'publica'>('privada');
+  const [sendEmail, setSendEmail] = useState(false);
 
   const handleCreate = async () => {
     if (!nome || !dataHora || !local) {
@@ -64,22 +69,56 @@ export function CreateEventDialog({
       return;
     }
 
+    const notificationTitle = `Novo Evento: ${nome}`;
+    const notificationDesc = `Não perca! O evento "${nome}" acontecerá em ${new Date(dataHora).toLocaleDateString('pt-BR')}.`;
+
     // Criar notificação para a igreja
     const { error: notificationError } = await supabase.from('notificacoes').insert({
       id_igreja: igrejaId,
       membro_id: null, // Para todos na igreja
       tipo: 'NOVO_EVENTO',
-      titulo: `Novo Evento: ${nome}`,
-      descricao: `Não perca! O evento "${nome}" acontecerá em ${new Date(dataHora).toLocaleDateString('pt-BR')}.`,
+      titulo: notificationTitle,
+      descricao: notificationDesc,
       link: '/dashboard?module=events'
     });
 
     if (notificationError) {
-      toast.warning("Evento criado, mas houve um erro ao enviar a notificação.");
+      toast.warning("Evento criado, mas houve um erro ao enviar a notificação no app.");
+    }
+
+    if (sendEmail) {
+      const { data: members, error: membersError } = await supabase
+        .from('membros')
+        .select('email')
+        .eq('id_igreja', igrejaId)
+        .not('email', 'is', null);
+
+      if (membersError) {
+        toast.warning("Notificação por e-mail não enviada: falha ao buscar membros.");
+      } else if (members && members.length > 0) {
+        const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
+        const emailHtml = createStandardEmailHtml({
+          title: notificationTitle,
+          description: notificationDesc,
+          link: '/dashboard?module=events',
+          churchName,
+          notificationType: 'Novo Evento'
+        });
+        
+        const emailPromises = members.map(member => 
+          sendEmailNotification({
+            to: member.email!,
+            subject: `[${churchName}] ${notificationTitle}`,
+            htmlContent: emailHtml
+          })
+        );
+        await Promise.all(emailPromises);
+        toast.info(`${members.length} e-mails de notificação estão sendo processados.`);
+      }
     }
 
     setSaving(false);
-    toast.success("Evento criado e notificação enviada!");
+    toast.success("Evento criado e notificações enviadas!");
     onCreated();
     onClose();
     resetForm();
@@ -97,6 +136,7 @@ export function CreateEventDialog({
     setLinkExterno("");
     setInscricoesAbertas(true);
     setVisibilidade("privada");
+    setSendEmail(false);
   };
 
   return (
@@ -217,6 +257,11 @@ export function CreateEventDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-600">Eventos públicos são visíveis por membros de todas as igrejas da plataforma.</p>
+          </div>
+
+          <div className="flex items-center space-x-2 pt-2">
+            <Switch id="send-email-event" checked={sendEmail} onCheckedChange={setSendEmail} />
+            <Label htmlFor="send-email-event">Notificar todos os membros por e-mail</Label>
           </div>
 
           <Button onClick={handleCreate} className="w-full" disabled={saving}>

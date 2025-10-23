@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { createInAppNotification } from '@/services/notificationService';
 
 type DevotionalStatus = 'Rascunho' | 'Publicado' | 'Arquivado' | 'Pendente';
 type DevotionalCategory = 'Diário' | 'Semanal' | 'Especial' | 'Temático';
@@ -172,11 +173,22 @@ const DevotionalsManagementPage = () => {
       const { error } = await supabase.from('devocionais').insert(payload);
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success('Devocional criado com sucesso!');
       qc.invalidateQueries({ queryKey });
       setIsDialogOpen(false);
       resetForm();
+
+      if (form.status === 'Publicado' && currentChurchId) {
+        createInAppNotification({
+          id_igreja: currentChurchId,
+          membro_id: null, // Broadcast
+          titulo: `Novo Devocional: ${form.titulo}`,
+          descricao: 'Um novo devocional foi publicado para sua leitura e meditação.',
+          link: '/dashboard?module=devotionals',
+          tipo: 'NEW_DEVOTIONAL'
+        });
+      }
     },
     onError: (err: any) => toast.error(`Erro ao criar: ${err.message}`),
   });
@@ -203,12 +215,24 @@ const DevotionalsManagementPage = () => {
       };
       const { error } = await supabase.from('devocionais').update(payload).eq('id', editingItem.id);
       if (error) throw new Error(error.message);
+      return { oldStatus: editingItem.status, newStatus: payload.status, title: payload.titulo };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       toast.success('Devocional atualizado!');
       qc.invalidateQueries({ queryKey });
       setIsDialogOpen(false);
       resetForm();
+
+      if (result && result.oldStatus !== 'Publicado' && result.newStatus === 'Publicado' && currentChurchId) {
+        createInAppNotification({
+          id_igreja: currentChurchId,
+          membro_id: null, // Broadcast
+          titulo: `Novo Devocional: ${result.title}`,
+          descricao: 'Um novo devocional foi publicado para sua leitura e meditação.',
+          link: '/dashboard?module=devotionals',
+          tipo: 'NEW_DEVOTIONAL'
+        });
+      }
     },
     onError: (err: any) => toast.error(`Erro ao atualizar: ${err.message}`),
   });
@@ -217,10 +241,23 @@ const DevotionalsManagementPage = () => {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('devocionais').delete().eq('id', id);
       if (error) throw new Error(error.message);
+      return { status: 'Publicado', id };
     },
-    onSuccess: () => {
-      toast.success('Devocional removido.');
+    onSuccess: async ({ status, id }) => {
       qc.invalidateQueries({ queryKey });
+      if (status === 'Publicado' && currentChurchId) {
+        const { data: devotional } = await supabase.from('devocionais').select('titulo').eq('id', id).single();
+        if (devotional) {
+          createInAppNotification({
+            id_igreja: currentChurchId,
+            membro_id: null, // Broadcast
+            titulo: `Novo Devocional: ${devotional.titulo}`,
+            descricao: 'Um novo devocional foi publicado para sua leitura e meditação.',
+            link: '/dashboard?module=devotionals',
+            tipo: 'NEW_DEVOTIONAL'
+          });
+        }
+      }
     },
     onError: (err: any) => toast.error(`Erro ao remover: ${err.message}`),
   });
@@ -244,9 +281,23 @@ const DevotionalsManagementPage = () => {
       };
       const { error } = await supabase.from('devocionais').update(payload).eq('id', id);
       if (error) throw new Error(error.message);
+      return { status, id };
     },
-    onSuccess: () => {
+    onSuccess: async ({ status, id }) => {
       qc.invalidateQueries({ queryKey });
+      if (status === 'Publicado' && currentChurchId) {
+        const { data: devotional } = await supabase.from('devocionais').select('titulo').eq('id', id).single();
+        if (devotional) {
+          createInAppNotification({
+            id_igreja: currentChurchId,
+            membro_id: null, // Broadcast
+            titulo: `Novo Devocional: ${devotional.titulo}`,
+            descricao: 'Um novo devocional foi publicado para sua leitura e meditação.',
+            link: '/dashboard?module=devotionals',
+            tipo: 'NEW_DEVOTIONAL'
+          });
+        }
+      }
     },
     onError: (err: any) => toast.error(`Erro ao alterar status: ${err.message}`),
   });

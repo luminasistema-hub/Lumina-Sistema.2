@@ -31,6 +31,8 @@ import {
 } from 'lucide-react'
 import { Checkbox } from '../ui/checkbox'
 import { AVAILABLE_PERMISSIONS } from '@/constants/permissions'
+import { createInAppNotification, sendEmailNotification } from '@/services/notificationService'
+import { createStandardEmailHtml } from '@/lib/emailTemplates'
 
 interface UserManagementProps {}
 
@@ -145,16 +147,45 @@ const UserManagement = ({}: UserManagementProps) => {
     }
 
     const oldUser = users.find(u => u.id === selectedUser.id);
-    if (oldUser && oldUser.status === 'ativo' && editUser.status === 'inativo') {
-      const currentChurch = getChurchById(currentChurchId);
-      if (currentChurch) {
-        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
-      }
-    }
     if (oldUser && oldUser.status !== 'ativo' && editUser.status === 'ativo') {
       const currentChurch = getChurchById(currentChurchId);
       if (currentChurch) {
         await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers + 1 });
+      }
+      
+      // Enviar notificação de boas-vindas
+      const notificationTitle = 'Acesso Liberado!';
+      const notificationDesc = 'Seu acesso à plataforma da igreja foi aprovado. Explore os recursos disponíveis!';
+      
+      await createInAppNotification({
+        id_igreja: currentChurchId,
+        membro_id: selectedUser.id,
+        titulo: notificationTitle,
+        descricao: notificationDesc,
+        link: '/dashboard',
+        tipo: 'ACCESS_GRANTED'
+      });
+
+      if (selectedUser.email) {
+        const churchName = currentChurch?.name || 'Sua Igreja';
+        const emailHtml = createStandardEmailHtml({
+          title: notificationTitle,
+          description: notificationDesc,
+          link: '/dashboard',
+          churchName,
+          notificationType: 'Aprovação de Cadastro'
+        });
+        await sendEmailNotification({
+          to: selectedUser.email,
+          subject: `[${churchName}] Bem-vindo(a)! Seu acesso foi liberado.`,
+          htmlContent: emailHtml
+        });
+      }
+    }
+    if (oldUser && oldUser.status === 'ativo' && editUser.status === 'inativo') {
+      const currentChurch = getChurchById(currentChurchId);
+      if (currentChurch) {
+        await updateChurch(currentChurchId, { currentMembers: currentChurch.currentMembers - 1 });
       }
     }
 

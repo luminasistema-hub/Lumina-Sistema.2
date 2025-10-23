@@ -21,6 +21,8 @@ import AddKidDialog from '../personal/AddKidDialog'
 import KidDetailsDialog from '@/components/kids/KidDetailsDialog'
 import KidCredentialDialog from '@/components/kids/KidCredentialDialog'
 import CheckinScanner from '@/components/kids/CheckinScanner'
+import { createInAppNotification, sendEmailNotification } from '@/services/notificationService'
+import { createStandardEmailHtml } from '@/lib/emailTemplates'
 
 interface MemberOption {
   id: string
@@ -109,6 +111,38 @@ const KidsPage = () => {
     ...mutationOptions,
     onSuccess: async (data) => {
       toast.success(`Check-in realizado! Código: ${data.codigo}`);
+      
+      // Notificação para o responsável
+      if (data.kid.responsavel_id && currentChurchId) {
+        const notificationTitle = `Check-in de ${data.kid.nome_crianca}`;
+        const notificationDesc = `${data.kid.nome_crianca} foi recebido(a) no ministério infantil. Seu código de segurança é: ${data.codigo}.`;
+        
+        await createInAppNotification({
+          id_igreja: currentChurchId,
+          membro_id: data.kid.responsavel_id,
+          titulo: notificationTitle,
+          descricao: notificationDesc,
+          link: '/dashboard?module=kids-management',
+          tipo: 'KIDS_CHECKIN'
+        });
+
+        if (data.kid.email_responsavel) {
+          const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
+          const emailHtml = createStandardEmailHtml({
+            title: notificationTitle,
+            description: notificationDesc,
+            link: '/dashboard?module=kids-management',
+            churchName,
+            notificationType: 'Check-in Kids'
+          });
+          await sendEmailNotification({
+            to: data.kid.email_responsavel,
+            subject: `[${churchName}] Check-in realizado`,
+            htmlContent: emailHtml
+          });
+        }
+      }
+
       const { data: telRow } = await supabase.from('informacoes_pessoais').select('telefone').eq('membro_id', data.kid.responsavel_id).maybeSingle();
       if (telRow?.telefone && currentChurchId) {
         await supabase.from('whatsapp_messages').insert({ church_id: currentChurchId, recipient_phone: telRow.telefone, template_key: 'kids_checkin', payload: { crianca_nome: data.kid.nome_crianca, codigo: data.codigo } });
@@ -126,6 +160,38 @@ const KidsPage = () => {
     ...mutationOptions,
     onSuccess: async (kid) => {
       toast.success('Check-out realizado com sucesso!');
+      
+      // Notificação para o responsável
+      if (kid.responsavel_id && currentChurchId) {
+        const notificationTitle = `Check-out de ${kid.nome_crianca}`;
+        const notificationDesc = `${kid.nome_crianca} foi retirado(a) do ministério infantil.`;
+        
+        await createInAppNotification({
+          id_igreja: currentChurchId,
+          membro_id: kid.responsavel_id,
+          titulo: notificationTitle,
+          descricao: notificationDesc,
+          link: '/dashboard?module=kids-management',
+          tipo: 'KIDS_CHECKOUT'
+        });
+
+        if (kid.email_responsavel) {
+          const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
+          const emailHtml = createStandardEmailHtml({
+            title: notificationTitle,
+            description: notificationDesc,
+            link: '/dashboard?module=kids-management',
+            churchName,
+            notificationType: 'Check-out Kids'
+          });
+          await sendEmailNotification({
+            to: kid.email_responsavel,
+            subject: `[${churchName}] Check-out realizado`,
+            htmlContent: emailHtml
+          });
+        }
+      }
+
       const { data: telRow } = await supabase.from('informacoes_pessoais').select('telefone').eq('membro_id', kid.responsavel_id).maybeSingle();
       if (telRow?.telefone && currentChurchId) {
         await supabase.from('whatsapp_messages').insert({ church_id: currentChurchId, recipient_phone: telRow.telefone, template_key: 'kids_checkout', payload: { crianca_nome: kid.nome_crianca, hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) } });
