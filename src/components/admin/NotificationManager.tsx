@@ -18,6 +18,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from '../ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { sendEmailNotification } from '@/services/notificationService';
+import { createStandardEmailHtml } from '@/lib/emailTemplates';
 
 const NotificationManager = () => {
   const { currentChurchId } = useAuthStore();
@@ -111,15 +112,13 @@ const NotificationManager = () => {
         }
 
         const churchName = useAuthStore.getState().churchName || 'Sua Igreja';
-        const emailHtmlContent = `
-          <div style="font-family: sans-serif; line-height: 1.6;">
-            <h2>${title}</h2>
-            <p>${description.replace(/\n/g, '<br>')}</p>
-            ${link ? `<p><a href="${window.location.origin}${link}" style="display: inline-block; padding: 10px 15px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px;">Acessar link</a></p>` : ''}
-            <br>
-            <p style="font-size: 0.9em; color: #666;"><em>Esta é uma notificação de ${churchName}.</em></p>
-          </div>
-        `;
+        const emailHtmlContent = createStandardEmailHtml({
+          title,
+          description,
+          link,
+          churchName,
+          notificationType: 'Comunicado da Igreja',
+        });
 
         const emailPromises = emailRecipients
           .filter((member) => member.email)
